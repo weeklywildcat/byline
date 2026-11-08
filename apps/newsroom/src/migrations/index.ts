@@ -12,6 +12,7 @@ import * as migration_20261107_214217_newsroom_version_attribution from './20261
 import * as migration_20261107_215529_newsroom_story_activity from './20261107_215529_newsroom_story_activity';
 import * as migration_20261107_221914_newsroom_notes_and_health from './20261107_221914_newsroom_notes_and_health';
 import * as migration_20261107_224351_remember_story_public_paths from './20261107_224351_remember_story_public_paths';
+import * as migration_20261108_160324_media_tags from './20261108_160324_media_tags';
 
 export const migrations = [
   {
@@ -82,6 +83,11 @@ export const migrations = [
   {
     up: migration_20261107_224351_remember_story_public_paths.up,
     down: migration_20261107_224351_remember_story_public_paths.down,
-    name: '20261107_224351_remember_story_public_paths'
+    name: '20261107_224351_remember_story_public_paths',
+  },
+  {
+    up: migration_20261108_160324_media_tags.up,
+    down: migration_20261108_160324_media_tags.down,
+    name: '20261108_160324_media_tags'
   },
 ];

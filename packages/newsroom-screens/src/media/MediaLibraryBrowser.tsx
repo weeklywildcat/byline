@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
-import { Check, CircleAlert, FileAudio, FileImage, FileText, LayoutGrid, List, ListFilter, Search, X, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent, type MouseEvent, type ReactElement, type ReactNode } from "react";
+import { Check, CircleAlert, FileAudio, FileImage, FileText, LayoutGrid, List, ListFilter, Search, Upload, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { siteDay } from "../home/newsroom-model";
 import type { MediaLibraryFetchers } from "./media-library-api";
 import {
@@ -24,6 +24,7 @@ import {
   EMPTY_MEDIA_FILTERS,
   GAP_LABELS,
   KIND_LABELS,
+  MEDIA_DRAG_TYPE,
   MEDIA_LIBRARY_SOURCES,
   MEDIA_PAGE_SIZE,
   MEDIA_SORTS,
@@ -33,9 +34,11 @@ import {
   type MediaLibraryFilters,
   type MediaLibrarySort,
   type MediaLibrarySource,
-  type MediaNavigatorData
+  type MediaNavigatorData,
+  type MediaTagCount
 } from "./media-library-model";
-import { useMediaLibrary } from "./media-query";
+import { useMediaLibrary, useMediaTags } from "./media-query";
+import { MediaTagFilter } from "./MediaTags";
 
 export type MediaLayout = "grid" | "list";
 
@@ -43,7 +46,7 @@ const KIND_ICONS: Record<MediaKind, LucideIcon> = { image: FileImage, audio: Fil
 const ANY = "__any";
 
 export type MediaLibraryBrowserProps = {
-  fetchers: Pick<MediaLibraryFetchers, "getLibrary">;
+  fetchers: Pick<MediaLibraryFetchers, "getLibrary" | "getTags">;
   /** Where the reader is browsing: a Library scope, or a folder (then `source` is ignored). */
   source: MediaLibrarySource;
   folderId: number | null;
@@ -72,6 +75,12 @@ export type MediaLibraryBrowserProps = {
   onCheckedChange?: (ids: Set<number>) => void;
   /** Shown floating over the results while files are checked (the screen's bulk actions). */
   selectionBar?: ReactNode;
+  /** Files dropped from the desktop onto the Library (upload into the place being browsed). */
+  onDropFiles?: (files: File[]) => void;
+  /** Files can be dragged (onto a folder in the navigator); a checked file drags the whole selection. */
+  draggableAssets?: boolean;
+  /** Space on a focused file: the host's Quick Look. */
+  onQuickLook?: (asset: MediaLibraryAsset) => void;
   /** The browse screen's context-menu items for one asset (desktop shortcut; every action is also visible elsewhere). */
   assetMenu?: (asset: MediaLibraryAsset) => ReactNode;
   /** Controls at the toolbar's end (Upload). */
@@ -93,7 +102,7 @@ export type MediaLibraryBrowserProps = {
  * private previews, loaded lazily; an original is never a thumbnail.
  */
 export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
-  const { fetchers, source, folderId, folderName, navigator, filters, onFiltersChange, sort, onSortChange, layout, onLayoutChange, timezone, selectedId = null, selectedIds, onActivate, checkedIds, onCheckedChange, selectionBar, assetMenu, toolbarEnd, onSearchEverywhere, onAssetsChange, label = "Media files", compact = false } = props;
+  const { fetchers, source, folderId, folderName, navigator, filters, onFiltersChange, sort, onSortChange, layout, onLayoutChange, timezone, selectedId = null, selectedIds, onActivate, checkedIds, onCheckedChange, selectionBar, onDropFiles, draggableAssets = false, onQuickLook, assetMenu, toolbarEnd, onSearchEverywhere, onAssetsChange, label = "Media files", compact = false } = props;
   const [text, setText] = useState(filters.search);
   // Typing settles for a moment before the Library is asked again.
   useEffect(() => { setText(filters.search); }, [filters.search]);
@@ -105,6 +114,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
 
   const query = useMemo(() => ({ ...filters, source, folderId, sort, limit: MEDIA_PAGE_SIZE }), [filters, folderId, sort, source]);
   const library = useMediaLibrary(fetchers, query);
+  const tags = useMediaTags(fetchers);
   const assets = useMemo(() => library.data?.pages.flatMap((page) => page.assets) ?? [], [library.data]);
   const total = library.data?.pages[0]?.totalDocs ?? 0;
   useEffect(() => { onAssetsChange?.(assets); }, [assets, onAssetsChange]);
@@ -154,10 +164,48 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
   }, [check, checkedCount, checking, onActivate]);
   const allChecked = checking && assets.length > 0 && assets.every((asset) => checkedIds!.has(asset.id));
   const checkAll = (on: boolean) => onCheckedChange?.(on ? new Set([...(checkedIds ?? []), ...assets.map((asset) => asset.id)]) : new Set());
+  /** Moves focus between files like a file manager: arrows (by row in Grid), Home and End. */
+  const root = useRef<HTMLDivElement | null>(null);
+  const focusAsset = (id: number) => {
+    const element = root.current?.querySelector<HTMLElement>(`[data-media-asset="${id}"]`);
+    element?.focus();
+    element?.scrollIntoView?.({ block: "nearest" });
+  };
+  const columns = () => {
+    const tiles = [...(root.current?.querySelectorAll<HTMLElement>("[data-media-grid] > li") ?? [])];
+    const top = tiles[0]?.offsetTop;
+    const count = tiles.filter((tile) => tile.offsetTop === top).length;
+    return Math.max(1, count);
+  };
+  const navigate = (event: KeyboardEvent): boolean => {
+    const id = Number((event.target as HTMLElement).closest<HTMLElement>("[data-media-asset]")?.dataset.mediaAsset);
+    const index = assets.findIndex((asset) => asset.id === id);
+    if (index < 0 || event.metaKey || event.ctrlKey || event.altKey) return false;
+    const row = layout === "grid" ? columns() : 1;
+    const moves: Record<string, number> = { ArrowRight: layout === "grid" ? 1 : 0, ArrowLeft: layout === "grid" ? -1 : 0, ArrowDown: row, ArrowUp: -row, Home: -index, End: assets.length - 1 - index };
+    if (event.key in moves && moves[event.key] !== 0) {
+      const next = Math.min(assets.length - 1, Math.max(0, index + moves[event.key]));
+      event.preventDefault();
+      focusAsset(assets[next].id);
+      if (event.shiftKey && checking) check(assets[next], null, true);
+      return true;
+    }
+    if (event.key === " " && onQuickLook) {
+      event.preventDefault();
+      onQuickLook(assets[index]);
+      return true;
+    }
+    if (event.key.toLowerCase() === "x" && checking && !event.shiftKey) {
+      event.preventDefault();
+      check(assets[index], null);
+      return true;
+    }
+    return false;
+  };
   const onKeyDown = (event: KeyboardEvent) => {
-    if (!checking) return;
     const target = event.target as HTMLElement;
     if (target.closest("input, textarea, select, [contenteditable=true], [role=combobox], [role=menu], [role=dialog]")) return;
+    if (navigate(event) || !checking) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && assets.length) {
       event.preventDefault();
       checkAll(true);
@@ -166,11 +214,57 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
       onCheckedChange?.(new Set());
     }
   };
+  /* ------------------------------------------------------ drag and drop */
+
+  const dragProps = (asset: MediaLibraryAsset) => (draggableAssets ? {
+    draggable: true,
+    onDragStart: (event: DragEvent) => {
+      const ids = checkedIds?.has(asset.id) && checkedIds.size ? assets.filter((item) => checkedIds.has(item.id)).map((item) => item.id) : [asset.id];
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(MEDIA_DRAG_TYPE, JSON.stringify(ids));
+      event.dataTransfer.setData("text/plain", assets.filter((item) => ids.includes(item.id)).map((item) => item.filename).join("\n"));
+      if (ids.length > 1) {
+        // Several files drag as one labelled ghost, not a picture of the one tile under the pointer.
+        const ghost = document.createElement("div");
+        ghost.textContent = `${ids.length} files`;
+        ghost.style.cssText = "position:fixed;top:-100px;left:-100px;padding:6px 10px;border-radius:8px;font:600 13px system-ui,sans-serif;background:#111;color:#fff;";
+        document.body.append(ghost);
+        event.dataTransfer.setDragImage(ghost, 12, 12);
+        window.setTimeout(() => ghost.remove(), 0);
+      }
+    }
+  } : {});
+  const [fileDrag, setFileDrag] = useState(false);
+  const dragDepth = useRef(0);
+  const hasFiles = (event: DragEvent) => Boolean(onDropFiles) && [...event.dataTransfer.types].includes("Files");
+  const dropZone = onDropFiles ? {
+    onDragEnter: (event: DragEvent) => { if (!hasFiles(event)) return; event.preventDefault(); dragDepth.current += 1; setFileDrag(true); },
+    onDragOver: (event: DragEvent) => { if (!hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "copy"; },
+    onDragLeave: (event: DragEvent) => { if (!hasFiles(event)) return; dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setFileDrag(false); },
+    onDrop: (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dragDepth.current = 0;
+      setFileDrag(false);
+      const files = [...event.dataTransfer.files];
+      if (files.length) onDropFiles!(files);
+    }
+  } : {};
+
   // Shift-click picks a range; it should never also select the page's text.
   const noTextSelection = (event: MouseEvent) => { if (event.shiftKey && checking && !(event.target as HTMLElement).closest("input, textarea")) event.preventDefault(); };
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col gap-3" data-media-browser="" data-media-checking={checkedCount ? "" : undefined} onKeyDown={onKeyDown} onMouseDown={noTextSelection}>
+    <div ref={root} className="relative flex min-h-full min-w-0 flex-col gap-3" data-media-browser="" data-media-checking={checkedCount ? "" : undefined} onKeyDown={onKeyDown} onMouseDown={noTextSelection} {...dropZone}>
+      {fileDrag ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/85" data-media-drop-overlay="">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <Upload aria-hidden="true" className="size-8 text-primary" />
+            <p className="text-base font-medium">Drop to upload</p>
+            <p className="text-sm text-muted-foreground">Into {folderId !== null ? folderName || "this folder" : "Unfiled"}</p>
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2" role="search" aria-label="Search media">
         <InputGroup className={cn("min-w-0 flex-1", compact ? "basis-full" : "basis-64")}>
           <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
@@ -199,7 +293,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
             </InputGroupAddon>
           ) : null}
         </InputGroup>
-        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} fixedKind={props.fixedKind} />
+        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} fixedKind={props.fixedKind} tags={tags.data ?? []} />
         <Select items={MEDIA_SORTS} value={sort} onValueChange={(value) => { if (value) onSortChange(value as MediaLibrarySort); }}>
           <SelectTrigger aria-label="Sort" className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>{MEDIA_SORTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
@@ -222,6 +316,12 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
           </ToggleGroup>
         ) : null}
         {searching && folderId === null && source !== "all" && onSearchEverywhere ? <Button variant="link" size="sm" className="h-auto p-0" onClick={onSearchEverywhere}>Search all media</Button> : null}
+        {filters.tag ? (
+          <Badge variant="secondary" className="gap-1 pr-0.5" data-media-tag-filter="">
+            Tagged “{filters.tag}”
+            <Button variant="ghost" size="icon-xs" className="size-4 rounded-sm" aria-label={`Stop filtering by ${filters.tag}`} onClick={() => set({ tag: "" })}><X aria-hidden="true" /></Button>
+          </Badge>
+        ) : null}
         {activeFilterCount(props.fixedKind ? { ...filters, type: "" } : filters) ? <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onFiltersChange({ ...EMPTY_MEDIA_FILTERS, search: filters.search, searchScope: filters.searchScope })}>Clear filters</Button> : null}
       </div>
 
@@ -246,7 +346,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
                 return (
                   <li key={asset.id} className="group/item relative min-w-0">
                     <WithMenu asset={asset} menu={assetMenu}>
-                      <AssetTile asset={asset} timezone={timezone} selected={selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id} picking={Boolean(selectedIds)} checked={checked} onActivate={checking ? activate : onActivate} />
+                      <AssetTile asset={asset} timezone={timezone} selected={selectedIds ? selectedIds.has(asset.id) : selectedId === asset.id} picking={Boolean(selectedIds)} checked={checked} onActivate={checking ? activate : onActivate} {...dragProps(asset)} />
                     </WithMenu>
                     {checking ? (
                       <span className={cn("absolute top-2 left-2 flex size-6 items-center justify-center rounded-md bg-background/90 shadow-xs transition-opacity", checked || checkedCount ? "opacity-100" : "opacity-0 group-hover/item:opacity-100 has-focus-visible:opacity-100")}>
@@ -268,7 +368,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
                     const open = checking ? activate : onActivate;
                     return (
                       <WithMenu key={asset.id} asset={asset} menu={assetMenu}>
-                        <TableRow data-state={selected || checked ? "selected" : undefined} className="cursor-pointer" onClick={(event) => { if (!(event.target as HTMLElement).closest("button, [role=checkbox]")) open(asset, event); }}>
+                        <TableRow data-state={selected || checked ? "selected" : undefined} className="cursor-pointer" {...dragProps(asset)} onClick={(event) => { if (!(event.target as HTMLElement).closest("button, [role=checkbox]")) open(asset, event); }}>
                           {checking ? (
                             <TableCell className="w-10 py-2"><Checkbox checked={checked} aria-label={`Select ${asset.filename}`} onCheckedChange={(value, details) => check(asset, details.event as { shiftKey?: boolean }, value)} data-media-check={asset.id} /></TableCell>
                           ) : null}
@@ -301,7 +401,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
                   <div key={asset.id} className="flex items-center border-b last:border-b-0">
                   {checking ? <span className="flex shrink-0 items-center pl-3"><Checkbox checked={checked} aria-label={`Select ${asset.filename}`} onCheckedChange={(value, details) => check(asset, details.event as { shiftKey?: boolean }, value)} data-media-check={asset.id} /></span> : null}
                   <WithMenu asset={asset} menu={assetMenu}>
-                    <Item size="sm" className={cn("min-w-0 flex-1 rounded-none", (selected || checked) && "bg-muted")} render={<button type="button" aria-pressed={selected} onClick={(event) => (checking ? activate : onActivate)(asset, event)} data-media-asset={asset.id} />}>
+                    <Item size="sm" className={cn("min-w-0 flex-1 rounded-none", (selected || checked) && "bg-muted")} render={<button type="button" aria-pressed={selected} {...dragProps(asset)} onClick={(event) => (checking ? activate : onActivate)(asset, event)} data-media-asset={asset.id} />}>
                       <ItemMedia variant="image"><AssetThumbnail asset={asset} className="size-full" /></ItemMedia>
                       <ItemContent className="min-w-0">
                         <ItemTitle className="w-full truncate">{asset.filename}</ItemTitle>
@@ -415,7 +515,7 @@ function TileSkeletons() {
 const TYPE_ITEMS = [{ value: ANY, label: "Any type" }, { value: "image", label: "Images" }, { value: "document", label: "PDFs" }, { value: "audio", label: "Audio" }];
 const PUBLICATION_ITEMS = [{ value: ANY, label: "Any state" }, ...(Object.entries(PUBLICATION_ASSET_LABELS) as Array<[MediaPublicationAssetState, string]>).map(([value, label]) => ({ value, label }))];
 
-function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind }) {
+function MediaFilters({ filters, onChange, navigator, fixedKind, tags }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind; tags: MediaTagCount[] }) {
   const count = activeFilterCount(fixedKind ? { ...filters, type: "" } : filters);
   const uploaders = [{ value: ANY, label: "Anyone" }, ...(navigator?.uploaders ?? []).map((person) => ({ value: String(person.id), label: person.name }))];
   const set = (patch: Partial<MediaLibraryFilters>) => onChange({ ...filters, ...patch });
@@ -439,6 +539,10 @@ function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: Me
               <SelectTrigger aria-label="Uploader" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>{uploaders.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
             </Select>
+          </Field>
+          <Field>
+            <FieldLabel>Tag</FieldLabel>
+            <MediaTagFilter value={filters.tag} onChange={(tag) => set({ tag })} tags={tags} />
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field><FieldLabel htmlFor="media-captured-from">Captured from</FieldLabel><Input id="media-captured-from" type="date" value={filters.capturedFrom} onChange={(event) => set({ capturedFrom: event.target.value })} /></Field>

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleAlert, CircleCheck, CircleDashed, Crop, Download, ExternalLink, Eye, FileText, Link2, Maximize2, MoreHorizontal, Pencil, RotateCw, Trash2, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleDashed, Crop, Download, FileUp, ExternalLink, Eye, FileText, Link2, Maximize2, MoreHorizontal, Pencil, RotateCw, Trash2, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from "react";
 import { toast } from "sonner";
 import { DatePicker } from "../editorial/pickers";
@@ -23,14 +23,16 @@ import { siteDay } from "../home/newsroom-model";
 import { mediaAssetKey, type MediaLibraryFetchers } from "./media-library-api";
 import { AssetThumbnail, shortDay } from "./MediaLibraryBrowser";
 import { assetFacts, cleanMediaName, folderPath, formatFilesize, GAP_LABELS, KIND_LABELS, MEDIA_FIELD_LIMITS, mediaMetadataGaps, PUBLICATION_ASSET_LABELS, splitFilename, type MediaAssetDetail, type MediaMetadataGap, type MediaMetadataPatch, type MediaNavigatorData } from "./media-library-model";
-import { invalidateMediaLibrary, replaceCachedAsset, useMediaAsset } from "./media-query";
+import { invalidateMediaLibrary, replaceCachedAsset, useMediaAsset, useMediaTags } from "./media-query";
 import { MediaNameInput, useRenameMedia } from "./MediaRename";
+import { MediaReplaceDialog, useMediaReplace } from "./MediaReplace";
+import { MediaTagInput } from "./MediaTags";
 import { rebasedUpdatedAt, type ArtDirectionEditResult } from "./art-direction-model";
 
 /** What the screen asks the inspector before it shows another asset. */
 export type MediaInspectorGuard = { dirty: () => boolean; save: () => Promise<boolean>; discard: () => void };
 
-type Draft = { alt: string; creator: string; credit: string; copyright: string; license: string; sourceUrl: string; capturedAt: string; folderId: number | null };
+type Draft = { alt: string; creator: string; credit: string; copyright: string; license: string; sourceUrl: string; capturedAt: string; folderId: number | null; tags: string[] };
 
 const UNFILED = "__unfiled";
 
@@ -43,7 +45,8 @@ function draftOf(asset: MediaAssetDetail, timezone: string): Draft {
     license: asset.license,
     sourceUrl: asset.sourceUrl,
     capturedAt: asset.capturedAt ? siteDay(asset.capturedAt, timezone) : "",
-    folderId: asset.folder?.id ?? null
+    folderId: asset.folder?.id ?? null,
+    tags: asset.tags ?? []
   };
 }
 
@@ -52,11 +55,12 @@ function changes(before: Draft, after: Draft): MediaMetadataPatch {
   for (const key of ["alt", "creator", "credit", "copyright", "license", "sourceUrl"] as const) if (before[key] !== after[key]) patch[key] = after[key];
   if (before.capturedAt !== after.capturedAt) patch.capturedAt = after.capturedAt || null;
   if (before.folderId !== after.folderId) patch.folderId = after.folderId;
+  if (before.tags.join("\n") !== after.tags.join("\n")) patch.tags = after.tags;
   return patch;
 }
 
 export type MediaInspectorContentProps = {
-  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication" | "renameMedia">;
+  fetchers: Pick<MediaLibraryFetchers, "getAsset" | "updateMedia" | "deleteMedia" | "retryPublication" | "renameMedia" | "replaceMedia" | "getTags">;
   assetId: number;
   navigator?: MediaNavigatorData;
   timezone: string;
@@ -73,6 +77,9 @@ export type MediaInspectorContentProps = {
    * image. Resolves when it closes, with what that editor saved (null: nothing).
    */
   onEditArtDirection?: (id: number) => Promise<ArtDirectionEditResult | null>;
+  /** The file before and after this one in the browser (absent at either end). */
+  onPrevious?: () => void;
+  onNext?: () => void;
 };
 
 /**
@@ -91,7 +98,7 @@ export type MediaInspectorContentProps = {
  * screens' sheet. Accounts that may not change the file see the same fields
  * read-only. Hashes, storage and raw manifests are never shown.
  */
-export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading = true, onEditArtDirection }: MediaInspectorContentProps) {
+export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading = true, onEditArtDirection, onPrevious, onNext }: MediaInspectorContentProps) {
   const query = useMediaAsset(fetchers, assetId);
   const asset = query.data;
   if (query.isError && !asset) {
@@ -103,10 +110,10 @@ export function MediaInspectorContent({ fetchers, assetId, navigator, timezone, 
     );
   }
   if (!asset) return <InspectorSkeleton />;
-  return <InspectorBody key={asset.id} asset={asset} fetchers={fetchers} navigator={navigator} timezone={timezone} guardRef={guardRef} onClose={onClose} onDeleted={onDeleted} onOpenStory={onOpenStory} assetHref={assetHref} showHeading={showHeading} onEditArtDirection={onEditArtDirection} />;
+  return <InspectorBody key={asset.id} asset={asset} fetchers={fetchers} navigator={navigator} timezone={timezone} guardRef={guardRef} onClose={onClose} onDeleted={onDeleted} onOpenStory={onOpenStory} assetHref={assetHref} showHeading={showHeading} onEditArtDirection={onEditArtDirection} onPrevious={onPrevious} onNext={onNext} />;
 }
 
-function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading, onEditArtDirection }: Omit<MediaInspectorContentProps, "assetId"> & { asset: MediaAssetDetail }) {
+function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose, onDeleted, onOpenStory, assetHref, showHeading, onEditArtDirection, onPrevious, onNext }: Omit<MediaInspectorContentProps, "assetId"> & { asset: MediaAssetDetail }) {
   const client = useQueryClient();
   // The version the reader started editing from: a newer copy from elsewhere never silently becomes "their" edit.
   const [base, setBase] = useState(asset);
@@ -167,6 +174,10 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
     setRenaming(false);
     setBase((current) => ({ ...current, filename: saved.filename, url: saved.url, previewUrl: saved.previewUrl, updatedAt: saved.updatedAt }));
   });
+  const tags = useMediaTags(fetchers, editable);
+  // A new version is this reader's own write too: unsaved details keep going, rebased onto it.
+  const replace = useMediaReplace({ fetchers, asset, accepted: navigator?.capabilities.acceptedMimeTypes, maxBytes: navigator?.capabilities.maxUploadBytes, expectedUpdatedAt: base.updatedAt, onReplaced: (saved) => setBase((current) => ({ ...current, ...pickFile(saved), updatedAt: saved.updatedAt })) });
+  const canReplace = editable && Boolean(fetchers.replaceMedia);
   const submitRename = (name: string) => {
     const { stem, extension } = splitFilename(asset.filename);
     const cleaned = cleanMediaName(name, extension);
@@ -249,11 +260,24 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
             )}
             <p className="truncate text-xs text-muted-foreground">{[KIND_LABELS[asset.kind], assetFacts(asset)].filter(Boolean).join(" · ")}</p>
           </div>
+          {onPrevious || onNext ? (
+            <ButtonGroup aria-label="Other files">
+              <Tooltip>
+                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Previous file" disabled={!onPrevious} onClick={onPrevious} data-media-previous="" />}><ChevronUp aria-hidden="true" /></TooltipTrigger>
+                <TooltipContent>Previous file</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Next file" disabled={!onNext} onClick={onNext} data-media-next="" />}><ChevronDown aria-hidden="true" /></TooltipTrigger>
+                <TooltipContent>Next file</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label="File actions" data-media-file-actions="" />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuGroup>
                 {canRename ? <DropdownMenuItem onClick={() => setRenaming(true)}><Pencil aria-hidden="true" />Rename</DropdownMenuItem> : null}
+                {canReplace ? <DropdownMenuItem onClick={replace.choose} data-media-replace=""><FileUp aria-hidden="true" />Replace with new version…</DropdownMenuItem> : null}
                 {asset.url ? <DropdownMenuItem render={<a href={asset.url} target="_blank" rel="noreferrer" />}><ExternalLink aria-hidden="true" />Open original</DropdownMenuItem> : null}
                 {asset.url ? <DropdownMenuItem render={<a href={asset.url} download={asset.filename} />}><Download aria-hidden="true" />Download</DropdownMenuItem> : null}
                 {copyAssetLink ? <DropdownMenuItem onClick={copyAssetLink}><Link2 aria-hidden="true" />Copy link</DropdownMenuItem> : null}
@@ -280,7 +304,11 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex flex-col gap-3 p-4 pb-3">
-            <Preview asset={asset} onZoom={() => setZoom(true)} />
+            <div className="relative" {...(canReplace ? replace.dropTarget : {})}>
+              <Preview asset={asset} onZoom={() => setZoom(true)} />
+              {replace.dragging ? <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/85 text-sm font-medium" data-media-replace-drop="">Drop to replace this file</div> : null}
+            </div>
+            {replace.input}
             <div className="flex flex-wrap items-center gap-2">
               {image && onEditArtDirection ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => void editArtDirection()} disabled={editingArt} data-media-art-direction="">
@@ -345,6 +373,11 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
                     </Field>
                   </div>
                 </FieldSet>
+                <Field>
+                  <FieldLabel htmlFor={`media-tags-${asset.id}`}>Tags</FieldLabel>
+                  <MediaTagInput id={`media-tags-${asset.id}`} value={draft.tags} onChange={(next) => set("tags", next)} suggestions={tags.data} readOnly={!editable} />
+                  {editable ? <FieldDescription className="text-xs">Keywords for search and the Tag filter, like a team, event or place.</FieldDescription> : null}
+                </Field>
                 {!editable ? <FieldDescription className="text-xs">Only the person who uploaded this file or an editor can change its details.</FieldDescription> : null}
                 {error ? (
                   <Alert variant="destructive">
@@ -402,6 +435,8 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
         ) : null}
       </form>
 
+      <MediaReplaceDialog asset={asset} state={replace} />
+
       <Dialog open={zoom} onOpenChange={setZoom}>
         <DialogContent className="sm:max-w-[min(90vw,900px)]">
           <DialogHeader><DialogTitle className="truncate">{asset.filename}</DialogTitle><DialogDescription>{assetFacts(asset)}</DialogDescription></DialogHeader>
@@ -426,6 +461,11 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
       </AlertDialog>
     </div>
   );
+}
+
+/** The file fields a new version or a rename changes (everything else is the reader's to keep editing). */
+function pickFile(saved: MediaAssetDetail) {
+  return { filename: saved.filename, url: saved.url, previewUrl: saved.previewUrl, mimeType: saved.mimeType, width: saved.width, height: saved.height, filesize: saved.filesize };
 }
 
 /** The header's rename in place: Enter saves, Escape cancels. Its own form, outside the details form. */

@@ -5,8 +5,9 @@ import { mediaWorkKey } from "@byline/newsroom-screens/media/media-library-api";
 import { folderPath, type MediaRoute } from "@byline/newsroom-screens/media/media-library-model";
 import { mediaDeskRows, mediaWorkCounts } from "@byline/newsroom-screens/media/media-desk-model";
 import { MediaNavigatorContent } from "@byline/newsroom-screens/media/MediaNavigatorContent";
-import { useMediaNavigator } from "@byline/newsroom-screens/media/media-query";
-import { useQuery } from "@tanstack/react-query";
+import { invalidateMediaLibrary, useMediaNavigator } from "@byline/newsroom-screens/media/media-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useEffect, useMemo } from "react";
 import { atLeast } from "../../access/user";
 import { useNewsroomAccount, useNewsroomRoutes } from "../shell/account";
@@ -49,6 +50,20 @@ export function MediaNavigator({ onNavigated }: { onNavigated?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folders, route.folderId]);
 
+  // Files dragged from the Library onto a folder (or Unfiled) are filed there, each checked on its own.
+  const client = useQueryClient();
+  const drop = async (folderId: number | null, ids: number[]) => {
+    const name = folderId === null ? "Unfiled" : folders?.find((folder) => folder.id === folderId)?.name ?? "the folder";
+    try {
+      const result = await workspace.fetchers.moveMedia(ids, folderId);
+      await invalidateMediaLibrary(client);
+      if (result.failed.length) toast.error(result.failed.length === 1 ? result.failed[0].message : `${result.failed.length} files couldn't be moved. ${result.failed[0].message}`);
+      if (result.moved.length) toast.success(`${result.moved.length === 1 ? "File" : `${result.moved.length} files`} moved to ${name}`);
+    } catch (error) {
+      toast.error((error as { message?: string })?.message || "The files couldn't be moved.");
+    }
+  };
+
   const go = (next: MediaRoute) => workspace.guardNavigation(() => {
     navigate(next);
     onNavigated?.();
@@ -65,6 +80,7 @@ export function MediaNavigator({ onNavigated }: { onNavigated?: () => void }) {
       showUnassigned={editor}
       expanded={workspace.expanded}
       onExpandedChange={workspace.setExpanded}
+      onDropAssets={(folderId, ids) => void drop(folderId, ids)}
       onNewFolder={navigator.data?.capabilities.canManageFolders ? () => { onNavigated?.(); workspace.requestFolderAction({ kind: "create", parentId: null }); } : undefined}
     />
   );

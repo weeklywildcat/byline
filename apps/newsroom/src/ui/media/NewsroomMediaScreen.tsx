@@ -3,6 +3,7 @@
 import { MEDIA_WORK_SCOPES } from "@byline/newsroom-screens/media/media-desk-model";
 import { MediaBulkDeleteDialog, MediaBulkEditDialog, MediaSelectionBar } from "@byline/newsroom-screens/media/MediaBulkActions";
 import { MediaFolderDialogs } from "@byline/newsroom-screens/media/MediaFolderDialogs";
+import { MediaQuickLook } from "@byline/newsroom-screens/media/MediaQuickLook";
 import { MediaRenameDialog } from "@byline/newsroom-screens/media/MediaRename";
 import { MediaInspectorContent } from "@byline/newsroom-screens/media/MediaInspectorContent";
 import { MediaLibraryBrowser } from "@byline/newsroom-screens/media/MediaLibraryBrowser";
@@ -19,13 +20,13 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@byline/newsroom-ui/ui/breadcrumb";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator } from "@byline/newsroom-ui/ui/context-menu";
+import { ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuShortcut } from "@byline/newsroom-ui/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/newsroom-ui/ui/resizable";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { useConfig, usePreferences } from "@payloadcms/ui";
-import { Download, FolderInput, FolderPen, FolderPlus, FolderTree, Info, Link2, MoreHorizontal, PanelLeft, Pencil, PenLine, SquareCheck, Trash2, Upload } from "lucide-react";
+import { Download, Eye, FolderInput, FolderPen, FolderPlus, FolderTree, Info, Link2, MoreHorizontal, PanelLeft, Pencil, PenLine, SquareCheck, Trash2, Upload } from "lucide-react";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { atLeast } from "../../access/user";
@@ -108,6 +109,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
   const [loaded, setLoaded] = useState<MediaLibraryAsset[]>([]);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [bulk, setBulk] = useState<"edit" | "delete" | null>(null);
+  const [quickLook, setQuickLook] = useState<number | null>(null);
   const checkedAssets = useMemo(() => loaded.filter((asset) => checked.has(asset.id)), [checked, loaded]);
   useEffect(() => {
     setChecked((current) => {
@@ -174,6 +176,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
         <ContextMenuLabel className="max-w-52 truncate">{asset.filename}</ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => select(asset)}><Info aria-hidden="true" />Details</ContextMenuItem>
+        <ContextMenuItem onClick={() => setQuickLook(loaded.findIndex((item) => item.id === asset.id))}><Eye aria-hidden="true" />Quick Look<ContextMenuShortcut>Space</ContextMenuShortcut></ContextMenuItem>
         <ContextMenuItem onClick={() => setChecked((current) => new Set([...current, asset.id]))}><SquareCheck aria-hidden="true" />Select</ContextMenuItem>
         {asset.canUpdate ? <ContextMenuItem onClick={() => setRenaming(asset)}><Pencil aria-hidden="true" />Rename…</ContextMenuItem> : null}
         {asset.canUpdate ? <ContextMenuItem onClick={() => workspace.requestFolderAction({ kind: "move-assets", assets: [asset] })}><FolderInput aria-hidden="true" />Move to folder…</ContextMenuItem> : null}
@@ -228,6 +231,10 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
   const lastAsset = useRef<number | null>(null);
   if (route.assetId !== null) lastAsset.current = route.assetId;
   const assetHref = useCallback((id: number) => workspace.href({ ...route, view: "library", assetId: id }), [route, workspace]);
+  // The inspector steps through the files as the browser shows them.
+  const shownIndex = route.assetId !== null ? loaded.findIndex((asset) => asset.id === route.assetId) : -1;
+  const previous = shownIndex > 0 ? loaded[shownIndex - 1] : null;
+  const next = shownIndex >= 0 && shownIndex < loaded.length - 1 ? loaded[shownIndex + 1] : null;
   const inspector = route.assetId !== null ? (
     <MediaInspectorContent
       key={route.assetId}
@@ -242,6 +249,8 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       assetHref={assetHref}
       showHeading
       onEditArtDirection={(id) => workspace.editArtDirection(id)}
+      onPrevious={previous ? () => select(previous) : undefined}
+      onNext={next ? () => select(next) : undefined}
     />
   ) : null;
 
@@ -261,6 +270,9 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
       timezone={timezone}
       selectedId={route.assetId}
       onActivate={(asset) => select(route.assetId === asset.id && !persistentInspector ? null : asset)}
+      onDropFiles={(files) => openCreate("media", { folderId: route.folderId, files })}
+      draggableAssets
+      onQuickLook={(asset) => setQuickLook(loaded.findIndex((item) => item.id === asset.id))}
       checkedIds={checked}
       onCheckedChange={setChecked}
       selectionBar={selectionBar}
@@ -349,6 +361,19 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
 
       {unsavedDialog}
 
+      <MediaQuickLook
+        assets={loaded}
+        index={quickLook !== null && quickLook >= 0 ? quickLook : null}
+        onIndexChange={setQuickLook}
+        onClose={() => {
+          const asset = quickLook !== null ? loaded[quickLook] : null;
+          setQuickLook(null);
+          // Focus goes back to the file Quick Look ended on.
+          if (asset) window.setTimeout(() => (document.querySelector(`[data-media-asset="${asset.id}"]`) as HTMLElement | null)?.focus(), 0);
+        }}
+        onOpenDetails={(asset) => { setQuickLook(null); select(asset); }}
+        timezone={timezone}
+      />
       <MediaRenameDialog asset={renaming} onClose={() => setRenaming(null)} fetchers={workspace.fetchers} />
       <MediaBulkEditDialog assets={checkedAssets} open={bulk === "edit"} onOpenChange={(open) => { if (!open) setBulk(null); }} fetchers={workspace.fetchers} />
       <MediaBulkDeleteDialog

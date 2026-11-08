@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient } from "@tanstack/react-query";
-import { mediaAssetKey, mediaFoldersKey, mediaLibraryKey, mediaLibraryRootKey, type MediaLibraryFetchers } from "./media-library-api";
+import { mediaAssetKey, mediaFoldersKey, mediaLibraryKey, mediaLibraryRootKey, mediaTagsKey, type MediaLibraryFetchers } from "./media-library-api";
 import type { MediaAssetDetail, MediaLibraryAsset, MediaLibraryQuery } from "./media-library-model";
 
 /** The navigator's one read (folders, counts, capabilities). Shared by the sidebar pane, the sheet and the screen. */
@@ -41,9 +41,14 @@ export function useMediaAsset(fetchers: Pick<MediaLibraryFetchers, "getAsset">, 
   });
 }
 
-/** After files change: Library pages and the navigator's counts, never Stories or Home. */
+/** After files change: Library pages, the navigator's counts and the tags in use, never Stories or Home. */
 export function invalidateMediaLibrary(client: QueryClient) {
-  return Promise.all([client.invalidateQueries({ queryKey: mediaLibraryRootKey }), client.invalidateQueries({ queryKey: mediaFoldersKey })]);
+  return Promise.all([client.invalidateQueries({ queryKey: mediaLibraryRootKey }), client.invalidateQueries({ queryKey: mediaFoldersKey }), client.invalidateQueries({ queryKey: mediaTagsKey })]);
+}
+
+/** The tags in use (suggestions). Absent when the host has no tag list. */
+export function useMediaTags(fetchers: Pick<MediaLibraryFetchers, "getTags">, enabled = true) {
+  return useQuery({ queryKey: mediaTagsKey, queryFn: () => fetchers.getTags!(), enabled: enabled && Boolean(fetchers.getTags), staleTime: 60_000 });
 }
 
 /** After one asset changes: its detail, and the row inside any cached Library page (no refetch storm). */

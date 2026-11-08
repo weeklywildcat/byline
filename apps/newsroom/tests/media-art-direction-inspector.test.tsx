@@ -24,7 +24,7 @@ const publication = (overrides: Partial<MediaPublicationDetail> = {}): MediaPubl
 const state = vi.hoisted(() => ({ updatedAt: "", filename: "band.jpg", publication: null as unknown, saves: [] as Array<Record<string, unknown>>, renames: [] as Array<Record<string, unknown>>, retries: 0, reads: 0 }));
 const asset = (): MediaAssetDetail => ({
   id: 7, filename: state.filename, mimeType: "image/jpeg", kind: "image", filesize: 1000, width: 3000, height: 2000, previewUrl: "/p.webp", url: "/o.jpg",
-  alt: "Band", creator: "Pat", credit: "Pat", copyright: "©", license: "", sourceUrl: "", capturedAt: null, createdAt: T0, updatedAt: state.updatedAt,
+  alt: "Band", creator: "Pat", credit: "Pat", copyright: "©", license: "", sourceUrl: "", tags: [], capturedAt: null, createdAt: T0, updatedAt: state.updatedAt,
   uploadedBy: null, folder: null, publicationAssets: (state.publication as MediaPublicationDetail).state, gaps: [], canUpdate: true, canDelete: false,
   folderPath: [], usages: [], usagesComplete: false, hiddenUsageCount: 0, publication: state.publication as MediaPublicationDetail
 });

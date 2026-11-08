@@ -1,6 +1,6 @@
 import { mediaDeskKey } from "../story/story-query";
 import type { MediaArtDirection, MediaArtDirectionSave } from "./art-direction-model";
-import type { MediaAssetDetail, MediaBulkPatch, MediaBulkResult, MediaFolder, MediaLibraryAsset, MediaLibraryPage, MediaLibraryQuery, MediaMetadataPatch, MediaNavigatorData, MediaRenameInput } from "./media-library-model";
+import type { MediaAssetDetail, MediaBulkPatch, MediaBulkResult, MediaFolder, MediaLibraryAsset, MediaLibraryPage, MediaLibraryQuery, MediaMetadataPatch, MediaNavigatorData, MediaRenameInput, MediaTagCount } from "./media-library-model";
 
 /**
  * What a host supplies for the Media Library. The screens never know the
@@ -18,7 +18,11 @@ export type MediaLibraryFetchers = {
   deleteMedia: (id: number) => Promise<void>;
   /** Renames the stored file (its type and links to it stay; its private URL changes). Compare-and-swap (409). */
   renameMedia?: (id: number, input: MediaRenameInput) => Promise<MediaAssetDetail>;
-  /** Applies the same creator, credit or rights to several files. Each is checked on its own. */
+  /** Replaces the file's bytes with a new version of the same kind; ID, metadata and links stay. Compare-and-swap (409). */
+  replaceMedia?: (id: number, file: File, options: { expectedUpdatedAt?: string; onProgress?: (fraction: number) => void; signal?: AbortSignal }) => Promise<MediaAssetDetail>;
+  /** Tags in use, most used first (suggestions for the tag picker and the filter). */
+  getTags?: () => Promise<MediaTagCount[]>;
+  /** Applies the same creator, credit or rights, or adds and removes tags, on several files. Each is checked on its own. */
   updateMediaMany?: (ids: number[], patch: MediaBulkPatch) => Promise<MediaBulkResult>;
   /** Deletes several files (editors). A file still linked anywhere is refused, the rest go. */
   deleteMediaMany?: (ids: number[]) => Promise<MediaBulkResult>;
@@ -56,5 +60,6 @@ export const mediaLibraryKey = (query: Omit<MediaLibraryQuery, "page">) => ["byl
 export const mediaAssetKey = (id: number) => ["byline", "media", "asset", id] as const;
 export const mediaArtDirectionKey = (id: number) => ["byline", "media", "art-direction", id] as const;
 export const mediaFoldersKey = ["byline", "media", "navigator"] as const;
+export const mediaTagsKey = ["byline", "media", "tags"] as const;
 /** Production work (WordPress's Media Desk key, so story changes invalidate it everywhere). */
 export const mediaWorkKey = mediaDeskKey;

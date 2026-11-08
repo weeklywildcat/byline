@@ -16,7 +16,7 @@ import { EMPTY_MEDIA_FILTERS, type MediaLibraryAsset, type MediaLibraryPage } fr
 
 const asset = (id: number): MediaLibraryAsset => ({
   id, filename: `photo-${id}.jpg`, mimeType: "image/jpeg", kind: "image", filesize: 1000, width: 800, height: 600, previewUrl: null, url: `/o/${id}.jpg`,
-  alt: "", creator: "", credit: "", copyright: "", license: "", sourceUrl: "", capturedAt: null, createdAt: "2026-11-01T12:00:00.000Z", updatedAt: "2026-11-01T12:00:00.000Z",
+  alt: "", creator: "", credit: "", copyright: "", license: "", sourceUrl: "", tags: [], capturedAt: null, createdAt: "2026-11-01T12:00:00.000Z", updatedAt: "2026-11-01T12:00:00.000Z",
   uploadedBy: null, folder: null, publicationAssets: "ready", gaps: [], canUpdate: true, canDelete: true
 });
 const page: MediaLibraryPage = { assets: [1, 2, 3, 4, 5].map(asset), totalDocs: 5, totalPages: 1, page: 1, hasNextPage: false } as MediaLibraryPage;
@@ -26,6 +26,7 @@ let root: Root;
 let container: HTMLElement;
 let checked: Set<number>;
 let opened: number[];
+let looked: number[];
 beforeEach(() => {
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
   globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
@@ -36,6 +37,7 @@ beforeEach(() => {
   root = createRoot(container);
   checked = new Set();
   opened = [];
+  looked = [];
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -58,6 +60,7 @@ function Harness({ layout }: { layout: MediaLayout }) {
       onLayoutChange={() => {}}
       timezone="America/Chicago"
       onActivate={(item) => opened.push(item.id)}
+      onQuickLook={(item) => looked.push(item.id)}
       checkedIds={ids}
       onCheckedChange={setIds}
       selectionBar={<div data-test-bar="">bar</div>}
@@ -74,7 +77,9 @@ async function mount(layout: MediaLayout = "grid") {
 const tile = (id: number) => container.querySelector<HTMLElement>(`[data-media-asset="${id}"]`)!;
 const box = (id: number) => container.querySelector<HTMLElement>(`[data-media-check="${id}"]`)!;
 const click = (element: HTMLElement, init: MouseEventInit = {}) => act(async () => { element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...init })); });
-const key = (init: KeyboardEventInit) => act(async () => { tile(1).dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init })); });
+const keyOn = (element: HTMLElement, init: KeyboardEventInit) => act(async () => { element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init })); });
+const key = (init: KeyboardEventInit) => keyOn(tile(1), init);
+const focused = () => Number((document.activeElement as HTMLElement | null)?.dataset.mediaAsset);
 const ids = () => [...checked].sort((a, b) => a - b);
 
 describe.each(["grid", "list"] as const)("multi-select in %s", (layout) => {
@@ -112,5 +117,21 @@ describe.each(["grid", "list"] as const)("multi-select in %s", (layout) => {
     expect(ids()).toEqual([1, 2, 3, 4, 5]);
     await key({ key: "Escape" });
     expect(ids()).toEqual([]);
+  });
+
+  it("moves focus with the keyboard, opens Quick Look with Space and checks with X", async () => {
+    await mount(layout);
+    tile(1).focus();
+    await keyOn(tile(1), { key: layout === "grid" ? "ArrowRight" : "ArrowDown" });
+    expect(focused()).toBe(2);
+    await keyOn(tile(2), { key: "End" });
+    expect(focused()).toBe(5);
+    await keyOn(tile(5), { key: "Home" });
+    expect(focused()).toBe(1);
+    await keyOn(tile(1), { key: " " });
+    expect(looked).toEqual([1]);
+    expect(opened).toEqual([]);
+    await keyOn(tile(1), { key: "x" });
+    expect(ids()).toEqual([1]);
   });
 });

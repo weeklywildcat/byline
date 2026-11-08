@@ -9,11 +9,12 @@ import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { mediaAssetKey, type MediaLibraryFetchers } from "./media-library-api";
 import { MEDIA_BULK_FIELDS, MEDIA_FIELD_LIMITS, type MediaBulkField, type MediaBulkPatch, type MediaBulkResult, type MediaLibraryAsset } from "./media-library-model";
-import { invalidateMediaLibrary } from "./media-query";
+import { invalidateMediaLibrary, useMediaTags } from "./media-query";
+import { MediaTagInput } from "./MediaTags";
 
 const files = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
 
@@ -62,13 +63,26 @@ function report(result: MediaBulkResult, verb: string, assets: MediaLibraryAsset
  * are applied; an empty field keeps each file's own value. Alt text describes
  * one picture, so it is never applied in bulk.
  */
-export function MediaBulkEditDialog({ assets, open, onOpenChange, fetchers, onDone }: { assets: MediaLibraryAsset[]; open: boolean; onOpenChange: (open: boolean) => void; fetchers: Pick<MediaLibraryFetchers, "updateMediaMany">; onDone?: (result: MediaBulkResult) => void }) {
+export function MediaBulkEditDialog({ assets, open, onOpenChange, fetchers, onDone }: { assets: MediaLibraryAsset[]; open: boolean; onOpenChange: (open: boolean) => void; fetchers: Pick<MediaLibraryFetchers, "updateMediaMany" | "getTags">; onDone?: (result: MediaBulkResult) => void }) {
   const client = useQueryClient();
   const [values, setValues] = useState(EMPTY_BULK);
+  const [addTags, setAddTags] = useState<string[]>([]);
+  const [removeTags, setRemoveTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (open) { setValues(EMPTY_BULK); setError(null); } }, [open]);
+  useEffect(() => { if (open) { setValues(EMPTY_BULK); setAddTags([]); setRemoveTags([]); setError(null); } }, [open]);
+  const tags = useMediaTags(fetchers, open);
   const editable = assets.filter((asset) => asset.canUpdate);
-  const patch: MediaBulkPatch = Object.fromEntries(MEDIA_BULK_FIELDS.filter((field) => values[field].trim()).map((field) => [field, values[field].trim()]));
+  // Removing offers the tags these files actually have.
+  const present = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const asset of editable) for (const tag of asset.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  }, [editable]);
+  const patch: MediaBulkPatch = {
+    ...Object.fromEntries(MEDIA_BULK_FIELDS.filter((field) => values[field].trim()).map((field) => [field, values[field].trim()])),
+    ...(addTags.length ? { addTags } : {}),
+    ...(removeTags.length ? { removeTags } : {})
+  };
   const save = useMutation({
     mutationFn: () => fetchers.updateMediaMany!(editable.map((asset) => asset.id), patch),
     onSuccess: async (result) => {
@@ -98,6 +112,20 @@ export function MediaBulkEditDialog({ assets, open, onOpenChange, fetchers, onDo
               <FieldLegend variant="label">Rights</FieldLegend>
               <div className="grid gap-3 sm:grid-cols-2">{(["copyright", "license"] as const).map((field) => <BulkField key={field} field={field} value={values[field]} onChange={(value) => setValues((current) => ({ ...current, [field]: value }))} />)}</div>
               <BulkField field="sourceUrl" value={values.sourceUrl} onChange={(value) => setValues((current) => ({ ...current, sourceUrl: value }))} />
+            </FieldSet>
+            <FieldSet>
+              <FieldLegend variant="label">Tags</FieldLegend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="media-bulk-add-tags">Add</FieldLabel>
+                  <MediaTagInput id="media-bulk-add-tags" value={addTags} onChange={setAddTags} suggestions={tags.data} placeholder="Tags to add…" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="media-bulk-remove-tags">Remove</FieldLabel>
+                  <MediaTagInput id="media-bulk-remove-tags" value={removeTags} onChange={setRemoveTags} suggestions={present} placeholder={present.length ? "Tags to remove…" : "No tags on these files"} disabled={!present.length && !removeTags.length} />
+                </Field>
+              </div>
+              <FieldDescription>Each file keeps its other tags.</FieldDescription>
             </FieldSet>
             {skipped ? <FieldDescription>{files(skipped)} you can't change {skipped === 1 ? "is" : "are"} left out: staff change only the files they uploaded.</FieldDescription> : null}
             {error ? <FieldError>{error}</FieldError> : null}

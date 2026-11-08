@@ -1,3 +1,4 @@
+import { MEDIA_TAG_LENGTH, MEDIA_TAGS_MAX, normalizeMediaTags } from "@byline/newsroom-screens/media/media-library-model";
 import { protectStoryMedia } from "../newsroom/story-media-uses";
 import { artDirectionIntentsEqual, normalizeArtDirectionIntent, type ImageDimensions } from "@byline/core";
 import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionBeforeOperationHook, CollectionConfig, PayloadRequest } from "payload";
@@ -207,6 +208,17 @@ export const Media: CollectionConfig = {
     },
     { name: "sourceUrl", label: "Source URL", type: "text", maxLength: 2000 },
     { name: "capturedAt", type: "date" },
+    {
+      name: "tags",
+      type: "text",
+      hasMany: true,
+      maxRows: MEDIA_TAGS_MAX,
+      maxLength: MEDIA_TAG_LENGTH,
+      index: true,
+      admin: { description: "Keywords for finding the file: lowercase, one spelling per tag." },
+      // One spelling everywhere, however the tags arrive (the Byline API, the raw admin, the import).
+      hooks: { beforeValidate: [({ value }) => (Array.isArray(value) ? normalizeMediaTags(value) : value)] }
+    },
     // Editorial intent only (`ImageArtDirectionIntent`): no URLs, no renditions.
     { name: "artDirection", type: "json", admin: { hidden: true }, access: { create: artDirectionWriter, update: artDirectionWriter } },
     // What the prepared files are made from has changed this many times (source, focal point, custom crops).
