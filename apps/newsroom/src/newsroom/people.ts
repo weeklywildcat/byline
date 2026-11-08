@@ -465,6 +465,27 @@ export async function updatePerson(
       data,
       ...asUser(ctx),
     });
+    if (typeof data.name === "string") {
+      const linked = await ctx.req.payload.find({
+        collection: "users",
+        where: { linkedPerson: { equals: id } },
+        select: { id: true },
+        depth: 0,
+        pagination: false,
+        overrideAccess: true,
+        req: ctx.req,
+      });
+      for (const account of linked.docs) {
+        await ctx.req.payload.update({
+          collection: "users",
+          id: account.id,
+          data: { name: data.name },
+          depth: 0,
+          overrideAccess: true,
+          req: ctx.req,
+        });
+      }
+    }
     if (started) await commitTransaction(ctx.req);
   } catch (error) {
     if (started) await killTransaction(ctx.req);
