@@ -1,6 +1,7 @@
 import { DefaultTemplate } from "@payloadcms/next/templates";
 import { Gutter } from "@payloadcms/ui";
 import type { AdminViewServerProps } from "payload";
+import { redirectIfSignedOut } from "../auth/session";
 import { requestUser } from "../access/user";
 import { NewsroomStories } from "../ui/stories/NewsroomStories";
 
@@ -15,6 +16,7 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
  */
 export function BylineStories({ initPageResult, params, searchParams }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
+  redirectIfSignedOut({ req, params, searchParams });
   const user = requestUser(req);
   // `coverage=` was the earlier name of the Collection scope; still accepted at the boundary.
   const collection = Number(first(searchParams?.collection) ?? first(searchParams?.coverage));

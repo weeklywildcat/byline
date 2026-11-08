@@ -72,3 +72,25 @@ it("loads photos off the request path, coalesces refreshes and excludes untruste
   });
   expect(schedule).toHaveBeenCalledTimes(1);
 });
+
+describe("expired session", () => {
+  it("sends an anonymous visitor to login carrying the address they wanted", async () => {
+    const { loginRedirectUrl } = await import("../src/auth/session");
+    const base = { admin: "/admin", login: "/login" };
+    expect(loginRedirectUrl(base)).toBe("/admin/login?redirect=%2Fadmin");
+    expect(loginRedirectUrl({ ...base, segments: ["stories"], searchParams: { view: "mine", redirect: "/x" } }))
+      .toBe("/admin/login?redirect=%2Fadmin%2Fstories%3Fview%3Dmine");
+    // What the login view will accept back is exactly this address.
+    expect(newsroomReturnTo("/admin/stories?view=mine", "/admin")).toBe("/admin/stories?view=mine");
+  });
+
+  it("redirects only when there is no user, so a disabled account still sees why", async () => {
+    const { redirectIfSignedOut } = await import("../src/auth/session");
+    const payload = { config: { routes: { admin: "/admin" }, admin: { routes: { login: "/login" } } } } as never;
+    let thrown: { digest?: string } | undefined;
+    try { redirectIfSignedOut({ req: { user: null, payload } as never, params: { segments: ["calendar"] } }); }
+    catch (error) { thrown = error as { digest?: string }; }
+    expect(thrown?.digest).toContain("NEXT_REDIRECT;replace;/admin/login?redirect=%2Fadmin%2Fcalendar");
+    expect(() => redirectIfSignedOut({ req: { user: { id: 1, enabled: false }, payload } as never })).not.toThrow();
+  });
+});
