@@ -90,3 +90,17 @@ export const liveUpdatePublicSlice: PublicSlice = async (row, req) => {
   if (!story || !isPublished(story)) return null;
   return pick(row, ["story", "headline", "body", "photo", "publishedAt", "pinned", "updatedAt"]);
 };
+
+/**
+ * Looked-up YouTube facts reach the public site only through a published video
+ * Story that uses the video. Facts for a draft, or a video no live Story uses,
+ * are not a public change (they must not trigger a deploy).
+ */
+export const videoFactsPublicSlice: PublicSlice = async (row, req) => {
+  if (row.status !== "found" || typeof row.videoId !== "string") return null;
+  const story = await req.payload.db.findOne({
+    collection: "stories", req,
+    where: { and: [{ _status: { equals: "published" } }, { "video.url": { contains: row.videoId } }] }
+  }) as Row | null;
+  return story && isPublished(story) ? { videoId: row.videoId, data: row.data ?? null } : null;
+};

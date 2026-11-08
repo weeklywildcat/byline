@@ -19,7 +19,13 @@ export async function readLiveUpdates(payload: Payload, storyIds: number[]) {
   return docs.sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
 }
 
-export function collectLiveCoverage(story: Pick<Story, "id" | "liveCoverage" | "publishedAt" | "updatedAt">, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig) {
+/**
+ * The published live projection in the shape the Worker and the static build
+ * both validate (`normalizeLiveCoverage`): coverage state, its times and every
+ * published update, newest first, as escaped HTML. Null unless coverage is
+ * live or ended.
+ */
+export function liveCoverageProjection(story: Pick<Story, "liveCoverage" | "publishedAt" | "updatedAt">, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: Pick<PreparedMediaCatalog, "articleAsset">): LiveCoverage | null {
   const state = story.liveCoverage?.state;
   if (state !== "live" && state !== "ended") return null;
   const updates: LiveCoverage["updates"] = rows.map((row) => {
@@ -31,12 +37,17 @@ export function collectLiveCoverage(story: Pick<Story, "id" | "liveCoverage" | "
       author: "", image: image ? { url: image.src, alt: image.alt, width: image.width, height: image.height, credit: image.credit } : null
     };
   });
-  const live = {
+  return {
     status: state,
     startedAt: iso(story.liveCoverage?.startedAt ?? story.publishedAt ?? story.updatedAt),
     endedAt: story.liveCoverage?.endedAt ? iso(story.liveCoverage.endedAt) : "",
     updates
   };
+}
+
+export function collectLiveCoverage(story: Pick<Story, "id" | "liveCoverage" | "publishedAt" | "updatedAt">, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig) {
+  const live = liveCoverageProjection(story, rows, catalog);
+  if (!live) return null;
   return createArticleLiveView(live, {
     postId: story.id, locale: publication.locale, timeZone: publication.timezone, feedUrl: `/_byline/live/${story.id}.json`
   });

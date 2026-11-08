@@ -767,3 +767,57 @@ describe("public URL history", () => {
     await expect(payload.create({ collection: "redirects", data: { from: "/test-url-b", to: "/test-url-c", reason: "manual" }, user: { ...editor, collection: "users" }, overrideAccess: false })).rejects.toThrow(/not allowed/i);
   });
 });
+
+describe("YouTube video facts", () => {
+  const VIDEO = "aB3dE5fG7hJ";
+  const OTHER = "zY9xW7vU5tS";
+  const fetcher = (duration: string) => async () => new Response(JSON.stringify({ items: [{ id: VIDEO, snippet: { title: "Homecoming recap", publishedAt: "2026-10-30T18:00:00Z", thumbnails: { high: { url: "https://i.ytimg.com/vi/x/hq.jpg" } } }, contentDetails: { duration } }] }), { status: 200 });
+  const queued = async () => (await payload.find({ collection: "payload-jobs", where: { and: [{ taskSlug: { equals: "refresh-video-facts" } }, { completedAt: { exists: false } }] }, depth: 0, pagination: false, overrideAccess: true })).docs;
+
+  it("queues one lookup when a video story is saved, even as a draft, without a public change", async () => {
+    const start = await rev();
+    await draftStory("Homecoming video", { format: "video", video: { url: `https://youtu.be/${VIDEO}` } });
+    expect((await queued()).length).toBeGreaterThan(0);
+    expect(await rev()).toBe(start);
+  });
+
+  it("records facts without a public change until a published story uses the video, then projects them", async () => {
+    const { refreshVideoFacts } = await import("../../src/newsroom/video-facts");
+    const draft = await draftStory("Homecoming video, draft", { format: "video", video: { url: `https://youtu.be/${VIDEO}` } });
+    const start = await rev();
+    expect(await refreshVideoFacts(payload, VIDEO, { fetch: fetcher("PT4M13S"), apiKey: "KEY" })).toBe("found");
+    expect(await rev()).toBe(start);
+
+    await publish(draft);
+    expect(await rev()).toBe(start + 1);
+    const projected = (await snapshot()).datasets.stories.find((story) => story.id === draft)!;
+    expect(projected.primaryVideo).toMatchObject({ videoId: VIDEO, title: "Homecoming recap", duration: "4:13" });
+    expect(projected.videoMetadata).toMatchObject({ uploadDate: "2026-10-30T18:00:00.000Z", thumbnailUrl: "https://i.ytimg.com/vi/x/hq.jpg" });
+
+    // Newly learned facts for a live video are a public change.
+    const row = (await payload.find({ collection: "video-facts", where: { videoId: { equals: VIDEO } }, overrideAccess: true })).docs[0];
+    await payload.update({ collection: "video-facts", id: row.id, data: { fetchedAt: new Date(Date.now() - 48 * 3600_000).toISOString() }, overrideAccess: true });
+    const before = await rev();
+    expect(await refreshVideoFacts(payload, VIDEO, { fetch: fetcher("PT5M00S"), apiKey: "KEY" })).toBe("found");
+    expect(await rev()).toBe(before + 1);
+
+    // A video nobody has published is not a public change.
+    const unused = await rev();
+    expect(await refreshVideoFacts(payload, OTHER, { fetch: async () => new Response(JSON.stringify({ title: "Unused" }), { status: 200 }), apiKey: "" })).toBe("found");
+    expect(await rev()).toBe(unused);
+  });
+
+  it("records an unavailable video and does not repeat the lookup straight away", async () => {
+    const { refreshVideoFacts } = await import("../../src/newsroom/video-facts");
+    const missing = "mN2pQ4rS6tU";
+    expect(await refreshVideoFacts(payload, missing, { fetch: async () => new Response("{}", { status: 404 }), apiKey: "" })).toBe("unavailable");
+    const row = (await payload.find({ collection: "video-facts", where: { videoId: { equals: missing } }, overrideAccess: true })).docs[0];
+    expect(row).toMatchObject({ status: "unavailable", attempts: 1 });
+  });
+
+  it("keeps facts system-only: no anonymous or staff read", async () => {
+    await expect(payload.find({ collection: "video-facts", overrideAccess: false })).rejects.toThrow(/not allowed/i);
+    const staff = await payload.findByID({ collection: "users", id: ids.editor, overrideAccess: true });
+    await expect(payload.find({ collection: "video-facts", overrideAccess: false, user: { ...staff, collection: "users" } })).rejects.toThrow(/not allowed/i);
+  });
+});

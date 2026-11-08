@@ -1,8 +1,8 @@
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { protectPageDescendants, publicURLHooks } from "../public/url-changes";
-import type { CollectionConfig } from "payload";
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig } from "payload";
 import { inIds, scopeManages, storyScope } from "../access/story-context";
-import { administratorsOnly, editorsOnly, relationId, requestUser, signedIn } from "../access/user";
+import { administratorsOnly, atLeast, editorsOnly, relationId, requestUser, sameId, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
 import { CORRECTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
@@ -94,6 +94,47 @@ export const Pages: CollectionConfig = {
   ]
 };
 
+const PUBLIC_UPDATE = "Only editors can change an update readers can see. Save it as a draft for an editor to publish.";
+
+async function storyIsPublished(req: Parameters<CollectionBeforeChangeHook>[0]["req"], story: unknown) {
+  const id = relationId(story);
+  if (id === null) return false;
+  const found = await req.payload.find({ collection: "stories", where: { id: { equals: id } }, draft: false, limit: 1, depth: 0, select: { _status: true }, overrideAccess: true, req });
+  return found.docs[0]?._status === "published";
+}
+
+/**
+ * Publishing is an editor's decision, here as for Stories: staff may write
+ * drafts, and an update that readers can see (published, on a published
+ * story) is created, changed or removed only by an editor. Account-less
+ * system writes and imports are trusted.
+ */
+const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
+  const user = requestUser(req);
+  if (!user || atLeast(user, "editor") || req.context?.bylineImport === true) return data;
+  const state = data.state ?? originalDoc?.state ?? "published";
+  if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, data.story ?? originalDoc?.story))) throw new APIError(PUBLIC_UPDATE, 403);
+  return data;
+};
+
+const guardPublicDelete: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const user = requestUser(req);
+  if (!user || atLeast(user, "editor")) return;
+  const found = await req.payload.find({ collection: "live-updates", where: { id: { equals: id } }, limit: 1, depth: 0, select: { story: true, state: true }, overrideAccess: true, req });
+  const row = found.docs[0];
+  if (row?.state === "published" && (await storyIsPublished(req, row.story))) throw new APIError(PUBLIC_UPDATE, 403);
+};
+
+/** Pinning replaces the previous key update: pin one and the story's others are unpinned. */
+const replacePinned: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
+  if (doc.pinned !== true || (previousDoc?.pinned === true && sameId(doc.story, previousDoc?.story))) return doc;
+  await req.payload.update({
+    collection: "live-updates", where: { and: [{ story: { equals: relationId(doc.story) } }, { pinned: { equals: true } }, { id: { not_equals: doc.id } }] },
+    data: { pinned: false }, overrideAccess: true, depth: 0, req, context: { ...req.context, bylineSystem: true }
+  });
+  return doc;
+};
+
 /**
  * Live coverage updates. A story with live coverage keeps its format; the
  * public projection (Phase 11) exposes only published updates on published
@@ -126,7 +167,10 @@ export const LiveUpdates: CollectionConfig = {
     }
   },
   hooks: {
+    afterChange: [replacePinned],
+    beforeDelete: [guardPublicDelete],
     beforeChange: [
+      guardPublicUpdate,
       ({ data, operation, req, originalDoc }) => {
         if (operation === "create") {
           data.author = data.author ?? requestUser(req)?.id ?? null;

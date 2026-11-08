@@ -50,6 +50,8 @@ export const Users: CollectionConfig = {
     beforeDelete: [async ({ req, id }) => {
       const account = await req.payload.findByID({ collection: "users", id, depth: 0, overrideAccess: true, req });
       if (account.role === "administrator" && account.enabled === true) await requireOtherAdministrator(req, id);
+      // A person's notifications go with their account (their inbox is private to them; nobody else reads it).
+      await req.payload.db.deleteMany({ collection: "notifications", where: { recipient: { equals: id } }, req });
     }],
     beforeLogin: [
       ({ user }) => {

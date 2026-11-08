@@ -51,3 +51,32 @@ modification times include update edits and coverage state changes. The news
 sitemap retains the original publication time and
 [Google's two-day publication window](https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap),
 including for running coverage.
+
+## In the Payload newsroom
+
+Stories with live coverage on (start it from Story details) get a **Live** tab.
+Managers of the story post, edit and delete updates; an update is a headline
+(optional), plain text (blank line = new paragraph, `- ` = bullet, bare
+http(s) links become links), and an optional photo from Media. The text is stored
+as bounded prose (paragraph, list, link, line break) and rendered to HTML from
+escaped text only; there is no markup, formatting or HTML a writer can add.
+
+Publishing follows the newsroom's rule: **only editors publish.** Staff on a
+story save drafts (always, whatever they ask for) that only the story's managers
+see; an editor publishes, unpublishes, pins and deletes anything readers can see.
+That is enforced by the `live-updates` collection, not the screen, so it holds
+over REST too. Until the story itself is published, everything is private.
+Pinning replaces the previous key update. Unlike the WordPress panel, an update
+needs text (a photo or headline alone is not enough).
+
+`GET /api/byline/live/<storyId>` is the public, read-only, `no-store`
+projection (no credentials, cookies or account details): the same shape
+`normalizeLiveCoverage` validates for the static build and the Worker, only for
+a published, untrashed story with live or ended coverage, with its published
+updates newest first. Photos are the prepared public renditions; if one is not
+yet prepared the feed omits photos until the next build. The Cloudflare Worker's
+`/api/live/<storyId>` still reads WordPress (`/wp-json/byline/v1/live/<id>`);
+pointing it at this endpoint is a cutover task with the poll proxy (Phase 11),
+and photos in the feed only resolve on the deployed site after a build
+materializes them.
+

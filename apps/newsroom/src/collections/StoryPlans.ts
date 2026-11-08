@@ -3,6 +3,7 @@ import { APIError, type CollectionConfig, type FieldAccess } from "payload";
 import { inIds, scopeManages, storyScope } from "../access/story-context";
 import { atLeast, editorsOnlyField, newsroomUser, requestUser } from "../access/user";
 import { dateOnly, TimingError } from "../domain/schedule";
+import { notifyAfterPlanChange } from "../newsroom/notification-hooks";
 import { LIMITS, RESOURCE_PURPOSE_OPTIONS, WORKFLOW_OPTIONS } from "../domain/vocabulary";
 
 const systemOnly: FieldAccess = ({ req }) => req.context?.bylineSystem === true || req.context?.bylineImport === true;
@@ -54,7 +55,7 @@ export const StoryPlans: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "administrator")
   },
   hooks: {
-    afterChange: [activityFor("plan")],
+    afterChange: [activityFor("plan"), notifyAfterPlanChange],
     beforeValidate: [
       ({ data }) => {
         if (data && data.deadline !== undefined) {
