@@ -20,7 +20,7 @@ import config from "../src/payload.config";
 import { recordPublicMutation } from "../src/public/revision";
 import { CORRECTION_TYPES } from "../src/domain/vocabulary";
 import { MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../src/collections/Media";
-import { newsroomTimeZone } from "../src/domain/dates";
+import { localToInstant, newsroomTimeZone } from "../src/domain/dates";
 import { isWorkflowStage } from "../src/domain/workflow";
 import { RESOURCE_PURPOSES } from "../src/domain/vocabulary";
 
@@ -46,7 +46,8 @@ type ExportAttachment = {
 };
 type ExportCorrection = { legacyId?: number | null; type: string; text: string; date: string; source?: string };
 type ExportPost = {
-  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string; createdAt?: string; publishedAt?: string; modifiedAt?: string;
+  id: number; title: string; slug: string; status: "publish" | "draft"; publicPath?: string;
+  createdLocal?: string; publishedLocal?: string; modifiedLocal?: string; publishedGmt?: string; modifiedGmt?: string;
   deck?: string; featuredMediaId?: number | null; featuredCaption?: string; categoryIds: number[]; tagIds: number[];
   contributors: Array<{ type: "user" | "guest"; id: number }>;
   reportingNote?: string; format?: string; videoUrl?: string; presentation?: string; immersiveAlignment?: string;
@@ -257,6 +258,12 @@ async function plan() {
 
   const knownAttachments = new Set(raw.attachments.map((item) => item.id));
   for (const post of raw.posts) {
+    if (!text(post.publishedLocal) || !text(post.modifiedLocal)) {
+      throw new Error(`Post ${post.id} is missing WordPress-local publication timestamps; regenerate the export with the current exporter.`);
+    }
+    // Validate conversion now, not during apply.
+    localToInstant(text(post.publishedLocal), newsroomTimeZone());
+    localToInstant(text(post.modifiedLocal), newsroomTimeZone());
     const inspect = (node: any) => {
       const ids: number[] = [];
       if (typeof node.media === "number") ids.push(node.media);
@@ -272,7 +279,8 @@ async function plan() {
     const section = sectionId ? categoryById.get(sectionId) : null;
     if (post.status === "publish") {
       if (!section) throw new Error(`Published post ${post.id} has no visible WordPress category for its Payload Section.`);
-      const expected = publicStoryPath({ slug: post.slug, sectionSlug: section.slug, publishedAt: post.publishedAt, timeZone: newsroomTimeZone() });
+      const publishedAt = localToInstant(text(post.publishedLocal), newsroomTimeZone());
+      const expected = publicStoryPath({ slug: post.slug, sectionSlug: section.slug, publishedAt, timeZone: newsroomTimeZone() });
       if (text(post.publicPath) && expected !== post.publicPath) {
         throw new Error(`Post ${post.id} URL parity failed: WordPress ${post.publicPath}, Payload would use ${expected || "(no route)"}.`);
       }
@@ -427,7 +435,7 @@ async function applyImport() {
       deck: text(post.deck),
       slug: post.slug,
       _status: post.status === "publish" ? "published" : "draft",
-      ...(post.status === "publish" ? { publishedAt: new Date(post.publishedAt || "").toISOString() } : {}),
+      ...(post.status === "publish" ? { publishedAt: localToInstant(text(post.publishedLocal), newsroomTimeZone()) } : {}),
       section,
       topics: post.tagIds.map((id) => topicMap.get(id)).filter((id): id is number => Boolean(id)),
       contributors,
@@ -449,11 +457,8 @@ async function applyImport() {
     }
     storyMap.set(post.id, Number(story.id));
 
-    const createdAt = new Date(post.createdAt || post.publishedAt || "");
-    const modifiedAt = new Date(post.modifiedAt || post.createdAt || post.publishedAt || "");
-    if (!Number.isFinite(createdAt.getTime()) || !Number.isFinite(modifiedAt.getTime())) {
-      throw new Error(`Post ${post.id} has invalid WordPress timestamps.`);
-    }
+    const createdAt = localToInstant(text(post.createdLocal || post.publishedLocal), newsroomTimeZone());
+    const modifiedAt = localToInstant(text(post.modifiedLocal || post.createdLocal || post.publishedLocal), newsroomTimeZone());
     // Payload owns these generated fields for normal writes. The controlled
     // import restores source timestamps directly on the main row so public
     // modifiedAt does not become the migration time. The first ordinary
@@ -461,7 +466,7 @@ async function applyImport() {
     await payload.db.updateOne({
       collection: "stories",
       id: story.id,
-      data: { createdAt: createdAt.toISOString(), updatedAt: modifiedAt.toISOString() } as never,
+      data: { createdAt, updatedAt: modifiedAt } as never,
     });
 
     const planInput = importedPlan(post);
