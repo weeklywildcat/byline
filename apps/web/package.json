@@ -26,7 +26,7 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
-    "astro": "7.3.1",
+    "astro": "7.3.3",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -39,8 +39,8 @@
     "@types/react-dom": "latest",
     "jsdom": "26.1.0",
     "typescript": "6.0.3",
-    "vitest": "^4.1.11",
-    "wrangler": "4.151.1"
+    "vitest": "^4.1.12",
+    "wrangler": "4.158.0"
   },
   "optionalDependencies": {
     "lightningcss-linux-x64-gnu": "1.33.0"
