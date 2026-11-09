@@ -108,13 +108,20 @@ export function parseTimestamp(value: string): number | null {
 /** A leading `Speaker:` / `<v Speaker>` on a cue becomes the segment's speaker. */
 function splitSpeaker(text: string): { speaker?: string; text: string } {
   const voice = /^<v(?:\.[^ >]+)?\s+([^>]{1,120})>([\s\S]*)$/.exec(text);
-  if (voice) return { speaker: voice[1].trim(), text: voice[2].replace(/<\/v>/g, "").trim() };
+  if (voice) return { speaker: voice[1].trim(), text: voice[2].trim().replace(/<\/v>$/, "") };
   const label = /^([A-Z][\w .'-]{0,60}):\s+(.+)$/.exec(text);
   if (label && label[1].split(" ").length <= 4) return { speaker: label[1].trim(), text: label[2].trim() };
   return { text };
 }
 
-const stripTags = (text: string) => text.replace(/<(?!v[ .])[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ");
+const CUE_ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " " };
+
+/** Turn subtitle formatting into plain text. Read each entity once and leave
+ * unsupported markup as spoken text for the renderer to escape. */
+function cueText(value: string): string {
+  return value.replace(/<\/?(?:b|i|u|c|ruby|rt|lang|v)(?:[ .][^<>]*)?>|<(?:\d{1,3}:)?\d{1,2}:\d{2}\.\d{3}>|&(?:amp|lt|gt|nbsp);/gi,
+    (token) => CUE_ENTITIES[token.toLowerCase()] ?? "").trim();
+}
 
 function parseCues(source: string, format: "srt" | "vtt"): TranscriptSegment[] {
   const blocks = source.replace(/\r\n?/g, "\n").replace(/^﻿/, "").split(/\n{2,}/);
@@ -128,10 +135,11 @@ function parseCues(source: string, format: "srt" | "vtt"): TranscriptSegment[] {
     const startMs = parseTimestamp(start ?? "");
     const endMs = parseTimestamp(end ?? "");
     if (startMs === null) throw new TranscriptImportError(`Line "${lines[timeIndex]}" has an unreadable timestamp.`);
-    const text = stripTags(lines.slice(timeIndex + 1).join(" ")).trim();
+    const raw = lines.slice(timeIndex + 1).join(" ").trim();
+    const parts = splitSpeaker(raw);
+    const text = cueText(parts.text);
     if (!text) continue;
-    const parts = splitSpeaker(text);
-    segments.push({ id: segmentId(segments.length), startMs, endMs: endMs !== null && endMs >= startMs ? endMs : null, ...(parts.speaker ? { speaker: parts.speaker } : {}), text: stripTags(parts.text) });
+    segments.push({ id: segmentId(segments.length), startMs, endMs: endMs !== null && endMs >= startMs ? endMs : null, ...(parts.speaker ? { speaker: cueText(parts.speaker) } : {}), text });
   }
   return segments;
 }

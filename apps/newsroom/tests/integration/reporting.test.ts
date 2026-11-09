@@ -1,8 +1,11 @@
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readCurrentRevision } from "../../src/db/publication-state";
 import { PUBLIC_COLLECTIONS } from "../../src/public/tracking";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
+import { fasterWhisperProvider } from "../../src/reporting/transcription/faster-whisper";
 import { PermanentTranscriptionError, TemporaryTranscriptionError, type TranscriptionProvider } from "../../src/reporting/transcription/provider";
 import { setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
 import type { User } from "../../src/payload-types";
@@ -174,10 +177,52 @@ describe("recordings, ground rules and transcription", () => {
   });
 
   it("transcribes on the reporting queue, stores provider-neutral segments and tells the uploader", async () => {
-    await runReporting();
+    // Use the actual multipart provider against a local implementation of the
+    // service contract. The model itself is exercised separately.
+    const received: Array<{ path?: string; authorization?: string; form: FormData }> = [];
+    let status = 200;
+    const server = createServer(async (request, response) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const form = await new Response(Buffer.concat(chunks), { headers: { "Content-Type": request.headers["content-type"]! } }).formData();
+      received.push({ path: request.url, authorization: request.headers.authorization, form });
+      response.writeHead(status, { "Content-Type": "application/json" });
+      response.end(JSON.stringify(status === 200 ? {
+        language: "EN", duration: 12,
+        segments: stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }))
+      } : { detail: "Unsupported audio codec." }));
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing transcription test address");
+    const url = `http://127.0.0.1:${address.port}`;
+    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 5000, token: "fixture-token" });
+    setTranscriptionProviderForTests(provider);
+    try {
+      await runReporting();
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({ path: "/transcribe", authorization: "Bearer fixture-token" });
+      const form = received[0].form;
+      expect(Object.fromEntries([...form].filter(([key]) => key !== "file"))).toEqual({ model: "test-model", language: "en", vad: "true", word_timestamps: "true" });
+      const upload = form.get("file") as File;
+      expect(upload.name).toBe("coach-smith.wav");
+      expect(Buffer.from(await upload.arrayBuffer())).toEqual(wav("coach-smith.wav").data);
+
+      status = 422;
+      const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, file: wav("http-broken.wav") });
+      await runReporting();
+      const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } }, depth: 0 })).docs[0];
+      expect(failed).toMatchObject({ state: "failed", failure: expect.stringContaining("Unsupported audio codec.") });
+      expect(JSON.stringify(failed)).not.toContain(url);
+    } finally {
+      setTranscriptionProviderForTests(stub);
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
     const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-    expect(transcript).toMatchObject({ state: "ready", provider: "stub-whisper", model: "test-model", language: "en", durationMs: 12000 });
-    expect((transcript.segments as unknown[]).length).toBe(3);
+    expect(transcript).toMatchObject({ state: "ready", provider: "faster-whisper", model: "test-model", language: "en", durationMs: 12000 });
+    expect(transcript.segments).toEqual(stubSegments);
+    expect(JSON.stringify(transcript)).not.toContain(url);
     expect(transcript.searchText).toContain("man coverage");
     const notices = await payload.find({ collection: "notifications", where: { and: [{ recipient: { equals: accounts.alice.id } }, { kind: { equals: "transcriptReady" } }] } });
     expect(notices.totalDocs).toBe(1);
@@ -271,7 +316,7 @@ describe("quotes, verification and provenance", () => {
     expect(provenance.body.source).toMatchObject({ label: "Coach Smith" });
     expect(provenance.body.appointment).toMatchObject({ title: "Interview Coach Smith" });
     expect(provenance.body.recording).toMatchObject({ filename: "coach-smith.wav", capturedBy: "alice Account" });
-    expect(provenance.body.transcript).toMatchObject({ origin: "machine", provider: "stub-whisper" });
+    expect(provenance.body.transcript).toMatchObject({ origin: "machine", provider: "faster-whisper" });
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);

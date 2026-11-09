@@ -73,6 +73,10 @@ describe("transcript import", () => {
     expect(parsed.segments[0]).toMatchObject({ speaker: "Gibson", text: "Thanks.", startMs: 1000, endMs: 3000 });
     expect(() => parseTranscriptFile("00:01.000 --> 00:03.000\nHi\n", "vtt")).toThrow(TranscriptImportError);
   });
+  it("decodes cue entities once and keeps escaped markup literal", () => {
+    const parsed = parseTranscriptFile("WEBVTT\n\n00:01.000 --> 00:03.000\n<v Casey><i>Thanks</i> &amp;lt; &lt;b&gt; &lt;script&gt;. </v>", "vtt");
+    expect(parsed.segments[0]).toMatchObject({ speaker: "Casey", text: "Thanks &lt; <b> <script>." });
+  });
   it("makes untimed segments from plain text, honoring optional [mm:ss] stamps", () => {
     const parsed = parseTranscriptFile("First paragraph.\n\n[01:05] Second paragraph.", "txt");
     expect(parsed.segments).toEqual([
