@@ -205,6 +205,26 @@ test("Social Post accepts public post addresses only and never loads the provide
   expect(providerRequests).toEqual([]);
 });
 
+test("invalid chapter edits clear the saved timestamp and can be corrected", async ({ page, request, baseURL }) => {
+  await openStory(page);
+  const time = block(page, "video").getByRole("textbox", { name: "Time of chapter 2, minutes and seconds" });
+  await expect(time).toHaveValue("1:24");
+  await time.fill("1:75");
+  await expect(time).toHaveValue("1:75");
+  await expect(time).toHaveAttribute("aria-invalid", "true");
+  await waitForSaved(page);
+  const savedTime = async () => {
+    const draft = await readDraft(request, baseURL!, editorToken, storyId);
+    const stored = draft.body as { root: { children: Array<{ fields?: { blockType?: string; chapters?: Array<{ time: number | null }> } }> } };
+    return stored.root.children.find((node) => node.fields?.blockType === "video")?.fields?.chapters?.[1]?.time;
+  };
+  await expect.poll(savedTime).toBeNull();
+  await time.fill("1:25");
+  await expect(time).not.toHaveAttribute("aria-invalid", "true");
+  await waitForSaved(page);
+  await expect.poll(savedTime).toBe(85);
+});
+
 test("Final Score swaps teams, keeps a zero and stores plain numbers; Event replaces by keyboard; Gallery features a photo", async ({ page, request, baseURL }) => {
   await openStory(page);
   const score = block(page, "finalScore");

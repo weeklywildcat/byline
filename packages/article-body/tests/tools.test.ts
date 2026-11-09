@@ -3,6 +3,7 @@ import {
   boundedParagraphs,
   chartDataProblem,
   chartModel,
+  chartPercent,
   chartValue,
   collectFootnotes,
   collectSources,
@@ -13,7 +14,9 @@ import {
   finalScoreSentence,
   finalScoreWinner,
   formatTimestamp,
+  formatTick,
   isBlockingIssue,
+  niceTicks,
   parseSocialPostUrl,
   parseTimestamp,
   safeWebUrl,
@@ -189,6 +192,20 @@ describe("native charts", () => {
     expect(model.min).toBe(0);
     expect(model.max).toBeGreaterThanOrEqual(16);
     expect(finalizeBlock(FIXTURE_NATIVE_CHART, lookup).block).toEqual(FIXTURE_NATIVE_CHART);
+  });
+  it("accepts plain decimals and rejects long malformed or overflowing cells", () => {
+    expect([chartValue("+.5"), chartValue("5."), chartValue("($1,500.25)")]).toEqual([0.5, 5, -1500.25]);
+    expect(chartValue(`${"0".repeat(500)}x`)).toBeNaN();
+    expect(chartValue("9".repeat(500))).toBeNaN();
+  });
+  it("keeps small tick labels distinct and preserves the scale below nine decimal places", () => {
+    const ticks = niceTicks(-0.0001, 0.0008);
+    expect(ticks.map((tick) => formatTick(tick, ticks[1]! - ticks[0]!))).toEqual(["-0.00025", "0", "0.00025", "0.0005", "0.00075", "0.001"]);
+    const tiny = niceTicks(0, 8e-12);
+    const max = tiny.at(-1)!;
+    expect(max).toBeGreaterThanOrEqual(8e-12);
+    expect(chartPercent({ min: 0, max }, 4e-12)).toBe(50);
+    expect(tiny.map((tick) => formatTick(tick, tiny[1]! - tiny[0]!))).toEqual(["0", "2E-12", "4E-12", "6E-12", "8E-12"]);
   });
   it("explains bad data in the reporter's words", () => {
     const data = FIXTURE_NATIVE_CHART.data!;

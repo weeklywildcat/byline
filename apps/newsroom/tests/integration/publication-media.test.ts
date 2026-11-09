@@ -400,6 +400,19 @@ describe("Story publication readiness", () => {
     await expect(publish(id)).resolves.toMatchObject({ _status: "published" });
   });
 
+  it("waits for the prepared PDF when only an inline Source references it", async () => {
+    const source = await upload("editor", { ...pdf(), name: "inline-source.pdf" });
+    const body = { root: { type: "root", version: 1, format: "", indent: 0, direction: "ltr", children: [
+      { type: "paragraph", version: 1, format: "", indent: 0, direction: "ltr", children: [
+        { type: "inlineBlock", version: 1, fields: { id: "s1", blockType: "source", kind: "document", media: source, label: "Meeting minutes" } }
+      ] }
+    ] } };
+    const id = await story({ body });
+    expect(await refusal(id)).toMatch(/body: inline-source\.pdf · Publication files are still being prepared/);
+    await runMediaJobs();
+    await expect(publish(id)).resolves.toMatchObject({ _status: "published" });
+  });
+
   it("refuses failed, stale, metadata-incomplete and old-recipe media", async () => {
     const failed = await upload("alice", await halves(640, 480, "failed.jpg"));
     unlinkSync(path.join(privateMediaDir(), (await media(failed)).filename!));

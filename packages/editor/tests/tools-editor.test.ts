@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateArticleBody, type MediaId } from "@byline/article-body";
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_MEDIA, FIXTURE_NATIVE_CHART, FIXTURE_REFERENCES, FIXTURE_TRACKER_KEY } from "@byline/article-body/fixtures";
 import { BLOCK_FIELD_READERS, articleBlockFromFields } from "../src/fields";
-import { collectMediaIds, normalizePayloadArticleBody } from "../src/normalize";
+import { collectMediaIds, collectMediaUses, normalizePayloadArticleBody } from "../src/normalize";
 import { enforcePrivilegedBlocks } from "../src/permissions";
 import { BYLINE_BODY_BLOCKS, BYLINE_SOURCE_BLOCK } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
@@ -34,6 +34,12 @@ describe("inline Source references", () => {
     expect(Object.keys(body.media)).toEqual(["201"]);
     expect(validateArticleBody(body).ok).toBe(true);
     expect(collectMediaIds(state(paragraph(pdf("s2"))))).toEqual([201]);
+  });
+
+  it("requires publication-ready media for inline PDFs alongside block media", () => {
+    const body = state(block({ blockType: "document", media: 201 }), paragraph(web("s1"), pdf("s2"), inline({ blockType: "source", kind: "document" })));
+    expect(collectMediaIds(body)).toEqual([201]);
+    expect(collectMediaUses(body)).toEqual([{ id: 201, hasAltOverride: false }, { id: 201, hasAltOverride: false }]);
   });
 
   it("report an unfinished source instead of publishing a dead reference", () => {

@@ -121,8 +121,7 @@ function storedSources(state: unknown): SourceRef[] {
 
 /** Every Media ID a body references (every block that names Media, and the PDFs inline sources point at), for the host to resolve before normalizing. */
 export function collectMediaIds(state: unknown): MediaId[] {
-  const sourceMedia = storedSources(state).flatMap((ref) => (ref.kind === "document" && ref.media !== null && ref.media !== undefined ? [ref.media] : []));
-  return [...new Map([...bodyMediaIds(storedBlocks(state)), ...sourceMedia].map((id) => [mediaKey(id), id])).values()];
+  return [...new Map(collectMediaUses(state).map(({ id }) => [mediaKey(id), id])).values()];
 }
 
 export type StoredMediaUse = { id: MediaId; hasAltOverride: boolean };
@@ -134,8 +133,8 @@ export type StoredMediaUse = { id: MediaId; hasAltOverride: boolean };
  * valid source: the public renderer already gives an `altOverride` precedence.
  */
 export function collectMediaUses(state: unknown): StoredMediaUse[] {
-  return storedBlocks(state).flatMap((block): StoredMediaUse[] => {
-    const use = (id: MediaId | null, altOverride?: string): StoredMediaUse[] => id === null ? [] : [{ id, hasAltOverride: Boolean(altOverride?.trim()) }];
+  const use = (id: MediaId | null, altOverride?: string): StoredMediaUse[] => id === null ? [] : [{ id, hasAltOverride: Boolean(altOverride?.trim()) }];
+  const blockUses = storedBlocks(state).flatMap((block): StoredMediaUse[] => {
     switch (block.type) {
       case "photo":
       case "portraitText":
@@ -152,6 +151,8 @@ export function collectMediaUses(state: unknown): StoredMediaUse[] {
         return blockMediaIds(block).map((id) => ({ id, hasAltOverride: false }));
     }
   });
+  const sourceUses = storedSources(state).flatMap((ref) => ref.kind === "document" ? use(ref.media) : []);
+  return [...blockUses, ...sourceUses];
 }
 
 /** Editorial labels for each block type that uses a Media asset. */

@@ -14,8 +14,9 @@ export function chartValue(cell: string | undefined): number | null {
   const text = (cell ?? "").trim();
   if (!text) return null;
   const cleaned = text.replace(/[−–]/g, "-").replace(/^\((.*)\)$/, "-$1").replace(/[,\s$€£%]/g, "");
-  if (!/^[-+]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) return Number.NaN;
-  return Number(cleaned);
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(cleaned)) return Number.NaN;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : Number.NaN;
 }
 
 export type ChartSeries = { id: string; label: string; values: Array<number | null>; texts: string[] };
@@ -45,13 +46,17 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
   const low = Math.min(0, min);
   const high = Math.max(0, max);
   if (low === high) return [0, 1];
-  const raw = (high - low) / count;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= raw) ?? raw;
-  const start = Math.floor(low / step) * step;
-  const end = Math.ceil(high / step) * step;
+  const span = high - low;
+  const raw = Math.max(Number.MIN_VALUE, Number.isFinite(span) ? span / count : high / count - low / count);
+  const magnitude = Math.max(Number.MIN_VALUE, 10 ** Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= raw && Number.isFinite(candidate)) ?? raw;
+  const first = Math.floor(low / step);
+  const last = Math.ceil(high / step);
   const ticks: number[] = [];
-  for (let value = start; value <= end + step / 2; value += step) ticks.push(Math.round(value * 1e9) / 1e9);
+  for (let index = first; index <= last; index += 1) {
+    const tick = index * step;
+    ticks.push(Number.isFinite(tick) ? tick : index < 0 ? low : high);
+  }
   return ticks;
 }
 
@@ -74,10 +79,20 @@ export function chartModel(data: NativeChartData): ChartModel {
 
 /** A position on the scale as a percentage of the axis, 0-100. */
 export function chartPercent(model: Pick<ChartModel, "min" | "max">, value: number): number {
-  return model.max === model.min ? 0 : Math.round(((value - model.min) / (model.max - model.min)) * 10000) / 100;
+  const span = model.max - model.min;
+  if (span === 0) return 0;
+  const fraction = Number.isFinite(span)
+    ? (value - model.min) / span
+    : (value / 2 - model.min / 2) / (model.max / 2 - model.min / 2);
+  return Math.round(fraction * 10000) / 100;
 }
 
-/** How a tick reads: no trailing zeros, thousands separated. */
-export function formatTick(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+/** Axis spacing sets the precision. Very small steps use compact scientific labels. */
+export function formatTick(value: number, step: number): string {
+  if (value === 0) return "0";
+  const maximumFractionDigits = Math.max(0, 1 - Math.floor(Math.log10(step)));
+  const options: Intl.NumberFormatOptions = maximumFractionDigits > 9
+    ? { notation: "scientific", maximumSignificantDigits: 3 }
+    : { maximumFractionDigits };
+  return new Intl.NumberFormat("en-US", options).format(value);
 }

@@ -10,16 +10,21 @@ import { ToolButton } from "../chrome";
 import { InlineText } from "../fields";
 import { focusIn } from "./shared";
 
+function parseChapterTime(text: string): number | null {
+  const time = parseTimestamp(text);
+  return time !== null && time <= LIMITS.chapterTimeMax ? time : null;
+}
+
 /** A chapter's time, typed as a reader reads it ("1:24"); kept as typed until it reads as a time. */
 function ChapterTime({ value, index, readOnly, onChange, onEnter }: { value: number | null; index: number; readOnly: boolean; onChange: (time: number | null) => void; onEnter: () => void }) {
   const [text, setText] = useState(value === null ? "" : formatTimestamp(value));
   useEffect(() => {
     // Follow outside changes (undo, sorting) unless the typed text already means this time.
-    if (parseTimestamp(text) !== value) setText(value === null ? "" : formatTimestamp(value));
+    if (parseChapterTime(text) !== value) setText(value === null ? "" : formatTimestamp(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only an outside change of `value` resets the text
   }, [value]);
-  const parsed = parseTimestamp(text);
-  const invalid = text.trim() !== "" && (parsed === null || parsed > LIMITS.chapterTimeMax);
+  const parsed = parseChapterTime(text);
+  const invalid = text.trim() !== "" && parsed === null;
   return (
     <input
       type="text"
@@ -34,12 +39,11 @@ function ChapterTime({ value, index, readOnly, onChange, onEnter }: { value: num
       maxLength={8}
       onChange={(event) => {
         setText(event.target.value);
-        const time = parseTimestamp(event.target.value);
-        if (time !== null && time <= LIMITS.chapterTimeMax) onChange(time);
-        else if (!event.target.value.trim()) onChange(null);
+        const time = parseChapterTime(event.target.value);
+        if (time !== value) onChange(time);
       }}
       onBlur={() => {
-        if (parsed !== null && !invalid) setText(formatTimestamp(parsed));
+        if (parsed !== null) setText(formatTimestamp(parsed));
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter") {

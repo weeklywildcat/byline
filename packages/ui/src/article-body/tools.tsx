@@ -48,11 +48,12 @@ function ChartKey({ labels }: { labels: string[] }): ReactNode {
 }
 
 function Ticks({ ticks, min, max }: { ticks: number[]; min: number; max: number }): ReactNode {
+  const step = ticks[1]! - ticks[0]!;
   return (
     <div className="byline-chart-ticks" aria-hidden="true">
       {ticks.map((tick) => (
         <span key={tick} className={join("byline-chart-tick", tick === 0 && "is-zero")} style={cssVars({ "--at": `${chartPercent({ min, max }, tick)}%` })}>
-          <span className="byline-chart-tick-label">{formatTick(tick)}</span>
+          <span className="byline-chart-tick-label">{formatTick(tick, step)}</span>
         </span>
       ))}
     </div>
@@ -121,6 +122,7 @@ const DASHES = ["", "6 4", "2 3", "10 3 2 3"];
 
 function LineChart({ data }: { data: NativeChartData }): ReactNode {
   const model = chartModel(data);
+  const tickStep = model.ticks[1]! - model.ticks[0]!;
   const count = model.categories.length;
   const x = (index: number) => (count > 1 ? (index / (count - 1)) * 100 : 50);
   const y = (value: number) => 100 - chartPercent(model, value);
@@ -134,7 +136,7 @@ function LineChart({ data }: { data: NativeChartData }): ReactNode {
           <div className="byline-chart-gridlines" aria-hidden="true">
             {model.ticks.map((tick) => (
               <span key={tick} className={join("byline-chart-gridline", tick === 0 && "is-zero")} style={cssVars({ "--at": `${chartPercent(model, tick)}%` })}>
-                <span className="byline-chart-tick-label">{formatTick(tick)}</span>
+                <span className="byline-chart-tick-label">{formatTick(tick, tickStep)}</span>
               </span>
             ))}
           </div>
