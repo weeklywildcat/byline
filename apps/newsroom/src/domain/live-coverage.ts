@@ -72,6 +72,9 @@ export function publishBlock(settings: LiveSettings, storyPublic: boolean): Excl
   return null;
 }
 
+/** Every reason an update can be sent to the desk instead of published (stored on the update). */
+export const DESK_REASON_OPTIONS = ["story-not-public", "not-live-mode", "coverage-not-started", "coverage-ended", "permission-revoked"] as const;
+
 export const PUBLISH_BLOCK_COPY: Record<PublishBlock, string> = {
   "story-not-public": "the story isn't published yet",
   "not-live-mode": "the story isn't in Live mode",

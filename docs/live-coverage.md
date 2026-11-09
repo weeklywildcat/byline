@@ -105,7 +105,10 @@ or any broader permission. It is offered to staff who work on the Story through
 Byline's existing Story access (its creator, the byline's linked accounts, people
 holding assigned work) and to anyone who already has it, never to editors
 (`liveCandidates`). Only editor-level accounts change coverage, checked on the
-server for each request (`changeLiveCoverage`).
+server for each request (`changeLiveCoverage`). Each change is written only if the plan is
+still the one it was computed from; otherwise it answers 409 ("Live coverage changed while
+you were working") so two editors can never overwrite each other. An update never moves
+between Stories, so permission and coverage checks always use the Story it is on.
 
 ### One rule for "can this become public now"
 
@@ -124,7 +127,7 @@ A live update is created with the reporter's explicit intent, `delivery: "publis
 published only if, at that moment, `canPublishLiveNow` holds; otherwise it becomes a
 desk draft and the response says why (`{ status: "sent-to-desk", reason }` with
 `story-not-public`, `not-live-mode`, `coverage-not-started`, `coverage-ended` or
-`permission-revoked`). A missing intent means the desk. Pinning is a publisher's call
+`permission-revoked`). The reason is stored with the update (`live-updates.deskReason`), so a retried request (a lost response) explains it the same way rather than recalculating. A missing intent means the desk. Pinning is a publisher's call
 and a draft is never pinned.
 
 ### Write

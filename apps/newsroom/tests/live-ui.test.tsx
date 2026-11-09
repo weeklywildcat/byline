@@ -49,6 +49,15 @@ describe("live update delivery buttons", () => {
 });
 
 describe("Story mode control", () => {
+  it("says so (with a retry) when the live desk fails to load, instead of silently hiding the controls", () => {
+    const html = render(undefined, <StoryModeControl />, { error: new Error("The live desk is unavailable."), retry: () => {} });
+    expect(html).toContain("Live coverage controls couldn&#x27;t load");
+    expect(html).toContain("The live desk is unavailable.");
+    expect(html).toContain("Try again");
+    // Still loading, no error: nothing yet.
+    expect(render(undefined, <StoryModeControl />)).toBe("");
+  });
+
   it("is a labelled Standard/Live group that reflects the real mode", () => {
     const html = render(desk({ mode: "live" }), <StoryModeControl />);
     expect(html).toContain("Story mode");

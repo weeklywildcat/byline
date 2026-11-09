@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fieldEndpoints } from "../../src/field/endpoints";
 import { readCurrentRevision } from "../../src/db/publication-state";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
+import { changeLiveCoverage } from "../../src/newsroom/live-coverage";
+import { screenContext } from "../../src/newsroom/screen-models";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -190,9 +192,12 @@ describe("delivery intent from Field (offline retries)", () => {
     const retried = await field("carol", "game", { text: "SENTINEL-OFFLINE-9-51", delivery: "publish", clientKey: "lw-field-0005", queued: true });
     expect(retried.body).toMatchObject({ status: "sent-to-desk", reason: "coverage-ended" });
     expect(JSON.stringify((await feed("game")).body)).not.toContain("SENTINEL-OFFLINE-9-51");
-    // A retry of the same capture returns the first record and never duplicates or flips to public.
+    // A retry of the same capture (the first response was lost) returns the first record, never duplicates or flips to
+    // public, and repeats the ORIGINAL reason even though coverage is live again by the time it arrives.
+    await coverage("editor", "game", { action: "start" });
     const again = await field("carol", "game", { text: "SENTINEL-OFFLINE-9-51", delivery: "publish", clientKey: "lw-field-0005", queued: true });
-    expect(again.body).toMatchObject({ id: retried.body.id, status: "sent-to-desk", duplicate: true });
+    expect(again.body).toMatchObject({ id: retried.body.id, status: "sent-to-desk", reason: "coverage-ended", duplicate: true });
+    await coverage("editor", "game", { action: "end" });
     expect((await payload.count({ collection: "live-updates", where: { clientKey: { equals: "lw-field-0005" } } })).totalDocs).toBe(1);
     // The session tells Field the truth: no Publish now while ended.
     expect((await session("carol", "game")).body).toMatchObject({ canPostLive: true, canPublishNow: false, publishBlock: "coverage-ended", canControl: false, story: { live: false, coverage: { mode: "live", state: "ended" } } });
@@ -292,5 +297,40 @@ describe("the public feed", () => {
     const json = JSON.stringify((await feed("game")).body);
     for (const draft of ["SENTINEL-BOB", "SENTINEL-FIELD legacy", "SENTINEL-FIELD desk", "SENTINEL-CAROL send"]) expect(json).not.toContain(draft);
     expect(json).not.toContain("example.test");
+  });
+});
+
+describe("review fixes", () => {
+  it("never lets an update be published into a different Story than the one it is on", async () => {
+    await newStory("endedA", "Ended game", true, [people.alice]);
+    await newStory("runningB", "Running game", true, [people.alice]);
+    await coverage("editor", "endedA", { action: "setup", publishers: [] });
+    await coverage("editor", "endedA", { action: "start" });
+    await coverage("editor", "runningB", { action: "setup", publishers: [accounts.alice.id] });
+    await coverage("editor", "runningB", { action: "start" });
+    // Alice holds a draft on A, then A's coverage ends. She holds the live grant on running B.
+    const draft = await post("alice", "endedA", { text: "SENTINEL-MOVE draft on A", delivery: "desk" });
+    await coverage("editor", "endedA", { action: "end" });
+    const moved = await payload.update({ collection: "live-updates", id: draft.body.id, data: { story: story.runningB, state: "published" } as never, req: await reqAs("alice"), overrideAccess: false }).then(() => "published", () => "refused");
+    expect(moved).toBe("refused");
+    const row = await payload.findByID({ collection: "live-updates", id: draft.body.id, depth: 0, overrideAccess: true });
+    expect(row).toMatchObject({ state: "draft", story: story.endedA });
+    expect(JSON.stringify((await feed("endedA")).body)).not.toContain("SENTINEL-MOVE");
+  });
+
+  it("rejects a stale coverage change instead of overwriting what another editor just did", async () => {
+    await newStory("race", "Race game", true, [people.alice]);
+    await coverage("editor", "race", { action: "setup", publishers: [] });
+    await coverage("editor", "race", { action: "start" });
+    const ctx = screenContext(await reqAs("editor"), "America/New_York");
+    // A slow End computed from the plan as it was; meanwhile another editor changes the direct publishers (and could as
+    // easily have changed the state). The stale write must not land over it.
+    const stale = changeLiveCoverage(ctx, story.race, { action: "end" }, {
+      beforeWrite: async () => { await changeLiveCoverage(screenContext(await reqAs("editor"), "America/New_York"), story.race, { action: "publishers", publishers: [accounts.alice.id] }); }
+    });
+    await expect(stale).rejects.toMatchObject({ status: 409 });
+    const after = (await desk("editor", "race")).body;
+    expect(after).toMatchObject({ mode: "live", status: "live" });
+    expect(after.publishers.map((person: { id: number }) => person.id)).toEqual([accounts.alice.id]);
   });
 });
