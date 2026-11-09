@@ -161,7 +161,7 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   const path = stripAdmin(pathname, adminRoute);
   const nav = NAVIGATION.find((item) => item.path === path);
   if (nav) return [{ label: nav.label }];
-  if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Story" }];
+  if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Stories", path: STORIES_PATH }, { label: "Story" }];
   if (path === "/site") return [{ label: "Site" }];
   if (path === "/review-workflows") return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
   if (path === "/content-health") return [{ label: "Content Health" }];

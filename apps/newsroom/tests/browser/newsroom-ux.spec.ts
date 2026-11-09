@@ -109,7 +109,7 @@ test("moves a Story to Trash from the shadcn publication menu", async ({ page, c
   await page.goto(`/admin/collections/stories/${id}`);
   await expect(page.getByRole("textbox", { name: "Headline" })).toHaveValue("Trash action fixture");
 
-  await page.getByRole("button", { name: "Publication actions" }).click();
+  await page.getByRole("button", { name: "More story actions" }).click();
   await page.getByRole("menuitem", { name: /Move to trash/i }).click();
 
   const dialog = page.getByRole("alertdialog", { name: "Move this story to Trash?" });

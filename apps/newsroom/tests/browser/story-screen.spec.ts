@@ -41,7 +41,9 @@ test("opens the Story itself, with Reporting visible and no tab bar or Plan", as
   await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Preview" })).toBeVisible();
+  // One quiet header: Reporting, the lifecycle action and a single menu. Preview, Field Mode, Story context and the publication actions live in it.
+  for (const name of ["Preview", "Field Mode", "Story context", "Publication actions"]) await expect(page.getByRole("button", { name })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(More story|Publication) actions$/ })).toHaveCount(1);
   await expect(page.getByRole("button", { name: /^Plan$/ })).toHaveCount(0);
   await expect(page.getByText("Add them in Plan")).toHaveCount(0);
   // Review is not navigation: no Review button for a Story nobody submitted.
@@ -50,6 +52,12 @@ test("opens the Story itself, with Reporting visible and no tab bar or Plan", as
   await expect(page.getByRole("button", { name: "View history" })).toHaveCount(0);
   await page.getByRole("button", { name: "More story actions" }).click();
   await expect(page.getByRole("menuitem", { name: "View history" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Preview" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Move to trash/ })).toBeVisible();
+  // Story mode is a property of the Story beside Section and Story type, not a bar above the headline.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("group", { name: "Story mode" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Live", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
 });
 
@@ -104,7 +112,8 @@ test("Story Context is a rail when there is room and the same content in a Sheet
 
   await page.setViewportSize({ width: 1100, height: 900 });
   await expect(rail).toHaveCount(0);
-  await page.getByRole("button", { name: "Story context" }).click();
+  await page.getByRole("button", { name: "More story actions" }).click();
+  await page.getByRole("menuitem", { name: "Story context" }).click();
   const sheet = page.getByRole("dialog", { name: "Story context" });
   await expect(sheet.getByRole("heading", { name: "Angle" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -164,4 +173,96 @@ test("Reporting capture saves notes, note edits and links in place, never reload
   await expect(notebook.getByText(/example\.org/).first()).toBeVisible();
   expect(await stillHere()).toBe(true);
   await expect(page).toHaveURL(/view=reporting/);
+});
+
+test("Legacy Story view is off by default and puts the Story back under Write / Plan / Production / History tabs", async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+
+  const setLegacy = async (on: boolean) => {
+    // By keyboard: the Next dev badge sits over the avatar in the compact rail.
+    await page.getByRole("button", { name: /^Account:/ }).focus();
+    await page.keyboard.press("Enter");
+    const item = page.getByRole("menuitemcheckbox", { name: "Legacy Story view" });
+    await expect(item).toHaveAttribute("aria-checked", on ? "false" : "true");
+    await item.click();
+  };
+
+  try {
+    await setLegacy(true);
+    const tabs = page.getByRole("tablist");
+    await expect(tabs.getByRole("tab")).toHaveText(["Write", "Plan", "Production", "History"]);
+    await expect(tabs.getByRole("tab", { name: "Write" })).toHaveAttribute("aria-selected", "true");
+    // Same header and lifecycle; only the arrangement differs.
+    await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeVisible();
+    const editor = page.locator("[data-story-article] [contenteditable=true]").first();
+    const handle = await editor.elementHandle();
+
+    await tabs.getByRole("tab", { name: "Plan" }).click();
+    await expect(page.locator("[data-story-article]")).toBeHidden();
+    await expect(page.getByRole("tabpanel")).toContainText("Brief");
+    await tabs.getByRole("tab", { name: "Production" }).click();
+    await expect(page.getByRole("tabpanel")).toContainText("Media & Production");
+    await tabs.getByRole("tab", { name: "Write" }).click();
+    await expect(editor).toBeVisible();
+    // The editor was only hidden, never remounted.
+    expect(await handle!.evaluate((node) => node.isConnected)).toBe(true);
+
+    // History is a tab here: the overflow menu and an old link land on it.
+    await page.getByRole("button", { name: "More story actions" }).first().click();
+    await page.getByRole("menuitem", { name: "View history" }).click();
+    await expect(tabs.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+
+    // The choice is the account's: it survives a reload, and `?tab=` still picks the tab.
+    await open(page, "?tab=production");
+    await expect(page.getByRole("tab", { name: "Production" })).toHaveAttribute("aria-selected", "true");
+  } finally {
+    await setLegacy(false);
+  }
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+});
+
+test("the top bar's breadcrumb is Stories › this Story, and a focused mode adds its name and a way back", async ({ page }) => {
+  await open(page);
+  const crumbs = page.getByRole("navigation", { name: "breadcrumb" });
+  await expect(crumbs.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/admin/stories");
+  await expect(crumbs.getByRole("listitem").last()).toContainText("Canteen could return next semester");
+  await page.getByRole("button", { name: "Reporting", exact: true }).click();
+  await expect(crumbs.getByRole("listitem").last()).toHaveText("Reporting");
+  await crumbs.getByRole("button", { name: /Canteen could return next semester/ }).click();
+  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
+  await expect(page).not.toHaveURL(/view=reporting/);
+});
+
+test("right-clicking the stage offers the same moves as the header, and the stage badge is colored", async ({ page }) => {
+  await open(page);
+  const stage = page.locator("[data-story-phase]");
+  await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
+  // Color is a second cue: the badge has a tint, never the plain secondary gray.
+  const tint = await stage.locator("[data-phase-badge]").evaluate((node) => getComputedStyle(node).backgroundColor);
+  const neutral = await page.locator("body").evaluate((node) => getComputedStyle(node).backgroundColor);
+  expect(tint).not.toBe(neutral);
+  await stage.click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Accept pitch" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Put on hold" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Drop story" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // The header button and the overflow menu are still the keyboard way to the same moves.
+  await expect(page.locator("[data-primary-action]")).toHaveText(/Accept pitch/);
+});
+
+test("an editor can right-click the stage and jump straight to any stage, with Undo", async ({ page, request, baseURL }) => {
+  // Start from a Pitch whatever an earlier run left behind.
+  await request.post(`/api/byline/stories/${storyId}/workflow`, { headers: headers(baseURL!), data: { status: "pitch" } });
+  await open(page);
+  const stage = page.locator("[data-story-phase]");
+  await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
+  await stage.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Move to stage" }).click();
+  // Pitch to Drafting in one move, skipping Reporting.
+  await page.getByRole("menuitemradio", { name: "Drafting" }).click();
+  await expect(stage.locator("[data-phase-badge=drafting]")).toBeVisible();
+  await expect(page.getByText(/Moved to Drafting/)).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
 });

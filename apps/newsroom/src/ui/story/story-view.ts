@@ -46,6 +46,19 @@ export function parseStoryLocation(search: string): StoryLocation {
   };
 }
 
+/**
+ * The tabs of the legacy tabbed layout (docs/story-screen.md#legacy-layout).
+ * `?tab=` picks the starting tab; anything else, and every Story that is not in
+ * that layout, starts on Write. Reporting is not a tab: it stays a focused mode.
+ */
+export const STORY_TABS = ["write", "plan", "production", "history"] as const;
+export type StoryTab = (typeof STORY_TABS)[number];
+
+export function parseStoryTab(search: string): StoryTab {
+  const tab = new URLSearchParams(search).get("tab") ?? "";
+  return (STORY_TABS as readonly string[]).includes(tab) ? (tab as StoryTab) : "write";
+}
+
 /** The address for a mode, keeping unrelated parameters and dropping the old `tab`. */
 export function storyLocationSearch(search: string, view: StoryView, extra: { capture?: CaptureIntent | null; transcript?: number | null } = {}): string {
   const params = new URLSearchParams(search);

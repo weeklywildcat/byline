@@ -5,6 +5,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsro
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { FieldGroup } from "@byline/newsroom-ui/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
@@ -14,12 +15,13 @@ import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import type { ReadinessPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
 import { relativeDay } from "@byline/newsroom-screens/story/attention";
-import { PHASE_LABELS, PHASE_STATUSES, type EffectivePhase } from "@byline/newsroom-screens/story/lifecycle";
+import { LIFECYCLE_PHASES, PHASE_LABELS, PHASE_STATUSES, type EffectivePhase } from "@byline/newsroom-screens/story/lifecycle";
 import { invalidateStoryData } from "@byline/newsroom-screens/story/story-query";
+import { PlanningProperties } from "@byline/newsroom-screens/workspace/DetailsSection";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronLeft, Ellipsis, History, List, NotebookPen, PanelRight, Smartphone } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, Ellipsis, Eye, History, List, NotebookPen, PanelRight, SlidersHorizontal, Smartphone } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
@@ -33,10 +35,11 @@ import { useStorySwitcher } from "../shell/StorySwitcher";
 import { getJson, postJson } from "./api";
 import { useStoryField } from "./form";
 import { formatDay, Property } from "./parts";
-import { PublicationActions } from "./PublicationActions";
+import { PhaseBadge } from "./PhaseBadge";
+import { usePublicationActions } from "./PublicationActions";
 import { blockingLines } from "./publication-readiness-model";
 import { StoryMediaReadinessNotice, useStoryMediaReadiness } from "./publication-readiness";
-import { PresentationStatus, PreviewButton, useStoryPresentationResolution } from "./StoryPreviewControl";
+import { PresentationStatus, useStoryPresentationResolution, useStoryPreview } from "./StoryPreviewControl";
 import type { StoryScreenContext } from "./StoryScreen";
 import type { StoryView } from "./story-view";
 import { StoryURL, useStoryURL } from "./StoryURL";
@@ -94,6 +97,8 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
   const workspace = useOptionalWorkspace();
   const workspaceQueries = useQueryClient();
   const planned = workspace?.data.story;
+  // Editors (anyone the plan lets assign) edit the editor, deadline and publication target in the details panel.
+  const planning = Boolean(workspace?.caps.assign) && !context.readOnly;
   const { id, hasPublishPermission, hasPublishedDoc, unpublishedVersionCount, lastUpdateTime, setHasPublishedDoc, setUnpublishedVersionCount, setMostRecentVersionIsAutosaved, uploadStatus } = useDocumentInfo();
   const { submit } = useForm();
   const modified = useFormModified();
@@ -158,6 +163,9 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
   const waitingFor = run?.status === "active" ? run.steps.find((step) => step.state === "active")?.waitingFor ?? null : null;
   const due = planned?.deadline && !hasPublishedDoc ? `Due ${relativeDay(planned.deadline, { now: new Date(), timeZone: context.timeZone })}` : null;
   const sidelined = phase === "on-hold" || phase === "dropped";
+  const preview = useStoryPreview();
+  // Schedule, Unpublish and Move to trash are not lifecycle steps. Trash is Payload's recoverable delete, distinct from editorial Drop, and stays reachable in every phase.
+  const publicationActions = usePublicationActions({ context, scheduledAt, changedPath, saving: saving || modified || publishing, canSchedule: (!hasPublishedDoc || newerDraft) && !modified && !saving, onChanged: refresh, finalFocus: menuTrigger });
 
   function refresh() {
     void invalidateStoryData(context.shellQueries, Number(id));
@@ -260,6 +268,39 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
     else if ((phase === "drafting" || (phase === "ready" && stale)) && canSubmit) primary = { label: reviewState!.viewer.submitLabel, run: () => void submitForReview() };
     else if (phase === "review" && reviewState?.viewer.canReview) primary = { label: "Review submitted version", run: () => onView("review") };
   }
+  // Hold and Drop (or Resume): shared by the overflow menu and the right-click menu on the stage.
+  const sidelineActions: Array<{ key: string; label: string; run: () => void; destructive?: boolean }> = storyEditor && !context.readOnly && !hasPublishedDoc
+    ? sidelined
+      ? [{ key: "resume", label: "Resume story", run: () => move("resume", "Story resumed.") }]
+      : [
+        { key: "hold", label: "Put on hold", run: () => move("put-on-hold", "Story put on hold.", "resume") },
+        { key: "drop", label: "Drop story", run: () => move("drop", "Story dropped.", "resume"), destructive: true }
+      ]
+    : [];
+  // An editor's jump to any stage, skipping the ones between (the same override as Story details). Undo goes back to where it was.
+  const [jumping, setJumping] = useState(false);
+  const canJump = isEditor && !context.readOnly && id != null && !hasPublishedDoc;
+  async function jumpTo(next: EffectivePhase, undoTo?: EffectivePhase) {
+    if (jumping || next === storedPhase) return;
+    setJumping(true);
+    try {
+      await postStage(context, next);
+      // Undo is its own request: it must not read this render's "busy" or stage.
+      toast.success(`Moved to ${PHASE_LABELS[next]}. Any open review was closed.`, undoTo ? {
+        action: {
+          label: "Undo",
+          onClick: () => void postStage(context, undoTo).then(() => { refresh(); void review.refetch(); }, (error: Error) => toast.error(error.message))
+        }
+      } : undefined);
+      refresh();
+      void review.refetch();
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setJumping(false);
+    }
+  }
+  const canMove = Boolean(primary) || sidelineActions.length > 0 || canJump;
   const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc);
   const statusLine = changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
 
@@ -268,11 +309,37 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-[1_1_18rem] flex-wrap items-center gap-x-4 gap-y-1.5">
           <StorySwitchButton />
-          <div className="flex items-center gap-2" data-story-phase={phase}>
-            <Badge variant={phase === "published" ? "default" : sidelined ? "outline" : "secondary"} className="tracking-wide uppercase">{PHASE_LABELS[phase]}</Badge>
-            {statusLine ? <span className={changesRequested ? "text-sm font-medium text-destructive" : "text-sm text-muted-foreground"} data-story-status="">{statusLine}</span> : null}
-            {liveCoverage?.desk?.mode === "live" && liveCoverage.desk.status !== "off" ? <LiveBadge desk={liveCoverage.desk} timeZone={context.timeZone} /> : null}
-          </div>
+          {/* Right-click the stage to move the Story: the same actions as the header button and the overflow menu. */}
+          <ContextMenu>
+            <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title={canMove ? "Right-click to move this story" : undefined} />}>
+              <PhaseBadge phase={phase} />
+              {statusLine ? <span className={changesRequested ? "text-sm font-medium text-destructive" : "text-sm text-muted-foreground"} data-story-status="">{statusLine}</span> : null}
+              {liveCoverage?.desk?.mode === "live" && liveCoverage.desk.status !== "off" ? <LiveBadge desk={liveCoverage.desk} timeZone={context.timeZone} /> : null}
+            </ContextMenuTrigger>
+            {canMove ? <ContextMenuContent className="w-56" side="bottom" align="start">
+              <ContextMenuGroup>
+                <ContextMenuLabel>{PHASE_LABELS[phase]}</ContextMenuLabel>
+                {primary ? <ContextMenuItem disabled={busy} onClick={primary.run} data-stage-menu-primary=""><ArrowRight aria-hidden="true" />{primary.label}</ContextMenuItem> : null}
+              </ContextMenuGroup>
+              {sidelineActions.length ? <>
+                {primary ? <ContextMenuSeparator /> : null}
+                <ContextMenuGroup>
+                  {sidelineActions.map((action) => <ContextMenuItem key={action.key} variant={action.destructive ? "destructive" : undefined} disabled={busy} onClick={action.run}>{action.label}</ContextMenuItem>)}
+                </ContextMenuGroup>
+              </> : null}
+              {canJump ? <>
+                {primary || sidelineActions.length ? <ContextMenuSeparator /> : null}
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger data-stage-menu-jump="">Move to stage</ContextMenuSubTrigger>
+                  <ContextMenuSubContent>
+                    <ContextMenuRadioGroup value={storedPhase} onValueChange={(next) => void jumpTo(next as EffectivePhase, storedPhase)}>
+                      {LIFECYCLE_PHASES.map((value) => <ContextMenuRadioItem key={value} value={value} disabled={jumping}>{PHASE_LABELS[value]}</ContextMenuRadioItem>)}
+                    </ContextMenuRadioGroup>
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+              </> : null}
+            </ContextMenuContent> : null}
+          </ContextMenu>
           {writers.length ? (
             <div className="flex min-w-0 items-center gap-2 text-sm" data-story-writers="">
               <PeopleAvatars people={writers.map((writer) => ({ name: writer.name, avatarUrl: writer.avatarUrl ?? null }))} />
@@ -288,24 +355,11 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
             {saving ? <Spinner className="size-3" /> : saveLabel === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveLabel}
           </span>
-          {liveCoverage && id != null ? (
-            <Button type="button" nativeButton={false} variant="ghost" size="sm" className="no-underline max-sm:min-h-11 max-sm:min-w-11" render={<ShellLink href={liveCoverage.fieldHref} />}>
-              <Smartphone data-icon="inline-start" aria-hidden="true" />
-              <span className="max-md:sr-only">Field Mode</span>
-            </Button>
-          ) : null}
           {/* Reporting is always visible and labeled: a reporter should see at once that it exists. */}
           {id != null && view === "story" ? (
             <Button type="button" variant="outline" size="sm" onClick={() => onView("reporting")} data-open-reporting="">
               <NotebookPen data-icon="inline-start" aria-hidden="true" />
               Reporting
-            </Button>
-          ) : null}
-          <PreviewButton />
-          {onOpenContext ? (
-            <Button type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={onOpenContext} data-story-context-toggle="">
-              <PanelRight data-icon="inline-start" aria-hidden="true" />
-              <span className="max-sm:sr-only">Story context</span>
             </Button>
           ) : null}
           <DropdownMenu>
@@ -314,23 +368,25 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => setDetailsOpen(true)}><PanelRight aria-hidden="true" />Story details{publicationProblems && canEditPublication ? <Badge variant="destructive" className="ml-auto">{publicationProblems}</Badge> : null}</DropdownMenuItem>
+                {preview.available ? <DropdownMenuItem onClick={preview.toggle} data-story-preview=""><Eye aria-hidden="true" />{preview.previewing ? "Close preview" : "Preview"}</DropdownMenuItem> : null}
+                {onOpenContext ? <DropdownMenuItem onClick={onOpenContext} data-story-context-toggle=""><PanelRight aria-hidden="true" />Story context</DropdownMenuItem> : null}
+                <DropdownMenuItem onClick={() => setDetailsOpen(true)}><SlidersHorizontal aria-hidden="true" />Story details{publicationProblems && canEditPublication ? <Badge variant="destructive" className="ml-auto">{publicationProblems}</Badge> : null}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onView("history")}><History aria-hidden="true" />View history</DropdownMenuItem>
+                {liveCoverage && id != null ? <DropdownMenuItem render={<ShellLink href={liveCoverage.fieldHref} />}><Smartphone aria-hidden="true" />Open in Field Mode</DropdownMenuItem> : null}
               </DropdownMenuGroup>
-              {storyEditor && !context.readOnly && !hasPublishedDoc ? <>
+              {sidelineActions.length ? <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  {sidelined
-                    ? <DropdownMenuItem onClick={() => move("resume", "Story resumed.")}>Resume story</DropdownMenuItem>
-                    : <>
-                      <DropdownMenuItem onClick={() => move("put-on-hold", "Story put on hold.", "resume")}>Put on hold</DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" onClick={() => move("drop", "Story dropped.", "resume")}>Drop story</DropdownMenuItem>
-                    </>}
+                  {sidelineActions.map((action) => <DropdownMenuItem key={action.key} variant={action.destructive ? "destructive" : undefined} onClick={action.run}>{action.label}</DropdownMenuItem>)}
                 </DropdownMenuGroup>
               </> : null}
               {canEditPublication && !showPublish ? <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config} onClick={startPublish}>Publish now, without review</DropdownMenuItem>
+              </> : null}
+              {canEditPublication && id != null ? <>
+                <DropdownMenuSeparator />
+                {publicationActions.items}
               </> : null}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -347,8 +403,6 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
               {hasPublishedDoc ? "Publish changes" : "Publish"}
             </Button>
           ) : null}
-          {/* Schedule, Unpublish and Move to trash are not lifecycle steps. Trash is Payload's recoverable delete, distinct from editorial Drop, and stays reachable in every phase. */}
-          {canEditPublication && id != null ? <PublicationActions context={context} scheduledAt={scheduledAt} changedPath={changedPath} saving={saving || modified || publishing} canSchedule={(!hasPublishedDoc || newerDraft) && !modified && !saving} onChanged={refresh} /> : null}
         </div>
       </div>
 
@@ -367,6 +421,8 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
         </Alert>
       ) : null}
 
+      {canEditPublication && id != null ? publicationActions.dialogs : null}
+
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent side="right" finalFocus={menuTrigger} className="gap-0 overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b border-border pr-12">
@@ -377,12 +433,16 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
             <section className="grid gap-3" aria-labelledby="details-status">
               <DetailsHeading id="details-status">Story</DetailsHeading>
               <dl className="grid gap-2 text-sm">
-                <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Stage</dt><dd><Badge variant="secondary">{PHASE_LABELS[storedPhase]}</Badge></dd></div>
+                <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Stage</dt><dd><PhaseBadge phase={storedPhase} /></dd></div>
                 <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Publication</dt><dd><Badge variant={hasPublishedDoc ? "default" : "outline"}>{publication}</Badge></dd></div>
-                {planned?.editor ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Editor</dt><dd>{planned.editor.name}</dd></div> : null}
-                {planned?.deadline ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Deadline</dt><dd>{formatDay(planned.deadline, context.timeZone)}</dd></div> : null}
-                {planned?.plannedPublication ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Publication target</dt><dd>{formatDay(planned.plannedPublication, context.timeZone)}</dd></div> : null}
+                {planning ? null : <>
+                  {planned?.editor ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Editor</dt><dd>{planned.editor.name}</dd></div> : null}
+                  {planned?.deadline ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Deadline</dt><dd>{formatDay(planned.deadline, context.timeZone)}</dd></div> : null}
+                  {planned?.plannedPublication ? <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">Publication target</dt><dd>{formatDay(planned.plannedPublication, context.timeZone)}</dd></div> : null}
+                </>}
               </dl>
+              {/* Editors set these here: the Plan tab that used to hold them is gone. */}
+              {planning ? <PlanningProperties /> : null}
               {isEditor && !context.readOnly && id != null && !hasPublishedDoc ? <StageOverride context={context} phase={storedPhase} onChanged={() => { refresh(); void review.refetch(); }} /> : null}
             </section>
 
@@ -465,6 +525,11 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
   );
 }
 
+/** The editor's stage override: the server checks who may, closes any open review and records it in History. */
+function postStage(context: StoryScreenContext, status: string) {
+  return postJson(context.api, `/byline/stories/${context.storyId}/workflow`, { status });
+}
+
 /**
  * The editor's manual stage override (docs/story-lifecycle.md#override): an
  * exception path in Story details, never the normal way a Story moves. It
@@ -479,7 +544,7 @@ function StageOverride({ context, phase, onChanged }: { context: StoryScreenCont
         if (!next || next === phase) return;
         setBusy(true);
         try {
-          await postJson(context.api, `/byline/stories/${context.storyId}/workflow`, { status: next });
+          await postStage(context, next);
           toast.success(`Stage changed to ${PHASE_LABELS[next as EffectivePhase]}. Any open review was closed.`);
           onChanged();
         } catch (error) {

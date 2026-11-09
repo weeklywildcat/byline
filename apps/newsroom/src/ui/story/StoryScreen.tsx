@@ -17,11 +17,14 @@ import { ReportingTab } from "../reporting/ReportingTab";
 import { FeedbackSummary } from "../review/FeedbackSheet";
 import { ReviewMode } from "../review/ReviewMode";
 import { useLeaveGuard } from "../shell/navigation";
+import { setStoryCrumb } from "../shell/story-crumb";
 import { useSettleAutosave, useStoryField } from "./form";
 import { HistoryTab } from "./HistoryTab";
 import { StoryNotes } from "./StoryNotes";
 import { FocusedHeader, StoryHeader } from "./StoryHeader";
-import { parseStoryLocation, storyLocationSearch, type StoryLocation, type StoryView } from "./story-view";
+import { LegacyStoryTabs } from "./LegacyStoryTabs";
+import { useStoryLayout } from "./story-layout";
+import { parseStoryLocation, parseStoryTab, storyLocationSearch, type StoryLocation, type StoryTab, type StoryView } from "./story-view";
 import { WriteTab } from "./WriteTab";
 
 export type StoryScreenContext = {
@@ -140,11 +143,32 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
 function StoryFrame({ context, location, go, saved, children }: { context: StoryScreenContext; location: StoryLocation; go: Go; saved: boolean; children: ReactNode }) {
   // Measured from the first render; the element exists in every mode.
   const [frameRef, width] = useElementWidth<HTMLDivElement>();
-  const wide = width >= CONTEXT_RAIL_AT;
+  // The legacy layout (account menu → Legacy Story view): same header and article under
+  // Write / Plan / Production / History tabs, and no context rail or Sheet.
+  const tabbed = useStoryLayout().layout === "tabs" && saved;
+  const wide = width >= CONTEXT_RAIL_AT && !tabbed;
   const [contextOpen, setContextOpen] = useState(location.context);
+  const [chosenTab, setChosenTab] = useState<StoryTab>(() => (location.context ? "plan" : parseStoryTab(typeof window === "undefined" ? "" : window.location.search)));
   const workspace = useOptionalWorkspace();
   const headline = useStoryField<string>("headline");
-  const view = saved ? location.view : "story";
+  const requested = saved ? location.view : "story";
+  // History is a tab here, not a mode: "View history" and old history links land on it.
+  const view = tabbed && requested === "history" ? "story" : requested;
+  const tab: StoryTab = tabbed && location.view === "history" ? "history" : chosenTab;
+  const selectTab = (next: StoryTab) => {
+    setChosenTab(next);
+    if (location.view === "history") go("story");
+  };
+  // The app header's breadcrumb: Stories › this Story's headline, and a focused mode's name after it.
+  const crumbId = saved ? Number(context.storyId) : null;
+  const crumbTitle = headline.value ?? "";
+  const crumbMode = view === "story" ? null : { reporting: "Reporting", review: "Review", history: "History" }[view];
+  useEffect(() => {
+    if (crumbId === null) return;
+    setStoryCrumb({ id: crumbId, title: crumbTitle, mode: crumbMode, openStory: crumbMode ? () => go("story") : null });
+  }, [crumbId, crumbTitle, crumbMode, go]);
+  useEffect(() => () => setStoryCrumb(null), []);
+  const showArticle = view === "story" && (!tabbed || tab === "write");
   const back = () => go("story");
   const openReporting = (capture?: CaptureAction) => {
     setContextOpen(false);
@@ -167,17 +191,21 @@ function StoryFrame({ context, location, go, saved, children }: { context: Story
     <div ref={frameRef} className="@container/story flex w-full flex-col gap-4 py-6" data-story-view={view}>
       <StoryLeaveGuard />
       {view === "story" ? (
-        <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8">
-          <StoryHeader context={context} view={view} onView={(next) => go(next)} onOpenContext={saved && !wide ? () => setContextOpen(true) : undefined} />
+        <div className={tabbed ? "mx-auto w-full max-w-5xl px-4 md:px-8" : "mx-auto w-full max-w-[1440px] px-4 md:px-8"}>
+          <StoryHeader context={context} view={view} onView={(next) => go(next)} onOpenContext={saved && !wide && !tabbed ? () => setContextOpen(true) : undefined} />
         </div>
       ) : null}
+      {tabbed && view === "story" ? (
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 empty:hidden md:px-8"><FeedbackSummary context={context} /></div>
+      ) : null}
+      {tabbed && view === "story" ? <LegacyStoryTabs context={context} tab={tab} onTab={selectTab} /> : null}
 
       {/*
         The article: always mounted, hidden in focused modes. It keeps the same
         position in the tree whether or not the rail shows, so crossing the
         width threshold never remounts the editor.
       */}
-      <div style={view === "story" ? undefined : { display: "none" }} data-story-article="">
+      <div style={showArticle ? undefined : { display: "none" }} data-story-article="">
         <div className={wide && contextContent ? "mx-auto grid w-full max-w-[1440px] grid-cols-[minmax(0,1fr)_18.5rem] items-start gap-8 px-4 md:px-8" : undefined}>
           <div className="min-w-0">{children}</div>
           {wide && contextContent ? <aside aria-label="Story context" className="sticky top-24 min-w-0 border-l border-border pl-6" data-story-context-rail="">{contextContent}</aside> : null}
@@ -208,7 +236,7 @@ function StoryFrame({ context, location, go, saved, children }: { context: Story
         </div>
       ) : null}
 
-      {saved && !wide ? (
+      {saved && !wide && !tabbed ? (
         <Sheet open={contextOpen && view === "story"} onOpenChange={setContextOpen}>
           <SheetContent side="right" className="gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
             <SheetHeader className="border-b border-border pr-12">

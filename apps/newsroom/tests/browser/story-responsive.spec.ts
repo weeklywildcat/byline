@@ -29,9 +29,12 @@ for (const width of [1440, 1024, 820, 390]) {
     expect(await overflow(page)).toBeLessThanOrEqual(0);
     await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeInViewport();
     await expect(page.locator("[data-primary-action]")).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Preview" })).toBeVisible();
-    // The Story Context is a rail when the article has room and a Sheet when it doesn't; either way it opens from a named button.
-    await page.getByRole("button", { name: "Story context" }).click();
+    // The Story Context is a rail when the article has room and a Sheet when it doesn't; the Sheet opens from the one story menu.
+    await expect(page.getByRole("button", { name: "More story actions" })).toBeInViewport();
+    if (await page.locator("[data-story-context-rail]").count() === 0) {
+      await page.getByRole("button", { name: "More story actions" }).click();
+      await page.getByRole("menuitem", { name: "Story context" }).click();
+    }
     await expect(page.getByRole("dialog").or(page.getByRole("complementary")).first()).toBeVisible();
     await page.keyboard.press("Escape");
     for (const view of ["reporting", "history"]) {

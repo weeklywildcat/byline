@@ -4,10 +4,10 @@ import { Field, FieldContent, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import type { ReactNode } from "react";
 
 /** A quiet property row: stable label column on the left, value/control on the right. */
-export function Property({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
+export function Property({ label, children, htmlFor, labelId }: { label: string; children: ReactNode; htmlFor?: string; labelId?: string }) {
   return (
     <Field orientation="responsive" className="min-h-8 py-0.5 @md/field-group:items-center!">
-      <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-28 @md/field-group:flex-none!">
+      <FieldTitle id={labelId} className="font-normal text-muted-foreground @md/field-group:w-28 @md/field-group:flex-none!">
         {htmlFor ? <label htmlFor={htmlFor}>{label}</label> : label}
       </FieldTitle>
       <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>

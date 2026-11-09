@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { useDocumentInfo, useForm } from "@payloadcms/ui";
 import { MoreHorizontal, Trash2 } from "lucide-react";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
 import { toast } from "sonner";
 import { invalidateStoryData } from "@byline/newsroom-screens/story/story-query";
 import type { Story } from "../../payload-types";
@@ -26,7 +26,12 @@ type Props = {
   onChanged: () => void;
 };
 
-export function PublicationActions({ context, page, scheduledAt, changedPath, saving, canSchedule, onChanged }: Props) {
+/**
+ * Schedule, Unpublish and Move to trash. The Story's header folds these into its one overflow menu
+ * (`items` inside the menu, `dialogs` beside it, focus returning to `finalFocus`); a Page has no other
+ * menu, so `PublicationActions` below gives it a menu of its own.
+ */
+export function usePublicationActions({ context, page, scheduledAt, changedPath, saving, canSchedule, onChanged, finalFocus }: Props & { finalFocus: RefObject<HTMLElement | null> }) {
   const { hasPublishedDoc, setData, setHasPublishedDoc, setUnpublishedVersionCount, setMostRecentVersionIsAutosaved, setLastUpdateTime, incrementVersionCount } = useDocumentInfo();
   const { reset } = useForm();
   const [dialog, setDialog] = useState<"schedule" | "unpublish" | "trash" | null>(null);
@@ -34,7 +39,6 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
   const [time, setTime] = useState("");
   const [error, setError] = useState("");
   const [confirmPath, setConfirmPath] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
   const field = useId();
   const { navigate } = useShellNavigation();
   const kind = page ? "page" : "story";
@@ -110,27 +114,25 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
     if (!busy) void schedule(time);
   }
 
-  return <>
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button ref={trigger} type="button" size="icon-sm" variant="outline" aria-label="Publication actions" disabled={saving || busy} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={!canSchedule} onClick={() => {
-          setTime(scheduledAt ? publicationLocalMinute(scheduledAt, context.timeZone) : "");
-          setError(""); setConfirmPath(false); setDialog("schedule");
-        }}>{scheduledAt ? "Reschedule publication" : "Schedule publication"}</DropdownMenuItem>
-        {scheduledAt ? <DropdownMenuItem onClick={() => void schedule(null)}>Cancel scheduled publication</DropdownMenuItem> : null}
-        {hasPublishedDoc ? <DropdownMenuItem variant="destructive" onClick={() => { setError(""); setDialog("unpublish"); }}>Unpublish…</DropdownMenuItem> : null}
-        {!page ? <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onClick={() => { setError(""); setDialog("trash"); }}>
-            <Trash2 aria-hidden="true" />
-            Move to trash…
-          </DropdownMenuItem>
-        </> : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+  const items = <>
+    <DropdownMenuItem disabled={!canSchedule || saving || busy} onClick={() => {
+      setTime(scheduledAt ? publicationLocalMinute(scheduledAt, context.timeZone) : "");
+      setError(""); setConfirmPath(false); setDialog("schedule");
+    }}>{scheduledAt ? "Reschedule publication" : "Schedule publication"}</DropdownMenuItem>
+    {scheduledAt ? <DropdownMenuItem disabled={saving || busy} onClick={() => void schedule(null)}>Cancel scheduled publication</DropdownMenuItem> : null}
+    {hasPublishedDoc ? <DropdownMenuItem variant="destructive" disabled={saving || busy} onClick={() => { setError(""); setDialog("unpublish"); }}>Unpublish…</DropdownMenuItem> : null}
+    {!page ? <>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" disabled={saving || busy} onClick={() => { setError(""); setDialog("trash"); }}>
+        <Trash2 aria-hidden="true" />
+        Move to trash…
+      </DropdownMenuItem>
+    </> : null}
+  </>;
+
+  const dialogs = <>
     <Dialog open={dialog === "schedule"} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
-      <DialogContent finalFocus={trigger} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+      <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] overflow-auto">
         <DialogHeader><DialogTitle>{scheduledAt ? "Reschedule publication" : "Schedule publication"}</DialogTitle>
           <DialogDescription>Byline will publish the latest saved changes at this time if the document passes publication checks.</DialogDescription>
         </DialogHeader>
@@ -146,7 +148,7 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
       </DialogContent>
     </Dialog>
     <AlertDialog open={dialog === "unpublish"} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
-      <AlertDialogContent finalFocus={trigger}>
+      <AlertDialogContent finalFocus={finalFocus}>
         <AlertDialogHeader><AlertDialogTitle>Unpublish this {kind}?</AlertDialogTitle><AlertDialogDescription>The {kind} will come off the public site on its next build. Its draft and publication date will remain.</AlertDialogDescription></AlertDialogHeader>
         {scheduledAt ? <p className="text-sm">There is still a scheduled publication. Cancel it first to keep this {kind} offline.</p> : null}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -154,7 +156,7 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
       </AlertDialogContent>
     </AlertDialog>
     {!page ? <AlertDialog open={dialog === "trash"} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
-      <AlertDialogContent finalFocus={trigger} size="sm">
+      <AlertDialogContent finalFocus={finalFocus} size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Move this story to Trash?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -173,5 +175,20 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog> : null}
+  </>;
+
+  return { busy, items, dialogs };
+}
+
+/** A Page's publication actions: the same items in a menu of their own. */
+export function PublicationActions(props: Props) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const { busy, items, dialogs } = usePublicationActions({ ...props, finalFocus: trigger });
+  return <>
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button ref={trigger} type="button" size="icon-sm" variant="outline" aria-label="Publication actions" disabled={props.saving || busy} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end">{items}</DropdownMenuContent>
+    </DropdownMenu>
+    {dialogs}
   </>;
 }

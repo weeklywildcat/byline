@@ -8,11 +8,17 @@ Story header, the article editor, the lifecycle and one primary next action, Sto
 
 ## Header {#header}
 
-The header holds the lifecycle stage, writers and deadline, and **one** primary lifecycle action for this reader right now: Accept pitch, Start drafting, Submit for review, Resubmit, Review submitted version, or Publish. Occasional things live in the overflow menu (**More story actions**: Story details, View history, Put on hold, Drop, and, before Ready, Publish now without review) and in Story details.
+The top bar's breadcrumb says where you are: **Stories › the Story's headline** (live as you type, "Untitled story" until it has one). Stories is a link to the list. In a focused mode the mode's name is added (**Stories › headline › Reporting**) and the headline is the way back to the Story. The Story screen publishes this while it is open; nothing is saved.
 
-A labelled **Reporting** button is always visible. It is the way into full Reporting and is deliberately not hidden in a menu. **Preview** is beside it.
+The header holds the lifecycle stage, writers and deadline, and **one** primary lifecycle action for this reader right now: Accept pitch, Start drafting, Submit for review, Resubmit, Review submitted version, or Publish.
 
-Publication actions (Schedule, Unpublish, Move to trash) are separate from the lifecycle and stay reachable in every stage for anyone who may publish.
+**Right-click the stage** (the colored badge and status beside it) for the moves available to you: the primary action (Accept pitch, Start drafting, Submit for review…), then Put on hold and Drop, or Resume. They are the same actions as the header button and the overflow menu, which remain the keyboard and touch route. Editors also get **Move to stage**: jump straight to Pitch, Reporting, Drafting, Review or Ready without stepping through the ones between. That is the same editor override as Change stage in Story details: it closes any open review, History records it, and the toast has an Undo. The badge is tinted by stage (Pitch violet, Reporting blue, Drafting amber, Review indigo, Ready green, On Hold gray, Dropped red); the stage is always written out, color is a second cue. Staff still cannot force Review or Ready.
+
+A labelled **Reporting** button is always visible. It is the way into full Reporting and is deliberately not hidden in a menu. Everything else lives in **one** overflow menu (**More story actions**), never a row of buttons or a second menu: Preview (Payload's Live Preview), Story context when it isn't a rail, Story details, View history, Open in Field Mode, Put on hold, Drop, and, before Ready, Publish now without review.
+
+Publication actions (Schedule, Unpublish, Move to trash) are separate from the lifecycle, stay reachable in every stage for anyone who may publish, and are the last group in that same menu.
+
+**Story mode** (Standard / Live) is a property of the Story, a row beside Section and Story type in the article's properties, not a bar above the headline. Only editors can change it.
 
 ## Focused modes
 
@@ -28,6 +34,19 @@ Each has a **Back to story**, works with the browser's Back and Forward, and nev
 ### Legacy URLs
 
 Old links keep working. `?tab=reporting` and `?tab=history` open those modes; `?tab=plan` and `?tab=write` open the Story (Plan no longer exists: its parts live in Story Context and Reporting, and an old Plan link opens the Story with its context showing). `?appointment=<id>` and `?transcript=<id>` open Reporting on that record. The `tab` parameter is dropped as soon as you move. An ordinary Story link never picks a mode from the lifecycle.
+
+## Legacy Story view {#legacy-layout}
+
+An opt-in for people who want the older arrangement while they get used to the new one. It is off by default. **Legacy Story view** is a checkbox in the account menu (next to Field Mode) and applies to that account everywhere.
+
+Only the arrangement changes. The header, article, lifecycle, review and publishing are the same; staff still cannot force Review or Ready from it. The same header sits over **Write / Plan / Production / History** tabs, with no Story Context rail or Sheet:
+
+- **Write** is the article. It stays mounted and is only hidden behind the other tabs, so the editor is never remounted by switching tabs or turning the view on or off.
+- **Plan** is the Brief, Reporting plan and Tasks beside Details, Resources, Notes and Activity. **Production** is Media & Production. **History** is the version history. These are the same shared sections Story Context and Reporting are built from.
+- **Reporting** and **Review** are not tabs: the header's Reporting button and Review action still open the focused modes with Back to story, and the Reporting-intent links (`?appointment=`, `?transcript=`) still land in Reporting.
+- **View history** in the overflow menu, `?view=history` and `?tab=history` open the History tab; `?tab=plan` and `?tab=production` open those tabs. Review feedback shows above the tabs.
+
+The choice is stored in Payload Preferences under `byline:story:layout:v1`, per user, like Stories saved views: no Users field, migration or endpoint. It is meant as a transition aid, not a second supported design: new Story features land in the default layout first.
 
 ## Story Context {#context}
 

@@ -158,7 +158,7 @@ describe("navigation", () => {
     expect(activeNavKey(navigationFor("staff"), "/admin/collections/stories", "/admin")).toBeNull();
     expect(locationFor("/admin/stories", "/admin")).toEqual([{ label: "Stories" }]);
     expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
-    expect(locationFor("/admin/collections/stories/12", "/admin")).toEqual([{ label: "Story" }]);
+    expect(locationFor("/admin/collections/stories/12", "/admin")).toEqual([{ label: "Stories", path: "/stories" }, { label: "Story" }]);
   });
 
   it("keeps raw Payload screens in an administrators-only section", () => {
@@ -207,7 +207,7 @@ describe("global Create", () => {
 describe("app header location", () => {
   it("names Byline screens and files raw screens under System administration", () => {
     expect(locationFor("/admin", "/admin")).toEqual([{ label: "Home" }]);
-    expect(locationFor("/admin/collections/stories/3", "/admin")).toEqual([{ label: "Story" }]);
+    expect(locationFor("/admin/collections/stories/3", "/admin")).toEqual([{ label: "Stories", path: "/stories" }, { label: "Story" }]);
     expect(locationFor("/admin/system", "/admin")).toEqual([{ label: "System administration" }]);
     expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
     expect(locationFor("/admin/collections/stories/create", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);

@@ -2,7 +2,8 @@
 
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { useStoryLayout } from "../story/story-layout";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { ChevronsUpDown, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
@@ -52,6 +53,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
   const { isMobile, state } = useSidebar();
   const [signingOut, setSigningOut] = useState(false);
   const { runGuarded } = useShellNavigation();
+  const storyLayout = useStoryLayout();
 
   async function signOut() {
     setSigningOut(true);
@@ -80,6 +82,8 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             {user.profileHref ? <DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem> : null}
             {/* Field Mode: the reporter's phone-first capture screen (its own shell, docs/field-mode.md). */}
             <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><Smartphone aria-hidden="true" />Field Mode</DropdownMenuItem>
+            {/* Legacy Story view: the older Write / Plan / Production / History tabs. Off by default; per account (docs/story-screen.md#legacy-layout). */}
+            <DropdownMenuCheckboxItem checked={storyLayout.layout === "tabs"} onCheckedChange={(checked) => storyLayout.setLayout(checked ? "tabs" : "focused")} data-legacy-story-view="">Legacy Story view</DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             {systemHref ? (
               <>
