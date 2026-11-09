@@ -297,7 +297,7 @@ export function CollectionWorkspace({
       ) : null}
       <StoryCreateDialog
         open={add === "story"}
-        fetchers={{ ...host.fetchers, createStory: (title, preset) => host.api.createStory(id, title, preset) }}
+        fetchers={{ ...host.fetchers, createStory: (title, preset, details) => host.api.createStory(id, title, preset, details) }}
         onClose={() => setAdd(null)}
         onCreated={(story) => {
           void actions.refresh({ membership: true });

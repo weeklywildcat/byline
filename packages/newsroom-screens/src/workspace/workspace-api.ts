@@ -1,4 +1,5 @@
 import type { CollectionApi } from "../collections/collection-api";
+import type { GetWorkloadHints } from "../editorial/workload-hints";
 import type { StoryVideoSettings } from "../editorial/story-video-model";
 import type { ArticleNotesResponse } from "../story/notes-model";
 import type {
@@ -16,6 +17,8 @@ import type {
 export type WorkspaceClient = {
   collections?: CollectionApi;
   getWorkspace: (storyId: number) => Promise<StoryWorkspace>;
+  /** Advisory workload text for the editor and writers pickers. */
+  getWorkloadHints?: GetWorkloadHints;
   saveBrief: (storyId: number, brief: string, expectedBrief?: string) => Promise<{ brief: string }>;
   saveFormat: (storyId: number, input: { format?: StoryVideoSettings["format"]; videoUrl?: string }) => Promise<StoryVideoSettings>;
   saveSource: (storyId: number, input: SourceInput, sourceId?: string) => Promise<ReportingResponse>;

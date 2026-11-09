@@ -279,7 +279,7 @@ describe("Story Workspace endpoints", () => {
 
   it("return the whole workflow story, so the screens fold the server's view in", async () => {
     const response = await call("post", "/byline/stories/:id/workflow", "editor", { status: "editing", editorId: accounts.editor.id }, story());
-    expect(response.body.story).toMatchObject({ postId: storyId, status: "editing", storedStatus: "editing", isPublished: false, editorId: accounts.editor.id, deadline: "2026-11-12" });
+    expect(response.body.story).toMatchObject({ postId: storyId, status: "review", storedStatus: "editing", isPublished: false, editorId: accounts.editor.id, deadline: "2026-11-12" });
   });
 
   it("respect Payload's document lock for byline changes made outside the editor", async () => {

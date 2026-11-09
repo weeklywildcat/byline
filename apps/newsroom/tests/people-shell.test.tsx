@@ -11,13 +11,17 @@ vi.mock("../src/ui/people/NewsroomPeopleScreen", () => ({
 }));
 const { BylinePeople } = await import("../src/components/BylinePeople");
 const { BylineProfile } = await import("../src/components/BylineProfile");
+const { RolesScreen } = await import("../src/ui/roles/RolesScreen");
+const { WorkloadScreen } = await import("../src/ui/roles/WorkloadScreen");
+const { BylineWorkflows } = await import("../src/components/BylineWorkflows");
+const { WorkflowScreen } = await import("../src/ui/roles/WorkflowScreen");
 const { NewsroomPeopleScreen } = await import(
   "../src/ui/people/NewsroomPeopleScreen"
 );
-const { NAVIGATION, navigationFor, CREATE_ACTIONS, locationFor } = await import(
+const { NAVIGATION, navigationFor, CREATE_ACTIONS, locationFor, activeNavKey } = await import(
   "../src/domain/navigation"
 );
-const props = (role: string, enabled = true) =>
+const props = (role: string, enabled = true, searchParams: Record<string, string> = {}) =>
   ({
     initPageResult: {
       req: {
@@ -29,7 +33,7 @@ const props = (role: string, enabled = true) =>
       visibleEntities: {},
     },
     params: {},
-    searchParams: {},
+    searchParams,
   }) as never;
 const child = (view: ReactElement) =>
   (view.props as { children: ReactElement }).children;
@@ -64,6 +68,16 @@ describe("People custom-view authorization and navigation", () => {
     expect(child(BylinePeople(props("editor", false))).type).not.toBe(
       NewsroomPeopleScreen,
     );
+  });
+  it("serves Roles, Workload and Review workflows to editors only, beside People", () => {
+    expect(child(BylinePeople(props("editor", true, { view: "roles" }))).type).toBe(RolesScreen);
+    expect(child(BylinePeople(props("editor", true, { view: "workload" }))).type).toBe(WorkloadScreen);
+    expect(child(BylinePeople(props("editor", true, { view: "other" }))).type).toBe(NewsroomPeopleScreen);
+    expect(child(BylinePeople(props("staff", true, { view: "roles" }))).type).not.toBe(RolesScreen);
+    expect(child(BylineWorkflows(props("editor"))).type).toBe(WorkflowScreen);
+    expect(child(BylineWorkflows(props("staff"))).type).not.toBe(WorkflowScreen);
+    expect(activeNavKey(NAVIGATION, "/admin/review-workflows", "/admin")).toBe("people");
+    expect(locationFor("/admin/review-workflows", "/admin")).toEqual([{ label: "People", path: "/people" }, { label: "Review workflows" }]);
   });
   it("uses the same screen for self-profile and refuses disabled accounts", () => {
     const profile = child(BylineProfile(props("staff")));

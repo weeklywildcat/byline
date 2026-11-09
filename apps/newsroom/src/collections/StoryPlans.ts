@@ -84,6 +84,8 @@ export const StoryPlans: CollectionConfig = {
       admin: { description: "Never changes on its own. Published is shown from the story's publication state." },
       access: { update: managersField }
     },
+    // The stage a Story was in when it was put On Hold or Dropped, so Resume returns it there (newsroom/lifecycle.ts).
+    { name: "sidelinedFrom", type: "select", options: [...WORKFLOW_OPTIONS], admin: { readOnly: true }, access: { update: systemOnly, create: systemOnly } },
     { name: "editor", type: "relationship", relationTo: "users", index: true, access: { update: editorsOnlyField, create: systemOnly } },
     {
       name: "deadline",

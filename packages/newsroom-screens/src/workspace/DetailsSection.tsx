@@ -7,6 +7,7 @@ import { checkVideoUrl, normalizeStoryVideoSettings, STORY_FORMAT_OPTIONS, video
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { AssigneePicker, DatePicker, WritersPicker, valueSelectTriggerClass } from "../editorial/pickers";
+import { useWorkloadHints } from "../editorial/workload-hints";
 import { Card, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
@@ -28,11 +29,12 @@ type Changes = { status?: string; editorId?: number | null; deadline?: string | 
  * different things, and are labelled so.
  */
 export function DetailsSection() {
-  const { storyId, editorial, data, timezone, now, caps, reload, announce, sectionError, articleInForm } = useWorkspace();
+  const { storyId, client, editorial, data, timezone, now, caps, reload, announce, sectionError, articleInForm } = useWorkspace();
   const cache = useWorkspaceCache();
   const { story } = data;
   const contributorsFailed = sectionError("contributors");
   const people = peopleOptions(data.people);
+  const hints = useWorkloadHints(client.getWorkloadHints, caps.assign);
   const statuses = data.statuses.filter((status) => status.selectable);
   const wpState = story.publicationState;
   const scheduled = wpState.isScheduled && wpState.scheduledAt ? ` · ${exactDate(wpState.scheduledAt, timezone)}` : wpState.isPublished && wpState.publishedAt ? ` · ${exactDate(wpState.publishedAt, timezone)}` : "";
@@ -85,10 +87,10 @@ export function DetailsSection() {
           </Select> : story.workflow.label}
         </Property>
         <Property label="Writers">
-          {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit && !articleInForm ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} /> : shownWriters.length ? <span className="flex items-center gap-2"><PeopleAvatars people={shownWriters} tooltips={false} />{names(shownWriters)}</span> : "None"}
+          {contributorsFailed ? <SectionFailed what="writers" onRetry={() => void reload()} /> : data.contributors.canEdit && !articleInForm ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={(value) => writers.mutate(value)} disabled={writers.isPending} hints={hints} /> : shownWriters.length ? <span className="flex items-center gap-2"><PeopleAvatars people={shownWriters} tooltips={false} />{names(shownWriters)}</span> : "None"}
         </Property>
         <Property label="Editor">
-          {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} /> : story.editor?.name || "None"}
+          {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} hints={hints} /> : story.editor?.name || "None"}
         </Property>
         <Property label="Story deadline">
           {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}

@@ -293,7 +293,7 @@ export function waitingForMe(data: HomeBootstrap, now = new Date(), collectionHr
 }
 
 export function reviewStories(data: HomeBootstrap): PlanningStory[] {
-  return data.capabilities.review ? data.stories.filter((s) => activeStory(s) && s.workflow.id === "ready").sort((a, b) => (a.modifiedAt || "").localeCompare(b.modifiedAt || "") || a.id - b.id) : [];
+  return data.capabilities.review ? data.stories.filter((s) => activeStory(s) && (s.needsReview || s.workflow.id === "review")).sort((a, b) => (a.modifiedAt || "").localeCompare(b.modifiedAt || "") || a.id - b.id) : [];
 }
 
 /**

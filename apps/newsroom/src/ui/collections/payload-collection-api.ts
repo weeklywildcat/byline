@@ -1,5 +1,7 @@
 "use client";
 
+import { storyCreateBody } from "@byline/newsroom-screens/story/story-fetchers";
+
 import type { CollectionApi } from "@byline/newsroom-screens/collections/collection-api";
 import {
   collectionQueryParams,
@@ -31,7 +33,7 @@ export function createPayloadCollectionApi(api: string): CollectionApi {
     create: (input) => request<Collection>(base, "POST", input),
     update: (id, input) => request<Collection>(`${base}/${id}`, "PATCH", input),
     storyOptions: (search = "") => request<{ stories: PlanningStory[] }>(queryPath(`${base}/story-options`, { search })),
-    createStory: (id, title, preset) => request<StoryWorkspace>(`${base}/${id}/stories/new`, "POST", preset ? { title, preset } : { title }),
+    createStory: (id, title, preset, details) => request<StoryWorkspace>(`${base}/${id}/stories/new`, "POST", storyCreateBody(title, preset, details)),
     addStory: (id, storyId) => request(`${base}/${id}/stories`, "POST", { storyId }),
     removeStory: (id, storyId) => request(`${base}/${id}/stories/${storyId}`, "DELETE"),
     addMember: (id, userId) => request(`${base}/${id}/members`, "POST", { userId }),

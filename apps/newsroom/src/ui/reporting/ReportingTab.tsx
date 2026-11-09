@@ -1,6 +1,14 @@
 "use client";
 
+import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
+import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
+import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
+import { useDialogTarget } from "@byline/newsroom-screens/workspace/dialog-target";
+import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
+import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
@@ -14,11 +22,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, PanelRight, Plus, Radio, Search, StickyNote, Upload, X } from "lucide-react";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
 import { transcriptFormat } from "../../domain/transcript";
@@ -26,6 +35,7 @@ import type { ReportingAppointment, ReportingSource } from "../../reporting/mate
 import { postJson } from "../story/api";
 import { formatDay } from "../story/parts";
 import type { StoryScreenContext } from "../story/StoryScreen";
+import type { CaptureIntent } from "../story/story-view";
 import { clock, RecorderPanel, type Recording } from "./Recorder";
 import { editNote, editFile, loadReporting, newClientKey, positionLabel, removeFile, removeNote, reportingKey, saveGroundRules, saveNote, startTranscription, uploadFile } from "./api";
 import { TranscriptView } from "./TranscriptView";
@@ -47,13 +57,24 @@ const size = (bytes: number) => (bytes >= 1_048_576 ? `${(bytes / 1_048_576).toF
  * reporter captures; Byline routes each capture to its canonical home and
  * carries the Story, Source, Appointment and ground rules forward.
  */
-export function ReportingTab({ context }: { context: StoryScreenContext }) {
+export type ReportingProps = {
+  context: StoryScreenContext;
+  /** A capture shortcut from Story Context ("Record audio"…), run once when Reporting opens. */
+  capture?: CaptureIntent | null;
+  /** A deep-linked appointment (Home, Calendar, Story Context): opened once. */
+  appointmentId?: string;
+  /** The open transcript, from the address so Back returns to the notebook. */
+  transcriptId?: number | null;
+  onTranscript?: (id: number | null) => void;
+};
+
+export function ReportingTab(props: ReportingProps) {
   // Measured from the first render (useElementWidth measures on mount), whatever the body shows.
   const [frameRef, width] = useElementWidth<HTMLDivElement>();
-  return <div ref={frameRef} className="min-w-0" data-reporting-frame=""><ReportingBody context={context} width={width} /></div>;
+  return <div ref={frameRef} className="min-w-0" data-reporting-frame=""><ReportingBody {...props} width={width} /></div>;
 }
 
-function ReportingBody({ context, width }: { context: StoryScreenContext; width: number }) {
+function ReportingBody({ context, width, capture: captureIntent, appointmentId, transcriptId, onTranscript }: ReportingProps & { width: number }) {
   const storyId = Number(context.storyId);
   const cache = useQueryClient();
   const query = useQuery({ queryKey: reportingKey(storyId), queryFn: () => loadReporting(context.api, storyId), refetchInterval: 20_000 });
@@ -63,10 +84,9 @@ function ReportingBody({ context, width }: { context: StoryScreenContext; width:
   const [panel, setPanel] = useState<null | "note" | "link" | "record">(null);
   const [bound, setBound] = useState<Bound | null>(null);
   const [railOpen, setRailOpen] = useState(false);
-  const [openTranscript, setOpenTranscript] = useState<number | null>(() => {
-    const id = typeof window === "undefined" ? 0 : Number(new URLSearchParams(window.location.search).get("transcript"));
-    return Number.isSafeInteger(id) && id > 0 ? id : null;
-  });
+  const [localTranscript, setLocalTranscript] = useState<number | null>(transcriptId ?? null);
+  const openTranscript = onTranscript ? transcriptId ?? null : localTranscript;
+  const setOpenTranscript = (id: number | null) => (onTranscript ? onTranscript(id) : setLocalTranscript(id));
   const [uploads, setUploads] = useState<Upload[]>([]);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const photoInput = useRef<HTMLInputElement | null>(null);
@@ -119,6 +139,25 @@ function ReportingBody({ context, width }: { context: StoryScreenContext; width:
     link: () => { setBound(from ?? null); setPanel("link"); }
   });
 
+  // Story Context's capture shortcuts and appointment links land here once, after the notebook loads.
+  const consumed = useRef({ capture: false, appointment: false });
+  const workspace = useOptionalWorkspace();
+  const appointmentDialog = useDialogTarget<StoryAppointment>("[data-reporting-add=appointment]");
+  useEffect(() => {
+    if (!data) return;
+    if (captureIntent && canCapture && !consumed.current.capture) {
+      consumed.current.capture = true;
+      capture()[captureIntent]();
+    }
+  });
+  useEffect(() => {
+    if (!data || !appointmentId || consumed.current.appointment || !workspace) return;
+    consumed.current.appointment = true;
+    const match = workspace.data.appointments.find((appointment) => appointment.id === appointmentId);
+    if (match) appointmentDialog.openWith(match);
+    else toast("That appointment isn't on this story any more.");
+  });
+
   if (openTranscript !== null) {
     return <TranscriptView context={context} transcriptId={openTranscript} onBack={() => { setOpenTranscript(null); void refresh(); }} />;
   }
@@ -128,6 +167,7 @@ function ReportingBody({ context, width }: { context: StoryScreenContext; width:
   const visible = sortMaterial(data.materials).filter((item) => materialMatchesFilter(item, filter) && materialMatchesSearch(item, needle));
   const groups = materialDayGroups(visible, data.timeZone);
   const planning = <PlanningContext context={context} data={data} capture={capture} canCapture={canCapture} refresh={refresh} />;
+  const appointmentEditor = <AppointmentDialog key={`deep-appointment-${appointmentDialog.session}`} open={appointmentDialog.open} appointment={appointmentDialog.target} onClose={() => { appointmentDialog.close(); void refresh(); }} finalFocus={appointmentDialog.finalFocus} />;
   const transcription = data.capabilities.transcription;
 
   return (
@@ -196,6 +236,7 @@ function ReportingBody({ context, width }: { context: StoryScreenContext; width:
         </div>
         {wide ? <aside aria-label="Sources and appointments" className="min-w-0 border-l pl-4">{planning}</aside> : null}
       </div>
+      {workspace ? appointmentEditor : null}
       <Sheet open={railOpen && !wide} onOpenChange={setRailOpen}>
         <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
           <SheetHeader><SheetTitle>Sources & appointments</SheetTitle><SheetDescription>Who the story is reporting on, and when. Capture from one and it is filed with it.</SheetDescription></SheetHeader>
@@ -232,21 +273,21 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
     onError: (error: Error) => toast.error(error.message)
   });
   return (
-    <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); if (text.trim()) save.mutate(); }} data-note-composer="">
+    <InlineForm label="New note" className="grid gap-2" onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} onCancel={onCancel} data-note-composer="">
       <InputGroup>
         <InputGroupTextareaAutoFocus value={text} onChange={setText} />
         <InputGroupAddon align="block-end" className="justify-between">
           <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground"><Checkbox checked={confidential} onCheckedChange={(next) => setConfidential(next === true)} />Confidential</label>
-          <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm" disabled={!text.trim() || save.isPending}>Save note</Button></div>
+          <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="button" size="sm" disabled={!text.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save note</Button></div>
         </InputGroupAddon>
       </InputGroup>
-      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."}</p>
-    </form>
+      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">⌘/Ctrl+Enter saves.</span></p>
+    </InlineForm>
   );
 }
 
 function InputGroupTextareaAutoFocus({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} />;
+  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} />;
 }
 
 function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenContext; onDone: () => void; onCancel: () => void }) {
@@ -261,24 +302,41 @@ function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenConte
     onSuccess: () => { toast.success("Link added to this story."); onDone(); },
     onError: (failure: Error) => setError(failure.message)
   });
+  const submit = () => {
+    if (!url.trim() || save.isPending) return;
+    setError(null);
+    save.mutate();
+  };
   return (
-    <form className="grid gap-1.5" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); setError(null); save.mutate(); }}>
+    <InlineForm label="Add a link" className="grid gap-1.5" onSubmit={submit} onCancel={onCancel}>
       <InputGroup>
         <InputGroupAddon><Link2 aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput autoFocus type="url" value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
-        <InputGroupAddon align="inline-end"><Button type="submit" size="xs" disabled={!url.trim() || save.isPending}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
+        <InputGroupAddon align="inline-end"><Button type="button" size="xs" disabled={!url.trim() || save.isPending} onClick={submit}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
       </InputGroup>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    </form>
+    </InlineForm>
   );
 }
 
+/** An upload in flight or failed: an Attachment in its real state, with retry and dismiss. */
 function UploadRow({ upload, onRetry, onDismiss }: { upload: Upload; onRetry: () => void; onDismiss: () => void }) {
   return (
-    <div className="grid gap-1.5 rounded-lg border p-3" data-upload={upload.error ? "failed" : "sending"}>
-      <div className="flex items-center justify-between gap-2"><p className="truncate text-sm">{upload.name}</p>{upload.error ? <div className="flex gap-2"><Button type="button" size="xs" onClick={onRetry}>Retry</Button><Button type="button" size="icon-xs" variant="ghost" aria-label="Dismiss" onClick={onDismiss}><X /></Button></div> : null}</div>
-      {upload.error ? <p role="alert" className="text-xs text-destructive">{upload.error}</p> : <Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`}><span className="text-xs text-muted-foreground">Uploading</span></Progress>}
-    </div>
+    <Attachment state={upload.error ? "error" : "uploading"} className="w-full" data-upload={upload.error ? "failed" : "sending"}>
+      <AttachmentMedia>{upload.kind === "photo" ? <ImageIcon aria-hidden="true" /> : <Upload aria-hidden="true" />}</AttachmentMedia>
+      <AttachmentContent className="flex-1">
+        <AttachmentTitle>{upload.name}</AttachmentTitle>
+        {upload.error
+          ? <AttachmentDescription role="alert">{upload.error}</AttachmentDescription>
+          : <Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`} className="mt-1.5" />}
+      </AttachmentContent>
+      {upload.error ? (
+        <AttachmentActions className="gap-1 pr-1">
+          <Button type="button" size="xs" variant="outline" onClick={onRetry}>Retry</Button>
+          <AttachmentAction type="button" aria-label="Dismiss" onClick={onDismiss}><X /></AttachmentAction>
+        </AttachmentActions>
+      ) : null}
+    </Attachment>
   );
 }
 
@@ -319,15 +377,47 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
   const file = item.kind === "file" ? item : null;
   const transcript = file?.transcript ?? null;
 
+  const actions = (
+    <>
+      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>{transcript.state === "ready" ? "Open transcript" : transcript.state === "failed" ? "Transcript failed" : "Transcribing…"}</Button> : null}
+      {file && !transcript && file.fileKind === "audio" && editable ? <>
+        {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
+        <Button type="button" size="xs" variant="outline" onClick={onImport}>Import transcript</Button>
+      </> : null}
+      {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
+      {editable && !(file && transcript) ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
+    </>
+  );
+
+  // A true file (recording, document, image, photo) is an Attachment; notes, links and live posts are not.
+  if (item.kind === "file" || item.kind === "media") {
+    const href = item.kind === "media" ? item.previewUrl : item.fileKind !== "audio" ? item.url : null;
+    const processing = Boolean(transcript && transcript.state !== "ready" && transcript.state !== "failed");
+    return (
+      <div className="grid gap-1.5 py-2" data-material={item.kind} data-key={item.key}>
+        <Attachment state={transcript?.state === "failed" ? "error" : processing ? "processing" : "done"} className="w-full">
+          <AttachmentMedia>{item.kind === "media" && item.previewUrl ? <img src={item.previewUrl} alt={item.alt} /> : iconFor(item)}</AttachmentMedia>
+          <AttachmentContent className="flex-1">
+            <AttachmentTitle className="flex items-center gap-1.5">{title}{item.confidential ? <Lock aria-label="Confidential" className="size-3.5 shrink-0 text-muted-foreground" /> : null}</AttachmentTitle>
+            <AttachmentDescription className="whitespace-normal">{sub}</AttachmentDescription>
+            {file ? <FileFacts file={file} /> : null}
+          </AttachmentContent>
+          {href ? <AttachmentTrigger render={<a href={href} target="_blank" rel="noreferrer noopener" aria-label={`Open ${title}`} />} /> : null}
+        </Attachment>
+        <div className="flex flex-wrap items-center gap-1.5 empty:hidden">{actions}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 py-2.5" data-material={item.kind} data-key={item.key}>
       <span className="pt-0.5 text-muted-foreground [&_svg]:size-4">{iconFor(item)}</span>
       <div className="min-w-0">
         {editing && item.kind === "note" ? (
-          <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); if (text.trim()) saveNoteText.mutate(); }}>
-            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setEditing(false); }} />
-            <div className="flex gap-2"><Button type="submit" size="sm" disabled={saveNoteText.isPending || !text.trim()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.kind === "note" ? item.text : ""); }}>Cancel</Button></div>
-          </form>
+          <InlineForm label="Edit note" className="grid gap-2" onSubmit={() => { if (text.trim() && !saveNoteText.isPending) saveNoteText.mutate(); }} onCancel={() => { setEditing(false); setText(item.text); }}>
+            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} />
+            <div className="flex gap-2"><Button type="button" size="sm" disabled={saveNoteText.isPending || !text.trim()} onClick={() => saveNoteText.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.text); }}>Cancel</Button></div>
+          </InlineForm>
         ) : (
           <>
             <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium [overflow-wrap:anywhere]">
@@ -342,14 +432,8 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
       </div>
       {/* Actions sit under the words, never beside them, so text keeps the full measure at any width. */}
       <div className="col-start-2 flex flex-wrap items-center gap-1.5 empty:hidden">
-        {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>{transcript.state === "ready" ? "Open transcript" : transcript.state === "failed" ? "Transcript failed" : "Transcribing…"}</Button> : null}
-        {file && !transcript && file.fileKind === "audio" && editable ? <>
-          {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
-          <Button type="button" size="xs" variant="outline" onClick={onImport}>Import transcript</Button>
-        </> : null}
         {item.kind === "note" && editable && !editing ? <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(true)}>Edit</Button> : null}
-        {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
-        {editable && !(file && transcript) ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
+        {actions}
       </div>
     </div>
   );
@@ -393,13 +477,14 @@ function FileFacts({ file }: { file: ReportingFileMaterial }) {
   );
 }
 
-function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stacked }: { appointment: ReportingAppointment; data: ReportingData; timeZone: string; capture: (from?: Bound) => { note: () => void; record: () => void }; canCapture: boolean; stacked?: boolean }) {
+function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stacked, onEdit }: { appointment: ReportingAppointment; data: ReportingData; timeZone: string; capture: (from?: Bound) => { note: () => void; record: () => void }; canCapture: boolean; stacked?: boolean; onEdit?: (element: HTMLElement) => void }) {
   const source = data.sources.find((entry) => entry.id === appointment.sourceId);
   const from: Bound = { appointmentId: appointment.id, ...(source ? { sourceId: source.id } : {}), label: appointment.title };
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
   const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
-  if (stacked) return <div className="grid gap-1 py-2"><p className="text-sm font-medium">{appointment.title}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
+  const name = onEdit ? <button type="button" className="text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
+  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <CalendarClock aria-hidden="true" className="size-4 text-muted-foreground" />
@@ -409,36 +494,63 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   );
 }
 
-/** Sources and Appointments stay visible because they matter to reporting; compact lists, never cards in the feed. */
+/**
+ * Sources and Appointments live here, in Reporting: created, edited and
+ * captured from without going anywhere else. The dialogs are the Story
+ * Workspace's own (one Source, one Appointment record, whoever edits it).
+ */
 function PlanningContext({ context, data, capture, canCapture, refresh }: { context: StoryScreenContext; data: ReportingData; capture: (from?: Bound) => { note: () => void; record: () => void }; canCapture: boolean; refresh: () => Promise<unknown> }) {
+  const workspace = useOptionalWorkspace();
+  const sourceDialog = useDialogTarget<StorySource>("[data-reporting-add=source]");
+  const appointmentDialog = useDialogTarget<StoryAppointment>("[data-reporting-add=appointment]");
+  const caps = workspace?.caps;
+  const writable = !context.readOnly && Boolean(workspace);
+  const canAddSource = writable && Boolean(caps?.addSource);
+  const canAddAppointment = writable && Boolean(caps?.addAppointment);
+  const sourceRecord = (id: number) => workspace?.data.sources.find((source) => source.id === String(id)) ?? null;
+  const appointmentRecord = (id: number) => workspace?.data.appointments.find((appointment) => appointment.id === String(id)) ?? null;
+  const closeAnd = (close: () => void) => () => { close(); void refresh(); };
   return (
     <div className="grid gap-5 text-sm">
-      <section aria-label="Sources" className="grid gap-1">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sources</h3>
-        {data.sources.length === 0 ? <p className="text-muted-foreground">No sources yet. Add them in Plan.</p> : (
-          <ul className="divide-y border-y">{data.sources.map((source) => <li key={source.id}><SourceRow context={context} source={source} canEdit={data.capabilities.manage && !context.readOnly} canCapture={canCapture} capture={capture} refresh={refresh} /></li>)}</ul>
+      <section aria-labelledby="reporting-sources" className="grid gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 id="reporting-sources" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sources</h3>
+          {canAddSource ? <Button type="button" size="xs" variant="ghost" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button> : null}
+        </div>
+        {data.sources.length === 0 ? <p className="text-muted-foreground">No sources yet.</p> : (
+          <ItemGroup className="gap-0 divide-y border-y" aria-labelledby="reporting-sources">{data.sources.map((source) => <SourceRow key={source.id} context={context} source={source} canEdit={data.capabilities.manage && !context.readOnly} canCapture={canCapture} capture={capture} refresh={refresh} onEdit={sourceRecord(source.id) && writable ? (element) => sourceDialog.openWith(sourceRecord(source.id), element) : undefined} />)}</ItemGroup>
         )}
       </section>
-      <section aria-label="Appointments" className="grid gap-1">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Appointments</h3>
-        {data.appointments.length === 0 ? <p className="text-muted-foreground">No appointments yet.</p> : (
-          <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked /></li>)}</ul>
+      <section aria-labelledby="reporting-appointments" className="grid gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 id="reporting-appointments" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Appointments</h3>
+          {canAddAppointment ? <Button type="button" size="xs" variant="ghost" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add</Button> : null}
+        </div>
+        {data.appointments.length === 0 ? <p className="text-muted-foreground">No interviews or events yet.</p> : (
+          <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked onEdit={appointmentRecord(appointment.id) && writable ? (element) => appointmentDialog.openWith(appointmentRecord(appointment.id), element) : undefined} /></li>)}</ul>
         )}
       </section>
+      {workspace ? <>
+        <SourceDialog key={`source-${sourceDialog.session}`} open={sourceDialog.open} source={sourceDialog.target} onClose={closeAnd(sourceDialog.close)} finalFocus={sourceDialog.finalFocus} />
+        <AppointmentDialog key={`appointment-${appointmentDialog.session}`} open={appointmentDialog.open} appointment={appointmentDialog.target} onClose={closeAnd(appointmentDialog.close)} finalFocus={appointmentDialog.finalFocus} />
+      </> : null}
     </div>
   );
 }
 
-function SourceRow({ context, source, canEdit, canCapture, capture, refresh }: { context: StoryScreenContext; source: ReportingSource; canEdit: boolean; canCapture: boolean; capture: (from?: Bound) => { note: () => void; record: () => void }; refresh: () => Promise<unknown> }) {
+function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onEdit }: { context: StoryScreenContext; source: ReportingSource; canEdit: boolean; canCapture: boolean; capture: (from?: Bound) => { note: () => void; record: () => void }; refresh: () => Promise<unknown>; onEdit?: (element: HTMLElement) => void }) {
   const from: Bound = { sourceId: source.id, label: source.label };
   return (
-    <div className="grid gap-1 py-2">
-      <p className="font-medium">{source.label}{source.role ? <span className="font-normal text-muted-foreground">, {source.role}</span> : null}</p>
-      <div className="flex flex-wrap items-center gap-1.5">
+    <Item size="xs" className="flex-col items-stretch gap-1 rounded-none px-0 py-2">
+      <ItemContent>
+        <ItemTitle>{onEdit ? <button type="button" className="text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{source.label}</button> : source.label}</ItemTitle>
+        {source.role ? <ItemDescription>{source.role}</ItemDescription> : null}
+      </ItemContent>
+      <ItemActions className="flex-wrap">
         <GroundRulesEditor context={context} source={source} canEdit={canEdit} refresh={refresh} />
         {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button></> : null}
-      </div>
-    </div>
+      </ItemActions>
+    </Item>
   );
 }
 

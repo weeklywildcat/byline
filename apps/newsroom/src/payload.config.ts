@@ -29,6 +29,8 @@ import { StoryPlans } from "./collections/StoryPlans";
 import { Appointments, ProductionAssignments, Sources, Tasks } from "./collections/StoryWork";
 import { Sections, Topics } from "./collections/Taxonomies";
 import { Users } from "./collections/Users";
+import { NewsroomRoles, RoleAssignments, SchoolYears, StaffMemberships } from "./collections/Newsroom";
+import { ReviewComments, ReviewRuns, ReviewWorkflows } from "./collections/Review";
 import { addPollVotesTable } from "./db/poll-votes";
 import { addPresenceSessionsTable } from "./db/presence-sessions";
 import { addPublicationStateTable } from "./db/publication-state";
@@ -109,6 +111,13 @@ const collections: CollectionConfig[] = [
   FrontPageRevisions,
   DistributionItems,
   Polls,
+  SchoolYears,
+  StaffMemberships,
+  NewsroomRoles,
+  RoleAssignments,
+  ReviewWorkflows,
+  ReviewRuns,
+  ReviewComments,
   Users
 ];
 
@@ -185,6 +194,7 @@ export default buildConfig({
         // (Payload refuses a custom view there); Payload's raw /collections/<slug> screens are untouched.
         collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
         people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
+        reviewWorkflows: { Component: "/components/BylineWorkflows#BylineWorkflows", path: "/review-workflows", exact: true, meta: { title: "Review workflows" } },
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
         site: { Component: "/components/BylineSite#BylineSite", path: "/site", exact: true, meta: { title: "Site" } },

@@ -22,7 +22,8 @@ export const notifyAfterStoryChange: CollectionAfterChangeHook = async ({ doc, p
   return doc;
 };
 
-const REVIEW = new Set(["editing", "ready"]);
+// Stored stages (docs/story-lifecycle.md): `editing` is Review; `ready` is review complete.
+const REVIEW = new Set(["editing"]);
 const BACK_TO_WORK = new Set(["pitch", "assigned", "reporting", "writing"]);
 
 /** Story plans: a new editor, a story moving into review, or being sent back. */
@@ -31,11 +32,12 @@ export const notifyAfterPlanChange: CollectionAfterChangeHook = async ({ doc, pr
   if (story === null) return doc;
   const before = operation === "create" ? null : previousDoc;
   if (doc.editor && !sameId(doc.editor, before?.editor)) await notify(req, { kind: "storyAssignments", recipients: [doc.editor], story, detail: "editor" });
-  if (before && doc.workflow !== before.workflow) {
+  // The review engine notifies the routed reviewer and the writers itself (newsroom/review); only manual moves notify here.
+  if (before && doc.workflow !== before.workflow && req.context?.bylineReview !== true) {
     if (REVIEW.has(doc.workflow) && !REVIEW.has(before.workflow)) {
       // No editor yet: the review is everyone-who-edits' to pick up.
       await notify(req, { kind: "readyForReview", recipients: doc.editor ? [doc.editor] : await editorRecipients(req), story });
-    } else if (BACK_TO_WORK.has(doc.workflow) && REVIEW.has(before.workflow)) {
+    } else if (BACK_TO_WORK.has(doc.workflow) && (REVIEW.has(before.workflow) || before.workflow === "ready")) {
       await notify(req, { kind: "storyReturned", recipients: await usersForPeople(req, relationIds(doc.contributors)), story });
     }
   }

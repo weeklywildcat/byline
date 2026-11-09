@@ -1,4 +1,5 @@
 import type { PayloadRequest, Where } from "payload";
+import { OPEN_RUN_STATUSES } from "../domain/review";
 import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUser } from "./user";
 
 /**
@@ -9,8 +10,10 @@ import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUse
  *   Managers read and change the plan, sources, appointments, tasks and
  *   production.
  * - **participant**: holds a task, a production assignment, a source or an
- *   appointment on the story and nothing stronger. Participants read the plan
- *   and change only the records assigned to them.
+ *   appointment on the story, or was routed to its open (or just approved)
+ *   review (docs/review.md), and nothing stronger. Participants read the plan
+ *   and change only the records assigned to them; a reviewer acts only
+ *   through the review engine, which checks the open step itself.
  * - **none**: everyone else, who may read only published stories.
  *
  * This is enforced through Payload access functions (SQL `Where` constraints
@@ -62,7 +65,7 @@ export async function storyScope(req: PayloadRequest): Promise<StoryScope | null
   return pending;
 }
 
-async function storyIds(req: PayloadRequest, collection: "story-plans" | (typeof ASSIGNED_WORK_COLLECTIONS)[number], where: Where) {
+async function storyIds(req: PayloadRequest, collection: "story-plans" | "review-runs" | (typeof ASSIGNED_WORK_COLLECTIONS)[number], where: Where) {
   const result = await req.payload.find({
     collection,
     where,
@@ -80,7 +83,8 @@ async function loadStoryScope(req: PayloadRequest, user: NewsroomUser): Promise<
   if (user.linkedPerson !== null) teamWhere.push({ contributors: { in: [user.linkedPerson] } });
   const [managed, ...assigned] = await Promise.all([
     storyIds(req, "story-plans", { or: teamWhere }),
-    ...ASSIGNED_WORK_COLLECTIONS.map((collection) => storyIds(req, collection, { assignees: { in: [user.id] } }))
+    ...ASSIGNED_WORK_COLLECTIONS.map((collection) => storyIds(req, collection, { assignees: { in: [user.id] } })),
+    storyIds(req, "review-runs", { and: [{ participants: { in: [user.id] } }, { status: { in: [...OPEN_RUN_STATUSES, "approved"] } }] })
   ]);
   const managedSet = new Set(managed.map(String));
   const participant = [...new Set(assigned.flat().filter((id) => !managedSet.has(String(id))))];

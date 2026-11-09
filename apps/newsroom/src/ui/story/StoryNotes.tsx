@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { workspaceKey } from "@byline/newsroom-screens/story/story-query";
 import { articleNotesKey } from "@byline/newsroom-screens/workspace/workspace-query";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
@@ -110,10 +111,10 @@ function NoteThread({ context, note, path, refresh }: { context: StoryScreenCont
           <p className="text-xs text-muted-foreground">{entry.author.name} · {formatDay(entry.at, context.timeZone)}</p>
           <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{entry.text}</p>
         </div>)}</div>
-        {!note.resolved ? <form className="mt-2 grid gap-2" onSubmit={(event) => { event.preventDefault(); if (!busy && reply.trim()) void save({ text: reply }); }}>
+        {!note.resolved ? <InlineForm label="Reply to note" className="mt-2 grid gap-2" onSubmit={() => { if (!busy && reply.trim()) void save({ text: reply }); }}>
           <Textarea aria-label="Reply text" required maxLength={4000} rows={2} value={reply} onChange={(event) => setReply(event.target.value)} />
-          <Button type="submit" size="xs" className="w-fit" disabled={busy || !reply.trim()}>Reply</Button>
-        </form> : null}
+          <Button type="button" size="xs" className="w-fit" disabled={busy || !reply.trim()} onClick={() => void save({ text: reply })}>Reply</Button>
+        </InlineForm> : null}
         {note.canResolve ? <Button type="button" size="xs" variant="ghost" className="mt-2" disabled={busy} onClick={() => void save({ resolved: !note.resolved, expected: note.updatedAt })}>{note.resolved ? "Reopen note" : "Resolve note"}</Button> : null}
         {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
       </CollapsibleContent>

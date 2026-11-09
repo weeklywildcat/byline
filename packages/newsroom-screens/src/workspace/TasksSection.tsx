@@ -48,9 +48,17 @@ function TaskItem({ task, timezone, now, busy, editable, people, canAssign, onTo
   </ContextMenu>;
 }
 
-type TaskDialogProps = { open: boolean; task: EditorialTask | null; onClose: () => void; finalFocus: () => HTMLElement | null };
+type TaskDialogProps = {
+  open: boolean;
+  task: EditorialTask | null;
+  onClose: () => void;
+  finalFocus: () => HTMLElement | null;
+  /** "checklist": the Story Context's wording for the same record (docs/story-screen.md#checklist). */
+  wording?: "task" | "checklist";
+};
 
-function TaskDialog({ open, task, onClose, finalFocus }: TaskDialogProps) {
+export function TaskDialog({ open, task, onClose, finalFocus, wording = "task" }: TaskDialogProps) {
+  const noun = wording === "checklist" ? "item" : "task";
   const { storyId, editorial, data, timezone, caps, currentUserId, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const people = peopleOptions(data.people);
@@ -65,8 +73,8 @@ function TaskDialog({ open, task, onClose, finalFocus }: TaskDialogProps) {
     mutationFn: () => editorial.createTask({ title: title.trim(), storyId, assigneeId: Number(assignee?.id) || (caps.assign ? null : currentUserId || null), dueAt, priority }),
     onSuccess: (response) => {
       cache.write((current) => appendNewTasks(current, response.tasks));
-      announce("Task added.");
-      toast.success("Task added.");
+      announce(wording === "checklist" ? "Checklist item added." : "Task added.");
+      toast.success(wording === "checklist" ? "Checklist item added." : "Task added.");
       onClose();
     },
     onError: (failure) => setError(describeEditorialError(failure, "The task couldn't be added. Try again.")),
@@ -82,7 +90,7 @@ function TaskDialog({ open, task, onClose, finalFocus }: TaskDialogProps) {
   const pending = create.isPending || edit.isPending;
   const dirty = task ? title.trim() !== task.title || (task.dueAt || null) !== dueAt || task.priority !== priority || (caps.assign && Number(task.assigneeId || task.assignee?.id || 0) !== Number(assignee?.id || 0)) : Boolean(title.trim() || dueAt || priority !== "normal");
 
-  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={task ? "Edit task" : "Add task"} description="Work that has to happen before this story can run." submitLabel={task ? "Save task" : "Add task"} pendingLabel={task ? "Saving…" : "Adding…"} pending={pending} dirty={dirty} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) task ? edit.mutate() : create.mutate(); }}>
+  return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={wording === "checklist" ? (task ? "Edit checklist item" : "Add checklist item") : task ? "Edit task" : "Add task"} description={wording === "checklist" ? "Something small to confirm or check before the story runs." : "Work that has to happen before this story can run."} submitLabel={task ? `Save ${noun}` : `Add ${noun}`} pendingLabel={task ? "Saving…" : "Adding…"} pending={pending} dirty={dirty} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) task ? edit.mutate() : create.mutate(); }}>
     <TextField label="What needs doing?" value={title} onChange={setTitle} maxLength={240} autoFocus error={attempted && !title.trim() ? "Add a title." : undefined} />
     <div className="grid gap-4 sm:grid-cols-2">
       {caps.assign ? <Field><FieldLabel htmlFor="ws-task-assignee">Assigned to</FieldLabel><AssigneePicker id="ws-task-assignee" people={people} value={assignee} onChange={setAssignee} disabled={pending} /></Field> : null}

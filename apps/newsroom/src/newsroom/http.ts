@@ -20,7 +20,9 @@ export function handle(run: (ctx: ScreenContext, req: PayloadRequest) => Promise
       const status = error instanceof APIError ? error.status : typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 500;
       const message = status >= 500 ? "Byline couldn't finish that. Try again." : (error as Error).message;
       if (status >= 500) req.payload.logger.error({ err: error, msg: "Newsroom screen request failed" });
-      return json({ message, code: `byline_${status}`, data: { status } }, status);
+      // A refusal may carry structured detail (e.g. the problems blocking a review submission).
+      const detail = status < 500 && error instanceof APIError && error.data && typeof error.data === "object" ? error.data : {};
+      return json({ message, code: `byline_${status}`, data: { ...detail, status } }, status);
     }
   };
 }

@@ -1,319 +1,179 @@
-import { StoryCollectionContext } from "../collections/StoryCollectionContext";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Copy, ExternalLink, LayoutDashboard, MessageSquareText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import type { EditorialTask, ContributorEntry, TaskPatch } from "../editorial/editorial-model";
+import { ArrowUpRight, CalendarClock, MessageSquareText } from "lucide-react";
+import type { ContributorEntry } from "../editorial/editorial-model";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
-import { PeopleAvatars, anyPicture } from "@byline/newsroom-ui/components/people-avatars";
-import { DatePicker, WritersPicker, fieldRow, valueSelectTriggerClass } from "../editorial/pickers";
-import { ResourceIcon } from "../workspace/resource-icon";
-import { WorkStatusBadge, mediaIntensity } from "@byline/newsroom-ui/components/work-status-badge";
-import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
-import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
-import { Field, FieldContent, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@byline/newsroom-ui/ui/field";
-import { Input } from "@byline/newsroom-ui/ui/input";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemHeader, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
-import { Spinner } from "@byline/newsroom-ui/ui/spinner";
-import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { AssigneePicker, DatePicker, WritersPicker, fieldRow } from "../editorial/pickers";
+import { useWorkloadHints, type WorkloadHints } from "../editorial/workload-hints";
+import { buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { Field, FieldContent, FieldGroup, FieldTitle } from "@byline/newsroom-ui/ui/field";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
-import { workingDraft } from "../workspace/resource-model";
 import { appointmentLine } from "../workspace/schedule-model";
-import { assigneeAvatars, sectionNames } from "../workspace/workspace-model";
-import { RESOURCE_PURPOSES, type ReportingSummary, type ResourcePurpose, type StoryResource, type StoryWorkspace } from "../workspace/workspace-types";
-import { exactDate, mediaStatusLabels, mediaTypeLabels, resourcePurposeLabels, shortDateTime } from "../home/newsroom-model";
-import { mediaTypeIcons } from "./media-icons";
-import { openNotesLabel, visibleNotes, type ArticleNotesSummary } from "./notes-model";
-import { ActivityRow, RowSkeletons, TaskRow } from "./rows";
+import { sectionNames } from "../workspace/workspace-model";
+import type { StoryWorkspace } from "../workspace/workspace-types";
+import { leadingSignals, relativeDay, type AttentionSignal } from "./attention";
+import { openNotesLabel, visibleNotes } from "./notes-model";
+import { RowSkeletons } from "./rows";
 import type { StoryFetchers } from "./story-fetchers";
 import { invalidateStoryData, workspaceKey } from "./story-query";
-import { useUpdateTask } from "./use-update-task";
-import { TaskEditDialog } from "./TaskEditDialog";
 
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-const PEEK_ACTIVITY = 3;
+/** How many attention lines the Peek shows: enough to orient, never a task list. */
+const PEEK_NEXT = 3;
 
-/** A section of the peek: Item's header row, then its content. */
-function PeekSection({ title, action, children }: { title: string; action?: ReactNode; children?: ReactNode }) {
-  return <section aria-label={title} className="flex flex-col gap-1 py-3">
-    <Item size="xs" className="px-0 py-0"><ItemHeader><ItemTitle role="heading" aria-level={3}>{title}</ItemTitle>{action ? <ItemActions>{action}</ItemActions> : null}</ItemHeader></Item>
-    {children}
-  </section>;
-}
+type PlanPatch = { deadline?: string | null; editorId?: number | null };
 
-/** A compact, note-free roll-up. A target window is shown as a window; it never acquires a clock time. */
-function ReportingPeek({ reporting, error, timezone, canAddSource, canAddAppointment, reportingUrl }: { reporting: ReportingSummary | null; error?: string; timezone: string; canAddSource: boolean; canAddAppointment: boolean; reportingUrl?: string }) {
-  const next = reporting?.nextAppointment;
-  const stats = reporting ? [reporting.sources ? plural(reporting.sources, "source") : "", reporting.interviewed ? `${reporting.interviewed} interviewed` : "", reporting.needsScheduling ? `${reporting.needsScheduling} needs scheduling` : ""].filter(Boolean) : [];
-  const empty = !stats.length && !next;
-  const canAdd = Boolean(reportingUrl) && (canAddSource || canAddAppointment);
-  // Nothing to show and nothing to do here: leave the section out.
-  if (!error && empty && !canAdd) return null;
-  return <>
-    <Separator />
-    <PeekSection title="Reporting" action={canAdd ? <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={reportingUrl}>{empty ? "Add reporting" : "Manage"}</a> : null}>
-      {error ? <InlineAlert>Reporting couldn't be loaded.</InlineAlert> : empty
-        ? <p className="text-sm text-muted-foreground">No sources or interviews yet.</p>
-        : <div className="flex flex-col gap-1 text-sm">
-          {stats.length ? <p>{stats.join(" · ")}</p> : null}
-          {next ? <p className="text-muted-foreground"><span className="font-medium text-foreground">{next.title}</span> · {appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone)}</p> : null}
-        </div>}
-    </PeekSection>
-  </>;
-}
+export type PeekNextLine = { key: string; title: string; detail: string | null; icon?: ReactNode; href?: string; external?: boolean };
 
 /**
- * Unresolved WordPress Notes, as one quiet row. It reads the count the workspace
- * already carries (no extra request) and the whole row opens the real editor,
- * where Notes live. Nothing renders when there are none or the viewer may not
- * edit the story.
+ * What this Story needs next: Story Attention (story/attention.ts, the
+ * server's one calculation), then the next appointment when no signal covers
+ * it, then open article notes. Hosts without attention (WordPress) still get
+ * the appointment and notes lines. Nothing here recalculates attention.
  */
-function NotesPeek({ notes }: { notes: ArticleNotesSummary | null | undefined }) {
-  const visible = visibleNotes(notes);
-  if (!visible || visible.openCount === 0 || !visible.editUrl) return null;
-  return <>
-    <Separator />
-    <PeekSection title="Article notes">
-      <ItemGroup role="group" aria-label="Article notes" className="-mx-3 w-auto gap-0">
-        <Item size="sm" render={<a href={visible.editUrl} target="_blank" rel="noopener noreferrer" data-peek-notes="" />}>
-          <ItemMedia variant="icon" className="text-muted-foreground"><MessageSquareText aria-hidden="true" /></ItemMedia>
-          <ItemContent><ItemTitle>{openNotesLabel(visible.openCount)}</ItemTitle><ItemDescription>Review in editor</ItemDescription></ItemContent>
-          <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span></ItemActions>
-        </Item>
-      </ItemGroup>
-    </PeekSection>
+export function peekNextLines(data: StoryWorkspace, timezone: string): PeekNextLine[] {
+  const lines: PeekNextLine[] = [];
+  // "Due Friday" is already the Deadline row; every other signal is new information.
+  const attention = data.story.attention ? { ...data.story.attention, signals: data.story.attention.signals.filter((signal) => signal.kind !== "deadline-soon") } : null;
+  const signals: AttentionSignal[] = leadingSignals(attention, PEEK_NEXT);
+  for (const signal of signals) lines.push({ key: `signal-${signal.kind}`, title: signal.label, detail: signal.detail });
+  const next = (data.reporting ?? data.story.reporting)?.nextAppointment;
+  if (next && !signals.some((signal) => signal.kind === "appointment-soon")) {
+    lines.push({ key: "appointment", title: next.title, detail: appointmentLine({ ...next, status: "confirmed", endAt: null }, timezone), icon: <CalendarClock aria-hidden="true" /> });
+  }
+  const notes = visibleNotes(data.story.notes);
+  if (notes && notes.openCount > 0 && notes.editUrl) {
+    lines.push({ key: "notes", title: openNotesLabel(notes.openCount), detail: "Review in editor", icon: <MessageSquareText aria-hidden="true" />, href: notes.editUrl, external: true });
+  }
+  return lines;
+}
+
+function NextItem({ line }: { line: PeekNextLine }) {
+  const body = <>
+    {line.icon ? <ItemMedia variant="icon" className="text-muted-foreground">{line.icon}</ItemMedia> : null}
+    <ItemContent><ItemTitle className="[overflow-wrap:anywhere]">{line.title}</ItemTitle>{line.detail ? <ItemDescription>{line.detail}</ItemDescription> : null}</ItemContent>
+    {line.href ? <ItemActions><ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />{line.external ? <span className="sr-only">(opens in a new tab)</span> : null}</ItemActions> : null}
   </>;
-}
-
-type LinkInput = { label: string; url: string; purpose?: ResourcePurpose };
-
-function LinkForm({ resource, pending, onSubmit, onCancel }: { resource: StoryResource | null; pending: boolean; onSubmit: (input: LinkInput) => void; onCancel: () => void }) {
-  const [purpose, setPurpose] = useState<ResourcePurpose | "none">(resource && resource.purpose !== "other" ? resource.purpose : "none");
-  const purposeItems = [{ value: "none", label: "No purpose" }, ...RESOURCE_PURPOSES.map((value) => ({ value, label: resourcePurposeLabels[value] }))];
-  return <form className="pt-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); onSubmit({ label: String(form.get("label")), url: String(form.get("url")), ...(purpose !== "none" ? { purpose } : {}) }); }}>
-    <FieldGroup className="gap-4">
-      <Field><FieldLabel htmlFor="home-link-label">Label</FieldLabel><Input id="home-link-label" name="label" required maxLength={120} placeholder="Interview notes" defaultValue={resource?.label} autoFocus /></Field>
-      <Field><FieldLabel htmlFor="home-link-url">URL</FieldLabel><Input id="home-link-url" name="url" type="url" required maxLength={2048} placeholder="https://…" defaultValue={resource?.url} /></Field>
-      <Field><FieldLabel htmlFor="home-link-purpose">Purpose <span className="font-normal text-muted-foreground">Optional</span></FieldLabel>
-        <Select items={purposeItems} value={purpose} onValueChange={(next) => setPurpose((next as ResourcePurpose | "none") || "none")}><SelectTrigger id="home-link-purpose" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{purposeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-      </Field>
-      <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={onCancel} disabled={pending}>Cancel</Button><Button type="submit" disabled={pending}>{pending ? <><Spinner data-icon="inline-start" />Saving…</> : resource ? "Save link" : "Add link"}</Button></div>
-    </FieldGroup>
-  </form>;
-}
-
-/** One external link: an Item that is an anchor, with Edit and Remove in a menu for people who may manage links. */
-function LinkRow({ link, canManage, disabled, onEdit, onRemove }: { link: StoryResource; canManage: boolean; disabled: boolean; onEdit: () => void; onRemove: () => void }) {
-  let trigger: HTMLElement | null = null;
-  return <ContextMenu>
-    <ContextMenuTrigger render={<div className="flex items-center gap-1" />}>
-      <Item size="sm" className="min-w-0 flex-1" render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}>
-        <ItemMedia variant="icon" className="text-muted-foreground"><ResourceIcon resource={link} /></ItemMedia>
-        <ItemContent><ItemTitle>{link.label}</ItemTitle><ItemDescription>{link.kind}{link.purpose && link.purpose !== "other" ? ` · ${resourcePurposeLabels[link.purpose] || ""}` : ""}</ItemDescription></ItemContent>
-        <ItemActions><ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
-      </Item>
-      {canManage ? <DropdownMenu>
-        <DropdownMenuTrigger render={<Button ref={(element: HTMLButtonElement | null) => { trigger = element; }} variant="ghost" size="icon-sm" aria-label={`Actions for ${link.label}`} disabled={disabled} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</DropdownMenuItem>
-          <DropdownMenuItem onClick={onEdit}><Pencil aria-hidden="true" />Edit link</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu> : null}
-    </ContextMenuTrigger>
-    <ContextMenuContent className="w-48">
-      <ContextMenuGroup>
-        <ContextMenuLabel className="max-w-44 truncate">{link.label}</ContextMenuLabel>
-        <ContextMenuSeparator />
-        <ContextMenuItem render={<a href={link.url} target="_blank" rel="noopener noreferrer" />}><ExternalLink aria-hidden="true" />Open link</ContextMenuItem>
-        <ContextMenuItem onClick={() => { void navigator.clipboard.writeText(link.url).then(() => toast.success("Link copied.")).catch(() => toast.error("The link couldn’t be copied.")); }}><Copy aria-hidden="true" />Copy link</ContextMenuItem>
-        {canManage ? <>
-          <ContextMenuItem disabled={disabled} onClick={onEdit}><Pencil aria-hidden="true" />Edit link</ContextMenuItem>
-          <ContextMenuItem variant="destructive" disabled={disabled} onClick={onRemove}><Trash2 aria-hidden="true" />Remove link</ContextMenuItem>
-        </> : null}
-      </ContextMenuGroup>
-    </ContextMenuContent>
-  </ContextMenu>;
+  return line.href
+    ? <Item size="sm" render={<a href={line.href} {...(line.external ? { target: "_blank", rel: "noopener noreferrer" } : {})} data-peek-next={line.key} {...(line.key === "notes" ? { "data-peek-notes": "" } : {})} />}>{body}</Item>
+    : <Item size="sm" data-peek-next={line.key}>{body}</Item>;
 }
 
 export type StoryPeekContentProps = {
-  collectionContext?: ReactNode;
   data: StoryWorkspace;
   timezone: string;
   now: Date;
   workspaceUrl?: (storyId: number) => string;
-  onNewTask: (storyId: number) => void;
-  onComplete: (task: EditorialTask) => void;
-  onUpdateTask: (task: EditorialTask, patch: TaskPatch, optimistic?: Partial<EditorialTask>) => void;
-  onEditTask: (task: EditorialTask) => void;
-  updatingTaskId?: string | null;
-  completing?: boolean;
-  /** Mutations. Each rejects through `error`; none is called when the user lacks the capability. */
-  onPlan: (patch: { deadline?: string | null; plannedPublishAt?: string | null; status?: string }) => void;
+  /** Quick edits; each control appears only for a reader with that capability. */
+  onPlan: (patch: PlanPatch) => void;
   onWriters: (writers: ContributorEntry[]) => void;
-  onSaveLink: (input: LinkInput, existing: StoryResource | null) => void;
-  onRemoveLink: (id: string) => void;
+  /** Advisory workload text for the writers and editor pickers; absent shows names alone. */
+  hints?: WorkloadHints;
   planning: boolean;
   writing: boolean;
-  linking: boolean;
   error: string;
-  linkError: string;
-  /** Closes the link form when the parent's save succeeds. */
-  linkFormOpen: boolean | StoryResource;
-  onLinkForm: (open: boolean | StoryResource) => void;
 };
 
-/** What the peek says about one story: identity in the header, then only the sections that have something to show or do. */
-export function StoryPeekContent(props: StoryPeekContentProps) {
-  const { data, timezone, now, workspaceUrl, onNewTask, onComplete, onUpdateTask, onEditTask, updatingTaskId, completing, onPlan, onWriters, onSaveLink, onRemoveLink, planning, writing, linking, error, linkError, linkFormOpen, onLinkForm } = props;
+/**
+ * Story Peek's content (docs/story-screen.md#peek): is this the Story I
+ * meant, where is it in the lifecycle, and what needs it next. The only edits
+ * are the editor's quick ones — writers, editor, deadline; everything else
+ * (reporting, media, checklist, files, activity) happens in the Story.
+ */
+export function StoryPeekContent({ data, timezone, now, workspaceUrl, onPlan, onWriters, hints, planning, writing, error }: StoryPeekContentProps) {
   const { story } = data;
-  const cp = data.contributors;
-  const contributors = cp.contributors;
-  const tasks = data.tasks.filter((task) => task.state === "open");
-  const assignments = data.mediaAssignments;
   const caps = data.capabilities;
-  const peopleLabel = (id: number) => data.people.find((person) => Number(person.id) === id);
-  const draft = workingDraft(data.resources);
-  const workspaceHref = workspaceUrl?.(story.id);
-  const canManageLinks = caps.manageResources;
-  const visibleActivity = data.activity.slice(0, PEEK_ACTIVITY);
-  const statusItems = data.statuses.map((status) => ({ value: status.id, label: status.label }));
+  const writers = data.contributors.contributors.length ? data.contributors.contributors : story.authors;
+  const editor: ContributorEntry | null = story.editor ? (data.people.find((person) => Number(person.id) === story.editor!.id) ?? { id: story.editor.id, name: story.editor.name, kind: "user" }) : null;
+  const due = story.deadline ? `Due ${relativeDay(story.deadline.slice(0, 10), { now, timeZone: timezone })}` : "";
+  const storyHref = workspaceUrl?.(story.id) || story.editUrl;
+  const next = peekNextLines(data, timezone);
   return <>
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-      <FieldSet className="gap-2 pt-4 pb-3">
-        <FieldLegend variant="label" className="mb-0">Story details</FieldLegend>
-        <FieldGroup className="gap-1">
-          <Field orientation="horizontal" aria-label="Workflow" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Workflow</FieldTitle><FieldContent className={fieldRow.value}>{caps.changeStatus ? <Select items={statusItems} value={story.workflow.id} disabled={planning} onValueChange={(id) => { if (id && id !== story.workflow.id) onPlan({ status: id }); }}><SelectTrigger aria-label="Workflow" className={valueSelectTriggerClass}><SelectValue /></SelectTrigger><SelectContent>{data.statuses.filter((status) => status.selectable).map((status) => <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>)}</SelectContent></Select> : story.workflow.label}</FieldContent></Field>
-          {cp.canEdit ? <Field orientation="horizontal" aria-label="Writers" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Writers</FieldTitle><FieldContent className={fieldRow.value}><WritersPicker people={cp.available || []} value={contributors} onChange={onWriters} disabled={writing} /></FieldContent></Field> : null}
-          <Field orientation="horizontal" aria-label="Deadline" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Deadline</FieldTitle><FieldContent className={fieldRow.value}>{caps.assign ? <DatePicker appearance="value" label="Deadline" dateOnly value={story.deadline} timezone={timezone} disabled={planning} onChange={(deadline) => onPlan({ deadline })} /> : exactDate(story.deadline, timezone)}</FieldContent></Field>
-          <Field orientation="horizontal" aria-label="Planned publication" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Planned publication</FieldTitle><FieldContent className={fieldRow.value}>{caps.assign ? <DatePicker appearance="value" label="Planned publication" value={story.plannedPublication} timezone={timezone} disabled={planning} onChange={(plannedPublishAt) => onPlan({ plannedPublishAt })} /> : exactDate(story.plannedPublication, timezone)}</FieldContent></Field>
-          <Field orientation="horizontal" aria-label="Publication" className={fieldRow.field}><FieldTitle className={fieldRow.label}>Publication</FieldTitle><FieldContent className={fieldRow.value}>{story.publicationState.label}{story.publicationState.isScheduled ? ` · ${exactDate(story.publicationState.scheduledAt, timezone)}` : ""}</FieldContent></Field>
-        </FieldGroup>
+      <FieldGroup className="gap-1 py-3" data-peek-facts="">
+        <Field orientation="horizontal" className={fieldRow.field}>
+          <FieldTitle className={fieldRow.label}>Writers</FieldTitle>
+          <FieldContent className={fieldRow.value}>{data.contributors.canEdit
+            ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={onWriters} disabled={writing} hints={hints} />
+            : <span className="py-1 text-sm">{writers.map((person) => person.name).join(", ") || "No writers yet"}</span>}</FieldContent>
+        </Field>
+        <Field orientation="horizontal" className={fieldRow.field}>
+          <FieldTitle className={fieldRow.label}>Editor</FieldTitle>
+          <FieldContent className={fieldRow.value}>{caps.assign
+            ? <AssigneePicker appearance="value" label="Editor" placeholder="Assign an editor" people={data.people} value={editor} disabled={planning} hints={hints} onChange={(person) => onPlan({ editorId: person ? Number(person.id) : null })} />
+            : <span className="py-1 text-sm">{editor?.name ?? "No editor yet"}</span>}</FieldContent>
+        </Field>
+        <Field orientation="horizontal" className={fieldRow.field}>
+          <FieldTitle className={fieldRow.label}>Deadline</FieldTitle>
+          <FieldContent className={fieldRow.value}>{caps.assign
+            ? <DatePicker appearance="value" label="Deadline" dateOnly value={story.deadline} displayValue={due} placeholder="Set a deadline" timezone={timezone} disabled={planning} onChange={(deadline) => onPlan({ deadline })} />
+            : <span className="py-1 text-sm">{due || "No deadline"}</span>}</FieldContent>
+        </Field>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
-      </FieldSet>
+      </FieldGroup>
 
-      <NotesPeek notes={story.notes} />
-
-      {tasks.length || caps.addTask ? <>
-        <Separator />
-        <PeekSection title="Tasks" action={caps.addTask ? <Button variant="outline" size="sm" data-peek-add-task="" onClick={() => onNewTask(story.id)}><Plus data-icon="inline-start" aria-hidden="true" />Add task</Button> : null}>
-          {tasks.length ? <ItemGroup role="group" aria-label="Open tasks" className="-mx-3 w-auto gap-0">{tasks.map((task) => <TaskRow key={task.id} task={task} storyTitle={story.title} compact timezone={timezone} now={now} people={data.people} canAssign={caps.assign} onComplete={() => onComplete(task)} onEdit={caps.addTask ? () => onEditTask(task) : undefined} onUpdate={caps.addTask ? (patch, optimistic) => onUpdateTask(task, patch, optimistic) : undefined} pending={Boolean(completing || (updatingTaskId && updatingTaskId === String(task.id)))} />)}</ItemGroup> : <p className="text-sm text-muted-foreground">No open tasks.</p>}
-        </PeekSection>
-      </> : null}
-
-      {data.errors.media || assignments.length ? <>
-        <Separator />
-        <PeekSection title="Production">
-          {data.errors.media ? <InlineAlert>Production assignments couldn't be loaded.</InlineAlert> : <ItemGroup role="group" aria-label="Production assignments" className="-mx-3 w-auto gap-0">{assignments.map((item) => {
-            const assignee = item.assignee ? { ...item.assignee, imageUrl: peopleLabel(item.assigneeId)?.imageUrl } : peopleLabel(item.assigneeId);
-            const Icon = mediaTypeIcons[item.type] || mediaTypeIcons.other;
-            const due = shortDateTime(item.dueAt, timezone);
-            return <Item key={item.id} size="sm">
-              {assignee && anyPicture([assignee]) ? <ItemMedia><PeopleAvatars people={[assignee]} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
-              <ItemContent>
-                <ItemTitle>{item.title || mediaTypeLabels[item.type]}</ItemTitle>
-                <ItemDescription>{mediaTypeLabels[item.type] || "Visual"} · {assignee?.name || "Unassigned"}</ItemDescription>
-                {due ? <ItemDescription>Due {due}</ItemDescription> : null}
-              </ItemContent>
-              <ItemActions><WorkStatusBadge kind="production" intensity={mediaIntensity(item.status)}>{mediaStatusLabels[item.status] || "Needed"}</WorkStatusBadge></ItemActions>
-            </Item>;
-          })}</ItemGroup>}
-        </PeekSection>
-      </> : null}
-
-      <ReportingPeek reporting={data.reporting} error={data.errors.reporting} timezone={timezone} canAddSource={caps.addSource} canAddAppointment={caps.addAppointment} reportingUrl={workspaceHref ? `${workspaceHref}#ws-reporting` : undefined} />
-      {props.collectionContext}
-
-      {data.resources.length || canManageLinks || draft ? <>
-        <Separator />
-        <PeekSection title="Files & links" action={canManageLinks && !linkFormOpen ? <Button variant="outline" size="sm" aria-label="Add link" disabled={linking} onClick={() => onLinkForm(true)}><Plus data-icon="inline-start" aria-hidden="true" />Add</Button> : null}>
-          {data.resources.length ? <ItemGroup role="group" aria-label="Links" className="-mx-3 w-auto gap-0">{data.resources.map((link) => <LinkRow key={link.id} link={link} canManage={canManageLinks} disabled={linking} onEdit={() => onLinkForm(link)} onRemove={() => onRemoveLink(link.id)} />)}</ItemGroup> : linkFormOpen ? null : <p className="text-sm text-muted-foreground">No links yet.</p>}
-          {linkFormOpen ? <LinkForm key={typeof linkFormOpen === "object" ? linkFormOpen.id : "new"} resource={typeof linkFormOpen === "object" ? linkFormOpen : null} pending={linking} onSubmit={(input) => onSaveLink(input, typeof linkFormOpen === "object" ? linkFormOpen : null)} onCancel={() => onLinkForm(false)} /> : null}
-          {linkError ? <InlineAlert className="mt-2">{linkError}</InlineAlert> : null}
-        </PeekSection>
-      </> : null}
-
-      {visibleActivity.length ? <>
-        <Separator />
-        <PeekSection title="Recent activity" action={data.activity.length > PEEK_ACTIVITY && workspaceHref ? <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={`${workspaceHref}#ws-activity`}>View activity</a> : null}>
-          <ItemGroup role="group" aria-label="Recent activity" className="-mx-2.5 w-auto gap-0">{visibleActivity.map((item) => <ActivityRow key={item.id} item={item} compact timezone={timezone} now={now} />)}</ItemGroup>
-        </PeekSection>
-      </> : null}
+      <section aria-labelledby="peek-next" className="flex flex-col gap-1 border-t py-3" data-peek-next-section="">
+        <h3 id="peek-next" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Next</h3>
+        {next.length
+          ? <ItemGroup aria-labelledby="peek-next" className="-mx-3 w-auto gap-0">{next.map((line) => <NextItem key={line.key} line={line} />)}</ItemGroup>
+          : <p className="text-sm text-muted-foreground">Nothing needs attention right now.</p>}
+      </section>
     </div>
-    <SheetFooter className="flex-row flex-wrap items-center gap-2 border-t sm:justify-between">
-      {workspaceHref ? <a className={buttonVariants({ variant: "outline" })} href={workspaceHref}><LayoutDashboard data-icon="inline-start" aria-hidden="true" />Open workspace</a> : <span />}
-      <div className="flex flex-wrap items-center gap-2">
-        {data.previewUrl ? <a className={buttonVariants({ variant: "ghost" })} href={data.previewUrl} target="_blank" rel="noopener noreferrer">Preview<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
-        {story.editUrl ? <a className={buttonVariants()} href={story.editUrl}>{story.workflow.id === "ready" && caps.assign ? "Review article" : "Edit article"}</a> : null}
-      </div>
+    <SheetFooter className="flex-row items-center justify-end gap-2 border-t">
+      {data.previewUrl ? <a className={buttonVariants({ variant: "outline" })} href={data.previewUrl} target="_blank" rel="noopener noreferrer">Preview<ArrowUpRight data-icon="inline-end" aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span></a> : null}
+      {storyHref ? <a className={buttonVariants()} href={storyHref} data-peek-open="">Open story</a> : null}
     </SheetFooter>
   </>;
 }
 
-export type StoryPeekProps = { storyId: number | null; fetchers: StoryFetchers; /** Used until the workspace names the site timezone. */ timezone?: string; onClose: () => void; origin: HTMLElement | null; onComplete: (task: EditorialTask) => void; completing?: boolean; onNewTask: (storyId: number) => void; now: Date; workspaceUrl?: (storyId: number) => string };
+export type StoryPeekProps = { storyId: number | null; fetchers: StoryFetchers; /** Used until the workspace names the site timezone. */ timezone?: string; onClose: () => void; origin: HTMLElement | null; now: Date; workspaceUrl?: (storyId: number) => string };
 
-export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, onComplete, completing, onNewTask, now, workspaceUrl }: StoryPeekProps) {
+/** The one Story Peek (docs/stories-planning-ui.md): a right Sheet over Home, Stories, Calendar, Media and Collections. */
+export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, now, workspaceUrl }: StoryPeekProps) {
   const client = useQueryClient();
-  const updateTask = useUpdateTask(fetchers);
   const peek = useQuery({ queryKey: workspaceKey(storyId || 0), queryFn: () => fetchers.getWorkspace!(storyId!), enabled: Boolean(storyId && fetchers.getWorkspace) });
   const data = peek.data;
   const story = data?.story;
-  const [linkForm, setLinkForm] = useState<boolean | StoryResource>(false);
-  const [linkError, setLinkError] = useState("");
+  // Editors choosing people get quiet workload context; one cached copy serves every picker.
+  const hints = useWorkloadHints(fetchers.getWorkloadHints, Boolean(data?.capabilities.assign));
   const [editError, setEditError] = useState("");
-  const [editingTask, setEditingTask] = useState<EditorialTask | null>(null);
   const refresh = () => invalidateStoryData(client, storyId);
 
   const planning = useMutation({
-    mutationFn: (patch: { deadline?: string | null; plannedPublishAt?: string | null; status?: string }) => fetchers.editorial!.updateWorkflow(storyId!, { ...patch, expectedRevision: data?.revision }),
+    mutationFn: (patch: PlanPatch) => fetchers.editorial!.updateWorkflow(storyId!, { ...patch, expectedRevision: data?.revision }),
     onMutate: async (patch) => {
       setEditError("");
       await client.cancelQueries({ queryKey: workspaceKey(storyId!) });
       const previous = client.getQueryData<StoryWorkspace>(workspaceKey(storyId!));
-      client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, story: { ...old.story, ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}), ...(patch.plannedPublishAt !== undefined ? { plannedPublication: patch.plannedPublishAt } : {}), ...(patch.status ? { workflow: (old.statuses.find((s) => s.id === patch.status) as StoryWorkspace["story"]["workflow"] | undefined) || old.story.workflow } : {}) } } : old);
+      client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => {
+        if (!old) return old;
+        const person = patch.editorId ? old.people.find((candidate) => Number(candidate.id) === patch.editorId) : null;
+        return { ...old, story: {
+          ...old.story,
+          ...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),
+          ...(patch.editorId !== undefined ? { editor: person ? { id: Number(person.id), name: person.name } : null } : {})
+        } };
+      });
       return previous;
     },
     onError: (error, _patch, previous) => { if (previous) client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (current) => current ? { ...current, story: previous.story } : current); setEditError(describeEditorialError(error, "The story couldn't be updated. Try again.")); },
     onSettled: refresh
   });
   const writers = useMutation({ mutationFn: (value: ContributorEntry[]) => fetchers.editorial!.saveContributors(storyId!, value), onError: (error) => setEditError(describeEditorialError(error, "Writers couldn't be saved.")), onSuccess: refresh });
-  const resources = useMutation({
-    mutationFn: (input: { label: string; url: string; purpose?: ResourcePurpose; id?: string } | { remove: string }) => "remove" in input ? fetchers.workspace!.removeResource(storyId!, input.remove) : input.id ? fetchers.workspace!.updateResource(storyId!, input.id, { label: input.label, url: input.url, purpose: input.purpose || "other" }) : fetchers.workspace!.addResource(storyId!, input),
-    onMutate: async (input) => {
-      setLinkError("");
-      await client.cancelQueries({ queryKey: workspaceKey(storyId!) });
-      const previous = client.getQueryData<StoryWorkspace>(workspaceKey(storyId!))?.resources || [];
-      client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: "remove" in input ? old.resources.filter((r) => r.id !== input.remove) : input.id ? old.resources : [...old.resources, { id: "pending-link", label: input.label, url: input.url, purpose: input.purpose || "other", kind: "Saving…" }] } : old);
-      return previous;
-    },
-    onSuccess: (result, input, previous) => { client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: result.resources } : old); setLinkForm(false); if ("remove" in input) { const removed = previous?.find((resource) => resource.id === input.remove); if (removed) toast.success("Link removed.", { action: { label: "Undo", onClick: () => { void fetchers.workspace!.addResource(storyId!, { label: removed.label, url: removed.url, purpose: removed.purpose }).then((restored) => client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: restored.resources } : old)).then(() => refresh()).catch(() => toast.error("The link couldn’t be restored.")); } } }); } },
-    onError: (error, _input, previous) => { client.setQueryData<StoryWorkspace>(workspaceKey(storyId!), (old) => old ? { ...old, resources: previous || [] } : old); setLinkError(describeEditorialError(error, "The link couldn't be saved. Try again.")); toast.error("Link couldn't be saved."); },
-    onSettled: () => { void refresh(); }
-  });
 
-  const writerList = data?.contributors.contributors.length ? data.contributors.contributors : story?.authors || [];
-  const editor = story?.editor ? { name: story.editor.name, imageUrl: data?.people.find((candidate) => Number(candidate.id) === story.editor!.id)?.imageUrl } : null;
-  return <><Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !resources.isPending && !writers.isPending && !planning.isPending) { setLinkForm(false); setEditError(""); setLinkError(""); setEditingTask(null); onClose(); } }}>
-    <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
+  const description = story && data ? [story.workflow.label, sectionNames(data.sections)].filter(Boolean).join(" · ") : "Story";
+  return <Sheet open={Boolean(storyId)} onOpenChange={(open) => { if (!open && !writers.isPending && !planning.isPending) { setEditError(""); onClose(); } }}>
+    <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-sm" finalFocus={() => { if (origin?.isConnected) return origin; return document.querySelector<HTMLElement>("[data-home-search]"); }}>
       <SheetHeader className="gap-1 border-b pr-12">
-        <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story details"}</SheetTitle>
-        <SheetDescription>{story ? [story.workflow.label, sectionNames(data.sections)].filter(Boolean).join(" · ") : "Newsroom context"}</SheetDescription>
-        {story && (writerList.length || editor) ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-sm">
-          {writerList.length ? <span className="flex items-center gap-2"><PeopleAvatars people={writerList} /><span>{writerList.map((p) => p.name).join(", ")}</span></span> : null}
-          {editor ? <span className="flex items-center gap-2 text-muted-foreground"><PeopleAvatars people={[editor]} />Edited by {editor.name}</span> : null}
-        </div> : null}
+        <SheetTitle className="text-lg leading-snug [overflow-wrap:anywhere]">{decodeEntities(story?.title) || "Story"}</SheetTitle>
+        <SheetDescription>{description}</SheetDescription>
       </SheetHeader>
-      {peek.isPending ? <div className="py-4"><RowSkeletons count={7} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
-        : <StoryPeekContent collectionContext={fetchers.collections ? <StoryCollectionContext storyId={data.story.id} api={fetchers.collections} compact /> : undefined} data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl} onNewTask={onNewTask} onComplete={onComplete} onUpdateTask={(task, patch, optimistic) => updateTask.mutate({ task, patch, optimistic })} onEditTask={setEditingTask} updatingTaskId={updateTask.isPending ? String(updateTask.variables?.task.id || "") : null} completing={completing}
-          onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
-          onSaveLink={(input, existing) => resources.mutate(existing ? { ...input, id: existing.id } : input)} onRemoveLink={(id) => resources.mutate({ remove: id })}
-          planning={planning.isPending} writing={writers.isPending} linking={resources.isPending} error={editError} linkError={linkError} linkFormOpen={linkForm} onLinkForm={(next) => { setLinkError(""); setLinkForm(next); }} />}
+      {peek.isPending ? <div className="py-4"><RowSkeletons count={4} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
+        : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl}
+          onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)} hints={hints}
+          planning={planning.isPending} writing={writers.isPending} error={editError} />}
     </SheetContent>
-  </Sheet>
-  <TaskEditDialog open={editingTask !== null} onClose={() => setEditingTask(null)} fetchers={fetchers} task={editingTask} people={data?.people || []} canAssign={Boolean(data?.capabilities.assign)} timezone={data?.timezone || timezone || "UTC"} />
-  </>;
+  </Sheet>;
 }

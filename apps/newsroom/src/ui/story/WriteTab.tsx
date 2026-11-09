@@ -124,7 +124,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   return (
     <BylineEditorHostProvider host={host}>
       <div className="flex flex-col gap-8">
-        <StoryModeControl />
         <article className="flex w-full flex-col gap-6" aria-label="Article">
           <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
             {showKicker ? (
@@ -205,6 +204,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                   disabled={readOnly}
                 />
               </Property>
+              <StoryModeControl />
               {format.value === "video" ? (
                 <Property label="YouTube video" htmlFor="story-video-url">
                   <div className="flex max-w-lg flex-col gap-1">

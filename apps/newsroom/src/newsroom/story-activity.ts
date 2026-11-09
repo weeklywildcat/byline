@@ -5,7 +5,7 @@ import type { ScreenContext } from "./screen-models";
 
 const summaries = {
   "story-created": "Created the story", "story-published": "Published the story", "story-unpublished": "Unpublished the story",
-  "workflow-changed": "Moved workflow", "editor-changed": "Changed the assigned editor", "contributors-changed": "Changed the byline",
+  "workflow-changed": "Changed the stage", "editor-changed": "Changed the assigned editor", "contributors-changed": "Changed the byline",
   "task-created": "Added a task", "task-completed": "Completed a task", "task-reopened": "Reopened a task",
   "source-added": "Added a source", "source-updated": "Updated a source",
   "appointment-added": "Added an appointment", "appointment-updated": "Updated an appointment", "appointment-completed": "Completed an appointment",
@@ -20,6 +20,10 @@ const summaries = {
   "live-publishers-changed": "Changed who may publish live updates", "live-published": "Published a live update",
   "live-mode-changed": "Changed the story mode", "live-coverage-started": "Started live coverage", "live-coverage-resumed": "Resumed live coverage", "live-coverage-ended": "Ended live coverage",
   "homepage-featured": "Proposed featuring on the homepage",
+  "review-submitted": "Submitted for review", "review-resubmitted": "Resubmitted for review", "review-claimed": "Took the review",
+  "review-changes-requested": "Requested changes", "review-step-approved": "Approved and sent up", "review-approved": "Approved: review complete",
+  "review-stale": "An approval no longer applies after changes", "review-reassigned": "Reassigned the review", "review-override": "Overrode the review",
+  "review-routing-failed": "Couldn't route the review", "review-cancelled": "Withdrew the review",
   "distribution-assigned": "Assigned distribution", "distribution-ready": "Marked distribution ready", "distribution-posted": "Recorded a distribution as posted", "distribution-failed": "Distribution failed", "distribution-skipped": "Skipped a distribution"
 } as const;
 export type ActivityAction = keyof typeof summaries;

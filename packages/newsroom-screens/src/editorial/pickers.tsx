@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { contributorKey, type ContributorEntry } from "./editorial-model";
+import { hintFor, type WorkloadHints } from "./workload-hints";
 import { exactDate, siteDay } from "../home/newsroom-model";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -36,7 +37,16 @@ function triggerProps(appearance: PickerAppearance, className?: string) {
 
 const muted = (text: string) => <span className="truncate text-muted-foreground">{text}</span>;
 
-export function AssigneePicker({ id, people, value, onChange, disabled, label = "Assignee", placeholder = "Choose an assignee", appearance = "field", clearable = true }: { id?: string; people: ContributorEntry[]; value: ContributorEntry | null; onChange: (value: ContributorEntry | null) => void; disabled?: boolean; label?: string; placeholder?: string; appearance?: PickerAppearance; clearable?: boolean }) {
+/** A person in a picker list: the name is primary; advisory workload, when known, is quiet secondary text. */
+function PersonOption({ person, hints }: { person: ContributorEntry; hints?: WorkloadHints }) {
+  const hint = hintFor(person, hints);
+  return <>
+    <PersonAvatar name={person.name} url={person.imageUrl} />
+    {hint ? <span className="flex min-w-0 flex-col"><span className="truncate">{person.name}</span><span className="truncate text-xs text-muted-foreground" data-workload-hint="">{hint}</span></span> : person.name}
+  </>;
+}
+
+export function AssigneePicker({ id, people, value, onChange, disabled, label = "Assignee", placeholder = "Choose an assignee", appearance = "field", clearable = true, hints }: { hints?: WorkloadHints; id?: string; people: ContributorEntry[]; value: ContributorEntry | null; onChange: (value: ContributorEntry | null) => void; disabled?: boolean; label?: string; placeholder?: string; appearance?: PickerAppearance; clearable?: boolean }) {
   return <Combobox items={people} value={value} onValueChange={onChange} itemToStringLabel={(person: ContributorEntry) => person.name} isItemEqualToValue={(a: ContributorEntry, b: ContributorEntry) => a.id === b.id} disabled={disabled}>
     <ComboboxTrigger render={<Button id={id} {...triggerProps(appearance)} aria-label={`${label}: ${value?.name ?? "none"}`} disabled={disabled} />}>
       {value ? <span className="flex min-w-0 items-center gap-2"><PersonAvatar name={value.name} url={value.imageUrl} /><span className="truncate">{value.name}</span></span> : muted(placeholder)}
@@ -44,12 +54,12 @@ export function AssigneePicker({ id, people, value, onChange, disabled, label = 
     <ComboboxContent>
       <ComboboxInput showTrigger={false} showClear={clearable} aria-label={`Search ${label.toLowerCase()}`} placeholder="Search people…" />
       <ComboboxEmpty>No one found.</ComboboxEmpty>
-      <ComboboxList>{(person: ContributorEntry) => <ComboboxItem key={String(person.id)} value={person}><PersonAvatar name={person.name} url={person.imageUrl} />{person.name}</ComboboxItem>}</ComboboxList>
+      <ComboboxList>{(person: ContributorEntry) => <ComboboxItem key={String(person.id)} value={person}><PersonOption person={person} hints={hints} /></ComboboxItem>}</ComboboxList>
     </ComboboxContent>
   </Combobox>;
 }
 
-export function WritersPicker({ people, value, onChange, disabled, appearance = "value" }: { people: ContributorEntry[]; value: ContributorEntry[]; onChange: (value: ContributorEntry[]) => void; disabled?: boolean; appearance?: PickerAppearance }) {
+export function WritersPicker({ people, value, onChange, disabled, appearance = "value", hints }: { hints?: WorkloadHints; people: ContributorEntry[]; value: ContributorEntry[]; onChange: (value: ContributorEntry[]) => void; disabled?: boolean; appearance?: PickerAppearance }) {
   const names = value.map((person) => person.name).join(", ");
   return <Combobox multiple items={people} value={value} onValueChange={onChange} itemToStringLabel={(person: ContributorEntry) => person.name} isItemEqualToValue={(a: ContributorEntry, b: ContributorEntry) => contributorKey(a) === contributorKey(b)} disabled={disabled}>
     <ComboboxTrigger render={<Button {...triggerProps(appearance)} aria-label={`Writers: ${names || "none"}`} disabled={disabled} />}>
@@ -58,7 +68,7 @@ export function WritersPicker({ people, value, onChange, disabled, appearance = 
     <ComboboxContent>
       <ComboboxInput showTrigger={false} aria-label="Search writers" placeholder="Search writers…" />
       <ComboboxEmpty>No writers found.</ComboboxEmpty>
-      <ComboboxList>{(person: ContributorEntry) => <ComboboxItem key={contributorKey(person)} value={person}><PersonAvatar name={person.name} url={person.imageUrl} />{person.name}</ComboboxItem>}</ComboboxList>
+      <ComboboxList>{(person: ContributorEntry) => <ComboboxItem key={contributorKey(person)} value={person}><PersonOption person={person} hints={hints} /></ComboboxItem>}</ComboboxList>
     </ComboboxContent>
   </Combobox>;
 }

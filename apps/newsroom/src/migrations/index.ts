@@ -20,6 +20,8 @@ import * as migration_20261109_130958_front_page from './20261109_130958_front_p
 import * as migration_20261109_134558_distribution from './20261109_134558_distribution';
 import * as migration_20261109_161224_live_story_mode from './20261109_161224_live_story_mode';
 import * as migration_20261109_164800_live_desk_reason from './20261109_164800_live_desk_reason';
+import * as migration_20261109_182945_newsroom_review from './20261109_182945_newsroom_review';
+import * as migration_20261109_213214_cms_url_default from './20261109_213214_cms_url_default';
 
 export const migrations = [
   {
@@ -130,6 +132,16 @@ export const migrations = [
   {
     up: migration_20261109_164800_live_desk_reason.up,
     down: migration_20261109_164800_live_desk_reason.down,
-    name: '20261109_164800_live_desk_reason'
+    name: '20261109_164800_live_desk_reason',
+  },
+  {
+    up: migration_20261109_182945_newsroom_review.up,
+    down: migration_20261109_182945_newsroom_review.down,
+    name: '20261109_182945_newsroom_review',
+  },
+  {
+    up: migration_20261109_213214_cms_url_default.up,
+    down: migration_20261109_213214_cms_url_default.down,
+    name: '20261109_213214_cms_url_default'
   },
 ];
