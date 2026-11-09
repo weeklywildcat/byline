@@ -33,7 +33,8 @@
   box-shadow: 0 14px 50px rgb(0 0 0 / 28%);
 }
 .byline-login-logo { display: block; width: min(220px, 100%); height: auto; margin: 0 auto; }
-.byline-login h1 { font: inherit; font-size: 1.25rem; font-weight: 650; text-align: center; margin: 20px 0; }
+.byline-login h1 { font: inherit; font-size: 1.25rem; font-weight: 650; text-align: center; margin: 20px 0 4px; }
+.byline-login-subtitle { color: var(--muted-foreground); text-align: center; margin: 0 0 20px; }
 .byline-login-options { display: grid; gap: 8px; text-align: center; }
 .byline-google-button { min-width: 0; grid-area: 1 / 1; }
 .byline-login-options > a { min-height: 44px; text-decoration: none; }

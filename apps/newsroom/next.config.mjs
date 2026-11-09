@@ -5,6 +5,9 @@ const nextConfig = {
   // The design system and the shared article packages ship TypeScript source.
   transpilePackages: ["@byline/newsroom-ui", "@byline/newsroom-screens", "@byline/admin-runtime", "@byline/core", "@byline/article-body", "@byline/content", "@byline/editor", "@byline/story-presentations", "@byline/ui", "@byline/theme-weekly-wildcat", "@byline/theme-contract"],
   poweredByHeader: false,
+  async redirects() {
+    return [{ source: "/", destination: "/admin", permanent: false }];
+  },
   async headers() {
     // Nothing on this host is meant for search engines.
     return [

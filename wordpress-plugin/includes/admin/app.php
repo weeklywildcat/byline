@@ -253,6 +253,10 @@ add_action('admin_menu', 'byline_register_admin_app');
 
 function byline_render_move_notice(): void
 {
+    if (!defined('BYLINE_NEWSROOM_CUTOVER') || BYLINE_NEWSROOM_CUTOVER !== true) {
+        return;
+    }
+
     ?>
     <div class="notice notice-info is-dismissible">
         <h2><?php echo esc_html__("We've moved to Byline!", 'weekly-wildcat-headless'); ?></h2>

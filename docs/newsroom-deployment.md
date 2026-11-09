@@ -4,6 +4,21 @@ The Payload newsroom is deployed as a separate service from the legacy WordPress
 CMS. Production should use PostgreSQL, persistent media/publication volumes and
 the repository's cache-friendly `apps/newsroom/Dockerfile`.
 
+## Staff entrance
+
+Weekly Wildcat staff use `https://byline.weeklywildcat.com/`. Route that
+hostname to the newsroom web service and set
+`BYLINE_NEWSROOM_URL=https://byline.weeklywildcat.com` in its environment.
+The root redirects to `/admin`, where Payload sends signed-out staff to the
+Byline login and signed-in staff to Byline Home. If Google sign-in is enabled,
+register the HTTPS origin and its `/api/byline/auth/google/callback` URL with
+the Google OAuth client.
+
+Before announcing the move, verify that staff can open the root, sign in, and
+reach Byline Home. Once the newsroom cutover is approved, enable the existing
+WordPress move notice with `define('BYLINE_NEWSROOM_CUTOVER', true);` in
+`wp-config.php`. Remove the setting to hide the notice during a rollback.
+
 ## Build context
 
 Build from the repository root so npm workspaces are available:
