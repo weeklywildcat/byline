@@ -14,7 +14,11 @@ for (const width of [1440, 820, 390]) {
       const id = await createStory(request, baseURL!, token, { headline: title, slug: `ux-${suffix}`, section: section.id });
       await signIn(context, baseURL!, token);
       await page.goto(`/admin/collections/stories/${id}`);
-      const url = page.getByRole("region", { name: "Public URL" });
+      const detailsButton = page.getByRole("button", { name: "Details", exact: true });
+      const details = page.getByRole("dialog", { name: "Story details" });
+      const closeDetails = () => details.getByRole("button", { name: "Close", exact: true }).click();
+      await detailsButton.click();
+      const url = details.getByRole("region", { name: "Public URL" });
       await expect(url).toContainText("The date is assigned on first publication.");
       const edit = url.getByRole("button", { name: "Edit URL" });
       await edit.click();
@@ -26,21 +30,26 @@ for (const width of [1440, 820, 390]) {
       await edit.click();
       await dialog.getByLabel(/First publication/).fill("2026-11-07T23:30");
       await dialog.getByRole("button", { name: "Apply to draft" }).click();
+      await closeDetails();
       await waitForSaved(page);
       await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await detailsButton.click();
       await expect(url.getByRole("link", { name: "Open published story" })).toHaveAttribute("href", new RegExp(`/2026/11/07/${section.slug}/ux-${suffix}/$`));
 
       await edit.click();
       await dialog.getByLabel("Story slug").fill(`new-${suffix}`);
       await dialog.getByRole("button", { name: "Apply to draft" }).click();
+      await closeDetails();
       await waitForSaved(page);
       await page.getByRole("button", { name: "Publish changes", exact: true }).click();
       const confirmation = page.getByRole("alertdialog", { name: "Change the published URL?" });
       await expect(confirmation).toContainText("permanent redirect");
       await expect(confirmation.getByRole("button", { name: "Publish with redirect" })).toBeInViewport();
       await confirmation.getByRole("button", { name: "Publish with redirect" }).click();
+      await detailsButton.click();
       await expect(url.getByRole("link", { name: "Open published story" })).toHaveAttribute("href", new RegExp(`/new-${suffix}/$`));
 
+      await closeDetails();
       await page.getByRole("tab", { name: "History", exact: true }).click();
       await expect(page.getByText("Currently published", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Add notice" }).click();
