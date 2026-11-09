@@ -50,7 +50,7 @@ export type StoryScreenContext = {
  *
  * Write edits the article through Payload's form hooks: the one copy of the
  * article. Live coverage is not a tab: it is the Story mode control and a section under the article in
- * Write (`ui/live`). Plan and Production are the shared Story Workspace sections
+ * Write (`ui/live`). Plan is the shared Story Workspace sections, Production included
  * (@byline/newsroom-screens), the same ones the WordPress workspace page
  * shows, reading and writing the plan and workspace records through
  * /api/byline. They run with `articleInForm`, so they never write article
@@ -106,7 +106,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             <TabsTrigger value="write">Write</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
-            <TabsTrigger value="production">Production</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
@@ -125,6 +124,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
                 <ReportingSummaryStrip />
                 <ReportingPlan />
                 <TasksSection />
+                <MediaSection />
               </div>
               <aside aria-label="Story context" className="flex min-w-0 flex-col gap-4">
                 <DetailsSection />
@@ -133,11 +133,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
                 <ActivitySection />
               </aside>
             </div>
-          </Workspace>
-        </TabsContent>
-        <TabsContent value="production" className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <Workspace storyId={storyId}>
-            <MediaSection />
           </Workspace>
         </TabsContent>
         <TabsContent value="history" className="mx-auto w-full max-w-5xl px-4 md:px-8">

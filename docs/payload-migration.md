@@ -674,9 +674,9 @@ landing on the Story screen.
 sections moved to `packages/newsroom-screens` and split into
 `StoryWorkspaceProvider` / `WorkspaceGate` / sections; WordPress rebuilds its page
 from them unchanged. The Story screen's Plan tab is now those sections (brief,
-reporting summary and plan, sources and appointments, tasks, details, files and
-links, activity) and Production is `MediaSection`; the hand-built Plan and
-Production tabs are gone. The header reads workflow, editor and deadline from the
+reporting summary and plan, sources and appointments, tasks, production
+assignments (`MediaSection`), details, files and links, activity); there is no
+separate Production tab, and the hand-built Plan and Production tabs are gone. The header reads workflow, editor and deadline from the
 same workspace data.
 
 - `articleInForm`: inside the Story screen the workspace never writes article

@@ -45,7 +45,7 @@ export function useOptionalWorkspace(): WorkspaceContextValue | null {
  * Loads one story's workspace and provides it. Children always render; put
  * sections inside `WorkspaceGate`, which shows the loading and error states.
  * A host composes the sections however its screen needs: the WordPress page
- * below, or the Payload Story screen's Plan and Production tabs.
+ * below, or the Payload Story screen's Plan tab.
  */
 export function StoryWorkspaceProvider({ children, ...env }: WorkspaceEnv & { children: ReactNode }) {
   return <QueryClientProvider client={workspaceQueryClient}><WorkspaceLoader env={env}>{children}</WorkspaceLoader></QueryClientProvider>;
