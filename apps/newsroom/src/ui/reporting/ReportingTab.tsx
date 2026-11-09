@@ -32,7 +32,9 @@ import { TranscriptView } from "./TranscriptView";
 
 /** Width of the Reporting area above which Sources and Appointments sit beside the feed (measured: feed rows need ~520px, the rail ~280px). */
 const RAIL_AT = 880;
+type ReportingData = Awaited<ReturnType<typeof loadReporting>>;
 
+type CaptureActions = { note: () => void; record: () => void; file: () => void; photo: () => void; link: () => void; transcript: () => void };
 type Bound = { sourceId?: number; appointmentId?: number; label?: string };
 type Upload = { id: string; name: string; kind: "file" | "photo" | "transcript"; progress: number; error: string | null; blob: Blob; extra: Record<string, unknown> };
 
@@ -199,7 +201,7 @@ export function ReportingTab({ context }: { context: StoryScreenContext }) {
   );
 }
 
-function CaptureMenu({ capture }: { capture: ReturnType<ReturnType<typeof makeCapture>> }) {
+function CaptureMenu({ capture }: { capture: CaptureActions }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Capture</DropdownMenuTrigger>
@@ -214,8 +216,6 @@ function CaptureMenu({ capture }: { capture: ReturnType<ReturnType<typeof makeCa
     </DropdownMenu>
   );
 }
-// Type helper only: the shape `capture()` returns.
-declare function makeCapture(from?: Bound): { note: () => void; record: () => void; file: () => void; photo: () => void; link: () => void; transcript: () => void };
 
 function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScreenContext; bound: Bound | null; onDone: () => void; onCancel: () => void }) {
   const [text, setText] = useState("");
@@ -285,7 +285,7 @@ function iconFor(item: StoryMaterialItem): ReactNode {
   return item.fileKind === "audio" ? <Mic aria-hidden="true" /> : item.fileKind === "image" ? <ImageIcon aria-hidden="true" /> : <FileText aria-hidden="true" />;
 }
 
-function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; data: NonNullable<ReturnType<typeof useReportingData>>; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
+function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; data: ReportingData; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.kind === "note" ? item.text : "");
   const remove = useMutation({
@@ -348,8 +348,6 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
     </div>
   );
 }
-type ReportingData = Awaited<ReturnType<typeof loadReporting>>;
-declare function useReportingData(): ReportingData | undefined;
 
 function rowTitle(item: StoryMaterialItem): string {
   switch (item.kind) {
