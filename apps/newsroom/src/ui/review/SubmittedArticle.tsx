@@ -3,6 +3,7 @@
 import { ImageIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ArticleCanvas } from "../story/ArticleCanvas";
+import { legacyHtmlBlocks } from "./legacy-html";
 
 /**
  * The exact version a writer submitted, read-only (docs/review.md#submitted).
@@ -29,7 +30,7 @@ const MEDIA = /^(upload|image|gallery|video|embed|chart|map|interactive|social|a
 /** One reviewable block: its stable index (the anchor) and its plain text. */
 export type ReviewBlock = { id: string; kind: "headline" | "deck" | "paragraph" | "heading" | "quote" | "list" | "media"; text: string; level?: number };
 
-export function reviewBlocks(story: SubmittedStory): ReviewBlock[] {
+export function reviewBlocks(story: SubmittedStory, parseHtml?: (html: string) => Document): ReviewBlock[] {
   const blocks: ReviewBlock[] = [];
   if (story.headline?.trim()) blocks.push({ id: "headline", kind: "headline", text: story.headline.trim() });
   if (story.deck?.trim()) blocks.push({ id: "deck", kind: "deck", text: story.deck.trim() });
@@ -59,8 +60,8 @@ export function reviewBlocks(story: SubmittedStory): ReviewBlock[] {
   };
   if (story.body?.root) visit(story.body.root);
   else if (story.legacyHtml) {
-    const plain = story.legacyHtml.replace(/<\/(p|h\d|li|blockquote)>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
-    for (const part of plain.split(/\n{2,}/).map((line) => line.trim()).filter(Boolean)) blocks.push({ id: `b${index++}`, kind: "paragraph", text: part });
+    // Imported stories: parsed inertly and read back as text, never as markup.
+    for (const block of legacyHtmlBlocks(story.legacyHtml, parseHtml) ?? []) blocks.push({ id: `b${index++}`, ...block });
   }
   return blocks;
 }
