@@ -491,6 +491,12 @@ describe("the projection", () => {
     expect(() => validatePublicBuildSnapshotV2(privateKey)).toThrow(/workflow/);
   });
 
+  it("validates canonical story URLs with trailing slashes in the publication URL", () => {
+    const withTrailingSlashes = structuredClone(snap);
+    withTrailingSlashes.publication.urls.publicSite += "///";
+    expect(validatePublicBuildSnapshotV2(withTrailingSlashes)).toBe(withTrailingSlashes);
+  });
+
   it("carries Event instants without preformatted presentation strings", () => {
     const [homecoming, fieldDay] = snap.datasets.events;
     expect(homecoming).toMatchObject({ title: "Homecoming", startAt: "2026-10-31T23:00:00.000Z", endAt: "2026-11-01T01:30:00.000Z", allDay: false, status: "scheduled" });
