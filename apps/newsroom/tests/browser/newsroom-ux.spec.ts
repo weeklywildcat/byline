@@ -33,7 +33,10 @@ for (const width of [1440, 820, 390]) {
       await dialog.getByRole("button", { name: "Apply to draft" }).click();
       await closeDetails();
       await waitForSaved(page);
-      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      // A new Story is a Pitch: the header's Publish appears at Ready. An editor publishes earlier from the overflow menu.
+      await page.getByRole("button", { name: "More story actions" }).click();
+      await page.getByRole("menuitem", { name: "Publish now, without review" }).click();
+      await expect(page.getByRole("button", { name: "Publish changes", exact: true })).toBeVisible();
       await detailsButton.click();
       await expect(url.getByRole("link", { name: "Open published story" })).toHaveAttribute("href", new RegExp(`/2026/11/07/${section.slug}/ux-${suffix}/$`));
 
@@ -104,7 +107,7 @@ test("moves a Story to Trash from the shadcn publication menu", async ({ page, c
   });
   await signIn(context, baseURL!, token);
   await page.goto(`/admin/collections/stories/${id}`);
-  await expect(page.getByRole("heading", { name: "Trash action fixture", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Headline" })).toHaveValue("Trash action fixture");
 
   await page.getByRole("button", { name: "Publication actions" }).click();
   await page.getByRole("menuitem", { name: /Move to trash/i }).click();
@@ -145,7 +148,7 @@ test("keyboard command results open Stories, Collections and Media at their dest
   }
   await choose(`story-${key}`, /Unique desk story/);
   await expect(page).toHaveURL(new RegExp(`/admin/collections/stories/${id}$`));
-  await expect(page.getByRole("heading", { name: "Unique desk story", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Headline" })).toHaveValue("Unique desk story");
   await choose(`Collection ${key}`, new RegExp(`Collection ${key}`));
   await expect(page).toHaveURL(new RegExp(`/admin/collections[?].*collection=${collectionId}`));
   await expect(page.getByRole("heading", { name: `Collection ${key}`, exact: true }).first()).toBeVisible();

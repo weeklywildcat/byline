@@ -347,7 +347,8 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
               {hasPublishedDoc ? "Publish changes" : "Publish"}
             </Button>
           ) : null}
-          {showPublish && id != null ? <PublicationActions context={context} scheduledAt={scheduledAt} changedPath={changedPath} saving={saving || modified || publishing} canSchedule={(!hasPublishedDoc || newerDraft) && !modified && !saving} onChanged={refresh} /> : null}
+          {/* Schedule, Unpublish and Move to trash are not lifecycle steps. Trash is Payload's recoverable delete, distinct from editorial Drop, and stays reachable in every phase. */}
+          {canEditPublication && id != null ? <PublicationActions context={context} scheduledAt={scheduledAt} changedPath={changedPath} saving={saving || modified || publishing} canSchedule={(!hasPublishedDoc || newerDraft) && !modified && !saving} onChanged={refresh} /> : null}
         </div>
       </div>
 
