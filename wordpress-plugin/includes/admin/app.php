@@ -251,6 +251,19 @@ function byline_register_admin_app(): void
 }
 add_action('admin_menu', 'byline_register_admin_app');
 
+function byline_render_move_notice(): void
+{
+    ?>
+    <div class="notice notice-info is-dismissible">
+        <h2><?php echo esc_html__("We've moved to Byline!", 'weekly-wildcat-headless'); ?></h2>
+        <p><a class="button button-primary button-large" href="https://byline.weeklywildcat.com/">
+            <?php echo esc_html__('Open Byline', 'weekly-wildcat-headless'); ?>
+        </a></p>
+    </div>
+    <?php
+}
+add_action('admin_notices', 'byline_render_move_notice', 5);
+
 /**
  * Contributors use Today as their newsroom landing screen. Preserve Dashboard
  * for users who also hold editorial or administrative privileges.
