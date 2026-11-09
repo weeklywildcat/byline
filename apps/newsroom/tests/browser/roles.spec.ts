@@ -148,6 +148,53 @@ test("workload is factual, alphabetical and has no scores", async ({ page }) => 
   await expect(page.getByText(/score|rank|productivity|hours/i)).toHaveCount(0);
 });
 
+test("plans a school year step by step and discards it, changing nothing", async ({ page, request, baseURL }) => {
+  const headers = { Authorization: `JWT ${token}`, Origin: baseURL! };
+  let before = await (await request.get("/api/byline/school-years", { headers })).json();
+  // A leftover fixture plan from an interrupted run is discarded first (never a real planned year: those have real names).
+  if (before.planned && /^Fixture \d+$/.test(before.planned.name)) {
+    await request.delete(`/api/byline/school-years/${before.planned.id}`, { headers });
+    before = await (await request.get("/api/byline/school-years", { headers })).json();
+  }
+  expect(before.planned).toBeNull();
+  await page.goto("/admin/people?view=roles");
+  await page.getByRole("link", { name: "New school year" }).click();
+  await expect(page.getByRole("heading", { name: "New school year", level: 1 })).toBeVisible();
+  // A fixture year far in the future never overlaps the real ones.
+  await page.getByLabel("Name").fill(`Fixture ${stamp}`);
+  await page.getByLabel("First day").fill("2099-08-01");
+  await page.getByLabel("Last day").fill("2100-07-31");
+  await page.getByRole("button", { name: "Start planning" }).click();
+  await expect(page.getByText("Step 1 of 7: New year")).toBeVisible();
+  await page.getByRole("button", { name: "Next: Returning staff" }).click();
+  const table = page.getByRole("table", { name: "Staff and their titles for the new year" });
+  await expect(table.getByRole("checkbox").first()).toBeChecked();
+  // Untick the first person: their title is disabled and the plan knows they leave.
+  const first = table.getByRole("checkbox").first();
+  await first.click();
+  await expect(first).not.toBeChecked();
+  await page.getByRole("button", { name: "Next: Responsibilities" }).click();
+  await expect(page.getByRole("heading", { name: "Responsibilities" })).toBeVisible();
+  await page.getByRole("button", { name: "Next: Departing staff" }).click();
+  await expect(page.getByRole("heading", { name: "Departing staff" })).toBeVisible();
+  await page.getByRole("button", { name: "Next: Unfinished work" }).click();
+  await expect(page.getByRole("heading", { name: "Unfinished work" })).toBeVisible();
+  await page.getByRole("button", { name: "Next: Routing check" }).click();
+  await expect(page.getByRole("heading", { name: "Routing check" })).toBeVisible();
+  await page.getByRole("button", { name: "Next: Start the year" }).click();
+  // The final step asks once, in an AlertDialog; we only look, then discard the plan.
+  await page.getByRole("button", { name: /^Start Fixture/ }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("This can’t be undone");
+  await page.getByRole("button", { name: "Not yet" }).click();
+  for (let n = 0; n < 6; n += 1) await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Discard this plan" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Discard" }).click();
+  await expect(page.getByRole("button", { name: "Start planning" })).toBeVisible();
+  const after = await (await request.get("/api/byline/school-years", { headers })).json();
+  expect(after.active).toEqual(before.active);
+  expect(after.planned).toBeNull();
+});
+
 test("staff can't open any of it", async ({ page, context, request, baseURL }) => {
   const staff = await login(request, baseURL!, "STAFF");
   await context.clearCookies();

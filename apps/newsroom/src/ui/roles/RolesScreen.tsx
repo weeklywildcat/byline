@@ -41,7 +41,7 @@ const SCOPE_HELP = {
 } as const;
 
 export function RolesScreen() {
-  const { api } = useNewsroomRoutes();
+  const { api, admin } = useNewsroomRoutes();
   const params = useSearchParams();
   const overview = useRoles(api);
   const [openId, open_] = useState<number | null>(() => {
@@ -64,7 +64,10 @@ export function RolesScreen() {
             <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
             <p className="max-w-prose text-sm text-muted-foreground">Newsroom roles decide who reviews which stories. They don’t give anyone access to anything; that stays with each account’s security role.</p>
           </div>
-          <Button type="button" size="sm" onClick={() => setCreating(true)} disabled={!data}><Plus aria-hidden="true" />New role</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/people?view=rollover`} />}>New school year</Button>
+            <Button type="button" size="sm" onClick={() => setCreating(true)} disabled={!data}><Plus aria-hidden="true" />New role</Button>
+          </div>
         </header>
         <TeamNav current="roles" />
 

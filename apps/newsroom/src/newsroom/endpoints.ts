@@ -74,6 +74,7 @@ import { effectiveWorkflow, workflowToStore } from "../domain/workflow";
 import { moveLifecycle } from "./lifecycle";
 import { previewRouting, removeAssignment, rolesOverview, saveAssignment, saveRole, saveWorkflow, workflowsOverview, type RoleInput, type WorkflowInput } from "./newsroom-roles";
 import { workload } from "./workload";
+import { activateYear, discardYear, planYear, previewRollover, yearsOverview } from "./school-years";
 import type { AssignmentInput } from "../domain/role-admin";
 import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
@@ -601,6 +602,11 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/review-workflows", method: "post", handler: handle(async (ctx, req) => saveWorkflow(ctx, null, await body<WorkflowInput>(req))) },
   { path: "/byline/review-workflows/preview", method: "post", handler: handle(async (ctx, req) => previewRouting(ctx, await body(req))) },
   { path: "/byline/review-workflows/:id", method: "patch", handler: handle(async (ctx, req) => saveWorkflow(ctx, idParam(req), await body<WorkflowInput>(req))) },
+  { path: "/byline/school-years", method: "get", handler: handle((ctx) => yearsOverview(ctx)) },
+  { path: "/byline/school-years", method: "post", handler: handle(async (ctx, req) => planYear(ctx, await body(req))) },
+  { path: "/byline/school-years/:id", method: "delete", handler: handle((ctx, req) => discardYear(ctx, idParam(req))) },
+  { path: "/byline/school-years/:id/preview", method: "post", handler: handle(async (ctx, req) => previewRollover(ctx, idParam(req), await body(req))) },
+  { path: "/byline/school-years/:id/activate", method: "post", handler: handle(async (ctx, req) => activateYear(ctx, idParam(req), await body(req))) },
   { path: "/byline/workload", method: "get", handler: handle((ctx) => workload(ctx)) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },

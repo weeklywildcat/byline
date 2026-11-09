@@ -330,7 +330,7 @@ function PreviewResult({ result, workflow, overview, admin }: { result: RoutingP
                 {step.kind === "queue" ? <p className="text-sm text-muted-foreground">{step.people.join(", ")}</p> : null}
                 {step.kind === "person" || step.kind === "queue" ? <p className="text-xs text-muted-foreground">{step.detail}{step.waitingFor ? ` · Reporters see “Waiting for ${step.waitingFor}”` : ""}</p> : null}
               </ItemContent>
-              {link ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} render={<ShellLink href={link.href} />}>{link.label}</Button></ItemActions> : null}
+              {link ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={link.href} />}>{link.label}</Button></ItemActions> : null}
             </Item>
           );
         })}

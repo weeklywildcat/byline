@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AssignmentInput } from "../../domain/role-admin";
 import type { PreviewStep, RoleInput, RolesOverview, RoutingPreview, WorkflowInput, WorkflowsOverview } from "../../newsroom/newsroom-roles";
+import type { RolloverPreview, YearsOverview } from "../../newsroom/school-years";
 import type { WorkloadView } from "../../newsroom/workload";
 import { ApiError, deleteJson, getJson, patchJson, postJson } from "../story/api";
 
@@ -70,4 +71,27 @@ export function rememberInUrl(key: string, id: number | null): void {
   if (id === null) url.searchParams.delete(key);
   else url.searchParams.set(key, String(id));
   window.history.replaceState(window.history.state, "", url);
+}
+
+/* ------------------------------------------------------------ school years */
+
+export type { RolloverPreview, StaffRow, YearRow, YearsOverview } from "../../newsroom/school-years";
+export const yearsKey = ["byline", "school-years"] as const;
+
+export const useYears = (api: string) => useQuery({ queryKey: [...yearsKey, api], queryFn: () => getJson<YearsOverview>(api, "/byline/school-years") });
+
+export function useYearWrites(api: string) {
+  const client = useQueryClient();
+  const keep = (overview: YearsOverview) => {
+    client.setQueryData([...yearsKey, api], overview);
+    // A new active year changes who can review what.
+    void client.invalidateQueries({ queryKey: rolesKey });
+    void client.invalidateQueries({ queryKey: workloadKey });
+  };
+  return {
+    plan: useMutation({ mutationFn: (data: { name: string; startsOn: string; endsOn: string }) => postJson<YearsOverview>(api, "/byline/school-years", data), onSuccess: keep }),
+    discard: useMutation({ mutationFn: (id: number) => deleteJson<YearsOverview>(api, `/byline/school-years/${id}`, {}), onSuccess: keep }),
+    preview: useMutation({ mutationFn: ({ id, plan }: { id: number; plan: unknown }) => postJson<RolloverPreview>(api, `/byline/school-years/${id}/preview`, plan) }),
+    activate: useMutation({ mutationFn: ({ id, plan, confirmed }: { id: number; plan: unknown; confirmed: boolean }) => postJson<YearsOverview>(api, `/byline/school-years/${id}/activate`, { ...(plan as object), confirmed }), onSuccess: keep })
+  };
 }

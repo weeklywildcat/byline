@@ -20,7 +20,7 @@ export function TeamNav({ current }: { current: TeamView }) {
   return (
     <ButtonGroup aria-label="Team and review routing" className="flex-wrap">
       {LINKS.map((link) => (
-        <Button key={link.view} type="button" size="sm" variant={link.view === current ? "secondary" : "outline"} nativeButton={false} render={<ShellLink href={`${admin}${link.path}`} aria-current={link.view === current ? "page" : undefined} />}>
+        <Button key={link.view} type="button" size="sm" variant={link.view === current ? "secondary" : "outline"} nativeButton={false} role="link" render={<ShellLink href={`${admin}${link.path}`} aria-current={link.view === current ? "page" : undefined} />}>
           {link.label}
         </Button>
       ))}

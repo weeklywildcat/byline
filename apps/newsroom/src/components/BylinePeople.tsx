@@ -5,6 +5,7 @@ import { redirectIfSignedOut } from "../auth/session";
 import { atLeast, requestUser } from "../access/user";
 import { NewsroomPeopleScreen } from "../ui/people/NewsroomPeopleScreen";
 import { RolesScreen } from "../ui/roles/RolesScreen";
+import { RolloverScreen } from "../ui/roles/RolloverScreen";
 import { WorkloadScreen } from "../ui/roles/WorkloadScreen";
 
 export function BylinePeople({
@@ -16,7 +17,7 @@ export function BylinePeople({
   redirectIfSignedOut({ req, params, searchParams });
   // People, plus the team's operational screens beside it (Review workflows have their own page).
   const view = typeof searchParams?.view === "string" ? searchParams.view : "";
-  const Screen = view === "roles" ? RolesScreen : view === "workload" ? WorkloadScreen : NewsroomPeopleScreen;
+  const Screen = view === "roles" ? RolesScreen : view === "workload" ? WorkloadScreen : view === "rollover" ? RolloverScreen : NewsroomPeopleScreen;
   return (
     <DefaultTemplate
       i18n={req.i18n}
