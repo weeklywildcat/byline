@@ -49,7 +49,7 @@ export type StoryScreenContext = {
  * (src/ui/shell) around it owns navigation, Create, Search and the one toaster.
  *
  * Write edits the article through Payload's form hooks: the one copy of the
- * article. Plan and Production are the shared Story Workspace sections
+ * article. Plan is the shared Story Workspace sections, Production included
  * (@byline/newsroom-screens), the same ones the WordPress workspace page
  * shows, reading and writing the plan and workspace records through
  * /api/byline. They run with `articleInForm`, so they never write article
@@ -104,7 +104,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             <TabsTrigger value="write">Write</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
-            <TabsTrigger value="production">Production</TabsTrigger>
             {liveState === "live" || liveState === "ended" ? <TabsTrigger value="live">Live{liveState === "live" ? <span aria-hidden="true" className="ml-1.5 inline-block size-1.5 rounded-full bg-destructive" /> : null}</TabsTrigger> : null}
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
@@ -124,6 +123,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
                 <ReportingSummaryStrip />
                 <ReportingPlan />
                 <TasksSection />
+                <MediaSection />
               </div>
               <aside aria-label="Story context" className="flex min-w-0 flex-col gap-4">
                 <DetailsSection />
@@ -132,11 +132,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
                 <ActivitySection />
               </aside>
             </div>
-          </Workspace>
-        </TabsContent>
-        <TabsContent value="production" className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <Workspace storyId={storyId}>
-            <MediaSection />
           </Workspace>
         </TabsContent>
         <TabsContent value="live" className="mx-auto w-full max-w-5xl px-4 md:px-8">
