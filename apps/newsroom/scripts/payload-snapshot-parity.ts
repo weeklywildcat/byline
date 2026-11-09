@@ -97,9 +97,11 @@ async function seed() {
   // Both builds must deploy a permanent alias for each spelling of the historical address.
   await payload.update({ collection: "stories", id: plain, data: { slug: "library-extends-hours", publishedAt: "2026-10-20T15:00:00.000Z", _status: "published" } });
 
-  await payload.update({ collection: "stories", id: late, data: {
-    liveCoverage: { state: "ended", startedAt: "2026-11-07T23:00:00.000Z", endedAt: "2026-11-08T04:30:00.000Z" }
-  }, context: { bylineImport: true } });
+  // Live coverage lives on the unversioned plan: Live mode, ended.
+  const latePlan = (await payload.find({ collection: "story-plans", where: { story: { equals: late } }, limit: 1, overrideAccess: true })).docs[0];
+  await payload.update({ collection: "story-plans", id: latePlan.id, overrideAccess: true, context: { bylineImport: true, bylineSystem: true }, data: {
+    liveCoverage: { mode: "live", state: "ended", startedAt: "2026-11-07T23:00:00.000Z", endedAt: "2026-11-08T04:30:00.000Z" }
+  } as never });
   const liveBody = lexicalFromArticleBody({ format: "byline-v1", version: 1, media: {}, nodes: [
     { type: "paragraph", children: [{ type: "text", text: "The Wildcats win after a late comeback." }] }
   ] });

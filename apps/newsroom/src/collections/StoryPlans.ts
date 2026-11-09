@@ -4,6 +4,7 @@ import { inIds, scopeManages, storyScope } from "../access/story-context";
 import { atLeast, editorsOnlyField, newsroomUser, requestUser } from "../access/user";
 import { dateOnly, TimingError } from "../domain/schedule";
 import { notifyAfterPlanChange } from "../newsroom/notification-hooks";
+import { COVERAGE_STATE_OPTIONS, LIVE_MODE_OPTIONS } from "../domain/live-coverage";
 import { LIMITS, RESOURCE_PURPOSE_OPTIONS, WORKFLOW_OPTIONS } from "../domain/vocabulary";
 
 const systemOnly: FieldAccess = ({ req }) => req.context?.bylineSystem === true || req.context?.bylineImport === true;
@@ -129,6 +130,20 @@ export const StoryPlans: CollectionConfig = {
       index: true,
       admin: { description: "May publish live updates on this story (only live updates; never the article)." },
       access: { update: editorsOnlyField, create: systemOnly }
+    },
+    {
+      // Live coverage's operational state (domain/live-coverage.ts). Unversioned on purpose: going live must
+      // never publish unpublished article copy, and a version restore must never rewind coverage. Only the
+      // live-coverage domain (newsroom/live-state.ts), after its own editor check, writes these.
+      name: "liveCoverage",
+      type: "group",
+      admin: { description: "Story mode and coverage state. Live is a mode of this story, not a second story." },
+      fields: [
+        { name: "mode", type: "select", defaultValue: "standard", options: [...LIVE_MODE_OPTIONS], access: { update: systemOnly, create: systemOnly } },
+        { name: "state", type: "select", defaultValue: "off", options: [...COVERAGE_STATE_OPTIONS], access: { update: systemOnly, create: systemOnly } },
+        { name: "startedAt", type: "date", access: { update: systemOnly, create: systemOnly }, admin: { readOnly: true } },
+        { name: "endedAt", type: "date", access: { update: systemOnly, create: systemOnly }, admin: { readOnly: true } }
+      ]
     }
   ]
 };

@@ -16,7 +16,8 @@ import { publicationConfigFromGlobal, readPublishedPublication } from "../public
 import { collectCollections, collectCorrections, collectEvents, collectPages, collectPeople, id, iso, prose, publicRead, published, taxonomy, text } from "./datasets";
 import { PublicSnapshotError } from "./errors";
 import { PreparedMediaCatalog } from "./media";
-import { collectLiveCoverage, hasLiveCoverage, readLiveUpdates } from "./live";
+import { hasLiveCoverage } from "../../domain/live-coverage";
+import { collectLiveCoverage, readLivePlans, readLiveUpdates } from "./live";
 import { collectPolls } from "./polls";
 import { activePlacements } from "../../front-page/server";
 
@@ -30,7 +31,7 @@ async function readStories(payload: Payload) {
     collection: "stories", draft: false, where: published, ...publicRead,
     select: { headline: true, kicker: true, deck: true, section: true, topics: true, contributors: true, featuredMedia: true,
       featuredCaption: true, contentFormat: true, body: true, legacyHtml: true, format: true, video: true, presentation: true,
-      immersiveAlignment: true, reportingNote: true, liveCoverage: true, slug: true, publishedAt: true, updatedAt: true, deletedAt: true }
+      immersiveAlignment: true, reportingNote: true, slug: true, publishedAt: true, updatedAt: true, deletedAt: true }
   });
   return docs.filter((row) => !row.deletedAt).sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
 }
@@ -96,12 +97,13 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const rows = storyRows.filter((row) => !hiddenSections.has(id(row.section) ?? -1));
   const storyIds = rows.map((row) => row.id);
   const pollIds = [...new Set(rows.flatMap((row) => row.contentFormat === "legacy-html" ? [] : collectReferenceIds(row.body).polls.map(Number)))];
+  const liveSettings = await readLivePlans(payload, storyIds);
   const [people, corrections, collections, polls, liveUpdates, videoFacts] = await Promise.all([
     collectPeople(payload, new Set(rows.flatMap((row) => ids(row.contributors)))),
     collectCorrections(payload, storyIds, options.asOf ?? now),
     collectCollections(payload, new Set(storyIds)),
     collectPolls(payload, pollIds, options.asOf ?? now),
-    readLiveUpdates(payload, rows.filter(hasLiveCoverage).map(({ id }) => id)),
+    readLiveUpdates(payload, rows.filter((row) => hasLiveCoverage(liveSettings.get(row.id))).map(({ id }) => id)),
     videoFactsFor(payload, rows.flatMap((row) => { const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null; return videoId ? [videoId] : []; }))
   ]);
   await options.afterRead?.();
@@ -160,7 +162,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     });
     const problems = contentLosingIssues(issues);
     if (problems.length) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} cannot be projected without losing article content.`, problems);
-    return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, updatesByStory.get(row.id) ?? [], catalog, publication) };
+    return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, liveSettings.get(row.id), updatesByStory.get(row.id) ?? [], catalog, publication) };
   });
   const paths = new Set([
     ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),

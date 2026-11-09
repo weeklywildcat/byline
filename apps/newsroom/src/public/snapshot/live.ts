@@ -1,13 +1,17 @@
 import type { BylinePublicationConfig, LiveCoverage } from "@byline/core";
 import { createArticleLiveView } from "@byline/ui/live-feed";
 import type { Payload } from "payload";
+import { hasLiveCoverage, normalizeLiveSettings, type LiveSettings } from "../../domain/live-coverage";
 import type { Story } from "../../payload-types";
 import { id, iso, publicRead, text } from "./datasets";
 import type { PreparedMediaCatalog } from "./media";
 import { pageBodyHtml } from "./page-html";
 
-export function hasLiveCoverage(story: Pick<Story, "liveCoverage">) {
-  return story.liveCoverage?.state === "live" || story.liveCoverage?.state === "ended";
+/** Mode and coverage state for these Stories, from their unversioned plans (never from article drafts). */
+export async function readLivePlans(payload: Payload, storyIds: number[]): Promise<Map<number, LiveSettings>> {
+  if (!storyIds.length) return new Map();
+  const { docs } = await payload.find({ collection: "story-plans", ...publicRead, where: { story: { in: storyIds } }, select: { story: true, liveCoverage: true } });
+  return new Map(docs.flatMap((plan) => { const story = id(plan.story); return story === null ? [] : [[story, normalizeLiveSettings(plan.liveCoverage)] as const]; }));
 }
 
 export async function readLiveUpdates(payload: Payload, storyIds: number[]) {
@@ -25,9 +29,9 @@ export async function readLiveUpdates(payload: Payload, storyIds: number[]) {
  * published update, newest first, as escaped HTML. Null unless coverage is
  * live or ended.
  */
-export function liveCoverageProjection(story: Pick<Story, "liveCoverage" | "publishedAt" | "updatedAt">, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: Pick<PreparedMediaCatalog, "articleAsset">): LiveCoverage | null {
-  const state = story.liveCoverage?.state;
-  if (state !== "live" && state !== "ended") return null;
+export function liveCoverageProjection(story: Pick<Story, "publishedAt" | "updatedAt">, settings: LiveSettings | undefined | null, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: Pick<PreparedMediaCatalog, "articleAsset">): LiveCoverage | null {
+  if (!hasLiveCoverage(settings)) return null;
+  const state = settings!.state as "live" | "ended";
   const updates: LiveCoverage["updates"] = rows.map((row) => {
     const title = text(row.headline);
     const image = catalog.articleAsset(id(row.photo) ?? -1);
@@ -39,14 +43,14 @@ export function liveCoverageProjection(story: Pick<Story, "liveCoverage" | "publ
   });
   return {
     status: state,
-    startedAt: iso(story.liveCoverage?.startedAt ?? story.publishedAt ?? story.updatedAt),
-    endedAt: story.liveCoverage?.endedAt ? iso(story.liveCoverage.endedAt) : "",
+    startedAt: iso(settings?.startedAt ?? story.publishedAt ?? story.updatedAt),
+    endedAt: settings?.endedAt ? iso(settings.endedAt) : "",
     updates
   };
 }
 
-export function collectLiveCoverage(story: Pick<Story, "id" | "liveCoverage" | "publishedAt" | "updatedAt">, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig) {
-  const live = liveCoverageProjection(story, rows, catalog);
+export function collectLiveCoverage(story: Pick<Story, "id" | "publishedAt" | "updatedAt">, settings: LiveSettings | undefined, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig) {
+  const live = liveCoverageProjection(story, settings, rows, catalog);
   if (!live) return null;
   return createArticleLiveView(live, {
     postId: story.id, locale: publication.locale, timeZone: publication.timezone, feedUrl: `/_byline/live/${story.id}.json`

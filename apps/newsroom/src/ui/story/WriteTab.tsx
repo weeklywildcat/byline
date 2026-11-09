@@ -17,6 +17,8 @@ import type { ClientField, SanitizedFieldPermissions } from "payload";
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { STORY_FORMAT_OPTIONS } from "../../domain/vocabulary";
 
+import { LiveCoverageSection } from "../live/LiveCoverageSection";
+import { StoryModeControl } from "../live/LiveModeControl";
 import { ArticleCanvas } from "./ArticleCanvas";
 import { useNewsroomEditorHost } from "./editor-host";
 import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
@@ -122,6 +124,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   return (
     <BylineEditorHostProvider host={host}>
       <div className="flex flex-col gap-8">
+        <StoryModeControl />
         <article className="flex w-full flex-col gap-6" aria-label="Article">
           <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
             {showKicker ? (
@@ -246,6 +249,8 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
             </section>
           )}
         </article>
+
+        <LiveCoverageSection />
 
         <div className="mx-auto w-full max-w-[760px] px-4 md:px-0">
           {showReportingNote ? (

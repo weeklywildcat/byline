@@ -226,13 +226,6 @@ export const PERSON_STATUS_OPTIONS = options<(typeof PERSON_STATUSES)[number]>([
   ["guest", "Guest contributor"]
 ]);
 
-export const LIVE_COVERAGE_STATES = ["off", "live", "ended"] as const;
-export const LIVE_COVERAGE_STATE_OPTIONS = options<(typeof LIVE_COVERAGE_STATES)[number]>([
-  ["off", "No live coverage"],
-  ["live", "Live"],
-  ["ended", "Ended"]
-]);
-
 /** Bounded limits carried over from the WordPress Story Workspace. */
 export const LIMITS = {
   brief: 4000,

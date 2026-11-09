@@ -12,6 +12,7 @@ import {
   personPublicSlice,
   pollPublicSlice,
   sectionPublicSlice,
+  storyPlanPublicSlice,
   storyPublicSlice,
   topicPublicSlice,
   videoFactsPublicSlice
@@ -20,7 +21,7 @@ import {
 /**
  * The one table of collections whose changes can reach the public site, and
  * how (docs/payload-build-snapshots.md#public-mutation-coverage). Every other
- * collection (story plans, tasks, sources, appointments, production
+ * collection (tasks, sources, appointments, production
  * assignments, interviews, resources, users, folders, jobs) is private and never advances the
  * public revision. The Publication Global tracks itself
  * (`globals/Publication.ts`).
@@ -28,6 +29,7 @@ import {
 export const PUBLIC_COLLECTIONS: Record<string, { slice: PublicSlice; options?: PublicTrackingOptions }> = {
   redirects: { slice: (row) => ({ from: row.from, to: row.to }) },
   stories: { slice: storyPublicSlice },
+  "story-plans": { slice: storyPlanPublicSlice },
   pages: { slice: pagePublicSlice },
   events: { slice: eventPublicSlice },
   people: { slice: personPublicSlice },

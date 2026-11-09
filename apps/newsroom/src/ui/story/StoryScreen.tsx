@@ -14,13 +14,13 @@ import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
 import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
+import { LiveCoverageProvider, type PublishStory } from "../live/LiveCoverageProvider";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
-import { useSettleAutosave, useStoryField } from "./form";
+import { useSettleAutosave } from "./form";
 import { HistoryTab } from "./HistoryTab";
-import { LiveTab } from "./LiveTab";
 import { ReportingTab } from "../reporting/ReportingTab";
 import { StoryNotes } from "./StoryNotes";
 import { StoryHeader } from "./StoryHeader";
@@ -49,7 +49,8 @@ export type StoryScreenContext = {
  * (src/ui/shell) around it owns navigation, Create, Search and the one toaster.
  *
  * Write edits the article through Payload's form hooks: the one copy of the
- * article. Plan and Production are the shared Story Workspace sections
+ * article. Live coverage is not a tab: it is the Story mode control and a section under the article in
+ * Write (`ui/live`). Plan and Production are the shared Story Workspace sections
  * (@byline/newsroom-screens), the same ones the WordPress workspace page
  * shows, reading and writing the plan and workspace records through
  * /api/byline. They run with `articleInForm`, so they never write article
@@ -61,7 +62,8 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const { id } = useDocumentInfo();
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string };
   const shellQueries = useQueryClient();
-  const liveState = useStoryField<"off" | "live" | "ended">("liveCoverage.state").value ?? "off";
+  // The Story header registers its normal publish action here; Publish & go live uses exactly it.
+  const publishRef = useRef<PublishStory | null>(null);
   const [tab, setTab] = useState<string>(() => {
     const requested = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("tab") ?? "";
     return requested === "reporting" || requested === "history" ? requested : "";
@@ -105,7 +107,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="production">Production</TabsTrigger>
-            {liveState === "live" || liveState === "ended" ? <TabsTrigger value="live">Live{liveState === "live" ? <span aria-hidden="true" className="ml-1.5 inline-block size-1.5 rounded-full bg-destructive" /> : null}</TabsTrigger> : null}
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
@@ -139,9 +140,6 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
             <MediaSection />
           </Workspace>
         </TabsContent>
-        <TabsContent value="live" className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <LiveTab context={context} />
-        </TabsContent>
         <TabsContent value="history" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <HistoryTab context={context} />
         </TabsContent>
@@ -152,6 +150,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
 
   // A brand-new document has no ID until its first save; it has no plan yet either.
   if (!Number.isSafeInteger(storyId) || storyId <= 0) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story" toaster={false}>{screen}</AdminRoot></div>;
+  const liveProvider = (children: ReactNode) => (
+    <LiveCoverageProvider api={context.api} admin={context.admin || "/admin"} storyId={storyId} timeZone={context.timeZone} readOnly={context.readOnly} userId={Number(user?.id ?? 0)} publishRef={publishRef}>{children}</LiveCoverageProvider>
+  );
 
   return (
     <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}>
@@ -166,7 +167,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
         media={media}
         articleInForm
       >
-        {screen}
+        {liveProvider(screen)}
         <WorkspaceAnnouncer />
       </StoryWorkspaceProvider>
     </AdminRoot>

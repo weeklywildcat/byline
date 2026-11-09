@@ -17,7 +17,8 @@ const summaries = {
   "quote-verified": "Verified a quote", "off-record-override": "Approved public use of off-the-record words",
   "material-made-confidential": "Made reporting material confidential", "material-made-normal": "Made reporting material visible to the story team",
   "live-submitted": "Sent a live update to the desk", "live-published-from-field": "Posted a live update from the field", "live-queued-sent": "Sent a queued live update",
-  "live-publishers-changed": "Changed who may publish live updates",
+  "live-publishers-changed": "Changed who may publish live updates", "live-published": "Published a live update",
+  "live-mode-changed": "Changed the story mode", "live-coverage-started": "Started live coverage", "live-coverage-resumed": "Resumed live coverage", "live-coverage-ended": "Ended live coverage",
   "homepage-featured": "Proposed featuring on the homepage",
   "distribution-assigned": "Assigned distribution", "distribution-ready": "Marked distribution ready", "distribution-posted": "Recorded a distribution as posted", "distribution-failed": "Distribution failed", "distribution-skipped": "Skipped a distribution"
 } as const;

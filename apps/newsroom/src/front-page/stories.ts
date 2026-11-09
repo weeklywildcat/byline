@@ -5,6 +5,7 @@ import { formatEditorialDate } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
 import type { Payload, PayloadRequest } from "payload";
 import { relationId } from "../access/user";
+import { readLivePlans } from "../public/snapshot/live";
 
 /**
  * Published Stories as the canonical homepage resolver's input
@@ -27,8 +28,9 @@ export type FrontPageStory = { input: HomepageStoryInput; headline: string; sect
 export async function publishedHomepageStories(payload: Payload, publication: BylinePublicationConfig, req?: PayloadRequest): Promise<FrontPageStory[]> {
   const { docs } = await payload.find({
     collection: "stories", draft: false, where: { _status: { equals: "published" } }, depth: 1, pagination: false, overrideAccess: true, ...(req ? { req } : {}),
-    select: { headline: true, deck: true, slug: true, section: true, topics: true, contributors: true, featuredMedia: true, publishedAt: true, liveCoverage: true, deletedAt: true }
+    select: { headline: true, deck: true, slug: true, section: true, topics: true, contributors: true, featuredMedia: true, publishedAt: true, deletedAt: true }
   });
+  const live = await readLivePlans(payload, docs.map((row) => row.id));
   const sections = new Set(publication.sections.filter((section) => section.active && (section.slug !== "sports" || publication.features.sports)).map((section) => section.slug));
   return docs
     .filter((row) => !row.deletedAt && row.publishedAt)
@@ -50,7 +52,7 @@ export async function publishedHomepageStories(payload: Payload, publication: By
         category: { name: section.name, href: `/category/${section.slug}/` },
         author: contributor && typeof contributor === "object" ? { name: contributor.name, href: null } : null,
         image,
-        ...(row.liveCoverage?.state === "live" ? { live: true } : {})
+        ...(live.get(row.id)?.mode === "live" && live.get(row.id)?.state === "live" ? { live: true } : {})
       };
       return [{
         input: {

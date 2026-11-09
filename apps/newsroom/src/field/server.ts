@@ -1,11 +1,12 @@
 import { APIError, type Where } from "payload";
-import { canPublishLive, livePublisherStories } from "../access/live-context";
+import { canPublishLive, liveGate, livePublisherStories } from "../access/live-context";
 import { scopeManages, scopeParticipates, storyScope } from "../access/story-context";
-import { relationId } from "../access/user";
+import { atLeast, relationId } from "../access/user";
+import { type CoverageState, type LiveMode, type PublishBlock } from "../domain/live-coverage";
 import { addDays, localDay } from "../domain/dates";
 import { validClientKey } from "../domain/reporting";
-import { recordStoryActivity } from "../newsroom/story-activity";
-import { lexicalToPlainText, LIVE_TEXT_MAX, plainTextToLexical } from "../newsroom/live-text";
+import { createLiveUpdate } from "../newsroom/live-coverage";
+import { lexicalToPlainText } from "../newsroom/live-text";
 import type { ScreenContext } from "../newsroom/screen-models";
 
 /**
@@ -65,16 +66,18 @@ export async function fieldFeed(ctx: ScreenContext): Promise<FieldFeed> {
     payload.find({ collection: "production-assignments", where: { and: [{ assignees: { in: [me] } }, { status: { not_in: ["done", "selected"] } }] }, limit: 60, sort: "deadline", ...as(ctx) }),
     livePublisherStories(ctx.req)
   ]);
-  // Live coverage on stories this person manages, works on, or may publish live updates for.
-  const liveScope: Where[] = scope.all ? [] : [{ id: { in: [...new Set([...scope.managed, ...scope.participant, ...granted])].map(Number).filter(Boolean) } }];
-  const live = scope.all || liveScope.length ? await payload.find({
-    collection: "stories", draft: true, where: { and: [{ "liveCoverage.state": { equals: "live" } }, ...(scope.all ? [] : liveScope)] },
-    limit: 20, select: { headline: true }, ...as(ctx)
-  }) : { docs: [] as Array<{ id: number; headline: string }> };
+  // Running live coverage (Live mode, Live now) on stories this person manages, works on, or may publish live updates for.
+  const reachable = scope.all ? null : [...new Set([...scope.managed, ...scope.participant, ...granted])].map(Number).filter(Boolean);
+  const livePlans = !reachable || reachable.length ? await payload.find({
+    collection: "story-plans", overrideAccess: true, depth: 0, limit: 20, select: { story: true },
+    where: { and: [{ "liveCoverage.mode": { equals: "live" } }, { "liveCoverage.state": { equals: "live" } }, ...(reachable ? [{ story: { in: reachable } }] : [])] }
+  }) : { docs: [] as Array<{ story?: unknown }> };
+  const liveIds = livePlans.docs.map((plan) => num(plan.story)).filter(Boolean);
+  const live = liveIds.length ? await payload.find({ collection: "stories", draft: true, where: { id: { in: liveIds } }, limit: 20, select: { headline: true }, ...as(ctx) }) : { docs: [] as Array<{ id: number; headline: string }> };
   const storyIds = [...new Set([...appointments.docs.map((row) => num(row.story)), ...production.docs.map((row) => num(row.story)), ...live.docs.map((row) => row.id)])].filter(Boolean);
-  const stories = storyIds.length ? await payload.find({ collection: "stories", draft: true, where: { id: { in: storyIds } }, pagination: false, select: { headline: true, liveCoverage: true }, ...as(ctx) }) : { docs: [] };
+  const stories = storyIds.length ? await payload.find({ collection: "stories", draft: true, where: { id: { in: storyIds } }, pagination: false, select: { headline: true }, ...as(ctx) }) : { docs: [] };
   const headline = new Map(stories.docs.map((story) => [story.id, story.headline || "Untitled story"]));
-  const isLive = new Set(stories.docs.filter((story) => story.liveCoverage?.state === "live").map((story) => story.id));
+  const isLive = new Set(liveIds);
 
   const items: Array<FieldItem & { bucket: "now" | "today" | "upcoming"; sort: string }> = [];
   for (const row of appointments.docs) {
@@ -108,10 +111,23 @@ export async function fieldFeed(ctx: ScreenContext): Promise<FieldFeed> {
 
 export type FieldRecent = { key: string; kind: "note" | "file" | "media" | "live"; text: string; at: string; state?: "draft" | "published" };
 
+export type FieldCoverage = {
+  mode: LiveMode;
+  state: CoverageState;
+  startedAt: string | null;
+  endedAt: string | null;
+};
+
 export type FieldSession = {
-  story: { id: number; headline: string; live: boolean; published: boolean };
-  /** May post updates readers see (editors, or this Story's live grant). */
+  /** `live` is "Live now" coverage on a Story in Live mode; `coverage` is the full mode and state. */
+  story: { id: number; headline: string; live: boolean; published: boolean; coverage: FieldCoverage };
+  /** Holds the live-publishing right on this Story (editors, or its direct-publisher grant). */
   canPostLive: boolean;
+  /** ...and coverage accepts public updates right now. The one shared rule (access/live-context.ts). */
+  canPublishNow: boolean;
+  publishBlock: PublishBlock | null;
+  /** Editor-level: start, end, resume coverage and choose direct publishers. */
+  canControl: boolean;
   appointment: { id: number; title: string; startAt: string | null; location: string; sourceId: number | null; source: string | null } | null;
   assignments: Array<{ id: number; title: string; type: string; deadline: string | null }>;
   recent: FieldRecent[];
@@ -124,7 +140,8 @@ export async function fieldSession(ctx: ScreenContext, storyId: number, appointm
   const postLive = await canPublishLive(ctx.req, storyId);
   if (!scopeManages(scope, storyId) && !scopeParticipates(scope, storyId) && !postLive) throw new APIError("You are not part of this story.", 403);
   const { payload } = ctx.req;
-  const story = await payload.findByID({ collection: "stories", id: storyId, draft: true, select: { headline: true, liveCoverage: true, _status: true }, ...as(ctx) });
+  const story = await payload.findByID({ collection: "stories", id: storyId, draft: true, select: { headline: true }, ...as(ctx) });
+  const gate = await liveGate(ctx.req, storyId);
   const byStory = { story: { equals: storyId } };
   const mine = { createdBy: { equals: ctx.user.id } };
   const [appointment, assignments, notes, files, media, live] = await Promise.all([
@@ -145,8 +162,14 @@ export async function fieldSession(ctx: ScreenContext, storyId: number, appointm
     ...live.docs.map((row) => ({ key: `live:${row.id}`, kind: "live" as const, text: [row.headline, lexicalToPlainText(row.body)].filter(Boolean).join(" — ").slice(0, 200), at: row.publishedAt ?? row.createdAt, state: row.state === "draft" ? "draft" as const : "published" as const }))
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20);
   return {
-    story: { id: storyId, headline: story.headline || "Untitled story", live: story.liveCoverage?.state === "live", published: story._status === "published" },
+    story: {
+      id: storyId, headline: story.headline || "Untitled story", live: gate.settings.mode === "live" && gate.settings.state === "live", published: gate.storyPublic,
+      coverage: { mode: gate.settings.mode, state: gate.settings.state, startedAt: gate.settings.startedAt, endedAt: gate.settings.endedAt }
+    },
     canPostLive: postLive,
+    canPublishNow: postLive && gate.block === null,
+    publishBlock: gate.block,
+    canControl: atLeast(ctx.user, "editor"),
     appointment: appointment ? { id: appointment.id, title: appointment.title, startAt: appointment.scheduleMode === "exact" ? appointment.startAt ?? null : null, location: appointment.location ?? "", sourceId: source?.id ?? null, source: source?.label ?? null } : null,
     assignments: assignments.docs.map((row) => ({ id: row.id, title: row.title, type: row.type, deadline: row.deadline ?? null })),
     recent,
@@ -163,20 +186,26 @@ export async function fieldStorySearch(ctx: ScreenContext, query: string) {
   const ids = scope.all ? null : [...new Set([...scope.managed, ...scope.participant, ...granted])];
   if (ids && !ids.length) return { stories: [] };
   const found = await ctx.req.payload.find({
-    collection: "stories", draft: true, limit: 10, sort: "-updatedAt", select: { headline: true, liveCoverage: true },
+    collection: "stories", draft: true, limit: 10, sort: "-updatedAt", select: { headline: true },
     where: { and: [{ headline: { like: text } }, ...(ids ? [{ id: { in: ids } }] : [])] }, ...as(ctx)
   });
-  return { stories: found.docs.map((story) => ({ id: story.id, headline: story.headline || "Untitled story", live: story.liveCoverage?.state === "live" })) };
+  const running = found.docs.length ? await ctx.req.payload.find({
+    collection: "story-plans", overrideAccess: true, depth: 0, pagination: false, select: { story: true },
+    where: { and: [{ story: { in: found.docs.map((story) => story.id) } }, { "liveCoverage.mode": { equals: "live" } }, { "liveCoverage.state": { equals: "live" } }] }
+  }) : { docs: [] as Array<{ story?: unknown }> };
+  const isLive = new Set(running.docs.map((plan) => num(plan.story)));
+  return { stories: found.docs.map((story) => ({ id: story.id, headline: story.headline || "Untitled story", live: isLive.has(story.id) })) };
 }
 
 /**
- * Posts from the field. Published only when the person may publish live
- * updates on this Story; otherwise a draft for the live desk. Idempotent on
- * the client key: a retried submission returns the first update and its real
- * state. The response says what actually happened, so the outbox never shows
- * "Posted" for a draft.
+ * Posts from the field. The reporter's explicit intent (`delivery`: "publish" or "desk") is frozen when they
+ * tap, survives offline queues and retries, and is decided AGAIN here: it is published only if, at send time,
+ * the Story is public, in Live mode, coverage is Live now and the person still holds the right. Otherwise it is
+ * a draft for the live desk and the answer says why, so a stale queued "Publish now" can never go public after
+ * coverage ended or a grant was removed. A missing intent is a desk draft. Idempotent on the client key: a
+ * retried submission returns the first update and its real state.
  */
-export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown }) {
+export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown; delivery?: unknown }) {
   const scope = await storyScope(ctx.req);
   const publisher = await canPublishLive(ctx.req, storyId);
   if (!scopeManages(scope, storyId) && !scopeParticipates(scope, storyId) && !publisher) throw new APIError("You are not part of this story.", 403);
@@ -186,26 +215,14 @@ export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: 
     const existing = (await payload.find({ collection: "live-updates", where: { clientKey: { equals: clientKey } }, limit: 1, depth: 0, overrideAccess: true, req: ctx.req })).docs[0];
     if (existing) {
       if (String(relationId(existing.author)) !== String(ctx.user.id)) throw new APIError("That capture key is already in use.", 409);
-      return { id: existing.id, status: existing.state === "published" ? "posted" : "sent-to-desk", duplicate: true };
+      return { id: existing.id, status: existing.state === "published" ? "posted" as const : "sent-to-desk" as const, duplicate: true };
     }
   }
-  const text = typeof input.text === "string" ? input.text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, LIVE_TEXT_MAX) : "";
-  if (!text) throw new APIError("Write the update readers should see.", 400);
-  const photo = Number(input.photoId) || null;
-  if (photo) {
-    // The photo must be one this story already has (captured for it), never an arbitrary asset.
-    const ok = (await payload.find({ collection: "media", where: { and: [{ id: { equals: photo } }, { "capture.story": { equals: storyId } }] }, limit: 1, depth: 0, overrideAccess: true, req: ctx.req })).docs.length;
-    if (!ok) throw new APIError("That photo isn't from this story.", 400);
-  }
   try {
-    const created = await payload.create({
-      collection: "live-updates",
-      data: { story: storyId, body: plainTextToLexical(text) as never, photo: photo ?? undefined, state: publisher ? "published" : "draft", ...(clientKey ? { clientKey } : {}) },
-      ...as(ctx)
+    const created = await createLiveUpdate(ctx, storyId, {
+      text: input.text, photoId: input.photoId, ...(clientKey ? { clientKey } : {}), queued: input.queued === true, source: "field", wantsPublish: input.delivery === "publish"
     });
-    const status = created.state === "published" ? "posted" : "sent-to-desk";
-    await recordStoryActivity(ctx.req, storyId, input.queued === true && status === "posted" ? "live-queued-sent" : status === "posted" ? "live-published-from-field" : "live-submitted", created.id);
-    return { id: created.id, status, duplicate: false };
+    return { ...created, duplicate: false };
   } catch (error) {
     if (clientKey && /23505|unique|duplicate/i.test(String((error as Error).message))) return fieldLivePost(ctx, storyId, input);
     throw error;

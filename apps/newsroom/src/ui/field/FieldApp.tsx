@@ -3,17 +3,25 @@
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Camera, ChevronRight, Mic, Paperclip, Radio, Search, X } from "lucide-react";
+import { ArrowLeft, Camera, ChevronRight, Mic, MoreVertical, Paperclip, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { deskNote, type PublishBlock } from "../../domain/live-coverage";
 import type { FieldFeed, FieldItem, FieldSession } from "../../field/server";
 import { ApiError, getJson, postJson } from "../story/api";
+import { useCoverageChange, useLiveDesk } from "../live/api";
+import { LiveDeliveryButtons } from "../live/LiveDelivery";
+import { LiveSetupDialog } from "../live/LiveSetup";
+import { LiveTimeline } from "../live/LiveTimeline";
 import { newClientKey, uploadFile } from "../reporting/api";
 import { RecorderPanel, type Recording } from "../reporting/Recorder";
-import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
+import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
 
 /**
  * Field Mode (docs/field-mode.md): "What am I covering right now?", then one
@@ -26,13 +34,21 @@ import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOu
  * Deliberately small: no desktop shell, no article editor, Front Page or
  * Distribution in this bundle. Primary controls are at least 44px and labelled.
  */
-type Route = { story: number | null; appointment: number | null };
+/**
+ * `from` says only that Field was opened from the Story screen (the one fixed value "story"); it is never a URL,
+ * so Back can return to the Story without any open redirect. Anything else is ignored.
+ */
+export type Route = { story: number | null; appointment: number | null; from: "story" | null };
+
+export function parseRoute(search: string): Route {
+  const params = new URLSearchParams(search);
+  const id = (key: string) => { const value = Number(params.get(key)); return Number.isSafeInteger(value) && value > 0 ? value : null; };
+  const story = id("story");
+  return { story, appointment: id("appointment"), from: story && params.get("from") === "story" ? "story" : null };
+}
 
 function readRoute(): Route {
-  if (typeof window === "undefined") return { story: null, appointment: null };
-  const params = new URLSearchParams(window.location.search);
-  const id = (key: string) => { const value = Number(params.get(key)); return Number.isSafeInteger(value) && value > 0 ? value : null; };
-  return { story: id("story"), appointment: id("appointment") };
+  return typeof window === "undefined" ? { story: null, appointment: null, from: null } : parseRoute(window.location.search);
 }
 
 const TAP = "min-h-11 px-4 text-base";
@@ -48,6 +64,7 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
     const params = new URLSearchParams();
     if (next.story) params.set("story", String(next.story));
     if (next.appointment) params.set("appointment", String(next.appointment));
+    if (next.story && next.from) params.set("from", next.from);
     window.history.pushState(null, "", `${admin}/field${params.size ? `?${params}` : ""}`);
     setRoute(next);
     window.scrollTo(0, 0);
@@ -58,7 +75,7 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
     <AdminRoot className="byline-field" toaster={false}>
       <div className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] text-foreground" data-field-shell="">
         <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
-          {route.story ? <FieldSessionView api={api} route={route} onBack={() => go({ story: null, appointment: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={go} outbox={outbox} />}
+          {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
         </div>
       </div>
     </AdminRoot>
@@ -86,8 +103,9 @@ function useOutbox(api: string, account: string) {
         return { id: result.id, status: "saved" };
       }
       if (item.kind === "live") {
-        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk" }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0 });
-        return { id: result.id, status: result.status };
+        // The reporter's tapped intent travels with the item (IndexedDB, offline, retries); the server decides again at send time.
+        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk" });
+        return { id: result.id, status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
       }
       if (!item.blob) throw new SendError("The file is no longer on this device.", 410);
       const route = item.kind === "photo" ? "photos" : "files";
@@ -157,7 +175,7 @@ function useOutbox(api: string, account: string) {
 const timeOf = (iso: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 const dayOf = (iso: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(new Date(iso));
 
-function FieldLanding({ api, admin, onOpen, outbox }: { api: string; admin: string; onOpen: (route: Route) => void; outbox: Outbox }) {
+function FieldLanding({ api, admin, onOpen, outbox }: { api: string; admin: string; onOpen: (route: Omit<Route, "from">) => void; outbox: Outbox }) {
   const feed = useQuery({ queryKey: ["byline", "field", "feed"], queryFn: () => getJson<FieldFeed>(api, "/byline/field"), refetchInterval: 60_000 });
   const [searching, setSearching] = useState(false);
   const pending = outbox.items.filter((item) => item.state !== "done").length;
@@ -224,34 +242,121 @@ function StoryPicker({ api, open, onOpenChange, onPick }: { api: string; open: b
 
 /* ----------------------------------------------------------------- session */
 
-function FieldSessionView({ api, route, onBack, outbox }: { api: string; route: Route; onBack: () => void; outbox: Outbox }) {
+function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; admin: string; route: Route; onBack: () => void; outbox: Outbox }) {
   const storyId = route.story!;
   const session = useQuery({ queryKey: ["byline", "field", "session", storyId, route.appointment], queryFn: () => getJson<FieldSession>(api, `/byline/field/stories/${storyId}${route.appointment ? `?appointment=${route.appointment}` : ""}`), refetchInterval: 30_000 });
   const data = session.data;
-  if (session.isError) return <><BackBar onBack={onBack} /><p role="alert" className="text-sm text-destructive">{(session.error as Error).message}</p></>;
-  if (!data) return <><BackBar onBack={onBack} /><p role="status" className="text-sm text-muted-foreground">Loading…</p></>;
+  // The shared live desk (the same record Write reads): the timeline, and the setup sheet's data for editors.
+  const desk = useLiveDesk(api, storyId, { enabled: Boolean(data) && (data!.story.coverage.mode === "live" || data!.canControl), refetchMs: 15_000 });
+  const { change, busy } = useCoverageChange(api, storyId);
+  const [sheet, setSheet] = useState<"setup" | "manage" | null>(null);
+  const [ending, setEnding] = useState(false);
+  // Back returns to where Field was opened from: the Story (a fixed address built here, never a URL taken from the page) or the assignments.
+  const storyHref = `${admin || "/admin"}/collections/stories/${storyId}`;
+  const back = route.from === "story" ? { href: storyHref, label: "Back to the story" } : null;
+  if (session.isError) return <><BackBar onBack={onBack} href={back?.href} /><p role="alert" className="text-sm text-destructive">{(session.error as Error).message}</p></>;
+  if (!data) return <><BackBar onBack={onBack} href={back?.href} /><p role="status" className="text-sm text-muted-foreground">Loading…</p></>;
   const tz = data.timeZone;
+  const coverage = data.story.coverage;
   const context = [data.appointment?.startAt ? timeOf(data.appointment.startAt, tz) : null, data.appointment?.location || null].filter(Boolean).join(" · ");
   const work = [data.appointment?.title, ...data.assignments.map((assignment) => `${assignment.title}${assignment.deadline ? `, due ${timeOf(assignment.deadline, tz)}` : ""}`)].filter(Boolean).join(" · ");
+  const liveNow = data.story.live;
+  const goLive = () => void change({ action: "start" }, "You're live.");
+  const ended = coverage.mode === "live" && coverage.state === "ended";
+  const notStarted = coverage.mode === "live" && coverage.state === "off";
   return (
     <>
       <header className="grid grid-cols-[minmax(0,1fr)] gap-1">
         <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label="Back to your assignments" onClick={onBack}><ArrowLeft /></Button>
+          {back ? (
+            <Button type="button" nativeButton={false} variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label={back.label} render={<a href={back.href} />}><ArrowLeft /></Button>
+          ) : (
+            <Button type="button" variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label="Back to your assignments" onClick={onBack}><ArrowLeft /></Button>
+          )}
           <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{data.story.headline}</h1>
-          {data.story.live ? <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-destructive"><span aria-hidden="true" className="size-2 rounded-full bg-destructive" />LIVE</span> : null}
+          {liveNow ? <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-destructive" data-field-live="live"><span aria-hidden="true" className="size-2 rounded-full bg-destructive" />LIVE</span> : ended ? <Badge variant="outline" className="shrink-0" data-field-live="ended">Ended</Badge> : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-lg" className="-mr-2 size-11" aria-label="More for this story" />}><MoreVertical /></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-56">
+              <DropdownMenuItem className="min-h-11 text-base" render={<a href={`${storyHref}${coverage.mode === "live" ? "?tab=live" : ""}`} />}>Open full story</DropdownMenuItem>
+              {data.canControl ? <DropdownMenuSeparator /> : null}
+              {data.canControl && coverage.mode === "standard" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("setup")}>Set up live coverage</DropdownMenuItem> : null}
+              {data.canControl && coverage.mode === "live" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("manage")}>Manage direct publishers</DropdownMenuItem> : null}
+              {data.canControl && liveNow ? <DropdownMenuItem variant="destructive" className="min-h-11 text-base" onClick={() => setEnding(true)}>End live coverage</DropdownMenuItem> : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {context ? <p className="text-sm text-muted-foreground">{context}</p> : null}
         {work ? <p className="text-sm">{work}</p> : null}
       </header>
+
+      {notStarted ? (
+        <Alert data-field-alert="not-started">
+          <AlertTitle>{data.canControl ? "Live coverage is ready" : "Live coverage hasn't started yet"}</AlertTitle>
+          <AlertDescription>
+            {data.canControl
+              ? <p>{data.story.published ? "Start coverage when the event begins." : "Publish the story from Write, then go live."}</p>
+              : <p>You can still save notes, photos and recordings.</p>}
+            {data.canControl && data.story.published ? <Button type="button" className={`${TAP} mt-2`} disabled={busy} onClick={goLive}>Go live</Button> : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {ended ? (
+        <Alert data-field-alert="ended">
+          <AlertTitle>Coverage ended{coverage.endedAt ? ` · ${timeOf(coverage.endedAt, tz)}` : ""}</AlertTitle>
+          <AlertDescription>
+            <p>{data.canControl ? "Live updates are closed. You can still save notes, photos and files." : "You can still save notes, photos and files, but can't publish live updates."}</p>
+            {data.canControl && data.story.published ? <Button type="button" className={`${TAP} mt-2`} disabled={busy} onClick={goLive}>Resume live coverage</Button> : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Composer api={api} session={data} appointmentId={route.appointment} outbox={outbox} />
+
+      {coverage.mode === "live" && desk.data ? (
+        <section aria-label="Live timeline" className="grid grid-cols-[minmax(0,1fr)] gap-2" data-field-timeline="">
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live timeline</h2>
+          <LiveTimeline updates={desk.data.updates} timeZone={tz} storyPublished={desk.data.storyPublished} tap />
+        </section>
+      ) : null}
       <Recent session={data} outbox={outbox} />
+
+      {desk.data ? (
+        <LiveSetupDialog
+          open={sheet !== null}
+          intent={sheet ?? "setup"}
+          onOpenChange={(open) => { if (!open) setSheet(null); }}
+          api={api}
+          desk={desk.data}
+          busy={busy}
+          readOnly={false}
+          goLiveHere={desk.data.storyPublished}
+          onSetUp={async (publishers) => { if (await change({ action: "setup", publishers }, "Live mode is set up. Coverage hasn't started.")) setSheet(null); }}
+          onManage={async (publishers) => { if (await change({ action: "publishers", publishers }, "Direct publishers updated.")) setSheet(null); }}
+          onGoLive={async (publishers) => { if (await change({ action: "setup", publishers, start: true }, "You're live.")) setSheet(null); }}
+        />
+      ) : null}
+
+      <AlertDialog open={ending} onOpenChange={setEnding}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End live coverage?</AlertDialogTitle>
+            <AlertDialogDescription>Existing updates will remain with the story, but reporters won't be able to publish new live updates until coverage is resumed.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" className={TAP}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" variant="destructive" className={TAP} disabled={busy} onClick={() => { setEnding(false); void change({ action: "end" }, "Coverage ended."); }}>End coverage</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
 
-function BackBar({ onBack }: { onBack: () => void }) {
-  return <Button type="button" variant="ghost" className={`${TAP} -ml-3 w-fit`} onClick={onBack}><ArrowLeft data-icon="inline-start" />Assignments</Button>;
+function BackBar({ onBack, href }: { onBack: () => void; href?: string }) {
+  return href
+    ? <Button type="button" nativeButton={false} variant="ghost" className={`${TAP} -ml-3 w-fit`} render={<a href={href} />}><ArrowLeft data-icon="inline-start" />Back to the story</Button>
+    : <Button type="button" variant="ghost" className={`${TAP} -ml-3 w-fit`} onClick={onBack}><ArrowLeft data-icon="inline-start" />Assignments</Button>;
 }
 
 function Composer({ api, session, appointmentId, outbox }: { api: string; session: FieldSession; appointmentId: number | null; outbox: Outbox }) {
@@ -263,6 +368,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
   const photoInput = useRef<HTMLInputElement | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const storyId = session.story.id;
+  // Live updates exist only while the Story is in Live mode and coverage is Live now; every other state is private capture only.
   const live = session.story.live;
   const context = { ...(appointmentId ? { appointmentId } : {}), ...(session.appointment?.sourceId ? { sourceId: session.appointment.sourceId } : {}) };
   void api;
@@ -288,22 +394,23 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     setText("");
     setPhoto(null);
   };
-  const postLive = async () => {
+  // The tapped intent is frozen into the outbox item, so a queued "Publish now" is still a publish request when it reaches the server (which re-checks).
+  const postLive = async (delivery: Delivery) => {
     if (!text.trim()) return;
     let photoKey: string | undefined;
     if (photo) {
       photoKey = newClientKey();
       await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {} }));
     }
-    await queue(newItem({ key: newClientKey(), storyId, kind: "live", text: text.trim(), photoKey, context }));
+    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), photoKey, context }));
     setText("");
     setPhoto(null);
   };
 
   return (
-    <section aria-label="Capture" className="grid grid-cols-[minmax(0,1fr)] gap-2" data-field-composer="">
+    <section aria-label="Capture" className="grid grid-cols-[minmax(0,1fr)] gap-3" data-field-composer={live ? "live" : "capture"}>
       <InputGroup className="h-auto flex-col items-stretch">
-        <InputGroupTextarea value={text} rows={4} placeholder={live ? "What's happening?" : "What did you see or hear?"} aria-label="What's happening?" className="min-h-28! px-3 text-base" onChange={(event) => setText(event.target.value)} />
+        <InputGroupTextarea value={text} rows={4} placeholder={live ? "What's happening?" : "What did you see or hear?"} aria-label={live ? "What's happening?" : "What did you see or hear?"} className="min-h-28! px-3 text-base [@media(max-height:480px)]:min-h-16!" onChange={(event) => setText(event.target.value)} />
         {photo ? (
           <div className="mx-3 flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm" data-attached-photo="">
             <Camera aria-hidden="true" className="size-4" /><span className="min-w-0 flex-1 truncate">{photo.name || "Photo"} — goes with this live update</span>
@@ -318,14 +425,25 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
       </InputGroup>
       <input ref={photoInput} type="file" accept="image/*" capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
       <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="outline" className={TAP} disabled={!text.trim()} onClick={() => void saveNote()}>Save note</Button>
-        {live ? <Button type="button" className={TAP} disabled={!text.trim()} onClick={() => void postLive()}><Radio data-icon="inline-start" />{session.canPostLive ? "Post live" : "Send to live desk"}</Button> : null}
-      </div>
-      <p className="text-xs text-muted-foreground" data-privacy-line="">
-        Save note keeps it private to the story team.{live ? session.canPostLive ? " Post live publishes to readers right away." : " Send to live desk gives it to an editor to publish." : ""}
-        {photo ? "" : " Photos go to Media for this story; recordings and attachments stay private."}
-      </p>
+
+      {live ? (
+        <div className="grid gap-4">
+          <div role="group" aria-labelledby="field-private-label" className="grid gap-1.5">
+            <p id="field-private-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Private</p>
+            <Button type="button" variant="outline" className={`${TAP} w-full`} disabled={!text.trim()} onClick={() => void saveNote()}>Save note</Button>
+            <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private.</p>
+          </div>
+          <div role="group" aria-labelledby="field-live-label" className="grid gap-1.5">
+            <p id="field-live-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live update</p>
+            <LiveDeliveryButtons tap canPublishNow={session.canPublishNow} disabled={!text.trim()} onDeliver={(delivery) => void postLive(delivery)} helperId="field-live-helper" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-1.5">
+          <Button type="button" variant="outline" className={`${TAP} w-full`} disabled={!text.trim()} onClick={() => void saveNote()}>Save note</Button>
+          <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private.</p>
+        </div>
+      )}
       {warning ? <p role="alert" className="text-sm font-medium text-destructive">{warning}</p> : null}
 
       <Drawer open={recording} onOpenChange={setRecording}>
@@ -357,6 +475,8 @@ function Recent({ session, outbox }: { session: FieldSession; outbox: Outbox }) 
   const tz = session.timeZone;
   // What this phone is still sending for this story, then what the server already has.
   const pending = outbox.items.filter((item) => item.storyId === session.story.id && (item.state !== "done" || !session.recent.some((row) => row.key === serverKey(item))));
+  // A Publish now that went to the desk instead keeps its reason once the server's own row replaces the outbox row.
+  const reasons = new Map(outbox.items.flatMap((item) => (item.kind === "live" && item.state === "done" && item.result?.reason ? [[serverKey(item), deskNote(item.result.reason)] as const] : [])));
   return (
     <section aria-label="Recent" className="grid grid-cols-[minmax(0,1fr)] gap-1">
       <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</h2>
@@ -372,10 +492,10 @@ function Recent({ session, outbox }: { session: FieldSession; outbox: Outbox }) 
           </li>
         ))}
         {session.recent.map((row) => (
-          <li key={row.key} className="flex items-center gap-3 py-2.5">
+          <li key={row.key} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2.5">
             <span className="w-16 shrink-0 text-xs tabular-nums text-muted-foreground">{timeOf(row.at, tz)}</span>
             <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[row.kind]} · {row.text}</span>
-            {row.kind === "live" ? <span className="text-sm text-muted-foreground">{row.state === "published" ? "Posted" : "At the live desk"}</span> : null}
+            {row.kind === "live" ? <span className={`text-sm text-muted-foreground ${row.state !== "published" && reasons.get(row.key) ? "basis-full pl-[4.75rem]" : ""}`}>{row.state === "published" ? "Posted" : reasons.get(row.key) ? `At the live desk — ${reasons.get(row.key)}.` : "At the live desk"}</span> : null}
           </li>
         ))}
       </ul>

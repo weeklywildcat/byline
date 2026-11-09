@@ -47,7 +47,9 @@ beforeAll(async () => {
   await account("photographer", "staff");
   await account("stranger", "staff");
   const section = (await payload.create({ collection: "sections", data: { name: "Sports", slug: "sports" } })).id;
-  ids.game = (await payload.create({ collection: "stories", data: { headline: "Football vs. Saluda", section, contributors: [people.reporter], _status: "published", liveCoverage: { state: "live" } } as never, overrideAccess: true })).id;
+  ids.game = (await payload.create({ collection: "stories", data: { headline: "Football vs. Saluda", section, contributors: [people.reporter], _status: "published" } as never, overrideAccess: true })).id;
+  const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: ids.game } }, limit: 1, overrideAccess: true })).docs[0];
+  await payload.update({ collection: "story-plans", id: plan.id, data: { liveCoverage: { mode: "live", state: "live", startedAt: new Date().toISOString() } } as never, overrideAccess: true, context: { bylineSystem: true } });
   const system = { overrideAccess: true as const, context: { bylineSystem: true } };
   ids.coach = (await payload.create({ collection: "sources", data: { story: ids.game, label: "Coach Smith", groundRules: "on-record" }, ...system } as never)).id;
   ids.interview = (await payload.create({ collection: "appointments", data: { story: ids.game, title: "Interview Coach Smith", kind: "interview", source: ids.coach, scheduleMode: "exact", startAt: new Date(Date.now() + 30 * 60_000).toISOString(), location: "Wildcat Stadium", assignees: [accounts.reporter.id] }, ...system } as never)).id;
@@ -92,7 +94,7 @@ describe("live from the field", () => {
     // Only editors control the grant.
     await expect(payload.update({ collection: "story-plans", id: plan.id, data: { livePublishers: [accounts.photographer.id] }, req: await reqAs("reporter"), overrideAccess: false })).resolves.toMatchObject({ livePublishers: [] });
     await payload.update({ collection: "story-plans", id: plan.id, data: { livePublishers: [accounts.photographer.id] }, req: await reqAs("editor"), overrideAccess: false });
-    const posted = await call("post", "/byline/field/stories/:id/live", "photographer", { params: { id: ids.game }, data: { text: "TOUCHDOWN — Wildcats", clientKey: "field-live-0002" } });
+    const posted = await call("post", "/byline/field/stories/:id/live", "photographer", { params: { id: ids.game }, data: { text: "TOUCHDOWN — Wildcats", clientKey: "field-live-0002", delivery: "publish" } });
     expect(posted.body.status).toBe("posted");
     const refused = await payload.update({ collection: "stories", id: ids.game, data: { headline: "Changed by the photographer" } as never, req: await reqAs("photographer"), overrideAccess: false }).then(() => "changed", () => "refused");
     expect(refused).toBe("refused");
