@@ -1,4 +1,5 @@
 import type { CollectionApi } from "../collections/collection-api";
+import type { GetWorkloadHints } from "../editorial/workload-hints";
 import type { HomePresetsPayload } from "../home/home-model";
 import type { EditorialRestClient } from "../editorial/editorial-rest";
 import type { WorkspaceClient } from "../workspace/workspace-api";
@@ -14,6 +15,8 @@ export type StoryFetchers = {
   /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
   createStory?: (title: string, preset?: string, details?: StoryCreateDetails) => Promise<StoryWorkspace>;
   getPresets?: () => Promise<HomePresetsPayload>;
+  /** Advisory workload text for the people pickers (editors only). Absent, the pickers show names alone. */
+  getWorkloadHints?: GetWorkloadHints;
 };
 
 /** New story's optional details (HomePresetsPayload.create says which a host offers). */

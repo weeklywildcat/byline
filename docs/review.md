@@ -6,7 +6,7 @@ Reporters press **Submit for review** and nothing else. The engine (`apps/newsro
 
 A review is of one exact, immutable Payload version, the one that was submitted. The writer keeps editing the draft; the reviewer never sees it change underneath them. **A newer draft exists** is shown when it has.
 
-Review mode renders the submitted words (headline, deck, the body) with each text block numbered, so a comment can name the words it is about, and the actual **media of that version**: the lead image, photos and galleries, with captions, credit and alt text. Video, audio and documents appear as named files. Nothing is read from the live form. Imported (legacy HTML) stories are read through an inert DOM parse and shown as text; no markup from them is ever rendered.
+Review mode renders the submitted words (headline, deck, the body) with each text block numbered, so a comment can name the words it is about, and the actual **media of that version**: the lead image, photos and galleries, with captions, credit and alt text. The byline the version carries sits under the deck. A gallery keeps each picture's own caption, credit and alt text beneath it, and a file edited after submission is flagged on that picture ("may differ from what the writer sent"); Byline does not keep the old bytes, so it never claims to show them. Video, audio and documents appear as named files. Nothing is read from the live form. Imported (legacy HTML) stories are read through an inert DOM parse and shown as text; no markup from them is ever rendered.
 
 Media files are not versioned. When a submission is sealed, each file's name and publication revision are recorded. If a file or its crop is edited afterwards, the image is flagged as edited after submission, never silently shown as if it were what was sent. A deleted file says so.
 
@@ -40,9 +40,9 @@ Writers see published feedback in the Story context and in Review, can reply, an
 A reviewer who reviewed an earlier round gets a comparison of the version they last decided on and the version now in front of them, from the two immutable versions:
 
 - **Text**: block by block in order; an edited passage is shown word by word, added and removed passages are marked, and a removed passage shows where it used to be.
-- **Visuals**: each block's files compared, so a lead image or photo is reported as added, removed or replaced, and an alt-text-only change is reported as such.
+- **Visuals**: each block's files compared, so a lead image or photo is reported as added, removed or replaced, and an alt-text-only change is reported as such. In the article itself, a replaced, added or alt-text-changed visual carries a label ("Photo replaced since your last review") and shows the new picture; a removed visual is listed at the top of the Changes lens.
 
-The summary reads like "1 passage edited · 1 added" and "Photo replaced". The **Whole story / Changes since your review** control switches the lens; Changes shows only what moved. Comments are made in Whole story, because their anchors are offsets into the submitted words. Imported stories get the category summary only.
+The summary reads like "1 passage edited · 1 added" and "Photo replaced". The **Whole story / Changes since your review** control switches the lens; Changes repeats the summary above the article and shows only what moved. Comments are made in Whole story, because their anchors are offsets into the submitted words. Imported stories get the category summary only.
 
 ### Staleness
 

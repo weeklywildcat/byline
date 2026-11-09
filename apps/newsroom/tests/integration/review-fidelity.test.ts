@@ -80,6 +80,8 @@ describe("the submitted view's media", () => {
     expect(line).toMatchObject({ kind: "image", alt: "A long lunch line", credit: "Weekly Wildcat", state: "unchanged", width: 640, height: 400 });
     expect(line.previewUrl ?? line.url).toMatch(/media/);
     expect(result.story.body.root.children).toHaveLength(3);
+    // The byline the submitted version carries, as names in order.
+    expect(result.byline).toEqual(["reporter Writer"]);
   });
 
   it("flags a file whose crop was edited after submission, never swapping it in silently", async () => {

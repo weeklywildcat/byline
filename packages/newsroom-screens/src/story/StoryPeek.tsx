@@ -6,6 +6,7 @@ import { describeEditorialError } from "../editorial/editorial-model";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { AssigneePicker, DatePicker, WritersPicker, fieldRow } from "../editorial/pickers";
+import { useWorkloadHints, type WorkloadHints } from "../editorial/workload-hints";
 import { buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { Field, FieldContent, FieldGroup, FieldTitle } from "@byline/newsroom-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -68,6 +69,8 @@ export type StoryPeekContentProps = {
   /** Quick edits; each control appears only for a reader with that capability. */
   onPlan: (patch: PlanPatch) => void;
   onWriters: (writers: ContributorEntry[]) => void;
+  /** Advisory workload text for the writers and editor pickers; absent shows names alone. */
+  hints?: WorkloadHints;
   planning: boolean;
   writing: boolean;
   error: string;
@@ -79,7 +82,7 @@ export type StoryPeekContentProps = {
  * are the editor's quick ones — writers, editor, deadline; everything else
  * (reporting, media, checklist, files, activity) happens in the Story.
  */
-export function StoryPeekContent({ data, timezone, now, workspaceUrl, onPlan, onWriters, planning, writing, error }: StoryPeekContentProps) {
+export function StoryPeekContent({ data, timezone, now, workspaceUrl, onPlan, onWriters, hints, planning, writing, error }: StoryPeekContentProps) {
   const { story } = data;
   const caps = data.capabilities;
   const writers = data.contributors.contributors.length ? data.contributors.contributors : story.authors;
@@ -93,13 +96,13 @@ export function StoryPeekContent({ data, timezone, now, workspaceUrl, onPlan, on
         <Field orientation="horizontal" className={fieldRow.field}>
           <FieldTitle className={fieldRow.label}>Writers</FieldTitle>
           <FieldContent className={fieldRow.value}>{data.contributors.canEdit
-            ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={onWriters} disabled={writing} />
+            ? <WritersPicker people={data.contributors.available || []} value={data.contributors.contributors} onChange={onWriters} disabled={writing} hints={hints} />
             : <span className="py-1 text-sm">{writers.map((person) => person.name).join(", ") || "No writers yet"}</span>}</FieldContent>
         </Field>
         <Field orientation="horizontal" className={fieldRow.field}>
           <FieldTitle className={fieldRow.label}>Editor</FieldTitle>
           <FieldContent className={fieldRow.value}>{caps.assign
-            ? <AssigneePicker appearance="value" label="Editor" placeholder="Assign an editor" people={data.people} value={editor} disabled={planning} onChange={(person) => onPlan({ editorId: person ? Number(person.id) : null })} />
+            ? <AssigneePicker appearance="value" label="Editor" placeholder="Assign an editor" people={data.people} value={editor} disabled={planning} hints={hints} onChange={(person) => onPlan({ editorId: person ? Number(person.id) : null })} />
             : <span className="py-1 text-sm">{editor?.name ?? "No editor yet"}</span>}</FieldContent>
         </Field>
         <Field orientation="horizontal" className={fieldRow.field}>
@@ -133,6 +136,8 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, now, w
   const peek = useQuery({ queryKey: workspaceKey(storyId || 0), queryFn: () => fetchers.getWorkspace!(storyId!), enabled: Boolean(storyId && fetchers.getWorkspace) });
   const data = peek.data;
   const story = data?.story;
+  // Editors choosing people get quiet workload context; one cached copy serves every picker.
+  const hints = useWorkloadHints(fetchers.getWorkloadHints, Boolean(data?.capabilities.assign));
   const [editError, setEditError] = useState("");
   const refresh = () => invalidateStoryData(client, storyId);
 
@@ -167,7 +172,7 @@ export function StoryPeek({ storyId, fetchers, timezone, onClose, origin, now, w
       </SheetHeader>
       {peek.isPending ? <div className="py-4"><RowSkeletons count={4} /></div> : peek.isError || !story || !data ? <div className="p-4"><InlineAlert title="The story couldn't be loaded." onAction={() => void peek.refetch()}>{describeEditorialError(peek.error, "The story couldn't be loaded.")}</InlineAlert></div>
         : <StoryPeekContent data={data} timezone={data.timezone || timezone || "UTC"} now={now} workspaceUrl={workspaceUrl}
-          onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)}
+          onPlan={(patch) => planning.mutate(patch)} onWriters={(value) => writers.mutate(value)} hints={hints}
           planning={planning.isPending} writing={writers.isPending} error={editError} />}
     </SheetContent>
   </Sheet>;

@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { describeEditorialError, type ContributorEntry } from "../editorial/editorial-model";
 import { DatePicker, WritersPicker } from "../editorial/pickers";
+import { useWorkloadHints } from "../editorial/workload-hints";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
@@ -44,6 +45,7 @@ export function StoryCreateDialog({ open, onClose, onCreated, fetchers }: StoryC
   const presets = useQuery({ queryKey: ["byline", "story-create-presets"], queryFn: () => fetchers.getPresets!(), enabled: open && Boolean(fetchers.getPresets), staleTime: 300_000, retry: false });
   const templates = presets.data ? (presets.data.types?.length ? presets.data.types.map((id) => presets.data!.presets[id]) : Object.values(presets.data.presets)).filter((item) => item?.id && item.label) : [];
   const options = presets.data?.create;
+  const hints = useWorkloadHints(fetchers.getWorkloadHints, open && Boolean(options?.writers));
   const reset = () => { setError(""); setTitle(""); setDetails(false); setPreset(""); setSectionId(null); setWriters(null); setDeadline(null); };
   const create = useMutation({
     mutationFn: (text: string) => fetchers.createStory!(text, preset || undefined, { sectionId, writerIds: writers?.map((person) => Number(person.id)), deadline }),
@@ -80,7 +82,7 @@ export function StoryCreateDialog({ open, onClose, onCreated, fetchers }: StoryC
                   <Select items={sectionItems} value={sectionId ? String(sectionId) : "none"} disabled={busy} onValueChange={(next) => setSectionId(!next || next === "none" ? null : Number(next))}><SelectTrigger id="story-create-section" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{sectionItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
                 </Field> : null}
                 {options?.canAssign ? <>
-                  <Field><FieldLabel>Writers</FieldLabel><WritersPicker appearance="field" people={options.writers} value={writers ?? []} onChange={setWriters} disabled={busy} /></Field>
+                  <Field><FieldLabel>Writers</FieldLabel><WritersPicker appearance="field" people={options.writers} value={writers ?? []} onChange={setWriters} disabled={busy} hints={hints} /></Field>
                   <Field><FieldLabel>Deadline</FieldLabel><DatePicker label="Deadline" dateOnly value={deadline} timezone="UTC" onChange={setDeadline} disabled={busy} placeholder="No deadline" /></Field>
                 </> : null}
                 {templates.length ? <Field><FieldLabel htmlFor="story-create-template">Template</FieldLabel>

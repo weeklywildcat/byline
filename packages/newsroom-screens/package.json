@@ -46,6 +46,7 @@
     "./editorial/editorial-model": "./src/editorial/editorial-model.ts",
     "./editorial/editorial-rest": "./src/editorial/editorial-rest.ts",
     "./editorial/pickers": "./src/editorial/pickers.tsx",
+    "./editorial/workload-hints": "./src/editorial/workload-hints.ts",
     "./editorial/story-sidebar-navigation": "./src/editorial/story-sidebar-navigation.ts",
     "./editorial/story-video-model": "./src/editorial/story-video-model.ts",
     "./home/HomeApp": "./src/home/HomeApp.tsx",

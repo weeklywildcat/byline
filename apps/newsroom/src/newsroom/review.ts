@@ -1,7 +1,7 @@
 import { lifecyclePhase, storedStage } from "@byline/newsroom-screens/story/lifecycle";
 import { APIError, type CollectionAfterChangeHook, type PayloadRequest } from "payload";
 import { scopeManages, storyScope } from "../access/story-context";
-import { atLeast, relationId, sameId } from "../access/user";
+import { atLeast, relationId, relationIds, sameId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
 import { nextApplicableStep, resolveStep, selectWorkflow, type ReviewWorkflowDef, type RoutingDirectory, type RoutingStory } from "../domain/newsroom-roles";
 import { buildReviewBlocks, mediaIdsOf, type SubmittedStory } from "../domain/review-blocks";
@@ -595,7 +595,7 @@ function kindOf(mimeType: string): SubmittedMedia["kind"] {
 }
 
 /** The exact submitted version, for the immutable review view, with the Media it shows. Reviewers, the Story's managers and editors. */
-export async function submittedVersion(ctx: ScreenContext, storyId: number): Promise<{ version: string; submittedAt: string; story: Story | null; media: SubmittedMedia[] }> {
+export async function submittedVersion(ctx: ScreenContext, storyId: number): Promise<{ version: string; submittedAt: string; story: Story | null; byline: string[]; media: SubmittedMedia[] }> {
   const run = (await openRun(ctx.req, storyId)) ?? (await latestRun(ctx.req, storyId));
   if (!run) throw new APIError("This story hasn't been submitted for review.", 404);
   const scope = await storyScope(ctx.req);
@@ -615,5 +615,9 @@ export async function submittedVersion(ctx: ScreenContext, storyId: number): Pro
     const state: SubmittedMedia["state"] = !known || !stamp ? "unknown" : stamp.revision !== (doc.publicationRevision ?? 0) || stamp.filename !== (doc.filename ?? "") ? "changed" : "unchanged";
     return { id, filename: doc.filename ?? `File ${id}`, kind: kindOf(doc.mimeType ?? ""), mimeType: doc.mimeType ?? "", width: doc.width ?? null, height: doc.height ?? null, alt: doc.alt ?? "", credit: doc.creator || doc.credit || "", previewUrl: mediaPreview(doc), url: doc.url ?? null, state };
   });
-  return { version: run.submittedVersion, submittedAt: run.submittedAt, story, media };
+  // The byline this version carries: the names a reader would see, in order.
+  const bylineIds = relationIds(story?.contributors).map(Number).filter((id) => Number.isSafeInteger(id));
+  const authors = bylineIds.length ? (await ctx.req.payload.find({ collection: "people", where: { id: { in: bylineIds } }, select: { name: true }, pagination: false, req: ctx.req, ...system })).docs : [];
+  const byline = bylineIds.map((id) => authors.find((person) => person.id === id)?.name).filter((name): name is string => Boolean(name));
+  return { version: run.submittedVersion, submittedAt: run.submittedAt, story, byline, media };
 }

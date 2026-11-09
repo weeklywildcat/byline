@@ -47,10 +47,10 @@ let host: HTMLDivElement;
 beforeEach(() => { host = document.createElement("div"); document.body.append(host); });
 afterEach(async () => { await act(async () => root?.unmount()); root = null; document.body.innerHTML = ""; });
 
-async function render(data: StoryWorkspace) {
+async function render(data: StoryWorkspace, hints?: Record<string, string>) {
   root = createRoot(host);
   await act(async () => {
-    root!.render(<AdminPortalContext value={document.body}><StoryPeekContent data={data} timezone="America/New_York" now={NOW} workspaceUrl={(id) => `/stories/${id}`} onPlan={vi.fn()} onWriters={vi.fn()} planning={false} writing={false} error="" /></AdminPortalContext>);
+    root!.render(<AdminPortalContext value={document.body}><StoryPeekContent data={data} timezone="America/New_York" now={NOW} workspaceUrl={(id) => `/stories/${id}`} onPlan={vi.fn()} onWriters={vi.fn()} hints={hints} planning={false} writing={false} error="" /></AdminPortalContext>);
   });
 }
 
@@ -84,6 +84,17 @@ describe("Story Peek", () => {
     root = null;
     await render(workspace(false));
     expect(host.querySelectorAll("button")).toHaveLength(0);
+  });
+
+  it("gives the writers and editor pickers quiet workload context, without ranking or blocking anyone", async () => {
+    await render(workspace(true), { "2": "2 active Stories · 1 review · 1 due this week" });
+    for (const label of ["Writers:", "Editor:"]) {
+      await act(async () => { host.querySelector<HTMLElement>(`[aria-label^='${label}']`)!.click(); });
+      const rows = Array.from(document.body.querySelectorAll<HTMLElement>("[role=option]"));
+      expect(rows.map((row) => row.textContent)).toEqual(["Caroline Elrod", "Maycie Krajewski2 active Stories · 1 review · 1 due this week"]);
+      expect(rows.some((row) => row.getAttribute("aria-disabled") === "true")).toBe(false);
+      await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    }
   });
 
   it("falls back to the next appointment and open notes where the host has no attention (WordPress)", async () => {

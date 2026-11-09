@@ -3,7 +3,7 @@
 import { FileAudio, FileText, FileVideo, ImageIcon, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { buildReviewBlocks, type ReviewBlock, type SubmittedStory } from "../../domain/review-blocks";
-import type { BlockChange, RemovedBlock, WordPart } from "../../domain/review-diff";
+import type { BlockChange, RemovedBlock, VisualChange, WordPart } from "../../domain/review-diff";
 import type { SubmittedMedia } from "../../newsroom/review";
 import { ArticleCanvas } from "../story/ArticleCanvas";
 import { legacyHtmlBlocks } from "./legacy-html";
@@ -51,11 +51,31 @@ function marked(text: string, marks: BlockMark[], onMark: (id: number) => void):
   return parts;
 }
 
-export type ReviewChanges = { blocks: Map<string, BlockChange>; removed: RemovedBlock[] };
+export type ReviewChanges = { blocks: Map<string, BlockChange>; removed: RemovedBlock[]; /** Media that moved since the last review: added, replaced in place, removed, or only its alt text changed. */ visuals?: VisualChange[] };
+
+const VISUAL_TAGS = { added: "added", replaced: "replaced", details: "alt text changed" } as const;
+
+/**
+ * Which media blocks of the submitted version are a visual change since the
+ * last review, matched on what the block shows (its label and files). A
+ * removed visual has no block here; it is listed on its own.
+ */
+export function visualChangesByBlock(blocks: readonly ReviewBlock[], visuals: readonly VisualChange[] | undefined): Map<string, VisualChange> {
+  const found = new Map<string, VisualChange>();
+  const open = [...(visuals ?? [])].filter((change) => change.change !== "removed");
+  for (const block of blocks) {
+    if (!block.media) continue;
+    const key = block.media.uses.map((use) => use.mediaId).join(",");
+    const at = open.findIndex((change) => change.where === block.media!.label && change.after.join(",") === key);
+    if (at >= 0) found.set(block.id, open.splice(at, 1)[0]!);
+  }
+  return found;
+}
 
 function Diff({ parts }: { parts: WordPart[] }) {
+  // An addition right after a deletion gets a little room, so "~~old~~new" never reads as one run-together word.
   return <>{parts.map((part, index) => part.change === "added"
-    ? <ins key={index} className="rounded-sm bg-emerald-200/60 text-inherit no-underline dark:bg-emerald-400/25">{part.text}</ins>
+    ? <ins key={index} className={`rounded-sm bg-emerald-200/60 text-inherit no-underline dark:bg-emerald-400/25${parts[index - 1]?.change === "removed" ? " ml-1" : ""}`}>{part.text}</ins>
     : part.change === "removed"
       ? <del key={index} className="rounded-sm bg-rose-200/60 text-inherit dark:bg-rose-400/25">{part.text}</del>
       : <span key={index}>{part.text}</span>)}</>;
@@ -82,17 +102,45 @@ function MediaBlock({ block, media, content, change, diff }: { block: ReviewBloc
   const alts = [...new Set(files.map((entry) => entry.use.alt || entry.file?.alt || "").filter(Boolean))];
   const credits = [...new Set(files.map((entry) => entry.file?.credit).filter(Boolean))];
   const many = uses.length > 1;
+  // Single pictures carry one note under the picture; a gallery flags the exact picture instead (below).
+  const note = changed.length && !many ? (
+    <p className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400" role="note" data-media-changed="">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      {changed.length === 1 ? "This file or its crop was edited after it was submitted, so the picture above may differ from what the writer sent." : `${changed.length} of these files, or their crops, were edited after submission, so what is shown may differ from what the writer sent.`}
+    </p>
+  ) : null;
+  const empty = <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"><ImageIcon className="size-4" aria-hidden="true" />{block.media ? `${label} without a file.` : "Media in an imported story. Open Preview to see it."}</div>;
+  if (many) {
+    // A gallery: each picture keeps its own caption, credit and alt text beneath it, so nothing is run together.
+    return (
+      <figure data-review-block={block.id} data-media-block="" className="grid gap-2">
+        <div className="grid grid-cols-2 items-start gap-x-3 gap-y-4 sm:grid-cols-3">
+          {files.map(({ use, file }, index) => {
+            const alt = use.alt || file?.alt || "";
+            return (
+              <div key={`${use.mediaId}-${index}`} data-gallery-item="" className="grid min-w-0 content-start gap-1">
+                <MediaFile file={file} alt={use.alt} fallbackLabel={label} />
+                {file?.state === "changed" ? <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400" role="note" data-media-changed=""><TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />This file or its crop was edited after it was submitted, so the picture may differ from what the writer sent.</p> : null}
+                <p className="text-sm text-muted-foreground">{use.caption || <span className="italic">No caption</span>}</p>
+                <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                  {file?.credit ? <span className="block">Credit: {file.credit}</span> : null}
+                  <span className="block">{alt ? `Alt text: ${alt}` : "No alt text"}</span>
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        <figcaption className="grid gap-1 text-xs text-muted-foreground">
+          {diff && change?.status === "changed" ? <span className="text-sm">Captions: <Diff parts={change.parts} /></span> : null}
+          <span><Badge variant="outline">{label}</Badge></span>
+        </figcaption>
+      </figure>
+    );
+  }
   return (
     <figure data-review-block={block.id} data-media-block="" className="grid gap-2">
-      {files.length
-        ? <div className={many ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : "grid"}>{files.map(({ use, file }, index) => <MediaFile key={`${use.mediaId}-${index}`} file={file} alt={use.alt} fallbackLabel={label} />)}</div>
-        : <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"><ImageIcon className="size-4" aria-hidden="true" />{block.media ? `${label} without a file.` : "Media in an imported story. Open Preview to see it."}</div>}
-      {changed.length ? (
-        <p className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400" role="note" data-media-changed="">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {changed.length === 1 ? "This file or its crop was edited after it was submitted, so the picture above may differ from what the writer sent." : `${changed.length} of these files, or their crops, were edited after submission, so what is shown may differ from what the writer sent.`}
-        </p>
-      ) : null}
+      {files.length ? <div className="grid">{files.map(({ use, file }, index) => <MediaFile key={`${use.mediaId}-${index}`} file={file} alt={use.alt} fallbackLabel={label} />)}</div> : empty}
+      {note}
       <figcaption className="grid gap-1 text-sm text-muted-foreground">
         {block.text ? <span>{diff && change?.status === "changed" ? <Diff parts={change.parts} /> : content}</span> : null}
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -105,8 +153,10 @@ function MediaBlock({ block, media, content, change, diff }: { block: ReviewBloc
   );
 }
 
-export function SubmittedArticle({ blocks, marks, onMark, media, changes, changesOnly = false }: {
+export function SubmittedArticle({ blocks, marks, onMark, byline, media, changes, changesOnly = false }: {
   blocks: ReviewBlock[];
+  /** The names the submitted version carries as its byline. */
+  byline?: string[];
   marks: Map<string, BlockMark[]>;
   onMark: (commentId: number) => void;
   media?: Map<number, SubmittedMedia>;
@@ -117,8 +167,12 @@ export function SubmittedArticle({ blocks, marks, onMark, media, changes, change
   const files = media ?? new Map<number, SubmittedMedia>();
   const removedAfter = new Map<string | null, RemovedBlock[]>();
   for (const entry of changes?.removed ?? []) removedAfter.set(entry.after, [...(removedAfter.get(entry.after) ?? []), entry]);
-  const touched = (block: ReviewBlock) => changes?.blocks.has(block.id) || Boolean(block.media?.uses.some((use) => files.get(use.mediaId)?.state === "changed"));
+  const visualFor = visualChangesByBlock(blocks, changes?.visuals);
+  const removedVisuals = (changes?.visuals ?? []).filter((change) => change.change === "removed");
+  const touched = (block: ReviewBlock) => changes?.blocks.has(block.id) || visualFor.has(block.id) || Boolean(block.media?.uses.some((use) => files.get(use.mediaId)?.state === "changed"));
   const shown = changesOnly ? blocks.filter((block) => touched(block) || removedAfter.has(block.id)) : blocks;
+  // The byline sits under the deck (or the headline when there is no deck), where a reader finds it.
+  const bylineAt = (blocks.find((block) => block.kind === "deck") ?? blocks.find((block) => block.kind === "headline"))?.id;
   const removedBlocks = (after: string | null) => (removedAfter.get(after) ?? []).map((entry, index) => (
     <div key={`removed-${after}-${index}`} data-review-removed="" className="rounded-lg border border-rose-300/60 bg-rose-50/50 p-3 text-sm dark:border-rose-400/30 dark:bg-rose-950/20">
       <Badge variant="outline" className="mb-1">Removed since your last review</Badge>
@@ -129,13 +183,21 @@ export function SubmittedArticle({ blocks, marks, onMark, media, changes, change
     <ArticleCanvas>
       <div className="flex flex-col gap-5" data-submitted-article="" data-changes-only={changesOnly || undefined}>
         {changesOnly ? removedBlocks(null) : null}
+        {changesOnly && removedVisuals.length ? (
+          <div data-review-removed="" data-review-removed-visuals="" className="rounded-lg border border-rose-300/60 bg-rose-50/50 p-3 text-sm dark:border-rose-400/30 dark:bg-rose-950/20">
+            <Badge variant="outline" className="mb-1">Removed since your last review</Badge>
+            <p className="text-muted-foreground">{removedVisuals.map((change) => change.where).join(" · ")}</p>
+          </div>
+        ) : null}
         {shown.map((block) => {
           const change = changes?.blocks.get(block.id);
           const content = marked(block.text, marks.get(block.id) ?? [], onMark);
           // In "changes only" the text is the edit itself, word by word; in the whole story it is the submitted words, so comment anchors line up.
           const text = changesOnly && change?.status === "changed" ? <Diff parts={change.parts} /> : content;
           const props = { "data-review-block": block.id };
-          const tag = change ? <Badge variant="secondary" className="mb-1 w-fit" data-change-badge="">{change.status === "added" ? "New since your last review" : "Edited since your last review"}</Badge> : null;
+          const visual = visualFor.get(block.id);
+          const tagText = visual ? `${block.media?.label ?? "Media"} ${VISUAL_TAGS[visual.change as keyof typeof VISUAL_TAGS]} since your last review` : change ? (change.status === "added" ? "New since your last review" : "Edited since your last review") : null;
+          const tag = tagText ? <Badge variant="secondary" className="mb-1 w-fit" data-change-badge="">{tagText}</Badge> : null;
           let node: ReactNode;
           switch (block.kind) {
             case "headline": node = <h1 {...props} className="text-3xl leading-tight font-semibold tracking-tight md:text-4xl">{text}</h1>; break;
@@ -151,6 +213,7 @@ export function SubmittedArticle({ blocks, marks, onMark, media, changes, change
             <div key={block.id} className={tag ? "grid gap-1 border-l-2 border-emerald-400/70 pl-3" : undefined}>
               {tag}
               {node}
+              {byline?.length && !changesOnly && block.id === bylineAt ? <p data-review-byline="" className="mt-2 text-sm text-muted-foreground">By {byline.join(", ")}</p> : null}
               {changesOnly ? removedBlocks(block.id) : null}
             </div>
           );

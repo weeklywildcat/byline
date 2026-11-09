@@ -330,6 +330,8 @@ test("never submits the story from a dialog, popover or block field", async ({ p
   expect(submits).toEqual([]);
 });
 
+// Known failure, also on main: Payload reports the document as locked but never persists a `payload_locked_documents` row,
+// so nothing enforces the lock. Tracked in https://github.com/weeklywildcat/byline/issues/275. The assertions are deliberately unchanged.
 test("is read-only while another user holds the story", async ({ page, browser, baseURL, request }) => {
   await openStory(page);
   // The editor holds Payload's document lock; an administrator opens the same story.

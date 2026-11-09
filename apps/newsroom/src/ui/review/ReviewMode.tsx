@@ -41,7 +41,7 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
   const review = useStoryReview(context);
   const submitted = useQuery({
     queryKey: ["byline", "story-review-submitted", storyId, review.data?.run?.submittedVersion ?? null],
-    queryFn: () => getJson<{ version: string; submittedAt: string; story: SubmittedStory | null; media: SubmittedMedia[] }>(context.api, `/byline/stories/${storyId}/review/submitted`),
+    queryFn: () => getJson<{ version: string; submittedAt: string; story: SubmittedStory | null; byline?: string[]; media: SubmittedMedia[] }>(context.api, `/byline/stories/${storyId}/review/submitted`),
     enabled: Boolean(review.data?.run)
   });
   const actions = useReviewActions(context);
@@ -61,7 +61,7 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
   const blocks = useMemo(() => (submitted.data?.story ? reviewBlocks(submitted.data.story) : []), [submitted.data]);
   const files = useMemo(() => new Map((submitted.data?.media ?? []).map((file) => [file.id, file])), [submitted.data]);
   const comparison = review.data?.changesSinceYourReview?.comparison ?? null;
-  const changes = useMemo(() => (comparison ? { blocks: new Map(comparison.blocks.map((change) => [change.id, change])), removed: comparison.removed } : null), [comparison]);
+  const changes = useMemo(() => (comparison ? { blocks: new Map(comparison.blocks.map((change) => [change.id, change])), removed: comparison.removed, visuals: comparison.visuals } : null), [comparison]);
   const marks = useMemo(() => {
     const map = new Map<string, BlockMark[]>();
     const add = (comment: ReviewCommentView) => {
@@ -178,11 +178,18 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
               <ToggleGroupItem value="changes">Changes since your review</ToggleGroupItem>
             </ToggleGroup>
             {lens === "changes" ? <span className="text-sm text-muted-foreground">Switch to Whole story to comment.</span> : null}
+            {lens === "changes" && (state.changesSinceYourReview?.copySummary || state.changesSinceYourReview?.visualSummary) ? (
+              <p className="basis-full text-sm" data-review-changes-summary="">
+                {state.changesSinceYourReview.copySummary ? <span>Text: {state.changesSinceYourReview.copySummary}.</span> : null}
+                {state.changesSinceYourReview.copySummary && state.changesSinceYourReview.visualSummary ? " " : null}
+                {state.changesSinceYourReview.visualSummary ? <span>Visuals: {state.changesSinceYourReview.visualSummary}.</span> : null}
+              </p>
+            ) : null}
           </div>
         ) : null}
         <div ref={articleRef} className="min-w-0" onMouseUp={onSelect} onKeyUp={(event) => { if (event.shiftKey) onSelect(); }}>
           {submitted.isPending ? <ReviewSkeleton /> : submitted.data?.story
-            ? <SubmittedArticle blocks={blocks} marks={marks} media={files} changes={changes} changesOnly={lens === "changes"} onMark={(id) => { setFocused(id); if (!wide) setPanelOpen(true); }} />
+            ? <SubmittedArticle blocks={blocks} marks={marks} byline={submitted.data?.byline} media={files} changes={changes} changesOnly={lens === "changes"} onMark={(id) => { setFocused(id); if (!wide) setPanelOpen(true); }} />
             : <Alert><AlertTitle>The submitted version isn't available</AlertTitle><AlertDescription>It may have been removed from the story's history. Ask the writer to resubmit.</AlertDescription></Alert>}
         </div>
         </div>

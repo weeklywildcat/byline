@@ -24,7 +24,7 @@ A story uses the most specific active workflow whose Sections and formats match 
 
 ## Workload {#workload}
 
-`/admin/people?view=workload`: factual counts per person: active Stories, due this week, overdue, reviews waiting on them, open media assignments. Alphabetical, never ranked; no scores, no time tracking. The same counts appear as an advisory hint when choosing someone for a role ("2 active Stories · 1 review") and never block an assignment.
+`/admin/people?view=workload`: factual counts per person: active Stories, due this week, overdue, reviews waiting on them, open media assignments. Alphabetical, never ranked; no scores, no time tracking. The same counts appear as a quiet, secondary line when choosing someone for a role or on a Story ("2 active Stories · 1 review · 1 due this week"): the role-member dialog, and the writers and editor pickers in Story Peek, the Story Details and New story (editors only; one cached read of `/byline/workload` serves every picker). It is advisory: it never disables, hides, orders or colours anyone, and never blocks an assignment.
 
 ## School years {#school-years}
 

@@ -35,6 +35,36 @@ describe("submitted media", () => {
     expect(html).toContain("file was deleted after submission");
   });
 
+  it("keeps each gallery picture's own caption, credit and alt text beside it, and flags only the picture that changed", () => {
+    const html = render(story([gallery(3, 4, 5)]), [file(3, { credit: "A. Ng", alt: "Alt three" }), file(4, { credit: "B. Cho", state: "changed" }), file(5, { credit: "C. Diaz" })]);
+    const dom = new DOMParser().parseFromString(html, "text/html");
+    const tiles = Array.from(dom.querySelectorAll("[data-gallery-item]"));
+    expect(tiles.map((tile) => tile.textContent)).toEqual([
+      expect.stringContaining("Cap 3"), expect.stringContaining("Cap 4"), expect.stringContaining("Cap 5")
+    ]);
+    expect(tiles[0].textContent).toContain("Credit: A. Ng");
+    expect(tiles[0].textContent).toContain("Alt text: Alt three");
+    expect(tiles[1].textContent).toContain("Credit: B. Cho");
+    expect(tiles[2].textContent).toContain("Credit: C. Diaz");
+    // Only the edited picture carries the note; it never claims to show the old bytes.
+    expect(tiles.map((tile) => tile.querySelector("[data-media-changed]") !== null)).toEqual([false, true, false]);
+    expect(tiles[1].textContent).toContain("may differ from what the writer sent");
+    expect(dom.querySelectorAll("figure > [data-media-changed]")).toHaveLength(0);
+  });
+
+  it("says when a gallery picture has no caption or alt text, rather than leaving it blank", () => {
+    const value = story([{ type: "block", fields: { blockType: "gallery", items: [{ media: 3, caption: "", altOverride: "" }, { media: 4, caption: "Has one", altOverride: "" }] } }]);
+    const html = render(value, [file(3, { alt: "" }), file(4)]);
+    expect(html).toContain("No caption");
+    expect(html).toContain("No alt text");
+  });
+
+  it("shows the submitted version's byline under the deck, or under the headline when there is no deck", () => {
+    expect(render(story([p("Body")], { deck: "A deck." }), [], { byline: ["Caroline Elrod", "Addyson Reed"] })).toMatch(/A deck\.<\/p><p[^>]*data-review-byline[^>]*>By Caroline Elrod, Addyson Reed/);
+    expect(render(story([p("Body")]), [], { byline: ["Caroline Elrod"] })).toMatch(/<\/h1><p[^>]*data-review-byline[^>]*>By Caroline Elrod/);
+    expect(render(story([p("Body")], { deck: "A deck." }), [])).not.toContain("data-review-byline");
+  });
+
   it("names non-image files instead of pretending to show them", () => {
     const html = render(story([{ type: "block", fields: { blockType: "document", media: 5 } }]), [file(5, { kind: "document", filename: "budget.pdf", mimeType: "application/pdf" })]);
     expect(html).toContain("budget.pdf");
@@ -55,7 +85,33 @@ describe("changes since your last review", () => {
   const before = story([p("The canteen closed in May."), p("Students bring lunch."), photo(7, "Cap")], { featuredMedia: 9 });
   const after = story([p("The canteen closed in May."), p("Students bring lunch from home."), photo(8, "Cap")], { featuredMedia: 9 });
   const comparison = compareVersions(buildReviewBlocks(before), buildReviewBlocks(after));
-  const changes = { blocks: new Map(comparison.blocks.map((change) => [change.id, change])), removed: comparison.removed };
+  const changes = { blocks: new Map(comparison.blocks.map((change) => [change.id, change])), removed: comparison.removed, visuals: comparison.visuals };
+
+  it("shows a replaced photo where it is, labelled, so a reviewer sees the visual change as well as the words", () => {
+    const html = render(after, [file(9), file(8)], { changes, changesOnly: true });
+    expect(html).toContain("Photo replaced since your last review");
+    expect(html).toContain('src="/media/8-preview.jpg"');
+    // The lead image did not move, so it is left out of the changes lens.
+    expect(html).not.toContain('src="/media/9-preview.jpg"');
+  });
+
+  it("labels an added photo and an alt-text-only change, and lists a removed visual on its own", () => {
+    const base = story([p("Intro."), photo(7, "Cap", "Old alt")]);
+    const next = story([p("Intro."), photo(7, "Cap", "New alt"), photo(8, "Fresh")]);
+    const diff = compareVersions(buildReviewBlocks(base), buildReviewBlocks(next));
+    const html = render(next, [file(7), file(8)], { changes: { blocks: new Map(diff.blocks.map((change) => [change.id, change])), removed: diff.removed, visuals: diff.visuals }, changesOnly: true });
+    expect(html).toContain("Photo alt text changed since your last review");
+    expect(html).toContain("Photo added since your last review");
+    const gone = compareVersions(buildReviewBlocks(next), buildReviewBlocks(base));
+    const removedHtml = render(base, [file(7)], { changes: { blocks: new Map(gone.blocks.map((change) => [change.id, change])), removed: gone.removed, visuals: gone.visuals }, changesOnly: true });
+    expect(removedHtml).toContain("data-review-removed-visuals");
+    expect(removedHtml).toContain("Removed since your last review");
+  });
+
+  it("separates a deleted word from the word that replaces it", () => {
+    const html = render(story([p("We kept holding bake sales.")]), [], { changesOnly: true, changes: { blocks: new Map([["b0", { id: "b0", status: "changed" as const, parts: [{ text: "We kept", change: "removed" as const }, { text: "Bake", change: "added" as const }, { text: " sales.", change: "same" as const }] }]]), removed: [] } });
+    expect(html).toMatch(/<del[^>]*>We kept<\/del><ins[^>]*ml-1[^>]*>Bake<\/ins>/);
+  });
 
   it("shows only what moved, word by word, with unchanged passages left out", () => {
     const html = render(after, [file(9), file(8)], { changes, changesOnly: true });
