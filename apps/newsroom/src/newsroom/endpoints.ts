@@ -72,6 +72,9 @@ import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, p
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow, workflowToStore } from "../domain/workflow";
 import { moveLifecycle } from "./lifecycle";
+import { previewRouting, removeAssignment, rolesOverview, saveAssignment, saveRole, saveWorkflow, workflowsOverview, type RoleInput, type WorkflowInput } from "./newsroom-roles";
+import { workload } from "./workload";
+import type { AssignmentInput } from "../domain/role-admin";
 import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
@@ -587,6 +590,18 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
+  // Newsroom Roles, review workflows, the routing preview and factual workload (editors; docs/newsroom-roles.md).
+  { path: "/byline/roles", method: "get", handler: handle((ctx) => rolesOverview(ctx)) },
+  { path: "/byline/roles", method: "post", handler: handle(async (ctx, req) => saveRole(ctx, null, await body<RoleInput>(req))) },
+  { path: "/byline/roles/:id", method: "patch", handler: handle(async (ctx, req) => saveRole(ctx, idParam(req), await body<RoleInput>(req))) },
+  { path: "/byline/roles/:id/assignments", method: "post", handler: handle(async (ctx, req) => saveAssignment(ctx, idParam(req), null, await body<AssignmentInput>(req))) },
+  { path: "/byline/roles/:id/assignments/:assignment", method: "patch", handler: handle(async (ctx, req) => saveAssignment(ctx, idParam(req), idParam(req, "assignment"), await body<AssignmentInput>(req))) },
+  { path: "/byline/roles/:id/assignments/:assignment", method: "delete", handler: handle((ctx, req) => removeAssignment(ctx, idParam(req, "assignment"))) },
+  { path: "/byline/review-workflows", method: "get", handler: handle((ctx) => workflowsOverview(ctx)) },
+  { path: "/byline/review-workflows", method: "post", handler: handle(async (ctx, req) => saveWorkflow(ctx, null, await body<WorkflowInput>(req))) },
+  { path: "/byline/review-workflows/preview", method: "post", handler: handle(async (ctx, req) => previewRouting(ctx, await body(req))) },
+  { path: "/byline/review-workflows/:id", method: "patch", handler: handle(async (ctx, req) => saveWorkflow(ctx, idParam(req), await body<WorkflowInput>(req))) },
+  { path: "/byline/workload", method: "get", handler: handle((ctx) => workload(ctx)) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
