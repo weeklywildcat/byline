@@ -14,7 +14,8 @@ for (const width of [1440, 820, 390]) {
       const id = await createStory(request, baseURL!, token, { headline: title, slug: `ux-${suffix}`, section: section.id });
       await signIn(context, baseURL!, token);
       await page.goto(`/admin/collections/stories/${id}`);
-      const detailsButton = page.getByRole("button", { name: "Details", exact: true });
+      // Story details is secondary: in the header's overflow menu.
+      const detailsButton = { click: async () => { await page.getByRole("button", { name: "More story actions" }).click(); await page.getByRole("menuitem", { name: /Story details/ }).click(); } };
       const details = page.getByRole("dialog", { name: "Story details" });
       const closeDetails = () => details.getByRole("button", { name: "Close", exact: true }).click();
       await detailsButton.click();
@@ -50,7 +51,10 @@ for (const width of [1440, 820, 390]) {
       await expect(url.getByRole("link", { name: "Open published story" })).toHaveAttribute("href", new RegExp(`/new-${suffix}/$`));
 
       await closeDetails();
-      await page.getByRole("tab", { name: "History", exact: true }).click();
+      // History is reachable, secondarily: ••• → View history, as a focused mode with Back to story.
+      await page.getByRole("button", { name: "More story actions" }).click();
+      await page.getByRole("menuitem", { name: "View history" }).click();
+      await expect(page).toHaveURL(/[?&]view=history/);
       await expect(page.getByText("Currently published", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Add notice" }).click();
       const notice = page.getByRole("dialog", { name: "Add a public notice" });

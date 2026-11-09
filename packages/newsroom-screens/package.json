@@ -101,6 +101,7 @@
     "./story/TaskCreateDialog": "./src/story/TaskCreateDialog.tsx",
     "./story/TaskEditDialog": "./src/story/TaskEditDialog.tsx",
     "./story/TaskQuickFields": "./src/story/TaskQuickFields.tsx",
+    "./story-context/StoryContext": "./src/story-context/StoryContext.tsx",
     "./story/attention": "./src/story/attention.ts",
     "./story/lifecycle": "./src/story/lifecycle.ts",
     "./story/media-icons": "./src/story/media-icons.ts",

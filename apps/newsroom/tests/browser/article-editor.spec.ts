@@ -275,19 +275,36 @@ test("moves and removes whole blocks as document edits, with Undo", async ({ pag
   await waitForSaved(page);
 });
 
-test("keeps the editor state across tabs and saves edits made just before leaving Write", async ({ page, request, baseURL }) => {
+test("keeps the editor mounted through Reporting and back, and saves edits made just before leaving", async ({ page, request, baseURL }) => {
   await openStory(page);
+  // The Story is the Story: no tab bar, Reporting is a labelled header button.
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  const reporting = page.getByRole("button", { name: "Reporting", exact: true });
+  await expect(reporting).toBeVisible();
   const caption = block(page, "photo").getByRole("textbox", { name: "Caption" });
   await caption.click();
   // The end of the caption, not of the visual line clicked (a long caption wraps).
   await caption.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(element.value.length, element.value.length));
-  await page.keyboard.type(" (Tab test.)");
-  await page.getByRole("tab", { name: "Plan" }).click();
-  await page.getByRole("tab", { name: "Write" }).click();
-  await expect(caption).toHaveValue(/\(Tab test\.\)$/);
+  await page.keyboard.type(" (Mode test.)");
+  // Leave while the edit is still unsaved (autosave has not run yet).
+  await reporting.click();
+  await expect(page).toHaveURL(/[?&]view=reporting/);
+  await expect(page.getByRole("heading", { name: "Reporting", level: 1 })).toBeVisible();
+  await expect(page.locator("[data-story-article]")).toBeHidden();
+  await page.getByRole("button", { name: "Back to story" }).click();
+  await expect(page).not.toHaveURL(/view=/);
+  await expect(caption).toHaveValue(/\(Mode test\.\)$/);
+  // Browser Back/Forward move between the Story and Reporting with the same editor.
+  await page.goBack();
+  await expect(page).toHaveURL(/[?&]view=reporting/);
+  await page.goForward();
+  await expect(caption).toHaveValue(/\(Mode test\.\)$/);
+  await caption.click();
+  await caption.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(element.value.length, element.value.length));
+  await page.keyboard.type(" Again.");
   await waitForSaved(page);
   const story = await readDraft(request, baseURL!, editorToken, storyId);
-  expect(JSON.stringify(story.body)).toContain("(Tab test.)");
+  expect(JSON.stringify(story.body)).toContain("(Mode test.) Again.");
 });
 
 test("never submits the story from a dialog, popover or block field", async ({ page }) => {

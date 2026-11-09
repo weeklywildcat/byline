@@ -7,7 +7,7 @@
  * call; nothing here is mirrored into the story's form state.
  */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly data: Record<string, unknown> = {}) {
     super(message);
   }
 }
@@ -23,7 +23,7 @@ async function request<T>(api: string, path: string, init: RequestInit = {}): Pr
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = body.message ?? (body as { errors?: Array<{ message?: string }> }).errors?.[0]?.message ?? "Byline could not save that change.";
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, (body as { data?: Record<string, unknown> }).data ?? {});
   }
   return body as T;
 }

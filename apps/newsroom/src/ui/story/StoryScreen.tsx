@@ -1,29 +1,27 @@
 "use client";
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { StoryContext, type CaptureAction } from "@byline/newsroom-screens/story-context/StoryContext";
 import { ActivitySection } from "@byline/newsroom-screens/workspace/ActivitySection";
-import { BriefSection } from "@byline/newsroom-screens/workspace/BriefSection";
-import { DetailsSection } from "@byline/newsroom-screens/workspace/DetailsSection";
-import { MediaSection } from "@byline/newsroom-screens/workspace/MediaSection";
-import { ReportingPlan } from "@byline/newsroom-screens/workspace/ReportingPlan";
-import { ReportingSummaryStrip } from "@byline/newsroom-screens/workspace/ReportingSummary";
-import { ResourcesSection } from "@byline/newsroom-screens/workspace/ResourcesSection";
-import { StoryWorkspaceProvider, WorkspaceAnnouncer, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
-import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
+import { StoryWorkspaceProvider, useOptionalWorkspace, WorkspaceAnnouncer, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { LiveCoverageProvider, type PublishStory } from "../live/LiveCoverageProvider";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
-import { useLeaveGuard } from "../shell/navigation";
-import { useSettleAutosave } from "./form";
-import { HistoryTab } from "./HistoryTab";
 import { ReportingTab } from "../reporting/ReportingTab";
+import { FeedbackSummary } from "../review/FeedbackSheet";
+import { ReviewMode } from "../review/ReviewMode";
+import { useLeaveGuard } from "../shell/navigation";
+import { useSettleAutosave, useStoryField } from "./form";
+import { HistoryTab } from "./HistoryTab";
 import { StoryNotes } from "./StoryNotes";
-import { StoryHeader } from "./StoryHeader";
+import { FocusedHeader, StoryHeader } from "./StoryHeader";
+import { parseStoryLocation, storyLocationSearch, type StoryLocation, type StoryView } from "./story-view";
 import { WriteTab } from "./WriteTab";
 
 export type StoryScreenContext = {
@@ -35,26 +33,33 @@ export type StoryScreenContext = {
   userId: string | number | undefined;
   readOnly: boolean;
   shellQueries: QueryClient;
-  /** Opens the Reporting tab, on a transcript when given (the article's Reporting sheet uses it). */
+  /** Opens Reporting, on a transcript when given (the article's Reporting sheet uses it). */
   openReporting?: (transcriptId?: number) => void;
 };
 
 /**
- * The Byline Story screen.
+ * The Story's static context rail appears only when the Story container (not
+ * the viewport) has room for the article's 760px column with its gutters and
+ * a ~300px rail beside it. Below that the same content is a right Sheet.
+ * A content breakpoint, measured: see docs/story-screen.md#context.
+ */
+export const CONTEXT_RAIL_AT = 1180;
+
+type Go = (view: StoryView, extra?: { capture?: CaptureAction | null; transcript?: number | null }) => void;
+
+/**
+ * The Byline Story screen (docs/story-screen.md).
  *
  * It is the custom `Field` of one presentational collapsible that holds every
  * story field, so it renders inside Payload's own Edit view: Payload keeps the
  * form, autosave, validation, drafts, versions, locking and the Live Preview
- * window, and this component is everything the writer sees. The Byline shell
- * (src/ui/shell) around it owns navigation, Create, Search and the one toaster.
+ * window, and this component is everything the writer sees.
  *
- * Write edits the article through Payload's form hooks: the one copy of the
- * article. Live coverage is not a tab: it is the Story mode control and a section under the article in
- * Write (`ui/live`). Plan is the shared Story Workspace sections, Production included
- * (@byline/newsroom-screens), the same ones the WordPress workspace page
- * shows, reading and writing the plan and workspace records through
- * /api/byline. They run with `articleInForm`, so they never write article
- * fields behind the form's back.
+ * Opening a Story opens the Story: header, article, Story Context. Reporting,
+ * Review and History are focused modes reached deliberately (`?view=`), each
+ * with Back to story — never peer tabs. The article and its Lexical editor
+ * stay mounted (only hidden) while a focused mode is open, so unsaved edits,
+ * autosave, locking and the leave guard are untouched by moving around.
  */
 export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath, parentSchemaPath, indexPath, permissions, readOnly }) => {
   const { config } = useConfig();
@@ -64,16 +69,24 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const shellQueries = useQueryClient();
   // The Story header registers its normal publish action here; Publish & go live uses exactly it.
   const publishRef = useRef<PublishStory | null>(null);
-  const [tab, setTab] = useState<string>(() => {
-    const requested = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("tab") ?? "";
-    return requested === "reporting" || requested === "history" ? requested : "";
-  });
+  const [location, setLocation] = useState<StoryLocation>(() => parseStoryLocation(typeof window === "undefined" ? "" : window.location.search));
+
+  // The address is the mode: Back/Forward move between the Story and a focused mode.
+  useEffect(() => {
+    const onPop = () => setLocation(parseStoryLocation(window.location.search));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const go = useCallback<Go>((view, extra = {}) => {
+    const search = storyLocationSearch(window.location.search, view, extra);
+    window.history.pushState(window.history.state, "", `${window.location.pathname}${search}`);
+    setLocation(parseStoryLocation(search));
+    window.scrollTo({ top: 0 });
+  }, []);
+
   const context: StoryScreenContext = {
     shellQueries,
-    openReporting: (transcriptId) => {
-      if (transcriptId) window.history.replaceState(null, "", `${window.location.pathname}?tab=reporting&transcript=${transcriptId}`);
-      setTab("reporting");
-    },
+    openReporting: (transcriptId) => go("reporting", { transcript: transcriptId ?? null }),
     api: config.routes.api,
     admin: config.routes.admin,
     timeZone: custom.newsroomTimeZone ?? "America/New_York",
@@ -87,88 +100,129 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const media = useBylineMediaPicker();
   const childPaths = { fields: field.fields, parentPath: parentPath ?? "", parentSchemaPath: parentSchemaPath ?? "stories", parentIndexPath: indexPath ?? "", permissions };
   const storyId = Number(id);
-  // `?appointment=<id>` opens that appointment's scheduler, as in the WordPress workspace.
-  const location = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
-  const appointmentId = location?.get("appointment") ?? "";
-  const defaultTab = tab || (appointmentId || location?.get("tab") === "plan" ? "plan" : "write");
+  const saved = Number.isSafeInteger(storyId) && storyId > 0;
 
-  const screen = (
-    // Write spans the whole canvas (wide and full photographs measure against it);
-    // the header, tabs and the other tabs keep the screen's reading width.
-    <div className="@container/story flex w-full flex-col gap-4 py-6">
-      <StoryLeaveGuard />
-      <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
-        <StoryHeader context={context} />
-      </div>
-      <Tabs value={tab || defaultTab} onValueChange={(next) => setTab(String(next))} className="gap-4">
-        <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <TabsList>
-            <TabsTrigger value="write">Write</TabsTrigger>
-            <TabsTrigger value="reporting">Reporting</TabsTrigger>
-            <TabsTrigger value="plan">Plan</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
-        </div>
-        {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
-        <TabsContent value="write" keepMounted>
-          <WriteTab context={context} paths={childPaths} />
-        </TabsContent>
-        <TabsContent value="reporting" className="mx-auto w-full max-w-6xl px-4 md:px-8">
-          {Number.isSafeInteger(storyId) && storyId > 0 ? <ReportingTab context={context} /> : <p className="text-sm text-muted-foreground">Save the story once to start reporting on it.</p>}
-        </TabsContent>
-        <TabsContent value="plan" className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <Workspace storyId={storyId}>
-            <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] lg:items-start lg:gap-5">
-              <div className="flex min-w-0 flex-col gap-4">
-                <BriefSection />
-                <ReportingSummaryStrip />
-                <ReportingPlan />
-                <TasksSection />
-                <MediaSection />
-              </div>
-              <aside aria-label="Story context" className="flex min-w-0 flex-col gap-4">
-                <DetailsSection />
-                <ResourcesSection />
-                <StoryNotes context={context} />
-                <ActivitySection />
-              </aside>
-            </div>
-          </Workspace>
-        </TabsContent>
-        <TabsContent value="history" className="mx-auto w-full max-w-5xl px-4 md:px-8">
-          <HistoryTab context={context} />
-        </TabsContent>
-      </Tabs>
-      <p className="mx-auto w-full max-w-5xl px-4 text-xs text-muted-foreground md:px-8">Dates shown in {context.timeZone.replace(/_/g, " ")}</p>
-    </div>
-  );
+  const screen = <StoryFrame context={context} location={location} go={go} saved={saved}>
+    <WriteTab context={context} paths={childPaths} />
+  </StoryFrame>;
 
-  // A brand-new document has no ID until its first save; it has no plan yet either.
-  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story" toaster={false}>{screen}</AdminRoot></div>;
-  const liveProvider = (children: ReactNode) => (
-    <LiveCoverageProvider api={context.api} admin={context.admin || "/admin"} storyId={storyId} timeZone={context.timeZone} readOnly={context.readOnly} userId={Number(user?.id ?? 0)} publishRef={publishRef}>{children}</LiveCoverageProvider>
-  );
+  // A brand-new document has no ID until its first save; it has no plan, context or reporting yet.
+  if (!saved) return <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}><AdminRoot className="byline-story" toaster={false}>{screen}</AdminRoot></div>;
 
   return (
     <div style={{ display: "contents" }} onSubmit={keepSubmitsInByline}>
-    <AdminRoot className="byline-story" toaster={false}>
-      <StoryWorkspaceProvider
-        storyId={storyId}
-        appointmentId={appointmentId}
-        currentUserId={Number(user?.id ?? 0)}
-        storiesUrl={context.admin || "/admin"}
-        client={fetchers.workspace!}
-        editorial={fetchers.editorial!}
-        media={media}
-        articleInForm
-      >
-        {liveProvider(screen)}
-        <WorkspaceAnnouncer />
-      </StoryWorkspaceProvider>
-    </AdminRoot>
+      <AdminRoot className="byline-story" toaster={false}>
+        <StoryWorkspaceProvider
+          storyId={storyId}
+          appointmentId=""
+          currentUserId={Number(user?.id ?? 0)}
+          storiesUrl={context.admin || "/admin"}
+          client={fetchers.workspace!}
+          editorial={fetchers.editorial!}
+          media={media}
+          articleInForm
+        >
+          <LiveCoverageProvider api={context.api} admin={context.admin || "/admin"} storyId={storyId} timeZone={context.timeZone} readOnly={context.readOnly} userId={Number(user?.id ?? 0)} publishRef={publishRef}>
+            {screen}
+          </LiveCoverageProvider>
+          <WorkspaceAnnouncer />
+        </StoryWorkspaceProvider>
+      </AdminRoot>
     </div>
   );
 };
+
+/**
+ * Lays the Story out for the current mode. The article (children) is always
+ * rendered; focused modes hide it with `display: none` rather than unmounting
+ * Payload's fields.
+ */
+function StoryFrame({ context, location, go, saved, children }: { context: StoryScreenContext; location: StoryLocation; go: Go; saved: boolean; children: ReactNode }) {
+  // Measured from the first render; the element exists in every mode.
+  const [frameRef, width] = useElementWidth<HTMLDivElement>();
+  const wide = width >= CONTEXT_RAIL_AT;
+  const [contextOpen, setContextOpen] = useState(location.context);
+  const workspace = useOptionalWorkspace();
+  const headline = useStoryField<string>("headline");
+  const view = saved ? location.view : "story";
+  const back = () => go("story");
+  const openReporting = (capture?: CaptureAction) => {
+    setContextOpen(false);
+    go("reporting", { capture: capture ?? null });
+  };
+  const featured = workspace?.data.story.featuredImage ?? null;
+  const contextContent = saved ? (
+    <WorkspaceGate>
+      <WorkspaceStaleNotice />
+      <StoryContext
+        onOpenReporting={openReporting}
+        canCapture={!context.readOnly}
+        leadImage={featured ? { url: featured.url ?? null, alt: featured.alt ?? null } : null}
+        before={<FeedbackSummary context={context} />}
+      />
+    </WorkspaceGate>
+  ) : null;
+
+  return (
+    <div ref={frameRef} className="@container/story flex w-full flex-col gap-4 py-6" data-story-view={view}>
+      <StoryLeaveGuard />
+      {view === "story" ? (
+        <div className="mx-auto w-full max-w-[1440px] px-4 md:px-8">
+          <StoryHeader context={context} view={view} onView={(next) => go(next)} onOpenContext={saved && !wide ? () => setContextOpen(true) : undefined} />
+        </div>
+      ) : null}
+
+      {/*
+        The article: always mounted, hidden in focused modes. It keeps the same
+        position in the tree whether or not the rail shows, so crossing the
+        width threshold never remounts the editor.
+      */}
+      <div style={view === "story" ? undefined : { display: "none" }} data-story-article="">
+        <div className={wide && contextContent ? "mx-auto grid w-full max-w-[1440px] grid-cols-[minmax(0,1fr)_18.5rem] items-start gap-8 px-4 md:px-8" : undefined}>
+          <div className="min-w-0">{children}</div>
+          {wide && contextContent ? <aside aria-label="Story context" className="sticky top-24 min-w-0 border-l border-border pl-6" data-story-context-rail="">{contextContent}</aside> : null}
+        </div>
+      </div>
+
+      {view === "reporting" ? (
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 md:px-8" data-story-mode="reporting">
+          <FocusedHeader title="Reporting" storyTitle={headline.value ?? ""} onBack={back} />
+          <ReportingTab context={context} capture={location.capture} appointmentId={location.appointment} transcriptId={location.transcript} onTranscript={(transcript) => go("reporting", { transcript })} />
+        </div>
+      ) : null}
+      {view === "history" ? (
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 md:px-8" data-story-mode="history">
+          <FocusedHeader title="History" storyTitle={headline.value ?? ""} onBack={back} />
+          <HistoryTab context={context} />
+          <WorkspaceGate>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <StoryNotes context={context} />
+              <ActivitySection />
+            </div>
+          </WorkspaceGate>
+        </div>
+      ) : null}
+      {view === "review" ? (
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 md:px-8" data-story-mode="review">
+          <ReviewMode context={context} storyTitle={headline.value ?? ""} onBack={back} width={width} />
+        </div>
+      ) : null}
+
+      {saved && !wide ? (
+        <Sheet open={contextOpen && view === "story"} onOpenChange={setContextOpen}>
+          <SheetContent side="right" className="gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
+            <SheetHeader className="border-b border-border pr-12">
+              <SheetTitle>Story context</SheetTitle>
+              <SheetDescription className="sr-only">The angle, reporting, media and checklist for this story.</SheetDescription>
+            </SheetHeader>
+            <div className="p-4">{contextContent}</div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+      {view === "story" ? <p className="mx-auto w-full max-w-[1440px] px-4 text-xs text-muted-foreground md:px-8">Dates shown in {context.timeZone.replace(/_/g, " ")}</p> : null}
+    </div>
+  );
+}
 
 /**
  * Tells the shell whether this story has work that leaving would lose: an
@@ -195,16 +249,3 @@ function StoryLeaveGuard() {
  * Payload's (an ancestor), so it stops here.
  */
 const keepSubmitsInByline = (event: FormEvent) => event.stopPropagation();
-
-/** A tab of workspace sections: loading and error states, and the stale-refresh notice. */
-function Workspace({ storyId, children }: { storyId: number; children: ReactNode }) {
-  if (!Number.isSafeInteger(storyId) || storyId <= 0) return <p className="text-sm text-muted-foreground">Save the story once to start planning it.</p>;
-  return (
-    <WorkspaceGate>
-      <div className="flex flex-col gap-4">
-        <WorkspaceStaleNotice />
-        {children}
-      </div>
-    </WorkspaceGate>
-  );
-}
