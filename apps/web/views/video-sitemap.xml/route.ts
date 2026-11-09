@@ -1,6 +1,6 @@
 import { filterVisibleContentPosts } from "@/lib/content";
 import { buildVideoSitemapXml } from "@/lib/video-sitemap";
-import { getAllPosts, getSiteUrl } from "@/lib/wordpress";
+import { getAllPosts, getSiteUrl } from "@/lib/public-content";
 
 export async function GET() {
   const xml = buildVideoSitemapXml(filterVisibleContentPosts(await getAllPosts()), { siteUrl: getSiteUrl() });

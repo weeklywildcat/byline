@@ -23,7 +23,6 @@
     "jobs:scheduled": "payload jobs:run --cron '* * * * *' --queue default --limit 10",
     "jobs:reporting": "payload jobs:run --cron '*/10 * * * * *' --queue reporting --limit 1",
     "publication-media:requeue": "payload run scripts/requeue-publication-media.ts",
-    "import:wordpress": "payload run scripts/import-wordpress-native.ts --",
     "publication:snapshot:prepare": "payload run scripts/publication-snapshot.ts prepare",
     "publication:snapshot:status": "payload run scripts/publication-snapshot.ts status",
     "benchmark:publication-media": "node --import tsx scripts/benchmark-publication-media.ts",
@@ -35,8 +34,7 @@
     "test:login:browser": "playwright test --config playwright.login.config.ts",
     "migrate:check": "node scripts/check-migrations.mjs",
     "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
-    "test:people:browser": "playwright test --config playwright.people.config.ts",
-    "provision:wordpress-access": "payload run scripts/provision-wordpress-access.ts --"
+    "test:people:browser": "playwright test --config playwright.people.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

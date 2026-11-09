@@ -1,7 +1,7 @@
 import { nativeStory } from "./native-snapshot";
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
-import { getPostHref, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
+import { getPostHref, getPostRouteParts, type ArchivePost } from "@/lib/public-content";
 
 const NEWS_NAMESPACE = "http://www.google.com/schemas/sitemap-news/0.9";
 const SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9";
@@ -26,7 +26,7 @@ type NewsSitemapOptions = {
   now: number;
 };
 
-function publishedAt(post: WordPressPost, timeZone: string) {
+function publishedAt(post: ArchivePost, timeZone: string) {
   const native = nativeStory(post.id);
   if (native) return new Date(native.publishedAt);
   return getWordPressInstant({ gmt: post.date_gmt, local: post.date }, timeZone);
@@ -36,7 +36,7 @@ function publishedAt(post: WordPressPost, timeZone: string) {
  * `posts` must already be limited to publicly visible stories. Only those
  * published within the news window, with a canonical article URL, are listed.
  */
-export function buildNewsSitemapXml(posts: WordPressPost[], { siteUrl, publicationName, timeZone, now }: NewsSitemapOptions) {
+export function buildNewsSitemapXml(posts: ArchivePost[], { siteUrl, publicationName, timeZone, now }: NewsSitemapOptions) {
   const urls = posts
     .flatMap((post) => {
       const published = publishedAt(post, timeZone);

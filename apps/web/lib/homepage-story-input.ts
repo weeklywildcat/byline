@@ -3,7 +3,7 @@ import type { BylinePublicationConfig } from "@byline/core";
 import { isAthleteSpotlightPost, isSpecialCoveragePost } from "@/lib/content";
 import { toAthleteSpotlightView, toStoryView } from "@/lib/story-view";
 import { getPublicationConfig } from "@/lib/publication";
-import { getFeaturedMedia, getPostCategories, type WordPressCoverage, type WordPressPost } from "@/lib/wordpress";
+import { getFeaturedMedia, getPostCategories, type ArchiveCoverage, type ArchivePost } from "@/lib/public-content";
 
 /**
  * The static site's adapter into the canonical homepage resolver.
@@ -13,7 +13,7 @@ import { getFeaturedMedia, getPostCategories, type WordPressCoverage, type WordP
  * shape; from this point on both hosts run the identical selection and
  * resolution code.
  */
-export function toHomepageStoryInput(post: WordPressPost): HomepageStoryInput {
+export function toHomepageStoryInput(post: ArchivePost): HomepageStoryInput {
   return {
     id: post.id,
     sticky: post.sticky === true,
@@ -30,7 +30,7 @@ export function toHomepageStoryInput(post: WordPressPost): HomepageStoryInput {
   };
 }
 
-export function toHomepageStoryInputs(posts: readonly WordPressPost[]): HomepageStoryInput[] {
+export function toHomepageStoryInputs(posts: readonly ArchivePost[]): HomepageStoryInput[] {
   return posts.map(toHomepageStoryInput);
 }
 
@@ -39,7 +39,7 @@ export function toHomepageStoryInputs(posts: readonly WordPressPost[]): Homepage
  * contract. The resolver never receives titles, descriptions, artwork, or any
  * other Coverage presentation data.
  */
-export function toHomepageCoverageInputs(coverages: readonly WordPressCoverage[]): HomepageCoverageInput[] {
+export function toHomepageCoverageInputs(coverages: readonly ArchiveCoverage[]): HomepageCoverageInput[] {
   return coverages.flatMap((coverage) => {
     const id = typeof coverage.id === "number" ? coverage.id : Number(coverage.id);
     if (!Number.isInteger(id) || id <= 0) return [];

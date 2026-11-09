@@ -97,6 +97,6 @@ export const People: CollectionConfig = {
       access: { read: editorsOnlyField }
     },
     legacyIdField(),
-    legacyIdField("legacyGuestId", "WordPress guest ID")
+    legacyIdField("legacyGuestId", "Source guest ID")
   ]
 };

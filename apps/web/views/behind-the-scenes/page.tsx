@@ -3,7 +3,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 import { getBehindTheScenesPosts } from "@/lib/content";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
-import { getAllPosts } from "@/lib/wordpress";
+import { getAllPosts } from "@/lib/public-content";
 
 async function getPosts() {
   return getBehindTheScenesPosts(await getAllPosts());

@@ -4,7 +4,7 @@ import { formatVideoDuration, youTubeDefaultThumbnailUrl, youTubeEmbedUrl } from
 import type { ArticleVideoView, StoryVideoBadgeView } from "@byline/ui";
 import { stripHtml } from "@/lib/format";
 import { absoluteUrl, getContributorPersonId, getNewsArticleId, getNewsArticleSchema, getOrganizationId, getPostTimestamps, getSeoDescription } from "@/lib/seo";
-import { getPostContributors, getPostHref, getPostPrimaryVideo, type WordPressPost } from "@/lib/wordpress";
+import { getPostContributors, getPostHref, getPostPrimaryVideo, type ArchivePost } from "@/lib/public-content";
 
 /**
  * A video story's one video, as every public surface describes it. The page's
@@ -41,7 +41,7 @@ function limit(value: string) {
 }
 
 /** Null for an article, including one with YouTube embeds in its body. */
-export function getVideoStoryMetadata(post: WordPressPost): VideoStoryMetadata | null {
+export function getVideoStoryMetadata(post: ArchivePost): VideoStoryMetadata | null {
   const native = nativeStory(post.id);
   if (native) return nativeVideoMetadata(native);
   const video = getPostPrimaryVideo(post);
@@ -66,23 +66,23 @@ export function getVideoStoryMetadata(post: WordPressPost): VideoStoryMetadata |
 }
 
 /** The player a video story's article view renders above its body. */
-export function getArticleVideoView(post: WordPressPost): ArticleVideoView | null {
+export function getArticleVideoView(post: ArchivePost): ArticleVideoView | null {
   const video = getVideoStoryMetadata(post);
   return video ? { videoId: video.videoId, embedUrl: video.embedUrl, title: video.name, duration: video.durationLabel } : null;
 }
 
 /** The small Video label on a video story's card. */
-export function getStoryVideoBadge(post: WordPressPost): StoryVideoBadgeView | null {
+export function getStoryVideoBadge(post: ArchivePost): StoryVideoBadgeView | null {
   const video = getVideoStoryMetadata(post);
   return video ? { duration: video.durationLabel } : null;
 }
 
-export function getVideoObjectId(post: WordPressPost) {
+export function getVideoObjectId(post: ArchivePost) {
   return `${absoluteUrl(getPostHref(post))}#video`;
 }
 
 /** Google's `VideoObject` for a video story; null for an article. */
-export function getVideoObjectSchema(post: WordPressPost) {
+export function getVideoObjectSchema(post: ArchivePost) {
   const video = getVideoStoryMetadata(post);
   if (!video) return null;
   // The same Person entities the NewsArticle names; one-off guests have no entity to point at.
@@ -109,7 +109,7 @@ export function getVideoObjectSchema(post: WordPressPost) {
  * The article's JSON-LD. A video story keeps its NewsArticle and adds the
  * VideoObject beside it in one graph, each pointing at the other.
  */
-export function getArticleJsonLd(post: WordPressPost, options: { articleBody?: boolean } = {}) {
+export function getArticleJsonLd(post: ArchivePost, options: { articleBody?: boolean } = {}) {
   const article = getNewsArticleSchema(post, options);
   const video = getVideoObjectSchema(post);
   if (!video) return article;
@@ -118,6 +118,6 @@ export function getArticleJsonLd(post: WordPressPost, options: { articleBody?: b
 }
 
 /** Published video stories, newest first as given; `posts` must already be publicly visible. */
-export function getVideoStories(posts: WordPressPost[]) {
+export function getVideoStories(posts: ArchivePost[]) {
   return posts.filter((post) => getVideoStoryMetadata(post) !== null);
 }

@@ -15,7 +15,7 @@ import {
   getContributorSocialLinks,
   getPostsByContributor,
   isGuestContributor
-} from "@/lib/wordpress";
+} from "@/lib/public-content";
 
 type AuthorPageProps = {
   params: Promise<{

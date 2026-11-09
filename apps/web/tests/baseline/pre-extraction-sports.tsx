@@ -1,7 +1,7 @@
 import { HomepageStory } from "@/components/HomepageStory";
 import { SportsSchedulePanel } from "@/components/SportsSchedulePanel";
 import type { SportsGame } from "@/lib/headless";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 import { SportsAthleteFeature } from "./pre-extraction-athlete-feature";
 
 // The pre-extraction Sports section, frozen.
@@ -17,8 +17,8 @@ import { SportsAthleteFeature } from "./pre-extraction-athlete-feature";
 // Changed deliberately: the section's stories no longer repeat the "Sports" label.
 
 export type PreExtractionSportsProps = {
-  fieldPosts: WordPressPost[];
-  athleteSpotlightPost: WordPressPost | null;
+  fieldPosts: ArchivePost[];
+  athleteSpotlightPost: ArchivePost | null;
   recentScores: SportsGame[];
   upcomingGames: SportsGame[];
   sportsFeatureEnabled: boolean;

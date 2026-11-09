@@ -3,7 +3,6 @@ import { HomepagePackages, ThisWeekCard as SharedThisWeekCard, packageHeadingId 
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
-import { PollWidget } from "@/components/PollWidget";
 import { optionalBuildData } from "@/lib/build-data";
 import { getNativeSnapshot } from "@/lib/native-snapshot";
 import { filterPublicHomepagePosts, getBehindTheScenesPosts } from "@/lib/content";
@@ -19,7 +18,7 @@ import {
 import { toCalendarEntries } from "@/lib/homepage-packages";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildPageMetadata, getHomepageTitle, getOrganizationSchema, getWebsiteSchema, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
-import { getAllPosts, getAllPublicCoverages } from "@/lib/wordpress";
+import { getAllPosts, getAllPublicCoverages } from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 export const metadata: Metadata = buildPageMetadata({
@@ -60,7 +59,6 @@ export default async function HomePage() {
         theme={publication.appearance.theme}
         slots={{
           railLimiter: <HomepageHeroRailLimiter />,
-          poll: ({ packageId }) => <PollWidget headingId={packageHeadingId(`${packageId}-poll`, "homepage-poll-heading")} inputName={`${packageId}-poll`} />,
           calendar: ({ package: resolvedPackage, packageId }) => "latest" in resolvedPackage ? <SharedThisWeekCard entries={toCalendarEntries(sportsSchedule.schoolEvents, sportsSchedule.upcomingGames, resolvedPackage.utility.calendarLimit ?? 3)} heading={resolvedPackage.utility.calendarHeading ?? "At NSHS"} scheduleHref="/sports/schedule/" headingId={packageHeadingId(`${packageId}-calendar`, "this-week-heading")} /> : null,
           newsletter: ({ package: resolvedPackage, packageId }) => "label" in resolvedPackage ? <NewsletterSignupForm headingId={packageHeadingId(`${packageId}-heading`, "article-newsletter-heading")} heading={resolvedPackage.heading} showLabel={resolvedPackage.presentation.showLabel} /> : null
         }}
@@ -75,7 +73,7 @@ export async function getHomepagePageData() {
   const requirements = getHomepageDataRequirements(homeDesign);
   const [allPosts, coverages, sportsSchedule] = await Promise.all([
     getAllPosts(),
-    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, []),
+    optionalBuildData("public snapshot: coverage", getAllPublicCoverages, []),
     getHomepageSportsSchedule(requirements)
   ]);
   const websiteSchema = getWebsiteSchema();

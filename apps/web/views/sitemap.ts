@@ -12,18 +12,18 @@ import {
   getAllPublicContributors,
   getAllPublicCoverages,
   getSiteUrl
-} from "@/lib/wordpress";
+} from "@/lib/public-content";
 
 export default async function sitemap(): Promise<SitemapEntry[]> {
   const publication = getPublicationConfig();
-  const [allPosts, authors, categories, wordpressPages, coverages] = await Promise.all([
-    requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
-    requireBuildData("/wp-json/wp/v2/users", getAllAuthors),
-    requireBuildData("/wp-json/wp/v2/categories", getAllCategories),
-    requireBuildData("/wp-json/wp/v2/pages", getAllPages),
-    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
+  const [allPosts, authors, categories, archivePages, coverages] = await Promise.all([
+    requireBuildData("public snapshot: posts", getAllPosts),
+    requireBuildData("public snapshot: users", getAllAuthors),
+    requireBuildData("public snapshot: categories", getAllCategories),
+    requireBuildData("public snapshot: pages", getAllPages),
+    optionalBuildData("public snapshot: coverage", getAllPublicCoverages, [])
   ]);
-  const contributors = await optionalBuildData("/wp-json/byline/v1/contributors", getAllPublicContributors, authors);
+  const contributors = await optionalBuildData("public snapshot: contributors", getAllPublicContributors, authors);
 
   return buildSitemapEntries({
     siteUrl: getSiteUrl(),
@@ -31,7 +31,7 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
     posts: filterVisibleContentPosts(allPosts),
     categories: categories.filter((category) => !isHiddenCategory(category)),
     sectionSlugs: PUBLIC_SECTIONS.map((section) => section.slug),
-    pages: wordpressPages,
+    pages: archivePages,
     contributors,
     coverages,
     features: { sports: publication.features.sports }

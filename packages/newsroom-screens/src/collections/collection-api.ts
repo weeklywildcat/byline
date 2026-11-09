@@ -16,8 +16,7 @@ import type {
 
 /**
  * What the Collection screens need from a host. Semantic operations, never
- * addresses: WordPress implements them over `/byline/v1/editorial/collections`
- * (wordpress-plugin/src/collections/wordpress-collection-api.ts), Payload
+ * addresses: the newsroom implements them
  * over `/api/byline/collections` (apps/newsroom). The screens know neither.
  */
 export type CollectionApi = {

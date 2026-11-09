@@ -137,7 +137,7 @@ export type WorkflowStage = WorkflowStatusDefinition & {
 export const DATE_FIELD_LABELS = {
   deadline: "Deadline",
   plannedPublication: "Planned publication",
-  scheduled: "WordPress scheduled",
+  scheduled: "Scheduled to publish",
   published: "Published"
 } as const;
 

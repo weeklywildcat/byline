@@ -241,7 +241,7 @@ const server = await serve();
 const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 process.env.BYLINE_NEWSROOM_URL = origin;
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["DATABASE_URL", "PAYLOAD_SECRET", "BYLINE_CONTENT_MODE", "BYLINE_BUILD_SNAPSHOT_FILE", "BYLINE_BUILD_SNAPSHOT_URL", "BYLINE_PUBLICATION_FILE", "BYLINE_PUBLICATION_JSON", "NODE_OPTIONS", "NODE_ENV"].includes(key)).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-Object.assign(env, { BYLINE_CONTENT_MODE: "weekly-wildcat-fixture", BYLINE_STORY_PRESENTATION_FIXTURES: "1", BYLINE_NEWSROOM_BUILD_URL: `${origin}/api/byline/build`, BYLINE_BUILD_TOKEN: TOKEN, BYLINE_NEWSROOM_URL: origin, BYLINE_LEGACY_REST_BUILD: "0" });
+Object.assign(env, { BYLINE_CONTENT_MODE: "weekly-wildcat-fixture", BYLINE_STORY_PRESENTATION_FIXTURES: "1", BYLINE_NEWSROOM_BUILD_URL: `${origin}/api/byline/build`, BYLINE_BUILD_TOKEN: TOKEN, BYLINE_NEWSROOM_URL: origin });
 rmSync(outputRoot, { recursive: true, force: true });
 mkdirSync(outputRoot, { recursive: true });
 

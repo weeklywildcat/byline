@@ -8,7 +8,6 @@ if (process.argv[2] === "start") {
   const forbidden = await readFile(path.join(directory, "forbidden-cms-requests.ndjson"), "utf8").catch(() => "");
   if (forbidden.trim()) throw new Error(`Snapshot build attempted forbidden CMS requests, including a potentially swallowed failure: ${forbidden}`);
   const phases = await load("frontend-phases.json");
-  const media = await load("media-phases.json").catch(() => null);
   const postbuild = await load("postbuild-start.json");
   async function size(directory) {
     let bytes = 0;
@@ -19,7 +18,7 @@ if (process.argv[2] === "start") {
     }
     return bytes;
   }
-  const report = { ...phases, media, astroExcludingMediaMs: phases.astroMs - (media?.totalMs ?? 0), postbuildMs: Date.now() - postbuild.startedAt, totalFrontendMs: Date.now() - phases.totalStartedAt, outputBytes: await size("out") };
+  const report = { ...phases, postbuildMs: Date.now() - postbuild.startedAt, totalFrontendMs: Date.now() - phases.totalStartedAt, outputBytes: await size("out") };
   await writeFile(path.join(directory, "performance.json"), JSON.stringify(report, null, 2) + "\n");
   console.log(`[byline] ${report.dataMode}: ${report.totalFrontendMs}ms, ${report.cmsRequests ?? "unmeasured"} CMS requests, ${report.routes.rendered} rendered / ${report.routes.restored} restored, ${report.outputBytes} output bytes`);
 }

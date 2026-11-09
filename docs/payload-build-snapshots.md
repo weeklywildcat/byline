@@ -17,9 +17,6 @@ Published Payload records
   → verify the static export
 ```
 
-Payload Snapshot v1 was scaffolding and is retired. The WordPress publication
-continues to use its separate build input until cutover.
-
 ## Revision semantics
 
 `byline_publication_state` has one row. It stores the current public content
@@ -126,8 +123,7 @@ continues normally and no deploy job is queued.
 
 Set `BYLINE_NEWSROOM_BUILD_URL` to the newsroom's build API root and
 `BYLINE_BUILD_TOKEN` to the shared credential. `BYLINE_EXPECTED_REVISION`
-can set a minimum public revision. An offline file supplied with the Payload
-build URL is validated against the same native contract.
+can set a minimum public revision. An offline file supplied with `BYLINE_BUILD_SNAPSHOT_FILE` is validated against the same contract. If it names prepared media, also configure the build media endpoint and token.
 
 Astro renders from the local snapshot and the build network assertion rejects
 any newsroom request in that process. After rendering, the build wrapper
@@ -178,7 +174,7 @@ sizes the block declares. Live Preview retains its private image sources.
 
 Related Coverage uses projected Story facts and prepared thumbnails. A Poll
 block shows the public question, choices, availability and results when
-released. Poll voting transport is Phase 11.
+released. Online voting is currently unavailable.
 
 A Repository Interactive stores its stable key, title and description. The
 repository registry supplies the static fallback. The article loads the

@@ -1,10 +1,6 @@
 import { appendFileSync } from "node:fs";
 import path from "node:path";
-// Installed in the renderer process only. The parent acquired and verified the
-// snapshot (WordPress pointer + artifact, or the Payload newsroom's completed
-// snapshot / direct-source recovery). Any hidden CMS request during rendering
-// is a build failure: WordPress REST, the Payload newsroom's origin and any
-// Byline newsroom API path are all forbidden.
+// Public rendering must read the verified local snapshot, never the newsroom.
 const originalFetch = globalThis.fetch;
 const newsroomOrigins = [process.env.BYLINE_NEWSROOM_BUILD_URL, process.env.BYLINE_NEWSROOM_BUILD_MEDIA_URL]
   .flatMap((value) => {
@@ -15,7 +11,6 @@ const newsroomOrigins = [process.env.BYLINE_NEWSROOM_BUILD_URL, process.env.BYLI
     }
   });
 function forbidden(url) {
-  if (/\/wp-json(?:\/|\?|$)/i.test(url)) return true;
   if (/\/api\/byline(?:\/|\?|$)/i.test(url)) return true;
   try {
     return newsroomOrigins.includes(new URL(url).origin);

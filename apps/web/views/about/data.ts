@@ -2,7 +2,7 @@ import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { formatDisplayDate, stripHtml } from "@/lib/format";
 import { getSportsArchiveHref } from "@/lib/sports-archive";
-import { getPresentationMediaUrl, getResponsiveImageProps, type ResponsiveImageProps } from "@/lib/media";
+import { getResponsiveImageProps, type ResponsiveImageProps } from "@/lib/media";
 import {
   getAllPages,
   getAllPosts,
@@ -13,9 +13,9 @@ import {
   getFeaturedMedia,
   getMediaCredit,
   getPostHref,
-  type WordPressPage,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchivePage,
+  type ArchivePost
+} from "@/lib/public-content";
 
 export type AboutStory = { title: string; href: string; date: string };
 
@@ -47,14 +47,14 @@ export type AboutData = {
   photo: (slug: string, alt: string, sizes: string) => AboutPhoto | null;
 };
 
-function toStory(post: WordPressPost): AboutStory {
+function toStory(post: ArchivePost): AboutStory {
   return { title: stripHtml(post.title.rendered), href: getPostHref(post), date: post.date };
 }
 
 // The sports archive pages are fixed records, one heading per season and one
 // anchor per game. Counting them here keeps the figures honest without a second
 // copy of the numbers to maintain.
-function getArchiveStats(pages: WordPressPage[]): AboutStats["archive"] {
+function getArchiveStats(pages: ArchivePage[]): AboutStats["archive"] {
   const sportPages = pages.filter((page) => {
     const key = page.bylinePage?.sportsArchive?.key;
     return key && key !== "index";
@@ -83,9 +83,9 @@ function getArchiveStats(pages: WordPressPage[]): AboutStats["archive"] {
 
 export async function getAboutData(): Promise<AboutData> {
   const [allPosts, contributors, pages] = await Promise.all([
-    requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
-    requireBuildData("/wp-json/byline/v1/contributors", getAllPublicContributors),
-    optionalBuildData("/wp-json/wp/v2/pages", getAllPages, [] as WordPressPage[])
+    requireBuildData("public snapshot: posts", getAllPosts),
+    requireBuildData("public snapshot: contributors", getAllPublicContributors),
+    optionalBuildData("public snapshot: pages", getAllPages, [] as ArchivePage[])
   ]);
 
   const posts = filterVisibleContentPosts(allPosts).sort((a, b) => b.date.localeCompare(a.date));
@@ -99,7 +99,7 @@ export async function getAboutData(): Promise<AboutData> {
         name: contributor.name,
         role: getContributorRole(contributor),
         href: getContributorHref(contributor),
-        photo: photo?.url ? { url: getPresentationMediaUrl(photo.url), width: photo.width ?? null, height: photo.height ?? null } : null
+        photo: photo?.url ? { url: photo.url, width: photo.width ?? null, height: photo.height ?? null } : null
       };
     });
 

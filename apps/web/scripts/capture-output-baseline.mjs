@@ -42,7 +42,7 @@ for (const file of files) {
   if (file.endsWith(".html")) sizes.html += bytes;
   else if (file.endsWith(".js")) sizes.js += bytes;
   else if (file.endsWith(".css")) sizes.css += bytes;
-  if (file.includes(`${path.sep}_wordpress-media${path.sep}`)) sizes.media += bytes;
+  if (file.includes(`${path.sep}_byline${path.sep}media${path.sep}`)) sizes.media += bytes;
 }
 await mkdir(destination, { recursive: true });
 await Promise.all([

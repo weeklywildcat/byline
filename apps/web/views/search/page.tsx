@@ -5,9 +5,8 @@ import { filterVisibleContentPosts, getPrimaryVisibleCategory, getPublicTopicTag
 import { formatDisplayDate, stripHtml } from "@/lib/format";
 import { buildPageMetadata } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
-import { getBylineRestUrl } from "@/lib/byline-rest";
 import { toSearchFacetValue } from "@/lib/search";
-import { getPostContributors, getPostHref } from "@/lib/wordpress";
+import { getPostContributors, getPostHref } from "@/lib/public-content";
 import { getStoryVideoBadge } from "@/lib/story-video";
 
 const publication = getPublicationConfig();
@@ -86,7 +85,7 @@ export async function getSearchPageProps() {
   return {
     items,
     publicationName: publication.identity.shortName,
-    searchGapEndpoint: getBylineRestUrl("search-gaps")
+    searchGapEndpoint: process.env.NEXT_PUBLIC_SEARCH_GAP_ENDPOINT
   };
 }
 

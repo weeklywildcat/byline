@@ -1,7 +1,7 @@
 import type { ArticleStoryCardView } from "@byline/ui";
 import { articleStoryCard, getArticleReadingTime, getCoverageStories, isCoverageComplete } from "@/lib/article-presentation";
 import { formatDisplayDate } from "@/lib/format";
-import { getContributorName, getCoverageHref, getPostContributors, getPostHref, type WordPressCoverage, type WordPressPost } from "@/lib/wordpress";
+import { getContributorName, getCoverageHref, getPostContributors, getPostHref, type ArchiveCoverage, type ArchivePost } from "@/lib/public-content";
 
 export type CoverageStoryView = ArticleStoryCardView & {
   /** Reading order (Part 1, Part 2…) for a series. */
@@ -13,7 +13,7 @@ export type CoverageStoryView = ArticleStoryCardView & {
 /** Everything the coverage page and its card render, with no renderer imports. */
 export type CoveragePresentation = {
   id: number | string;
-  format: WordPressCoverage["format"];
+  format: ArchiveCoverage["format"];
   title: string;
   href: string;
   description: string;
@@ -23,20 +23,20 @@ export type CoveragePresentation = {
   complete: boolean;
   /** "4 parts", "2 parts so far" or "7 stories". */
   countLabel: string;
-  artwork: WordPressCoverage["artwork"];
+  artwork: ArchiveCoverage["artwork"];
   stories: CoverageStoryView[];
   /** The first part, for "Start reading". */
   startHref: string | null;
 };
 
-function bylineNames(post: WordPressPost) {
+function bylineNames(post: ArchivePost) {
   const names = getPostContributors(post).map(getContributorName).filter(Boolean);
   if (names.length === 0) return "";
   if (names.length === 1) return names[0];
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-export function getCoverageCountLabel(format: WordPressCoverage["format"], count: number, complete: boolean) {
+export function getCoverageCountLabel(format: ArchiveCoverage["format"], count: number, complete: boolean) {
   if (format === "series") {
     const parts = `${count} ${count === 1 ? "part" : "parts"}`;
     return complete || count === 0 ? parts : `${parts} so far`;
@@ -44,7 +44,7 @@ export function getCoverageCountLabel(format: WordPressCoverage["format"], count
   return `${count} ${count === 1 ? "story" : "stories"}`;
 }
 
-export function buildCoveragePresentation(coverage: WordPressCoverage, allPosts: readonly WordPressPost[]): CoveragePresentation {
+export function buildCoveragePresentation(coverage: ArchiveCoverage, allPosts: readonly ArchivePost[]): CoveragePresentation {
   const memberIds = new Set(coverage.stories.map((story) => story.id));
   const posts = getCoverageStories(coverage, new Map(allPosts.filter((post) => memberIds.has(post.id)).map((post) => [post.id, post])));
   const complete = isCoverageComplete(coverage);

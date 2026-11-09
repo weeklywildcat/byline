@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArticleView, HeroReveal, HeroRevealContent, ImmersiveArticleView, type ArticlePresentation, type ArticleViewSlots } from "@byline/ui";
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { getPostContributors, getPostStoryPresentation, isGuestContributor, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
+import { getPostContributors, getPostStoryPresentation, isGuestContributor, type ArchiveAuthor, type ArchivePost } from "@/lib/public-content";
 import { defineStoryPresentation, defineVisualStory, findStoryPresentation, fixtureStoryPresentations, isVisualStory, resolveStoryPresentation, storyPresentationRegistry, storyPresentations } from "@byline/story-presentations";
 import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
 import { getNewsArticleSchema } from "@/lib/seo";
@@ -25,7 +25,7 @@ function basePresentation(overrides: Partial<ArticlePresentation> = {}): Article
       post,
       allPosts: publicEditorialPosts,
       contributors,
-      author: contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? null
+      author: contributors.find((contributor): contributor is ArchiveAuthor => !isGuestContributor(contributor)) ?? null
     }),
     image: {
       src: "/media/lead-1600.jpg",
@@ -116,7 +116,7 @@ describe("a standard story", () => {
 });
 
 describe("WordPress story presentation settings", () => {
-  const post = (byline?: Record<string, unknown>, legacy?: Record<string, unknown>) => ({ ...publicEditorialPosts[0], ...(byline ? { byline } : {}), ...(legacy ? { weeklyWildcat: legacy } : {}) }) as unknown as WordPressPost;
+  const post = (byline?: Record<string, unknown>, legacy?: Record<string, unknown>) => ({ ...publicEditorialPosts[0], ...(byline ? { byline } : {}), ...(legacy ? { weeklyWildcat: legacy } : {}) }) as unknown as ArchivePost;
 
   it("reads the choice from the Byline settings, then the legacy alias", () => {
     expect(getPostStoryPresentation(post({ presentation: "immersive", immersiveAlignment: "center" }))).toEqual({ presentation: "immersive", immersiveAlignment: "center" });
@@ -358,7 +358,7 @@ describe("a flagship visual story", () => {
 });
 
 describe("structured data for a flagship visual story", () => {
-  const post = { ...publicEditorialPosts[0], content: { rendered: "<p>The WordPress text edition.</p>" } } as WordPressPost;
+  const post = { ...publicEditorialPosts[0], content: { rendered: "<p>The WordPress text edition.</p>" } } as ArchivePost;
 
   it("claims the WordPress body only when the page shows it", () => {
     expect(getNewsArticleSchema(post).articleBody).toBe("The WordPress text edition.");

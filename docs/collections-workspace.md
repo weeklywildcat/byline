@@ -6,10 +6,7 @@ It coordinates stories, a team, shared reporting and work. **Coverage** and
 newsroom destinations or a second authority. The newsroom product is Collections;
 the public site keeps its `coverages` dataset and `/coverage/` URLs.
 
-This document describes the implemented Payload slice. WordPress remains the
-production control plane until cutover; [collections.md](collections.md) describes
-its storage and legacy migration. [payload-migration.md](payload-migration.md)
-tracks the wider migration and the work still needed for public snapshot delivery.
+Collections are managed in Payload and projected into Snapshot v2 when public presentation is enabled.
 
 ## Ownership and schema
 
@@ -23,7 +20,7 @@ with `overrideAccess: false`.
 
 | Record | Stored data and relationships |
 | --- | --- |
-| `collections` | Required `name`, `type`, `status`; private `brief`; `lead` and `members` referencing newsroom users; `startDate` / `endDate`; ordered `stories` membership; nested `publicPresentation`; `createdBy`, legacy WordPress ID and Payload timestamps. |
+| `collections` | Required `name`, `type`, `status`; private `brief`; `lead` and `members` referencing newsroom users; `startDate` / `endDate`; ordered `stories` membership; nested `publicPresentation`; `createdBy`, historical import ID and Payload timestamps. |
 | `collection-interviews` | Required parent `collection` and `interviewee`; status and timing; location; interviewer users; linked member stories; notes, follow-ups, protected `privateContact`; linked resources; completion/creator metadata. |
 | `collection-resources` | Required label and kind; web URL and/or Media reference; links to multiple Collections and stories; creator metadata. |
 | `tasks` | The existing task engine gains optional `collection`; `story` becomes optional, with at least one context required. No separate Collection task engine. |
@@ -200,11 +197,7 @@ there is no short preview limit that truncates the public order.
 Status maps Planning → Upcoming, Active → Active, Wrapping up → Past and
 Archived → Archived. The overview is normalized plain text with
 `overviewParagraphs`; the renderer escapes it. Artwork is ID/alt/dimensions and
-stories are identities/positions here. Wiring these into full public snapshots
-and public artwork renditions remains a later migration phase. This function is
-not a new public endpoint, and Payload-only public settings do not publish the
-production WordPress site. View coverage is supplied only for an imported
-public Collection with a configured site URL.
+stories are identities and positions. The snapshot adds the prepared public artwork and full public story references. The public URL becomes available after the next deployment.
 
 The committed migration `20261106_233140_collections` replaces the old thin
 Payload `coverages` authority: each record keeps its ID, legacy ID and timestamps;
@@ -217,17 +210,10 @@ sequence advances beyond retained IDs. Old tables/relations are dropped, and
 compatibility dataset name. The down migration reconstructs the old public shape;
 it cannot preserve all new private reporting data, so it is not a lossless rollback.
 
-This database migration is distinct from WordPress's existing idempotent legacy
-`byline_coverage` → `byline_collection` migration, which retains its source records
-and old Planning bookmark compatibility ([collections.md](collections.md)). A
-general WordPress-to-Payload import and public-site cutover remain separate work.
-
 ## Validation
 
 `apps/newsroom/tests/integration/collections.test.ts` covers the semantic API,
 roles/privacy, stale edits, membership, tasks, reporting/resources, Calendar/Home
 and public compatibility projection on real PostgreSQL. The shell tests cover
 routes, width/composition, pinned/current switcher behavior, navigation state and
-the server navigation's exact-match flag. Shared Calendar/Media regression
-tests live under `packages/newsroom-screens/tests`; Collection model/UI tests
-remain in the existing WordPress test suite.
+the server navigation's exact-match flag. Shared Calendar and Media regressions live under `packages/newsroom-screens/tests`.

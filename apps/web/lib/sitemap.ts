@@ -18,25 +18,25 @@ import {
   getPostLiveCoverage,
   getPostRouteParts,
   isGuestContributor,
-  type WordPressCategory,
-  type WordPressContributor,
-  type WordPressCoverage,
-  type WordPressPage,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchiveCategory,
+  type ArchiveContributor,
+  type ArchiveCoverage,
+  type ArchivePage,
+  type ArchivePost
+} from "@/lib/public-content";
 
 export type SitemapInput = {
   /** Public origin without a trailing slash. */
   siteUrl: string;
   timeZone: string;
   /** Only stories that are publicly visible (the caller applies the visibility filter). */
-  posts: WordPressPost[];
-  categories: WordPressCategory[];
+  posts: ArchivePost[];
+  categories: ArchiveCategory[];
   /** Section slugs in display order; categories outside this list are appended. */
   sectionSlugs: string[];
-  pages: WordPressPage[];
-  contributors: WordPressContributor[];
-  coverages: WordPressCoverage[];
+  pages: ArchivePage[];
+  contributors: ArchiveContributor[];
+  coverages: ArchiveCoverage[];
   features: { sports: boolean };
 };
 
@@ -62,12 +62,12 @@ function latest(dates: Array<Date | undefined>) {
   return dates.reduce<Date | undefined>((current, date) => (date && (!current || date > current) ? date : current), undefined);
 }
 
-function contributorKey(contributor: WordPressContributor) {
+function contributorKey(contributor: ArchiveContributor) {
   return `${isGuestContributor(contributor) ? "guest" : "user"}:${contributor.id}`;
 }
 
 /** Whether an author page has anything to show. Pages without stories are marked noindex, so they are not listed. */
-export function contributorIsIndexable(contributor: WordPressContributor, posts: WordPressPost[]) {
+export function contributorIsIndexable(contributor: ArchiveContributor, posts: ArchivePost[]) {
   const key = contributorKey(contributor);
 
   return contributorHasProfilePage(contributor) && posts.some((post) => getPostContributors(post).some((candidate) => contributorKey(candidate) === key));

@@ -4,13 +4,13 @@ import { buildRssFeed } from "@/lib/feed";
 import { buildNewsSitemapXml, NEWS_RECENCY_WINDOW_MS } from "@/lib/news-sitemap";
 import { buildSitemapEntries } from "@/lib/sitemap";
 import { getCategorySeoDescription, isUsableCategoryDescription } from "@/lib/sections";
-import { excludeInternalPages, getPageIndexing, type WordPressPage } from "@/lib/wordpress";
+import { excludeInternalPages, getPageIndexing, type ArchivePage } from "@/lib/public-content";
 import { author, category, post } from "@/tests/support/seo-fixtures";
 
 const ORIGIN = "https://weeklywildcat.com";
 const NOW = Date.parse("2026-10-15T12:00:00Z");
 
-function page(slug: string, title: string, bylinePage?: WordPressPage["bylinePage"]): WordPressPage {
+function page(slug: string, title: string, bylinePage?: ArchivePage["bylinePage"]): ArchivePage {
   return {
     id: slug.length, slug, date: "2026-07-01T10:00:00", modified: "2026-07-02T10:00:00", modified_gmt: "2026-07-02T14:00:00",
     title: { rendered: title }, excerpt: { rendered: "" }, content: { rendered: "" }, ...(bylinePage ? { bylinePage } : {})

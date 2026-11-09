@@ -1,5 +1,5 @@
 import { sql } from "@payloadcms/db-postgres";
-import { wordpressLocalDateTime } from "@byline/content";
+import { publicationLocalDateTime } from "@byline/content";
 import { APIError, commitTransaction, initTransaction, killTransaction } from "payload";
 import { atLeast, sameId } from "../access/user";
 import { localToInstant } from "../domain/dates";
@@ -28,7 +28,7 @@ function localTime(ctx: ScreenContext, value: unknown) {
     if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return new Date(value).toISOString();
     if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)) throw new Error();
     const instant = localToInstant(value, ctx.timeZone);
-    if (!wordpressLocalDateTime(instant, ctx.timeZone).startsWith(value)) throw new Error();
+    if (!publicationLocalDateTime(instant, ctx.timeZone).startsWith(value)) throw new Error();
     return instant;
   } catch {
     throw new APIError("Enter a date and time in the newsroom timezone.", 400);

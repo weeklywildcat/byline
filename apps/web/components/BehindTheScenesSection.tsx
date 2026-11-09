@@ -1,9 +1,9 @@
 import { SectionHeader } from "@/components/SectionHeader";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 
-export function BehindTheScenesSection({ posts }: { posts: WordPressPost[] }) {
+export function BehindTheScenesSection({ posts }: { posts: ArchivePost[] }) {
   if (posts.length === 0) return null;
 
   return (

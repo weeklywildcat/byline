@@ -3,7 +3,6 @@ import { nativeImage } from "@/lib/native-article";
 import { ContributorDirectoryCard } from "@byline/ui/contributor-profile";
 import { filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
-import { getPresentationMediaUrl } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
@@ -14,8 +13,8 @@ import {
   getContributorRole,
   getPostContributors,
   isGuestContributor,
-  type WordPressContributor
-} from "@/lib/wordpress";
+  type ArchiveContributor
+} from "@/lib/public-content";
 
 async function getAuthorCards() {
   const [contributors, posts] = await Promise.all([getAllPublicContributors(), getAllPosts()]);
@@ -34,10 +33,10 @@ async function getAuthorCards() {
   return authorPosts.sort((a, b) => b.posts.length - a.posts.length || a.contributor.name.localeCompare(b.contributor.name));
 }
 
-function AuthorCard({ contributor, storyCount, showDescription }: { contributor: WordPressContributor; storyCount: number; showDescription: boolean }) {
+function AuthorCard({ contributor, storyCount, showDescription }: { contributor: ArchiveContributor; storyCount: number; showDescription: boolean }) {
   const photo = getContributorPhoto(contributor);
   const description = stripHtml(getContributorDescription(contributor)) || `${getPublicationConfig().identity.shortName} contributor`;
-  return <ContributorDirectoryCard person={{ name: contributor.name, role: getContributorRole(contributor), photo: photo ? { ...photo, url: getPresentationMediaUrl(photo.url) } : null }} href={getContributorHref(contributor)} description={showDescription ? description : undefined} storyCount={storyCount} />;
+  return <ContributorDirectoryCard person={{ name: contributor.name, role: getContributorRole(contributor), photo: photo ? { ...photo, url: photo.url } : null }} href={getContributorHref(contributor)} description={showDescription ? description : undefined} storyCount={storyCount} />;
 }
 
 type AuthorDirectoryProps = {

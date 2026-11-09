@@ -47,7 +47,7 @@ export const COLLECTIONS_VIEW_PATH = "/byline-collections";
  * Stories, Calendar, Media, Collections (reporting projects; public coverage
  * is only an optional presentation of a Collection, never a destination),
  * then the editor tools (People, Polls, Feedback…), each as its screen is ported
- * (docs/payload-migration.md §7.2). There is no generic Planning
+ * (docs/newsroom-os.md). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
  * and here each is first-class. Visibility is a convenience; every
  * destination enforces its own access on the server.

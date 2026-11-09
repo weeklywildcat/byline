@@ -1,6 +1,6 @@
 /**
  * Byline's newsroom vocabularies. Each domain keeps its own statuses on
- * purpose (docs/story-workspace.md, "Status vocabularies"): a story's workflow,
+ * purpose (docs/newsroom-os.md): a story's workflow,
  * a task, a production assignment, a source and an appointment never share one
  * "status" list, and none of them is the publication state.
  */
@@ -23,7 +23,7 @@ export const ROLE_OPTIONS = options<Role>([
 
 /**
  * Workflow stages. `published` is derived from Payload's `_status` and is
- * never stored or selected (docs/editorial-workflow.md).
+ * never stored or selected (docs/newsroom-os.md).
  */
 export const WORKFLOW_STAGES = STORED_STAGES;
 export type WorkflowStage = StoredStage;

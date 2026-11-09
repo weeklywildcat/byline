@@ -4,8 +4,7 @@ import { notFound } from "@/lib/static-not-found";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { stripHtml } from "@/lib/format";
 import { requireBuildData } from "@/lib/build-data";
-import { getPageBySlug, getPageIndexing } from "@/lib/wordpress";
-import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
+import { getPageBySlug, getPageIndexing } from "@/lib/public-content";
 
 type StaticPageProps = {
   params: Promise<{
@@ -16,10 +15,10 @@ type StaticPageProps = {
 export async function getMetadata({ params }: StaticPageProps): Promise<Metadata> {
   const { segment } = await params;
 
-  const wordpressPage = await requireBuildData(`/wp-json/wp/v2/pages?slug=${segment}`, () => getPageBySlug(segment));
-  const title = wordpressPage ? stripHtml(wordpressPage.title.rendered) : "";
-  const description = wordpressPage
-    ? stripHtml(wordpressPage.excerpt.rendered || wordpressPage.content.rendered)
+  const archivePage = await requireBuildData(`public snapshot: pages?slug=${segment}`, () => getPageBySlug(segment));
+  const title = archivePage ? stripHtml(archivePage.title.rendered) : "";
+  const description = archivePage
+    ? stripHtml(archivePage.excerpt.rendered || archivePage.content.rendered)
     : "";
 
   if (!title || !description) {
@@ -30,25 +29,24 @@ export async function getMetadata({ params }: StaticPageProps): Promise<Metadata
     title,
     description,
     path: `/${segment}/`,
-    noIndex: wordpressPage ? getPageIndexing(wordpressPage) === "noindex" : false
+    noIndex: archivePage ? getPageIndexing(archivePage) === "noindex" : false
   });
 }
 
 export default async function StaticPage({ params }: StaticPageProps) {
   const { segment } = await params;
 
-  const wordpressPage = await requireBuildData(`/wp-json/wp/v2/pages?slug=${segment}`, () => getPageBySlug(segment));
+  const archivePage = await requireBuildData(`public snapshot: pages?slug=${segment}`, () => getPageBySlug(segment));
 
-  if (!wordpressPage) {
+  if (!archivePage) {
     notFound();
   }
 
-  const title = stripHtml(wordpressPage.title.rendered);
-  const description = stripHtml(wordpressPage.excerpt.rendered || wordpressPage.content.rendered);
+  const title = stripHtml(archivePage.title.rendered);
+  const description = stripHtml(archivePage.excerpt.rendered || archivePage.content.rendered);
   return (
-    <PublicProsePage title={title} description={description} href={`/${segment}/`} bodyHtml={wordpressPage.content.rendered}
-      eyebrow={wordpressPage.bylinePage?.eyebrow?.trim() || ""} isSportsArchive={Boolean(wordpressPage.bylinePage?.sportsArchive)}>
-      <NewsroomPollHydrator />
+    <PublicProsePage title={title} description={description} href={`/${segment}/`} bodyHtml={archivePage.content.rendered}
+      eyebrow={archivePage.bylinePage?.eyebrow?.trim() || ""} isSportsArchive={Boolean(archivePage.bylinePage?.sportsArchive)}>
     </PublicProsePage>
   );
 }

@@ -3,8 +3,6 @@ import { notFound } from "@/lib/static-not-found";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
-import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
-import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
 import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
 import { getPrimaryVisibleCategory, getPublicTopicTags, isVisibleContentPost } from "@/lib/content";
 import { stripHtml, decodeHtml } from "@/lib/format";
@@ -14,11 +12,9 @@ import { getSportsGameById } from "@/lib/headless";
 import { absoluteUrl, buildPageMetadata, getArticleAuthorProfileUrls, getBreadcrumbSchema, getPostTimestamps, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
 import { isVisualStory } from "@byline/story-presentations";
-import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
   getAllPublicCoverages,
-  getBylineRestUrl,
   getFeaturedMedia,
   getPostBySlug,
   getPostContributorsWithProfiles,
@@ -28,10 +24,9 @@ import {
   getPostRouteParts,
   getPostAuthorWithProfile,
   isGuestContributor,
-  type WordPressAuthor
-} from "@/lib/wordpress";
+  type ArchiveAuthor
+} from "@/lib/public-content";
 
-const publication = getPublicationConfig();
 
 type ArticleRouteParams = {
   segment: string;
@@ -74,7 +69,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const [post, allPosts, coverages] = await Promise.all([
     getPostBySlug(routeParams.articleSlug),
     getAllPosts(),
-    optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, [])
+    optionalBuildData("public snapshot: coverage", getAllPublicCoverages, [])
   ]);
   if (!post || !isVisibleContentPost(post)) notFound();
 
@@ -82,7 +77,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   if (!route || route.year !== routeParams.segment || route.month !== routeParams.month || route.day !== routeParams.day || route.category !== routeParams.category) notFound();
 
   const contributors = await getPostContributorsWithProfiles(post);
-  const author = contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? await getPostAuthorWithProfile(post);
+  const author = contributors.find((contributor): contributor is ArchiveAuthor => !isGuestContributor(contributor)) ?? await getPostAuthorWithProfile(post);
   const primaryGameId = getPostPrimaryGameId(post);
   const primaryGame = primaryGameId ? await getSportsGameById(primaryGameId) : null;
   const showLegacyPrimaryGame = Boolean(primaryGame && !getPostGameScoreGameIds(post).includes(primaryGame.id));
@@ -108,15 +103,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         metadata,
         shareActions: <ArticleShareActions title={title} url={articleUrl} />,
         primaryGame: showLegacyPrimaryGame && primaryGame ? <ArticleGameCard game={primaryGame} className="article-primary-game-card" /> : null,
-        poll: <NewsroomPollHydrator />,
-        feedback: publication.features.readerFeedback !== false ? (
-          <ReaderFeedbackForm
-            postId={post.id}
-            articleTitle={title}
-            articleUrl={articleUrl}
-            endpointCandidates={[getBylineRestUrl("/feedback"), getBylineRestUrl("/feedback", true)]}
-          />
-        ) : null,
         newsletter: <NewsletterSignupForm />
       }}
     />

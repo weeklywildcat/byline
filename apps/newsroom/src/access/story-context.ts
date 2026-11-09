@@ -4,7 +4,6 @@ import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUse
 
 /**
  * Who may see and change a story's private context. Ported from
- * `byline_story_context()` (wordpress-plugin/includes/editorial/story-context.php):
  *
  * - **manager**: an editor or administrator; the story's creator; its assigned
  *   editor; or one of its contributors (through the account's linked person).

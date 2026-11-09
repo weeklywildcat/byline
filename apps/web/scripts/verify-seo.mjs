@@ -85,7 +85,7 @@ for (const [route, page] of pages) {
 
 // Media contract: every photograph the sitemap advertises and every full-size
 // source the lightbox or a media link can open must be a file in this export.
-// Markup that names a mirrored file the build did not copy is a broken deploy.
+// Markup that names a prepared file the build did not materialize is a broken deploy.
 async function publishedFileExists(url) {
   let pathname;
   try { pathname = decodeURIComponent(new URL(url, `${origin}/`).pathname); } catch { return false; }
@@ -104,7 +104,7 @@ for (const file of htmlFiles) {
   const route = publicPath(file);
   for (const tag of html.match(/<img\b[^>]*\bdata-byline-full-url=[^>]*>/gi) ?? []) {
     const full = tag.match(/data-byline-full-url="([^"]*)"/i)?.[1];
-    if (full && full.includes("/_wordpress-media/") && !(await publishedFileExists(decodeEntities(full)))) {
+    if (full && full.includes("/_byline/media/") && !(await publishedFileExists(decodeEntities(full)))) {
       issues.push({ route, message: `full-size photograph is not in the export: ${full}` });
     }
   }

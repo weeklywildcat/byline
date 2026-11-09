@@ -5,9 +5,9 @@ import {
   type HomepageStoryInput
 } from "@byline/ui/homepage";
 import { toHomepageStoryInputs } from "@/lib/homepage-story-input";
-import { getPostCategories, type WordPressPost } from "@/lib/wordpress";
+import { getPostCategories, type ArchivePost } from "@/lib/public-content";
 
-export function hasCategory(post: WordPressPost, slugs: string[]) {
+export function hasCategory(post: ArchivePost, slugs: string[]) {
   const slugSet = new Set(slugs);
 
   return getPostCategories(post).some((category) => slugSet.has(category.slug));
@@ -21,12 +21,12 @@ export function hasCategory(post: WordPressPost, slugs: string[]) {
  * tests keep reading WordPress records.
  */
 export function takeUnused(
-  posts: WordPressPost[],
+  posts: ArchivePost[],
   usedPostIds: Set<number>,
   count: number,
-  predicate = (_post: WordPressPost) => true
+  predicate = (_post: ArchivePost) => true
 ) {
-  const selected: WordPressPost[] = [];
+  const selected: ArchivePost[] = [];
 
   for (const post of posts) {
     if (usedPostIds.has(post.id) || !predicate(post)) continue;
@@ -57,25 +57,25 @@ export { takeUnusedStories };
  * first; the pinning package then places them itself.
  */
 export type HomepageSelection = SharedHomepageSelection & {
-  athleteSpotlightPost: WordPressPost | null;
-  leadPost: WordPressPost | null;
-  inFocusPost: WordPressPost | null;
-  specialCoveragePosts: WordPressPost[];
-  opinionPosts: WordPressPost[];
-  fieldPosts: WordPressPost[];
-  morePosts: WordPressPost[];
-  rightNowPosts: WordPressPost[];
-  briefPosts: WordPressPost[];
+  athleteSpotlightPost: ArchivePost | null;
+  leadPost: ArchivePost | null;
+  inFocusPost: ArchivePost | null;
+  specialCoveragePosts: ArchivePost[];
+  opinionPosts: ArchivePost[];
+  fieldPosts: ArchivePost[];
+  morePosts: ArchivePost[];
+  rightNowPosts: ArchivePost[];
+  briefPosts: ArchivePost[];
   usedPostIds: Set<number>;
 };
 
 export function resolveWeeklyWildcatHomepage(
-  posts: WordPressPost[],
+  posts: ArchivePost[],
   reservedPostIds?: ReadonlySet<number>
 ): HomepageSelection {
   const selection = resolveCompatibilityHomepageSelection(toHomepageStoryInputs(posts), reservedPostIds);
   const byId = new Map(posts.map((post) => [post.id, post]));
-  const post = (story: HomepageStoryInput) => byId.get(story.id) as WordPressPost;
+  const post = (story: HomepageStoryInput) => byId.get(story.id) as ArchivePost;
   const postsOf = (stories: HomepageStoryInput[]) => stories.map(post);
 
   return {

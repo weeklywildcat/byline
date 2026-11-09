@@ -1,5 +1,5 @@
 import type { SportsGame } from "@/lib/headless";
-import type { WordPressCategory, WordPressPost, WordPressTag } from "@/lib/wordpress";
+import type { ArchiveCategory, ArchivePost, ArchiveTag } from "@/lib/public-content";
 
 // Shared fixture builders for the sports package tests.
 //
@@ -7,12 +7,12 @@ import type { WordPressCategory, WordPressPost, WordPressTag } from "@/lib/wordp
 // pre-Studio components fell back through: `display.*` first, then the flat
 // record, then a literal default.
 
-export function category(id: number, slug: string): WordPressCategory {
+export function category(id: number, slug: string): ArchiveCategory {
   return { id, count: 1, description: "", link: "", name: slug, slug, taxonomy: "category", parent: 0 };
 }
 
-export function tag(id: number, slug: string, name = slug): WordPressTag {
-  return { id, count: 1, description: "", link: "", name, slug, taxonomy: "post_tag" } as WordPressTag;
+export function tag(id: number, slug: string, name = slug): ArchiveTag {
+  return { id, count: 1, description: "", link: "", name, slug, taxonomy: "post_tag" } as ArchiveTag;
 }
 
 export type PostOptions = {
@@ -27,8 +27,8 @@ export type PostOptions = {
   excerpt?: string;
 };
 
-export function post(id: number, categorySlug: string, options: PostOptions = {}): WordPressPost {
-  const tags: WordPressTag[] = options.athlete
+export function post(id: number, categorySlug: string, options: PostOptions = {}): ArchivePost {
+  const tags: ArchiveTag[] = options.athlete
     ? [tag(id + 500, "athlete-of-the-week", "Athlete of the Week"), tag(id + 600, "soccer", "Sport: Soccer")]
     : options.specialCoverage
       ? [tag(id + 700, "special-coverage", "Special Coverage")]
@@ -74,7 +74,7 @@ export function post(id: number, categorySlug: string, options: PostOptions = {}
         : [],
       "wp:term": [[category(id, categorySlug)], tags]
     }
-  } as unknown as WordPressPost;
+  } as unknown as ArchivePost;
 }
 
 export type GameOptions = {

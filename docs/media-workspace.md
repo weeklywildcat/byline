@@ -6,7 +6,7 @@ destination, two concepts that never mix:
 - **Library**: the files. Payload's `media` upload collection and its native
   folders.
 - **Work**: production assignments (photo, gallery, graphic, video, audio),
-  the shared desk WordPress called *Media Desk*.
+  the newsroom production desk.
 
 ```
 Media workspace
@@ -132,7 +132,7 @@ and resource `media`, live-update
 inspector says *Linked uses*, never "every use", and counts records the account
 can't open.
 
-**Metadata gaps** reuse WordPress's media readiness checks on Payload fields:
+**Metadata gaps** use the media readiness checks:
 an image needs alt text and a credit (or creator); every file needs copyright,
 a licence or a source URL. The UI names each gap (*Missing alt text*, *Missing
 credit*, *Missing rights/source information*); it does not decide a rights
@@ -157,9 +157,7 @@ Shared, CMS-independent (`packages/newsroom-screens/src/media/`):
   screen asks before leaving unsaved edits), `MediaUploadDialog`,
   `MediaPickerDialog`, `MediaFolderDialogs`.
 - `MediaWork`, `media-desk-model.ts`, `media-desk-errors.ts`: the production
-  desk, moved from `wordpress-plugin/src/planning`. WordPress renders it under
-  its old *Media Desk* header with its Media Library picker; Payload renders it
-  as Work.
+  desk, shown as Work.
 
 Payload host (`apps/newsroom/src/ui/media/`): `payload-media-fetchers.ts`
 (including XHR upload progress), `MediaWorkspaceShell` (in `BylineShell`: the

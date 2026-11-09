@@ -253,7 +253,7 @@ function addDeploymentAttention(items: HomeAttentionItem[], deployment: HomeDepl
     items.push({
       id: "deployment-needs-configuration",
       title: "Configure website publishing",
-      detail: "WordPress has a newer public revision, but no deployment provider is configured.",
+      detail: "The newsroom has a newer public revision, but no deployment provider is configured.",
       severity: "critical",
       source: "deployment"
     });
@@ -264,7 +264,7 @@ function addDeploymentAttention(items: HomeAttentionItem[], deployment: HomeDepl
     items.push({
       id: "deployment-failed",
       title: "Website update failed",
-      detail: "The story remains safely in WordPress. Retry the website update.",
+      detail: "The story remains safely in the newsroom. Retry the website update.",
       severity: "critical",
       source: "deployment"
     });
