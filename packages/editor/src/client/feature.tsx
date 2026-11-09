@@ -23,6 +23,8 @@ import { Plus } from "lucide-react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { markCreated } from "./focus";
 import { AddBlockBar, AddBlockMenu } from "./inserter";
+import { useOptionalEditorHost } from "./host";
+import { insertStoryBlock } from "./lexical";
 
 /** The body element is the article's: the shared CSS styles it as `.article-body`. */
 const ROOT_CLASSES = ["article-body", "byline-article-canvas-body"];
@@ -46,6 +48,18 @@ const isHistoryKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) 
  */
 function BylineCanvasPlugin() {
   const [editor] = useLexicalComposerContext();
+  const register = useOptionalEditorHost()?.registerInserter;
+
+  // Hands the host this canvas's inserter (the Reporting sheet's "Insert quote"): the same command as the slash menu.
+  useEffect(() => {
+    if (!register) return;
+    register((type, fields) => {
+      if (!editor.isEditable()) return false;
+      insertStoryBlock(editor, type, fields);
+      return true;
+    });
+    return () => register(null);
+  }, [editor, register]);
 
   useLayoutEffect(() => mergeRegister(
     editor.registerRootListener((root, previous) => {

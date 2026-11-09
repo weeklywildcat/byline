@@ -76,11 +76,35 @@ describe("posting", () => {
     expect(row.state).toBe("draft");
   });
 
-  it("refuses an empty update, a participant who is not a manager, and a stranger", async () => {
+  it("refuses an empty update and a stranger", async () => {
     expect((await post("editor", "game", { title: "Only a title" })).status).toBe(400);
     expect((await post("editor", "game", { text: "   " })).status).toBe(400);
-    expect((await post("bob", "game", { text: "I shot the halftime show" })).status).toBe(403);
     expect((await post("stranger", "game", { text: "Hello" })).status).toBe(403);
+  });
+
+  it("lets a participant send a draft to the live desk, never a public update", async () => {
+    const sent = await post("bob", "game", { text: "SENTINEL-BOB halftime show photos are in", state: "published" });
+    expect(sent.status).toBe(200);
+    const row = (await desk("editor", "game")).body.updates.find((update: { id: number }) => update.id === sent.body.id);
+    expect(row.state).toBe("draft");
+    // The participant sees their own draft; the editor can publish it.
+    expect((await desk("bob", "game")).body.updates.some((update: { id: number }) => update.id === sent.body.id)).toBe(true);
+    await remove("editor", "game", sent.body.id);
+  });
+
+  it("lets the Story-level live grant publish live updates on that story only", async () => {
+    const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: story.game } }, limit: 1 })).docs[0];
+    await payload.update({ collection: "story-plans", id: plan.id, data: { livePublishers: [accounts.bob.id] }, overrideAccess: true });
+    const posted = await post("bob", "game", { text: "Granted: touchdown!", state: "published" });
+    expect((await desk("editor", "game")).body.updates.find((update: { id: number }) => update.id === posted.body.id).state).toBe("published");
+    expect((await desk("bob", "game")).body.canPublish).toBe(true);
+    // The grant never publishes the article.
+    const write = await payload.update({ collection: "stories", id: story.game, data: { headline: "Bob's headline" } as never, req: await reqAs("bob"), overrideAccess: false }).then(() => "ok", () => "refused");
+    expect(write).toBe("refused");
+    // Nor live updates elsewhere.
+    expect((await desk("bob", "off")).status).toBe(403);
+    await remove("bob", "game", posted.body.id);
+    await payload.update({ collection: "story-plans", id: plan.id, data: { livePublishers: [] }, overrideAccess: true });
   });
 });
 

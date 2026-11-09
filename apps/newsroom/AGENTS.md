@@ -190,6 +190,28 @@ snapshot; nothing in this app serves public reading.
   JSX converters, never feed Lexical JSON to Astro, never add a Scrollytelling
   block, never send `legacy-html` through the normalizer. The Media picker is
   Byline's, never Payload's.
+- **Reporting** ([docs/reporting.md](../../docs/reporting.md)) lives inside the
+  Story. Route captures with `routeCapture()` and resolve context with
+  `resolveCaptureContext()` (never in components); no polymorphic materials
+  table, the feed is a read model. Reporting collections are never public and
+  never in `public/tracking.ts`. Confidential material is visible only to its
+  creator, the Story's assigned editor and administrators
+  (`access/reporting-context.ts`). Ground rules are snapshots; verification is
+  explicit; off-the-record words are never inserted without an editor's audited
+  override. Transcription runs on the `reporting` queue behind the provider
+  boundary; Byline owns the transcript format.
+- **Field Mode** ([docs/field-mode.md](../../docs/field-mode.md)) is `/admin/field`
+  without the desktop template; keep its bundle free of the editor, Front Page
+  and Distribution. Every capture goes through the IndexedDB outbox with a
+  client key; never report "Posted" before the server says published. The
+  Story-level live grant (`livePublishers`, `access/live-context.ts`) covers
+  live updates only.
+- **Front Page** ([docs/front-page.md](../../docs/front-page.md)) is editorial
+  priority, not design: placements (slot id → Story id) through the one
+  resolver; revisions are activated only by Publish or the scheduled job, which
+  advance the public revision; history is never mutated. The preview is the
+  real renderer; keep `front-page/stories.ts` in step with the build's homepage
+  pool.
 - `src/payload-types.ts` is this app's internal type file. It must never become
   the public site's content contract.
 
@@ -205,6 +227,7 @@ npm run generate:types --workspace @byline/newsroom        # after any field cha
 npm run generate:importmap --workspace @byline/newsroom    # after adding admin components
 npm run migrate:create --workspace @byline/newsroom -- <name>
 npm run migrate:check --workspace @byline/newsroom         # against an EMPTY database
+npm run jobs:reporting --workspace @byline/newsroom        # transcription worker (optional provider)
 ```
 
 Payload 3.92 needs Node ^22.23.4 or ≥24.22.1.

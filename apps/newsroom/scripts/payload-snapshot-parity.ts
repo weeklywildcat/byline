@@ -75,9 +75,16 @@ async function seed() {
   const gus = (await payload.create({ collection: "people", data: { name: "Gus Guest", slug: "gus-guest", status: "guest", hasProfilePage: true, bio: "Gus writes columns." } })).id;
   const olive = (await payload.create({ collection: "people", data: { name: "Olive Once", slug: "olive-once", status: "guest", hasProfilePage: false } })).id;
 
+  const owner = await payload.create({ collection: "users", data: { email: "sentinel-account@example.test", password: "parity-account-password", name: "SENTINEL-PRIVATE-USER", role: "editor", enabled: true, googleSubject: "SENTINEL-GOOGLE-SUBJECT", linkedPerson: ada } });
   const story = async (data: Record<string, unknown>, publishedAt: string) => {
     const created = await payload.create({ collection: "stories", data, draft: true });
-    await payload.update({ collection: "stories", id: created.id, data: { _status: "published" } });
+    try {
+      const req = await createLocalReq({ user: { ...owner, collection: "users" } }, payload);
+      await payload.update({ collection: "stories", id: created.id, data: { _status: "published", publishedAt }, req, overrideAccess: false });
+    } catch (error) {
+      log(`Fixture publish failed for ${String(data.headline)}: ${JSON.stringify((error as { data?: unknown }).data)}`);
+      throw error;
+    }
     const db = await drizzleFor(payload);
     await db.execute(sql`update stories set published_at = ${publishedAt}, updated_at = ${publishedAt} where id = ${created.id}`);
     return created.id as number;
@@ -107,9 +114,20 @@ async function seed() {
   for (let i = 0; i < 6; i++) {
     await db.execute(sql`insert into byline_poll_votes (poll_id, option_id, voter_key) values (${poll.pollKey}, ${i < 4 ? "yes" : "no"}, ${`SENTINEL-VOTER-${i}`})`);
   }
+  const event = await payload.create({ collection: "events", data: { title: "Homecoming", slug: "homecoming", eventType: "game", startAt: "2027-10-30T23:00:00.000Z", endAt: "2027-10-31T01:30:00.000Z", location: "Wildcat Stadium", eventStatus: "scheduled", _status: "published" } });
   const remap = (id: unknown) => Number(id) % 2 === 1 ? meeting : laughing;
   const nodes = FIXTURE_ARTICLE_BODY.nodes.map((node): ArticleBodyNode => {
     switch (node.type) {
+      case "paragraph":
+        return { ...node, children: node.children.map((child) => child.type === "source" && child.kind === "document" ? { ...child, media: pdf } : child) };
+      case "timeline":
+        return { ...node, items: node.items.map((item) => ({
+          ...item,
+          ...(item.image && { image: { ...item.image, media: remap(item.image.media) } }),
+          ...(item.document && { document: { ...item.document, media: pdf } })
+        })) };
+      case "event":
+        return { ...node, event: event.id };
       case "photo":
       case "portraitText":
       case "annotatedImage":
@@ -143,7 +161,21 @@ async function seed() {
   await payload.create({ collection: "tasks", data: { story: structured, title: "SENTINEL-PRIVATE-TASK" }, ...privateWrite });
   await payload.create({ collection: "appointments", data: { story: structured, title: "Interview", notes: "SENTINEL-PRIVATE-APPOINTMENT" }, ...privateWrite });
   await payload.create({ collection: "production-assignments", data: { story: structured, type: "photo", title: "Portrait", notes: "SENTINEL-PRIVATE-PRODUCTION" }, ...privateWrite });
-  await payload.create({ collection: "users", data: { email: "sentinel-account@example.test", password: "parity-account-password", name: "SENTINEL-PRIVATE-USER", role: "editor", enabled: true, googleSubject: "SENTINEL-GOOGLE-SUBJECT", linkedPerson: ada }, ...privateWrite });
+  const [draftDistribution, sentDistribution, failedDistribution] = (await payload.find({
+    collection: "distribution-items", where: { story: { equals: structured } }, sort: "id", pagination: false
+  })).docs;
+  await payload.update({ collection: "distribution-items", id: draftDistribution.id, data: {
+    state: "draft", textMode: "custom", text: "SENTINEL-DISTRIBUTION-DRAFT-CAPTION", owner: owner.id,
+    note: "SENTINEL-DISTRIBUTION-NOTE", plannedFor: "2026-11-10T14:00:00.000Z"
+  }, ...privateWrite });
+  await payload.update({ collection: "distribution-items", id: sentDistribution.id, data: {
+    state: "posted", approvedBy: owner.id, approvedAt: "2026-11-09T15:00:00.000Z",
+    sent: [{ at: "2026-11-09T15:00:00.000Z", by: owner.id, destination: sentDistribution.destination, text: "SENTINEL-DISTRIBUTION-HISTORY" }]
+  }, ...privateWrite });
+  await payload.update({ collection: "distribution-items", id: failedDistribution.id, data: {
+    state: "failed", failure: "SENTINEL-DISTRIBUTION-FAILURE"
+  }, ...privateWrite });
+
   // Seed private Media fields on a referenced prepared asset without changing its public metadata.
   await db.execute(sql`update media set url = '/api/media/file/SENTINEL-PRIVATE-ORIGINAL', thumbnail_u_r_l = '/api/media/file/SENTINEL-LIBRARY-PREVIEW' where id = ${meeting}`);
   await payload.create({ collection: "corrections", data: { story: structured, type: "correction", text: "An earlier version misstated the vote count.", date: "2026-10-15T13:00:00.000Z" } });
@@ -153,7 +185,6 @@ async function seed() {
   const page = await payload.create({ collection: "pages", data: { title: "About the newsroom", slug: "about-the-newsroom", summary: "Who we are.", body: { root: { type: "root", version: 1, children: [{ type: "heading", tag: "h2", version: 1, children: [{ type: "text", text: "Our mission", format: 0, version: 1 }] }, { type: "paragraph", version: 1, children: [{ type: "text", text: "We are student journalists.", format: 0, version: 1 }] }] } }, _status: "published" } });
   await payload.create({ collection: "pages", data: { parent: page.id, title: "Contact our newsroom", slug: "contact-our-newsroom",
     summary: "Get in touch.", _status: "published" } });
-  await payload.create({ collection: "events", data: { title: "Homecoming", slug: "homecoming", eventType: "game", startAt: "2027-10-30T23:00:00.000Z", endAt: "2027-10-31T01:30:00.000Z", location: "Wildcat Stadium", eventStatus: "scheduled", _status: "published" } });
   return { structured, late, plain };
 }
 

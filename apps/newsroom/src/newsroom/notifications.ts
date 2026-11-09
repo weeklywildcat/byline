@@ -183,7 +183,7 @@ export async function deliverNotification(payload: Payload, id: Id, options: { c
   const storyId = relationId(row.story);
   const { headlines, names } = await nameMaps(payload, [row]);
   const admin = payload.config.routes.admin;
-  const link = `${origin()}${admin}${storyId !== null ? `/collections/stories/${storyId}` : ""}`;
+  const link = `${origin()}${admin}${storyId !== null ? `/collections/stories/${storyId}${notificationTab(row.data)}` : ""}`;
   const message = notificationEmail(factsFor(row, headlines, names), link);
   await payload.sendEmail({ to: user.email, subject: message.subject, text: message.text, html: message.html });
   await setState("sent");
@@ -206,6 +206,15 @@ export const deliverNotificationTask: TaskConfig = {
 };
 
 /* ---------------------------------------------------------------------- inbox */
+
+/** A notification may open a particular tab of the Story screen (transcripts open Reporting; Distribution opens its item on History). */
+export function notificationTab(data: unknown): string {
+  const record = (data && typeof data === "object" ? data : {}) as { tab?: unknown; transcriptId?: unknown; distribution?: unknown };
+  if (record.tab !== "reporting" && record.tab !== "publish" && record.tab !== "history") return "";
+  const transcript = Number(record.transcriptId);
+  const distribution = Number(record.distribution);
+  return `?tab=${record.tab}${Number.isSafeInteger(transcript) && transcript > 0 ? `&transcript=${transcript}` : ""}${Number.isSafeInteger(distribution) && distribution > 0 ? `&distribution=${distribution}` : ""}`;
+}
 
 export type InboxItem = { id: number; kind: NotificationKind; text: string; createdAt: string; readAt: string | null; storyId: number | null; href: string | null; items: DigestItem[] };
 export type InboxResponse = { unread: number; items: InboxItem[]; hasMore: boolean; emailConfigured: boolean };
@@ -232,7 +241,7 @@ export async function inbox(ctx: ScreenContext, options: { unreadOnly?: boolean;
       const storyId = relationId(row.story);
       return {
         id: Number(row.id), kind: facts.kind, text: describeNotification(facts), createdAt: String(row.createdAt), readAt: row.readAt ?? null,
-        storyId: storyId === null ? null : Number(storyId), href: storyId === null ? null : `${admin}/collections/stories/${storyId}`, items: facts.items ? [...facts.items] : []
+        storyId: storyId === null ? null : Number(storyId), href: storyId === null ? null : `${admin}/collections/stories/${storyId}${notificationTab(row.data)}`, items: facts.items ? [...facts.items] : []
       };
     })
   };

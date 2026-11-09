@@ -81,7 +81,7 @@ function WorkspaceLoader({ env, children }: { env: WorkspaceEnv; children: React
   } : null, [env, data, now, reload, announce]);
 
   const load = useMemo(() => ({ env, query, value, message }), [env, query, value, message]);
-  return <WorkspaceLoadContext value={load}>{value ? <WorkspaceContext value={value}>{children}</WorkspaceContext> : children}</WorkspaceLoadContext>;
+  return <WorkspaceLoadContext value={load}><WorkspaceContext value={value}>{children}</WorkspaceContext></WorkspaceLoadContext>;
 }
 
 /** Renders its sections once the workspace has loaded; the skeleton or the load error until then. */

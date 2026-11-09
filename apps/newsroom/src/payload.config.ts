@@ -18,6 +18,7 @@ import sharp from "sharp";
 import { atLeast, newsroomUser } from "./access/user";
 import { googleEndpoints } from "./auth/google-endpoints";
 import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
+import { REPORTING_LIMITS } from "./domain/reporting";
 import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
 import { Polls } from "./collections/Polls";
@@ -32,6 +33,15 @@ import { addPollVotesTable } from "./db/poll-votes";
 import { addPresenceSessionsTable } from "./db/presence-sessions";
 import { addPublicationStateTable } from "./db/publication-state";
 import { Events } from "./collections/Events";
+import { ReportingFiles, ReportingNotes, ReportingTranscripts, TranscriptSelections } from "./collections/Reporting";
+import { reportingEndpoints } from "./reporting/endpoints";
+import { fieldEndpoints } from "./field/endpoints";
+import { frontPageEndpoints } from "./front-page/endpoints";
+import { activateFrontPageTask } from "./front-page/server";
+import { FrontPageRevisions } from "./collections/FrontPage";
+import { DistributionItems, DistributionSettings } from "./collections/Distribution";
+import { distributionEndpoints } from "./distribution/endpoints";
+import { transcribeReportingFileTask } from "./reporting/transcription/queue";
 import { Publication } from "./globals/Publication";
 import { withPublicTracking } from "./public/tracking";
 import { preparePublicSnapshotTask } from "./public/snapshot/task";
@@ -92,6 +102,12 @@ const collections: CollectionConfig[] = [
   Sources,
   Appointments,
   ProductionAssignments,
+  ReportingNotes,
+  ReportingFiles,
+  ReportingTranscripts,
+  TranscriptSelections,
+  FrontPageRevisions,
+  DistributionItems,
   Polls,
   Users
 ];
@@ -114,9 +130,10 @@ export default buildConfig({
     : {}),
   collections: collections.map((collection) => withImportIdGuard(withPublicTracking(collection))),
   // The publication's public configuration (administrators; drafts stage changes, only the published Global is public).
-  globals: [Publication],
-  // Camera originals are larger than Payload's 20 MB multipart default.
-  upload: { limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES } },
+  globals: [Publication, DistributionSettings],
+  // Camera originals are larger than Payload's 20 MB multipart default, and interview recordings larger still.
+  // The multipart limit is the larger of the two; Media refuses anything over its own limit (collections/Media.ts).
+  upload: { limits: { fileSize: Math.max(MEDIA_UPLOAD_MAX_BYTES, REPORTING_LIMITS.fileBytes) } },
   // Payload's native folders, for Media (logical organization, never storage paths).
   folders: mediaFolders,
   db: postgresAdapter({
@@ -130,7 +147,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...googleEndpoints],
+  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
@@ -171,6 +188,11 @@ export default buildConfig({
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
         site: { Component: "/components/BylineSite#BylineSite", path: "/site", exact: true, meta: { title: "Site" } },
+        // Field Mode: a phone-first capture shell, without the desktop template.
+        field: { Component: "/components/BylineField#BylineField", path: "/field", exact: true, meta: { title: "Field" } },
+        // Front Page Desk: editorial priority over the code-owned homepage (editors).
+        frontPage: { Component: "/components/BylineFrontPage#BylineFrontPage", path: "/front-page", exact: true, meta: { title: "Front Page" } },
+        distribution: { Component: "/components/BylineDistribution#BylineDistribution", path: "/distribution", exact: true, meta: { title: "Distribution" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }
@@ -191,12 +213,14 @@ export default buildConfig({
       admin: { ...defaultJobsCollection.admin, group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") }
     }),
     // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
-    // (public snapshots + deploy hook), `default` → `jobs:scheduled` (Payload's scheduled publish).
+    // (public snapshots + deploy hook), `default` → `jobs:scheduled` (Payload's scheduled publish),
+    // `reporting` → `jobs:reporting` (long transcriptions, kept apart so they never delay publication).
     tasks: [
       withFailureNotice(preparePublicationMediaTask, "Media preparation"),
       withFailureNotice(preparePublicSnapshotTask, "Public snapshot preparation"),
       withFailureNotice(deployPublicSiteTask, "Public site deployment"),
-      advancePublicRevisionTask, contentHealthTask, refreshVideoFactsTask, deliverNotificationTask, sendDueDigestTask
+      advancePublicRevisionTask, contentHealthTask, refreshVideoFactsTask, deliverNotificationTask, sendDueDigestTask,
+      transcribeReportingFileTask, withFailureNotice(activateFrontPageTask, "Front Page activation")
     ]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },

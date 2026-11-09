@@ -24,8 +24,10 @@ describe("notification preferences", () => {
     for (const value of [undefined, null, "x", 3, []]) expect(resolveNotificationPreferences(value)).toEqual(defaultNotificationPreferences());
   });
 
-  it("recognizes only the eight kinds", () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(8);
+  it("recognizes the eight WordPress kinds plus Reporting's, Front Page's and Distribution's", () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(13);
+    expect(isNotificationKind("transcriptReady")).toBe(true);
+    expect(isNotificationKind("frontPageFailures")).toBe(true);
     expect(isNotificationKind("dueDigest")).toBe(true);
     expect(isNotificationKind("newsletter")).toBe(false);
   });

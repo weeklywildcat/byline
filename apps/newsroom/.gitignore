@@ -7,3 +7,5 @@ next-env.d.ts
 test-results/
 # Prepared publication files (BYLINE_PUBLICATION_MEDIA_DIR defaults to ./publication-media).
 /publication-media/
+# Private reporting files (BYLINE_REPORTING_LOCAL_DIR defaults to ./reporting-files).
+/reporting-files/

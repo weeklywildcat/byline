@@ -106,7 +106,7 @@ export function useBlockNode(nodeKey: string) {
  * itself is Payload's (`INSERT_BLOCK_COMMAND`), the same command the slash
  * menu runs, so both paths create identical nodes.
  */
-export function insertStoryBlock(editor: LexicalEditor, type: ArticleBlockType): void {
+export function insertStoryBlock(editor: LexicalEditor, type: ArticleBlockType, fields: Record<string, unknown> = {}): void {
   editor.update(() => {
     const selection = $getSelection() ?? $getPreviousSelection();
     if ($isNodeSelection(selection)) {
@@ -126,7 +126,7 @@ export function insertStoryBlock(editor: LexicalEditor, type: ArticleBlockType):
       else root.append($createParagraphNode()).selectEnd();
     }
   }, { discrete: true });
-  editor.dispatchCommand(INSERT_BLOCK_COMMAND, { blockName: "", blockType: type });
+  editor.dispatchCommand(INSERT_BLOCK_COMMAND, { ...fields, blockName: "", blockType: type } as never);
 }
 
 /** Whether the editor is editable now (false while another user holds the story's lock). */

@@ -53,3 +53,14 @@ export function localToInstant(value: string, timeZone: string): string {
   instant = wall - offsetMinutes(instant, timeZone) * 60_000;
   return new Date(instant).toISOString();
 }
+
+/** An instant as newsroom-local wall time ("2026-11-10T10:15"), the inverse of `localToInstant` (for datetime-local fields). */
+export function instantToLocal(instant: Date | string, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      .formatToParts(typeof instant === "string" ? new Date(instant) : instant)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}

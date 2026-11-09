@@ -59,7 +59,16 @@ export type BylineEditorHost = {
   /** The publication's timezone and locale, for event times on the canvas. */
   timeZone?: string;
   locale?: string;
+  /**
+   * Receives the canvas's block inserter when the editor mounts (null when it
+   * unmounts), so newsroom surfaces outside the canvas (the Reporting sheet's
+   * "Insert quote") insert through the same Lexical command as the slash menu.
+   */
+  registerInserter?: (insert: StoryBlockInserter | null) => void;
 };
+
+/** Inserts one Byline block with initial fields where the writer is; false when the editor is read-only. */
+export type StoryBlockInserter = (type: "reportedQuote", fields: Record<string, unknown>) => boolean;
 
 /** A published Story as the picker and the canvas show it. Facts come from the Story, never from the block. */
 export type StoryChoice = PublicStoryReference & { thumbnailAsset?: ArticleMediaAsset | null };

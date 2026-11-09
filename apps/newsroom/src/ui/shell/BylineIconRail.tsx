@@ -43,11 +43,12 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
           <SidebarGroup>
             <SidebarGroupContent className="px-1.5 md:px-0">
               <SidebarMenu className="gap-0.5">
-                {items.map((item) => {
+                {items.map((item, index) => {
                   const Icon = NAV_ICONS[item.key];
+                  const firstPublish = item.group === "publish" && items[index - 1]?.group !== "publish";
                   const current = item.key === active;
                   return (
-                    <SidebarMenuItem key={item.key}>
+                    <SidebarMenuItem key={item.key} className={firstPublish ? "mt-2 border-t pt-2" : undefined}>
                       <SidebarMenuButton
                         isActive={current}
                         tooltip={{ children: item.label, hidden: false }}

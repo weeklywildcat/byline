@@ -1,5 +1,5 @@
+import { body, handle, idParam, json } from "./http";
 import { relatedSuggestions } from "./related-suggestions";
-import { storyDistribution } from "./story-distribution";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
 import { changeLiveUpdate, deleteLiveUpdate, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
@@ -14,7 +14,7 @@ import { setScheduledPublication, trashStory } from "./scheduled-publication";
 import { storyURLContext } from "./story-url";
 import type { ContributorEntry, EditorialWorkflowPayload, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
-import { addDataAndFileToRequest, APIError, type Endpoint, type PayloadHandler, type PayloadRequest } from "payload";
+import { APIError, type Endpoint, type PayloadRequest } from "payload";
 import { resetStoryScope, scopeManages, storyScope } from "../access/story-context";
 import { atLeast } from "../access/user";
 import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/dates";
@@ -85,34 +85,6 @@ import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch }
  * user (`overrideAccess: false`), so collection and field access decide.
  */
 
-const json = (body: unknown, status = 200, headers: Record<string, string> = { "Cache-Control": "private, no-store" }) => Response.json(body, { status, headers });
-
-function handle(run: (ctx: ScreenContext, req: PayloadRequest) => Promise<unknown>): PayloadHandler {
-  return async (req) => {
-    try {
-      const ctx = screenContext(req, newsroomTimeZone());
-      const result = await run(ctx, req);
-      return result instanceof Response ? result : json(result);
-    } catch (error) {
-      const status = error instanceof APIError ? error.status : typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 500;
-      const message = status >= 500 ? "Byline couldn't finish that. Try again." : (error as Error).message;
-      if (status >= 500) req.payload.logger.error({ err: error, msg: "Newsroom screen request failed" });
-      return json({ message, code: `byline_${status}`, data: { status } }, status);
-    }
-  };
-}
-
-async function body<T>(req: PayloadRequest): Promise<T> {
-  await addDataAndFileToRequest(req);
-  return (req.data ?? {}) as T;
-}
-
-function idParam(req: PayloadRequest, name = "id"): number {
-  const id = Number(req.routeParams?.[name]);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new APIError("Unknown record.", 404);
-  return id;
-}
-
 /** A newsroom-local time from the screens, or null. */
 function instantOrNull(value: unknown, timeZone: string): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -175,7 +147,7 @@ export async function createStory(ctx: ScreenContext, req: PayloadRequest, given
     // The plan is created with the story; a preset seeds its stage, and its deadline only for editors.
     context: {
       bylinePlan: {
-        ...(preset ? { workflow: preset.workflow.status } : {}),
+        ...(preset ? { workflow: preset.workflow.status, preset: preset.id } : {}),
         ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {})
       }
     },
@@ -524,7 +496,6 @@ const collectionEndpoints: Endpoint[] = [
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
-  { path: "/byline/stories/:id/distribution", method: "get", handler: handle((ctx, req) => storyDistribution(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },

@@ -1,4 +1,5 @@
 import { activityFor } from "../newsroom/story-activity";
+import { GROUND_RULE_OPTIONS, REPORTING_LIMITS } from "../domain/reporting";
 import { APIError, type Access, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type PayloadRequest, type Where } from "payload";
 import { collectionCanManage, collectionScope, managedCollections } from "../access/collection-context";
 import { inIds, scopeManages, storyScope, type StoryScope } from "../access/story-context";
@@ -164,7 +165,12 @@ export const Sources: CollectionConfig = {
     { name: "organization", type: "text", maxLength: LIMITS.line },
     { name: "status", type: "select", defaultValue: "planned", index: true, options: [...SOURCE_STATUS_OPTIONS] },
     assigneesField,
-    { name: "notes", label: "Private notes", type: "textarea", maxLength: LIMITS.notes }
+    { name: "notes", label: "Private notes", type: "textarea", maxLength: LIMITS.notes },
+    // Journalistic ground rules: a fact the reporter or editor records, never inferred (docs/reporting.md#ground-rules).
+    // Captured material copies them as a snapshot, so a later edit here never rewrites an interview already recorded.
+    { name: "groundRules", type: "select", defaultValue: "unspecified", options: [...GROUND_RULE_OPTIONS] },
+    { name: "recordingPermission", label: "Recording permission confirmed", type: "checkbox", defaultValue: false },
+    { name: "groundRulesNote", label: "Ground rules note", type: "textarea", maxLength: REPORTING_LIMITS.groundRulesNote }
   ]
 };
 

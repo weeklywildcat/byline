@@ -94,16 +94,26 @@ function takeDiverseUnusedStories(
  * which is what every design without a manual source produces -- leaves the
  * algorithm unchanged.
  */
+/**
+ * Positions already taken by Front Page placements, per selection bucket. A
+ * bucket takes that many fewer automatic stories, so a story an editor
+ * displaced flows on to the next bucket in the ordered pass instead of
+ * vanishing from the page.
+ */
+export type HomepageOccupiedPositions = Partial<Record<"lead" | "inFocus" | "specialCoverage" | "opinion" | "field" | "more" | "latest" | "brief", number>>;
+
 export function resolveCompatibilityHomepageSelection(
   stories: readonly HomepageStoryInput[],
-  reservedStoryIds?: ReadonlySet<number>
+  reservedStoryIds?: ReadonlySet<number>,
+  occupied: HomepageOccupiedPositions = {}
 ): HomepageSelection {
   const usedStoryIds = new Set<number>(reservedStoryIds ?? []);
+  const room = (bucket: keyof HomepageOccupiedPositions, limit: number) => Math.max(0, limit - (occupied[bucket] ?? 0));
   const athleteSpotlightStory = stories.find((story) => story.isAthleteSpotlight) ?? null;
 
   if (athleteSpotlightStory) usedStoryIds.add(athleteSpotlightStory.id);
 
-  const leadStory =
+  const leadStory = room("lead", 1) === 0 ? null :
     stories.find((story) => !usedStoryIds.has(story.id) && story.sticky) ??
     stories.find((story) => !usedStoryIds.has(story.id)) ??
     null;
@@ -114,21 +124,21 @@ export function resolveCompatibilityHomepageSelection(
     takeUnusedStories(
       stories,
       usedStoryIds,
-      1,
+      room("inFocus", 1),
       (story) => story.hasFeaturedImage && storyHasSection(story, ["features", "culture"])
     )[0] ?? null;
-  const specialCoverageStories = takeUnusedStories(stories, usedStoryIds, 3, (story) => story.isSpecialCoverage);
-  const opinionStories = takeUnusedStories(stories, usedStoryIds, 3, (story) => storyHasSection(story, ["opinion"]));
-  const fieldStories = takeUnusedStories(stories, usedStoryIds, 3, (story) => storyHasSection(story, ["sports"]));
-  const moreStories = takeDiverseUnusedStories(stories, usedStoryIds, 4, [
+  const specialCoverageStories = takeUnusedStories(stories, usedStoryIds, room("specialCoverage", 3), (story) => story.isSpecialCoverage);
+  const opinionStories = takeUnusedStories(stories, usedStoryIds, room("opinion", 3), (story) => storyHasSection(story, ["opinion"]));
+  const fieldStories = takeUnusedStories(stories, usedStoryIds, room("field", 3), (story) => storyHasSection(story, ["sports"]));
+  const moreStories = takeDiverseUnusedStories(stories, usedStoryIds, room("more", 4), [
     "news",
     "features",
     "culture",
     "opinion",
     "sports"
   ]);
-  const latestStories = takeUnusedStories(stories, usedStoryIds, 4);
-  const briefStories = takeUnusedStories(stories, usedStoryIds, 4);
+  const latestStories = takeUnusedStories(stories, usedStoryIds, room("latest", 4));
+  const briefStories = takeUnusedStories(stories, usedStoryIds, room("brief", 4));
 
   return {
     athleteSpotlightStory,

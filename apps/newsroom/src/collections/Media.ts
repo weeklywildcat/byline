@@ -1,6 +1,6 @@
 import { protectStoryMedia } from "../newsroom/story-media-uses";
 import { artDirectionIntentsEqual, normalizeArtDirectionIntent, type ImageDimensions } from "@byline/core";
-import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionBeforeOperationHook, CollectionConfig, PayloadRequest } from "payload";
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type PayloadRequest } from "payload";
 import { atLeast, requestUser, signedIn } from "../access/user";
 import { legacyIdField } from "../fields/slug";
 import { privateMediaDir } from "../publication-media/paths";
@@ -119,6 +119,9 @@ const trackPublicationRevision: CollectionBeforeChangeHook = ({ data, originalDo
  */
 const stripNativeFocalEdits: CollectionBeforeOperationHook = ({ args, operation }) => {
   if (operation !== "create" && operation !== "update" && operation !== "updateByID") return args;
+  // The multipart limit is shared with private reporting files (larger); Media keeps its own.
+  const size = (args.req?.file as { size?: number } | undefined)?.size;
+  if (typeof size === "number" && size >= MEDIA_UPLOAD_MAX_BYTES) throw new APIError("That file is too large to upload.", 413);
   const data = args.data as Record<string, unknown> | undefined;
   if (data) {
     delete data.focalX;
@@ -234,6 +237,21 @@ export const Media: CollectionConfig = {
       ]
     },
     { name: "uploadedBy", type: "relationship", relationTo: "users", index: true, admin: { readOnly: true, position: "sidebar" }, access: { update: systemOnly } },
+    // Capture provenance (docs/field-mode.md#media-provenance): where a photo was taken for, set by the capture
+    // endpoint from what Byline already knew. Private: never part of the public Media projection.
+    {
+      name: "capture",
+      type: "group",
+      admin: { readOnly: true, position: "sidebar" },
+      access: { create: systemOnly, update: systemOnly },
+      fields: [
+        { name: "story", type: "relationship", relationTo: "stories", index: true },
+        { name: "assignment", type: "relationship", relationTo: "production-assignments", index: true },
+        { name: "originalHash", type: "text", index: true },
+        // The Field outbox's idempotency key: a retried upload finds this asset instead of making a second.
+        { name: "clientKey", type: "text", unique: true, index: true }
+      ]
+    },
     legacyIdField()
   ]
 };

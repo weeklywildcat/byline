@@ -9,6 +9,7 @@ import type { WorkspaceClient } from "@byline/newsroom-screens/workspace/workspa
 import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, ScheduleResponse, StoryResource, StoryWorkspace } from "@byline/newsroom-screens/workspace/workspace-types";
 import { queryPath } from "@byline/newsroom-screens/planning/planning-api";
 import type { StoryCorrections } from "../../newsroom/story-corrections";
+import type { StoryDistributionView } from "../../distribution/server";
 import { createPayloadCollectionApi } from "../collections/payload-collection-api";
 
 /**
@@ -87,7 +88,11 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     updateCorrection: async (id, correctionId, input) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id, correctionId), "PATCH", correctionInput(input))),
     deleteCorrection: async (id, correctionId, expected) => correctionPayload(id, await request<StoryCorrections>(correctionPath(id, correctionId), "DELETE", { expected })),
     getActivity: (id) => request(`/stories/${id}/activity`),
-    getDistribution: (id) => request(`/stories/${id}/distribution`),
+    // The shared screens' summary of a Story's distribution; the newsroom's own surface is StoryDistribution / the desk.
+    getDistribution: async (id) => {
+      const view = await request<StoryDistributionView>(`/stories/${id}/distribution`);
+      return { storyId: view.story.id, headline: view.copy.headline, canonicalUrl: view.copy.canonicalUrl ?? "", excerpt: view.copy.excerpt, channels: [], capabilities: { addToNewsletter: false } };
+    },
     distributionAction: notYet("Distribution"),
     addToNewsletter: notYet("Newsletters")
   };

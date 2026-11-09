@@ -122,7 +122,10 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "text", type: "textarea", required: true, maxLength: LIMITS.quote },
     { name: "attribution", type: "text", required: true, maxLength: LIMITS.attribution },
     { name: "sourceUrl", type: "text", maxLength: LIMITS.webUrl, validate: optionalWebUrl },
-    { name: "sourceLabel", type: "text", maxLength: LIMITS.quoteSourceLabel }
+    { name: "sourceLabel", type: "text", maxLength: LIMITS.quoteSourceLabel },
+    // Private provenance: the newsroom's verified transcript selection this quote was inserted from.
+    // Never part of the semantic body (fields.ts drops it), so it never reaches Live Preview or the public site.
+    { name: "reportingSelection", type: "number", admin: { hidden: true } }
   ]),
   pullQuote: storyBlock("pullQuote", [
     { name: "text", type: "textarea", required: true, maxLength: LIMITS.quote },

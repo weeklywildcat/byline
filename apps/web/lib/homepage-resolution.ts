@@ -67,6 +67,8 @@ export type HomepageResolutionInput = {
   posts: WordPressPost[];
   coverages?: WordPressCoverage[];
   publication: BylinePublicationConfig;
+  /** The active Front Page placements from the snapshot (slot id → Story id); absent means automatic. */
+  placements?: Readonly<Record<string, number>>;
   sportsSchedule: {
     recentScores: SportsGame[];
     upcomingGames: SportsGame[];
@@ -90,6 +92,7 @@ export function resolveHomepageDocument(input: HomepageResolutionInput): Resolve
     stories: toHomepageStoryInputs(input.posts),
     coverages: toHomepageCoverageInputs(input.coverages ?? []),
     publication: toHomepagePublicationInput(input.publication),
+    ...(input.placements ? { placements: input.placements } : {}),
     sportsSchedule: {
       recentScores: input.sportsSchedule.recentScores.map((game) => toSportsResultView(game, input.publication)),
       upcomingGames: input.sportsSchedule.upcomingGames.map(toSportsFixtureView)

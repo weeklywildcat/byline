@@ -25,11 +25,25 @@ access never changes the public profile, historical bylines or story history.
 Story notes are private threaded discussions about the entire Story, with
 replies and resolution. They are not attached to a selection of copy. Native
 Lexical node keys do not survive the complete save/restore lifecycle as durable
-anchors; inline annotation is deferred. Distribution offers copy actions from
-the published headline, deck and URL. No local channel state or delivery
-provider is configured in Payload, so no send, newsletter or delivery controls
-are offered. The legacy shared adapter still has no standalone task list or
-secondary format write; Tasks and Write own those actions.
+anchors, so inline annotation is deferred. Tasks and Write own the task list
+and format actions for a Story.
+
+## Reporting, Field Mode, Front Page and Distribution
+
+The Story screen has a **Reporting** tab ([reporting](reporting.md)): one
+notebook of notes, recordings, documents, photos, links and live updates, with
+transcripts, verified quotes and the article's Reporting sheet. Field Mode
+(`/admin/field`, [Field Mode](field-mode.md)) is phone-first capture with an
+offline outbox. The Front Page Desk (`/admin/front-page`, [front page](front-page.md))
+pins published Stories into the code-owned homepage's slots and publishes or
+schedules those changes.
+
+Use **History → Distribution** for a single Story and **Publish → Distribution**
+for the editors' cross-Story queue. The desk uses a table with a compact row on
+phones, and both routes open the same detail Sheet. Each copy or image field
+follows the published Story until someone chooses Custom. The final link
+field validates in place. A confirmed post freezes its sent content in the
+item's private history. [Distribution](distribution.md)
 
 ## Notifications
 
@@ -46,6 +60,11 @@ eight notifications as WordPress, each on by default, in the inbox and by email:
 | Appointments | New assignees of an appointment | Assigned or reassigned |
 | Publishing failures | Editors and administrators | Public snapshot or media preparation fails for good |
 | Daily due digest | Anyone with something due | 07:00 on the worker clock: open tasks, media work and story deadlines due today or overdue, and today's appointments |
+| Transcripts | Whoever uploaded or requested the recording | A transcript finishes (asynchronous, so the uploader is told) |
+| Front Page failures | Editors | A scheduled homepage change could not be activated |
+| Distribution assignment | New owner | An editor assigns or reassigns destination work |
+| Distribution approval | Editors | Staff mark a destination that needs approval Ready |
+| Distribution failure | Owner and editors | A delivery reports a failure |
 
 Nobody is notified of their own change, and imports notify nobody. A
 notification stores only references (story, actor, a short detail); headlines

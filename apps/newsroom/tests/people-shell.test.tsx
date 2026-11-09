@@ -35,8 +35,9 @@ const child = (view: ReactElement) =>
   (view.props as { children: ReactElement }).children;
 describe("People custom-view authorization and navigation", () => {
   it("places People after Collections only for editor+ and leaves global Create alone", () => {
-    expect(NAVIGATION.at(-2)?.key).toBe("collections");
-    expect(NAVIGATION.at(-1)?.key).toBe("people");
+    const main = NAVIGATION.filter((item) => !item.group);
+    expect(main.at(-2)?.key).toBe("collections");
+    expect(main.at(-1)?.key).toBe("people");
     expect(navigationFor("staff").some((item) => item.key === "people")).toBe(
       false,
     );

@@ -18,6 +18,7 @@ import { PublicSnapshotError } from "./errors";
 import { PreparedMediaCatalog } from "./media";
 import { collectLiveCoverage, hasLiveCoverage, readLiveUpdates } from "./live";
 import { collectPolls } from "./polls";
+import { activePlacements } from "../../front-page/server";
 
 type Datasets = PublicBuildSnapshotV2["datasets"];
 type StoryFacts = Omit<PublicStorySnapshot, "body">;
@@ -171,8 +172,14 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   // don't deploy a rule that would send readers to a missing public document.
   const redirects = collapseRedirects(redirectRows.docs).filter((row) => paths.has(row.to)).map(({ id, from, to }) => ({ id, from, to, status: 301 as const }));
   const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, polls: [...polls.values()], media: catalog.records(), redirects };
+  // The active Front Page placements only (never drafts or schedules). A pinned Story that is no longer
+  // published is left out, so its slot falls back to automatic instead of failing the public build.
+  const active = await activePlacements(payload);
+  const publicStoryIds = new Set(stories.map((row) => row.id));
+  const placements = active ? Object.fromEntries(Object.entries(active.placements).filter(([, storyId]) => publicStoryIds.has(storyId))) : {};
   const snapshot = { schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION, revision, generatedAt: now.toISOString(), publication, datasets,
-    counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])) };
+    counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])),
+    ...(active && Object.keys(placements).length ? { frontPage: { placements, activatedAt: active.activatedAt } } : {}) };
   try {
     return validatePublicBuildSnapshotV2(snapshot, { interactive, tracker });
   } catch (error) {
