@@ -139,6 +139,19 @@ function wp_safe_redirect(string $location): void
 
 require __DIR__ . '/../includes/admin/app.php';
 
+ob_start();
+byline_render_move_notice();
+if (ob_get_clean() !== '') {
+    fail('The newsroom move notice should be hidden before cutover.');
+}
+
+define('BYLINE_NEWSROOM_CUTOVER', true);
+ob_start();
+byline_render_move_notice();
+if (strpos(ob_get_clean(), 'href="https://byline.weeklywildcat.com/"') === false) {
+    fail('The newsroom move notice should link to the staff entrance after cutover.');
+}
+
 function reset_menu_state(): void
 {
     global $registered_menus, $registered_submenus;

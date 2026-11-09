@@ -93,6 +93,27 @@ async function google(page: Page, mode: string) {
   await page.getByRole("link", { name: "Continue with Google" }).click();
 }
 
+test("the staff entrance opens Byline Home after sign-in", async ({ page, request }) => {
+  const root = await request.get("/", { maxRedirects: 0 });
+  expect(root.status()).toBe(307);
+  expect(root.headers().location).toBe("/admin");
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/admin\/login(?:\?.*)?$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Byline" })).toBeVisible();
+  await expect(page.getByText("The Weekly Wildcat newsroom")).toBeVisible();
+  if (configured) {
+    await page.getByRole("button", { name: "Use email and password" }).click();
+  }
+  await signIn(page, staff, password);
+  await expect(page).toHaveURL(/\/admin$/);
+  expect(await currentAccount(page)).toMatchObject({ email: staff });
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+});
+
 test.describe("Google configured", () => {
   test.skip(!configured);
 

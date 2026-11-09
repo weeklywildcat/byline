@@ -27,6 +27,7 @@ export function BylineLogin({ initPageResult: { req }, searchParams }: AdminView
         <section className="byline-login-card" aria-labelledby="byline-login-title">
           <img className="byline-login-logo" src={logo.src} alt="Weekly Wildcat" />
           <h1 id="byline-login-title">Sign in to Byline</h1>
+          <p className="byline-login-subtitle">The Weekly Wildcat newsroom</p>
           <LoginForm
             key={failed ? "google-failed" : "login"}
             google={google && {
