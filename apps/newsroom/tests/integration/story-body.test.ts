@@ -2,7 +2,7 @@ import { createLocalReq, getPayload, type Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIXTURE_BLOCKS } from "../../../../packages/article-body/src/fixtures";
 import { blockFields } from "../../../../packages/editor/tests/lexical-fixture";
-import type { User } from "../../src/payload-types";
+import type { Story, User } from "../../src/payload-types";
 
 /**
  * Story body rules against real PostgreSQL: privileged blocks (Editor's Note,
@@ -49,6 +49,37 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await payload.destroy();
+});
+
+it("opens previously imported empty Lexical roots in the editor and version history", async () => {
+  const emptyRoot = body();
+  const blankParagraph = { root: { children: [{ type: "paragraph", children: [] }] } };
+  const { id } = await payload.create({
+    collection: "stories",
+    context: { bylineImport: true },
+    data: {
+      headline: "Imported story", slug: "imported-empty-body", legacyWordPressId: 3100, _status: "published",
+      contentFormat: "byline-v1", format: "standard", presentation: "standard", body: emptyRoot
+    }
+  });
+  const stored = await payload.db.findOne<Story>({ collection: "stories", where: { id: { equals: id } } });
+  expect(stored?.body).toMatchObject(blankParagraph);
+
+  // Recreate the persisted shape from before the fix, bypassing the field hooks.
+  await payload.db.updateOne({ collection: "stories", id, data: { body: emptyRoot } });
+  const { docs: [version] } = await payload.db.findVersions({ collection: "stories", where: { parent: { equals: id } }, limit: 1 });
+  await payload.db.updateVersion({
+    collection: "stories", id: version!.id, versionData: { version: { ...version!.version, body: emptyRoot } }
+  });
+
+  for (const draft of [false, true]) {
+    const story = await payload.findByID({ collection: "stories", id, draft, depth: 0 });
+    expect(story.body).toMatchObject(blankParagraph);
+  }
+  const history = await payload.findVersionByID({ collection: "stories", id: version!.id, depth: 0 });
+  expect(history.version.body).toMatchObject(blankParagraph);
+  const untouched = await payload.db.findOne<Story>({ collection: "stories", where: { id: { equals: id } } });
+  expect(untouched?.body).toEqual(emptyRoot);
 });
 
 describe("privileged blocks are enforced on the server", () => {
