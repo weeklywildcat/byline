@@ -4,7 +4,7 @@ import { SportsPackage } from "@byline/ui";
 import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
 import { resolveSportsPackage } from "@/lib/sports-packages";
 import type { SportsGame } from "@/lib/headless";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 import { PreExtractionSports } from "./baseline/pre-extraction-sports";
 import { game, post } from "./fixtures/sports-fixture";
 
@@ -17,8 +17,8 @@ import { game, post } from "./fixtures/sports-fixture";
 // live render -- no athlete, no stories, no fixtures, no finals, sports off.
 
 function renderBaseline(options: {
-  fieldPosts: WordPressPost[];
-  athleteSpotlightPost?: WordPressPost | null;
+  fieldPosts: ArchivePost[];
+  athleteSpotlightPost?: ArchivePost | null;
   recentScores?: SportsGame[];
   upcomingGames?: SportsGame[];
   sportsFeatureEnabled?: boolean;
@@ -35,7 +35,7 @@ function renderBaseline(options: {
 }
 
 function renderExtracted(options: {
-  posts: WordPressPost[];
+  posts: ArchivePost[];
   recentScores?: SportsGame[];
   upcomingGames?: SportsGame[];
   sportsFeatureEnabled?: boolean;

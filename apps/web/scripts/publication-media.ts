@@ -17,8 +17,8 @@ import {
 
 /**
  * Build-time acquisition of prepared publication media: the consumer half of
- * docs/publication-media.md. Given a CLOSED set of descriptors (from the
- * canonical public dataset's manifests; Phase 7 supplies them), it downloads
+ * docs/publication-media.md. Given a CLOSED set of descriptors from the
+ * validated public snapshot, it downloads
  * each file from the newsroom's build-only endpoint, verifies SHA-256, byte
  * count and file type while streaming, stages it, and atomically promotes it
  * to its fingerprinted `publicPath` under `out/_byline/media/`.
@@ -28,8 +28,6 @@ import {
  * authentication failure fails the build: there is no fallback to a private
  * original or any other URL. No image is transformed here.
  *
- * It is not part of the WordPress `postbuild` yet: production still uses the
- * WordPress media materializers until the Payload snapshot (Phase 7) feeds it.
  */
 export type MaterializeOptions = {
   descriptors: PublicationBlob[];

@@ -52,7 +52,7 @@ export function publicStoryReference(doc: unknown, options: { timeZone: string; 
 /**
  * A Poll's public definition. A draft poll is not public. Voting is open only
  * while the poll is `open` and inside its window (`opensAt` inclusive,
- * `closesAt` exclusive, the contract in docs/polls.md); counts are never read
+ * `closesAt` exclusive, a half-open window); counts are never read
  * here, so a snapshot of an open poll carries no tallies.
  */
 export function publicPollReference(doc: unknown, now: Date = new Date()): PublicPollReference | null {

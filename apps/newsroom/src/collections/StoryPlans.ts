@@ -32,7 +32,7 @@ export function validResourceUrl(value: unknown): true | string {
  * editorial decision that applies immediately, autosave never touches it, and a
  * version restore never brings back old planning. Nothing here is public.
  *
- * Field rules port docs/editorial-workflow.md: anyone who manages the story
+ * Field rules port docs/newsroom-os.md: anyone who manages the story
  * moves its workflow and edits the brief and links; only editors assign the
  * editor or set the deadline and planned publication.
  */

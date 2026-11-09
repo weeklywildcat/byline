@@ -1,54 +1,7 @@
 # Page authoring
 
-Normal informational pages are authored in WordPress's native Page editor.
-The public static export fetches published Pages from `wp/v2/pages`, generates
-one route per page slug, and renders the API's `content.rendered` as the page
-body. There is no TypeScript copy of the publication's About, Contact, policy,
-or other normal-page prose.
+Create informational pages in the newsroom's Pages collection. Set the title, summary, slug, optional parent, and indexing. Drafts and internal pages stay out of the public snapshot; a hidden page can be linked but is marked noindex. A published public page appears in the sitemap. Renaming a published route records a redirect.
 
-## In WordPress
+Some public routes, including About and the homepage, are implemented in the Astro app. These routes keep their code-owned layout and do not render a second page at the same address.
 
-- Use the native Page editor for normal pages. The editor supports the native
-  excerpt, which supplies the page deck and metadata description.
-- Use the Byline Page document panel for the optional `_byline_page_eyebrow`
-  label shown above the title. The same value is exposed by the compatible
-  `bylinePage.eyebrow` REST field.
-- Use the **Search engines** setting in the same panel (`_byline_page_indexing`,
-  exposed as `bylinePage.indexing`) to decide how the page takes part in search:
-  *Public* (default: in the sitemap and indexable), *Hidden* (`noindex`:
-  published and linkable, but out of the sitemap and marked noindex) or
-  *Internal* (not published on the public site at all). The editors' "CMS
-  Notice" page is always treated as internal.
-- Use `Byline → Page Section` for the common heading/body layout. Its heading
-  level and wide alignment are editable, and its `Default` and `Featured`
-  styles are presentation-only. Core paragraphs, headings, lists, images,
-  quotes, embeds, tables, groups, columns, and buttons remain available inside
-  the section.
-- Use the generic Byline patterns when starting a page. Patterns contain
-  editable blocks and placeholder copy; they are not publication-specific
-  templates.
-
-The homepage composition is maintained in code under `packages/design/src/home-design.ts`. The post editor's editorial workflow remains for stories.
-
-## Sports archive Pages
-
-Published historical games and rosters are converted once into normal Pages grouped by sport and season. The archive uses native headings, paragraphs, links, and tables, with no sports editor or dynamic schedule dependency. See [sports-archive.md](sports-archive.md).
-
-## Migration behavior
-
-Migration version 2 converts fresh Weekly Wildcat installs to block markup. On
-an existing legacy installation, a v1 page is converted in place only when its
-stored `_byline_legacy_seed_hash` and current body still match the original
-seed exactly. A page with changed content or a missing marker is editor-owned:
-it is never overwritten or duplicated. Such pages remain readable through the
-legacy compatibility styles and appear in the Byline health recommendation so
-an editor can convert them manually.
-
-## Static-export contract
-
-The Pages endpoint is a required build input. If it cannot be fetched, the
-build fails rather than silently restoring source-owned page content. The
-sitemap includes each *public* WordPress Page with that page's own modified
-date. Hidden and internal pages, redirected legacy pages (see
-`REDIRECTED_PAGE_SLUGS` in `lib/code-routes.ts`), and URLs already owned by
-application routes are not listed twice. See [seo.md](seo.md).
+Publish historical sports records as regular Pages. See [Sports archive](sports-archive.md) and [SEO](seo.md).

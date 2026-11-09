@@ -1,21 +1,20 @@
 import type { Metadata } from "@/lib/metadata";
 import { optionalBuildData } from "@/lib/build-data";
 import { buildCoveragePresentation, type CoveragePresentation } from "@/lib/coverage-presentation";
-import { getPresentationMediaUrl } from "@/lib/media";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
 import {
   getAllPosts,
   getAllPublicCoverages,
   getCoverageHref,
-  type WordPressCoverage
-} from "@/lib/wordpress";
+  type ArchiveCoverage
+} from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 
 export async function getMetadata(): Promise<Metadata> {
   const coverages = await optionalBuildData(
-    "/wp-json/byline/v1/coverage",
+    "public snapshot: coverage",
     getAllPublicCoverages,
     []
   );
@@ -28,7 +27,7 @@ export async function getMetadata(): Promise<Metadata> {
   });
 }
 
-function coverageSortValue(coverage: WordPressCoverage) {
+function coverageSortValue(coverage: ArchiveCoverage) {
   return coverage.modified || coverage.startDate || "";
 }
 
@@ -41,7 +40,7 @@ function CoverageCard({ view }: { view: CoveragePresentation }) {
       <a className="coverage-card-art" href={view.href} tabIndex={-1} aria-hidden="true">
         {view.artwork ? (
           <img
-            src={getPresentationMediaUrl(view.artwork.url)}
+            src={view.artwork.url}
             alt=""
             width={view.artwork.width ?? undefined}
             height={view.artwork.height ?? undefined}
@@ -65,7 +64,7 @@ function CoverageCard({ view }: { view: CoveragePresentation }) {
   );
 }
 
-function getCoverageIndexSchema(coverages: WordPressCoverage[]) {
+function getCoverageIndexSchema(coverages: ArchiveCoverage[]) {
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -88,7 +87,7 @@ function getCoverageIndexSchema(coverages: WordPressCoverage[]) {
 
 export default async function CoverageIndexPage() {
   const coverages = await optionalBuildData(
-    "/wp-json/byline/v1/coverage",
+    "public snapshot: coverage",
     getAllPublicCoverages,
     []
   );

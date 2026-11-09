@@ -24,7 +24,7 @@ describe("live coverage on the public site", () => {
     expect(view.updatedAt).toBe("2026-10-14T23:40:00.000Z");
     expect(view.updates[0].dateLabel).toBe(formatLiveTime("2026-10-14T23:40:00Z"));
     expect(formatLiveTime("2026-10-14T23:40:00Z")).toBe("Oct 14, 7:40 PM");
-    expect(view.feedUrl).toBe("/api/live/9");
+    expect(view.feedUrl).toBe("/_byline/live/9.json");
     expect(buildArticleLiveView(post())).toBeNull();
   });
 
@@ -95,11 +95,11 @@ describe("live data boundary", () => {
   });
   it("credits each update to its own author with a headshot, profile link and role", () => {
     const story = post({ live: { status: "live", startedAt: "2026-11-02T19:00:00Z", updates: [
-      { ...updates[0], id: 2, date: "2026-11-02T20:00:00Z", author: "Ana Reporter", authorSlug: "ana-reporter", authorRole: "Reporting from the stadium", authorPhoto: { url: "/_wordpress-media/ana.jpg", width: 150, height: 150 } },
+      { ...updates[0], id: 2, date: "2026-11-02T20:00:00Z", author: "Ana Reporter", authorSlug: "ana-reporter", authorRole: "Reporting from the stadium", authorPhoto: { url: "/_byline/media/ana.jpg", width: 150, height: 150 } },
       { ...updates[0], id: 1, date: "2026-11-02T18:00:00Z", author: "Jo Writer", authorSlug: "../evil", authorPhoto: { url: "javascript:alert(1)", width: 150, height: 150 } }
     ] } });
     const [ana, jo] = buildLiveFeed(story)!.updates.map((update) => update.html);
-    expect(ana).toContain('class="article-live-update-avatar author-avatar" src="/_wordpress-media/ana.jpg"');
+    expect(ana).toContain('class="article-live-update-avatar author-avatar" src="/_byline/media/ana.jpg"');
     expect(ana).toContain('<a href="/author/ana-reporter/">Ana Reporter</a>');
     expect(ana).toContain('<span class="article-live-update-role">Reporting from the stadium</span>');
     expect(ana).toContain('data-live-share="update-2"');
@@ -114,7 +114,7 @@ describe("live data boundary", () => {
     expect(view.updatedAt).toBe("2026-11-02T19:00:00.000Z");
     expect(renderToStaticMarkup(<ArticleView presentation={buildArticlePresentation({ post: empty, allPosts: [empty], contributors: [], author: null })} />)).toContain("Updates will appear here.");
     const pinned = post({ live: { status: "ended", startedAt: "2026-11-02T19:00:00Z", endedAt: "2026-11-02T21:00:00Z", updates: [
-      { ...updates[0], pinned: true, title: '<headline>', author: 'Ana & Jo', image: { url: '/_wordpress-media/photo.jpg', alt: 'A "photo"', width: 900, height: 600, credit: 'Jo & Ana' } }
+      { ...updates[0], pinned: true, title: '<headline>', author: 'Ana & Jo', image: { url: '/_byline/media/photo.jpg', alt: 'A "photo"', width: 900, height: 600, credit: 'Jo & Ana' } }
     ] } });
     const feed = buildLiveFeed(pinned)!;
     expect(feed.updates).toHaveLength(1);

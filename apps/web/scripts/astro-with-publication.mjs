@@ -4,46 +4,22 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { tsImport } from "tsx/esm/api";
-
-// The snapshot contract, acquisition and media materializer are TypeScript modules shared with
-// Astro and the tests; tsx loads them here without registering a loader for the Astro child.
-const { parseBuildSnapshot } = await tsImport("../lib/prepared-snapshot.ts", import.meta.url);
 
 const totalStartedAt = Date.now();
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const astroCommand = path.join(path.dirname(require.resolve("astro/package.json")), "bin", "astro.mjs");
 const astroArguments = process.argv.slice(2);
-const defaultWordPressApi = "https://cms.weeklywildcat.com/wp-json/wp/v2";
-
 if (astroArguments.length === 0) throw new Error("An Astro command is required.");
 
-function publicationEndpoint() {
-  if (process.env.BYLINE_PUBLICATION_URL) return process.env.BYLINE_PUBLICATION_URL;
-  return (process.env.NEXT_PUBLIC_WP_API_URL || defaultWordPressApi).replace(/\/wp\/v2\/?$/, "/byline/v1/publication");
-}
-
-async function loadPublication() {
-  if (process.env.BYLINE_PUBLICATION_FILE) {
-    const value = JSON.parse(await readFile(path.resolve(projectRoot, process.env.BYLINE_PUBLICATION_FILE), "utf8"));
-    if (value?.schemaVersion !== 1) throw new Error("BYLINE_PUBLICATION_FILE uses an unsupported schema version.");
-    return value;
-  }
+async function loadFixturePublication() {
   if (process.env.BYLINE_PUBLICATION_JSON) return JSON.parse(process.env.BYLINE_PUBLICATION_JSON);
-  const endpoint = publicationEndpoint();
-  try {
-    const response = await fetch(endpoint, { headers: { "User-Agent": "Byline static publication builder" }, signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    const value = await response.json();
-    if (value?.schemaVersion !== 1) throw new Error("unsupported or missing schemaVersion");
-    console.log(`Loaded Byline publication configuration from ${endpoint}`);
-    return value;
-  } catch (error) {
-    console.warn(`Byline publication endpoint unavailable (${error instanceof Error ? error.message : error}); using compatibility defaults.`);
-    return null;
-  }
+  const file = process.env.BYLINE_PUBLICATION_FILE || "tests/fixtures/weekly-wildcat-publication.json";
+  const value = JSON.parse(await readFile(path.resolve(projectRoot, file), "utf8"));
+  if (value?.schemaVersion !== 1) throw new Error("Unsupported fixture publication schema version.");
+  return value;
 }
 
 /**
@@ -83,82 +59,52 @@ async function invalidateIncrementalBuildWhenSourcesChange() {
 }
 
 const isBuild = astroArguments[0] === "build";
+if (!isBuild) process.env.BYLINE_CONTENT_MODE ??= "weekly-wildcat-fixture";
 const fixture = process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture") || process.env.BYLINE_CONTENT_MODE === "empty";
-const buildIdentity = process.env.WORDPRESS_FETCH_CACHE_KEY || process.env.WORKERS_CI_BUILD_UUID || process.env.WORKERS_CI_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.NETLIFY_COMMIT_REF || `local-${randomUUID()}`;
+const buildIdentity = process.env.WORKERS_CI_BUILD_UUID || process.env.WORKERS_CI_COMMIT_SHA || `local-${randomUUID()}`;
 const acquisitionStarted = performance.now();
+const payloadBuildUrl = process.env.BYLINE_NEWSROOM_BUILD_URL?.trim();
+const snapshotFile = process.env.BYLINE_BUILD_SNAPSHOT_FILE?.trim();
+const minimumRevision = Number(process.env.BYLINE_EXPECTED_REVISION || 0);
 let snapshot;
 let snapshotIdentity;
 let cmsRequests = 0;
 let snapshotBytes = 0;
 let downloadMs = 0;
 let parseMs = 0;
-// Acquisition source, in precedence order (docs/payload-build-snapshots.md#the-build):
-//   1. BYLINE_BUILD_SNAPSHOT_FILE: a deliberate local/offline snapshot.
-//   2. BYLINE_NEWSROOM_BUILD_URL: the Payload newsroom's build-only API (completed snapshot, or
-//      direct-source recovery only when discovery reports the current revision not ready).
-//   3. The existing WordPress pointer + artifact (BYLINE_BUILD_SNAPSHOT_URL or derived).
-//   4. BYLINE_LEGACY_REST_BUILD=1: the explicit legacy REST compatibility mode.
-// A deployed newsroom never turns a WordPress build into a Payload build on its own.
-let snapshotSource = null;
-let acquisitionMode = null;
-const payloadBuildUrl = process.env.BYLINE_NEWSROOM_BUILD_URL?.trim();
-if (isBuild && process.env.BYLINE_LEGACY_REST_BUILD !== "1" && !process.env.BYLINE_BUILD_SNAPSHOT_FILE && payloadBuildUrl) {
+let acquisitionMode = "fixture";
+if (isBuild && snapshotFile) {
+  const { parseNativeSnapshot } = await tsImport("../lib/native-snapshot.ts", import.meta.url);
+  const bytes = await readFile(path.resolve(projectRoot, snapshotFile));
+  const started = performance.now();
+  snapshot = parseNativeSnapshot(bytes, undefined, minimumRevision);
+  parseMs = performance.now() - started;
+  snapshotBytes = bytes.byteLength;
+  snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: createHash("sha256").update(bytes).digest("hex"), bytes: snapshotBytes, attempts: 1 };
+  acquisitionMode = "prepared-snapshot";
+} else if (isBuild && payloadBuildUrl) {
   const { acquirePayloadSnapshot } = await tsImport("../lib/build-acquisition.ts", import.meta.url);
-  const acquired = await acquirePayloadSnapshot({ baseUrl: payloadBuildUrl, token: process.env.BYLINE_BUILD_TOKEN ?? "", minimumRevision: Number(process.env.BYLINE_EXPECTED_REVISION || 0) });
+  const acquired = await acquirePayloadSnapshot({ baseUrl: payloadBuildUrl, token: process.env.BYLINE_BUILD_TOKEN ?? "", minimumRevision });
   snapshot = acquired.snapshot;
-  snapshotSource = "payload";
   acquisitionMode = acquired.mode;
   cmsRequests = acquired.requests;
   snapshotBytes = acquired.bytes.byteLength;
   downloadMs = acquired.downloadMs;
+  parseMs = acquired.parseMs;
   snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: acquired.digest, bytes: snapshotBytes, attempts: acquired.attempts };
   console.log(`[byline] Payload snapshot acquired by ${acquired.mode}: revision ${acquired.revision}, ${snapshotBytes} bytes, ${acquired.digest.slice(0, 12)}…`);
-} else if (isBuild && (!fixture || process.env.BYLINE_BUILD_SNAPSHOT_FILE || process.env.BYLINE_BUILD_SNAPSHOT_URL) && process.env.BYLINE_LEGACY_REST_BUILD !== "1") {
-  let bytes;
-  let pointer;
-  if (process.env.BYLINE_BUILD_SNAPSHOT_FILE) {
-    // Deliberate offline fixture/benchmark input; still enforce the contract.
-    bytes = await readFile(path.resolve(projectRoot, process.env.BYLINE_BUILD_SNAPSHOT_FILE));
-    snapshotSource = payloadBuildUrl ? "payload" : "file";
-  } else {
-    snapshotSource = "wordpress";
-    const endpoint = new URL(process.env.BYLINE_BUILD_SNAPSHOT_URL || publicationEndpoint().replace(/\/publication\/?$/, "/build-snapshot"));
-    endpoint.searchParams.set("_byline_build", buildIdentity);
-    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(30000) });
-    cmsRequests++;
-    if (!response.ok) throw new Error(`Prepared build snapshot discovery failed: HTTP ${response.status}. Prepare a completed snapshot in WordPress before building.`);
-    pointer = await response.json();
-    if (pointer?.schemaVersion !== 1 || !Number.isSafeInteger(pointer.revision) || !/^[a-f0-9]{64}$/.test(pointer.digest) || !Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0) throw new Error("Invalid build snapshot discovery metadata");
-    const artifact = new URL(pointer.url);
-    if (artifact.protocol !== "https:" && !(artifact.protocol === "http:" && ["127.0.0.1", "localhost"].includes(artifact.hostname))) throw new Error("Build snapshot artifact must use HTTPS");
-    const downloadStarted = performance.now();
-    const artifactResponse = await fetch(artifact, { signal: AbortSignal.timeout(60000) });
-    cmsRequests++;
-    if (!artifactResponse.ok) throw new Error(`Build snapshot download failed: HTTP ${artifactResponse.status}`);
-    bytes = Buffer.from(await artifactResponse.arrayBuffer());
-    downloadMs = performance.now() - downloadStarted;
-  }
-  acquisitionMode = "prepared-snapshot";
-  snapshotBytes = bytes.byteLength;
-  const parseStarted = performance.now();
-  const minimumRevision = Number(process.env.BYLINE_EXPECTED_REVISION || 0);
-  if (snapshotSource === "payload") {
-    const { parseNativeSnapshot } = await tsImport("../lib/native-snapshot.ts", import.meta.url);
-    snapshot = parseNativeSnapshot(bytes, undefined, minimumRevision);
-  } else {
-    snapshot = parseBuildSnapshot(bytes, pointer, minimumRevision);
-  }
-  parseMs = performance.now() - parseStarted;
-  snapshotIdentity = { schemaVersion: snapshot.schemaVersion, revision: snapshot.revision, generatedAt: snapshot.generatedAt, artifactDigest: createHash("sha256").update(bytes).digest("hex"), bytes: snapshotBytes };
+} else if (!fixture) {
+  throw new Error("Set BYLINE_NEWSROOM_BUILD_URL and BYLINE_BUILD_TOKEN for a public build, or BYLINE_CONTENT_MODE=weekly-wildcat-fixture for a local preview.");
 }
+const snapshotSource = snapshot ? "payload" : null;
 // Prepared publication media named by the accepted snapshot (Payload manifests): a closed,
-// validated descriptor set, acquired after Astro renders. WordPress snapshots have none.
+// validated descriptor set, acquired after Astro renders. Fixture builds have none.
 let publicationMediaDescriptors = [];
-if (snapshotSource === "payload") {
+if (snapshot) {
   const { descriptorsFromManifests, closedDescriptorSet } = await tsImport("./publication-media.ts", import.meta.url);
   publicationMediaDescriptors = closedDescriptorSet(descriptorsFromManifests(snapshot.datasets.media.map(({ manifest }) => manifest)));
 }
-const publication = snapshot?.publication ?? await loadPublication();
+const publication = snapshot?.publication ?? await loadFixturePublication();
 if (publication) publication.appearance = { theme: "weekly-wildcat", tokenOverrides: {} };
 const acquisitionMs = performance.now() - acquisitionStarted;
 if (astroArguments[0] === "build") {
@@ -166,14 +112,12 @@ if (astroArguments[0] === "build") {
   const buildDirectory = path.join(projectRoot, ".byline-build");
   await rm(buildDirectory, { recursive: true, force: true });
   await mkdir(buildDirectory, { recursive: true });
-  if (snapshot) await rm(path.join(projectRoot, "public/_wordpress-media"), { recursive: true, force: true });
 }
 if (snapshot) {
   // The one local contract every acquisition mode converges on; from here there is one code path.
   const file = path.join(projectRoot, ".byline-build", "public-snapshot.json");
   await writeFile(file, JSON.stringify(snapshot));
   process.env.BYLINE_PREPARED_SNAPSHOT_FILE = file;
-  process.env.BYLINE_PREPARED_SNAPSHOT_PROVIDER = snapshotSource === "payload" ? "payload" : "wordpress";
   if (publicationMediaDescriptors.length) await writeFile(path.join(projectRoot, ".byline-build", "publication-media-descriptors.json"), JSON.stringify(publicationMediaDescriptors));
 }
 const buildStarted = performance.now();
@@ -182,10 +126,8 @@ const child = spawn(process.execPath, [...(snapshot ? ["--import", path.join(pro
   cwd: projectRoot,
   env: {
     ...process.env,
-    WORDPRESS_FETCH_CACHE_KEY: buildIdentity,
     ...(publication ? { BYLINE_PUBLICATION_JSON: JSON.stringify(publication) } : {}),
     ...(publication?.urls?.publicSite && !process.env.NEXT_PUBLIC_SITE_URL ? { NEXT_PUBLIC_SITE_URL: publication.urls.publicSite } : {}),
-    ...(publication?.urls?.cms && !process.env.NEXT_PUBLIC_WP_API_URL ? { NEXT_PUBLIC_WP_API_URL: `${String(publication.urls.cms).replace(/\/$/, "")}/wp-json/wp/v2` } : {})
   },
   stdio: ["inherit", "pipe", "inherit"]
 });
@@ -219,8 +161,8 @@ if (astroArguments[0] === "build") {
   const restored = (cleanLog.match(/\((?:restored|cached)\)/g) || []).length;
   const emitted = (cleanLog.match(/[├└]─ /g) || []).length;
   await writeFile(path.join(projectRoot, ".byline-build", "frontend-phases.json"), JSON.stringify({
-    totalStartedAt, acquisitionMs, downloadMs, parseMs, snapshotBytes, snapshotIdentity, cmsRequests: snapshot ? cmsRequests : fixture ? 0 : null,
-    dataMode: snapshot ? acquisitionMode : fixture ? "fixture" : "legacy-rest-compatibility",
+    totalStartedAt, acquisitionMs, downloadMs, parseMs, snapshotBytes, snapshotIdentity, cmsRequests,
+    dataMode: acquisitionMode,
     snapshotSource, publicationMedia: publicationMediaMetrics,
     buildIdentity, commit: process.env.WORKERS_CI_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || null,
     branch: process.env.WORKERS_CI_BRANCH || process.env.CF_PAGES_BRANCH || null,

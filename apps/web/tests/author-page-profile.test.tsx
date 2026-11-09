@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ posts: [] as unknown[] }));
-vi.mock("@/lib/wordpress", () => ({
+vi.mock("@/lib/public-content", () => ({
   getContributorBySlug: async () => ({
     id: 99,
     name: "Quiet Writer",

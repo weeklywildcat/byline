@@ -33,14 +33,14 @@ import {
   getPostHref,
   getPostRouteParts,
   isGuestContributor,
-  type WordPressCategory,
-  type WordPressContributor,
-  type WordPressCorrection,
-  type WordPressCoverage,
-  type WordPressPage,
-  type WordPressPost,
-  type WordPressTag
-} from "@/lib/wordpress";
+  type ArchiveCategory,
+  type ArchiveContributor,
+  type ArchiveCorrection,
+  type ArchiveCoverage,
+  type ArchivePage,
+  type ArchivePost,
+  type ArchiveTag
+} from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 
@@ -49,33 +49,33 @@ export type BylineSportsSnapshot = {
   rosters: SportsRoster[];
   teamMedia: SportsTeamMedia[];
   teams: TeamSummary[];
-  coverages: WordPressCoverage[];
+  coverages: ArchiveCoverage[];
 };
 
 export type WebBuildSnapshot = BylineBuildSnapshot<
-  WordPressPost,
-  WordPressContributor,
-  WordPressCategory,
-  WordPressTag,
-  WordPressPage,
-  WordPressCorrection,
+  ArchivePost,
+  ArchiveContributor,
+  ArchiveCategory,
+  ArchiveTag,
+  ArchivePage,
+  ArchiveCorrection,
   SportsGame,
   BylineSportsSnapshot
 >;
 
-function contributorIdentity(contributor: WordPressContributor) {
+function contributorIdentity(contributor: ArchiveContributor) {
   return `${isGuestContributor(contributor) ? "guest" : "user"}:${contributor.id}`;
 }
 
-function postContributorIdentities(post: WordPressPost) {
+function postContributorIdentities(post: ArchivePost) {
   return getPostContributors(post).map(contributorIdentity);
 }
 
 function routeEntries(input: {
-  posts: WordPressPost[];
-  contributors: WordPressContributor[];
-  categories: WordPressCategory[];
-  pages: WordPressPage[];
+  posts: ArchivePost[];
+  contributors: ArchiveContributor[];
+  categories: ArchiveCategory[];
+  pages: ArchivePage[];
   sports: BylineSportsSnapshot;
 }): RouteManifestEntry[] {
   const archiveHref = getSportsArchiveHref(input.pages);
@@ -116,25 +116,25 @@ function routeEntries(input: {
 async function loadSnapshot(): Promise<WebBuildSnapshot> {
   return buildSnapshot({
     loaders: {
-      posts: () => requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
-      contributors: () => requireBuildData("/wp-json/byline/v1/contributors", getAllPublicContributors),
-      categories: () => requireBuildData("/wp-json/wp/v2/categories", getAllCategories),
+      posts: () => requireBuildData("public snapshot: posts", getAllPosts),
+      contributors: () => requireBuildData("public snapshot: contributors", getAllPublicContributors),
+      categories: () => requireBuildData("public snapshot: categories", getAllCategories),
       tags: async () => {
-        const posts = await requireBuildData("/wp-json/wp/v2/posts", getAllPosts);
-        const tags = new Map<number, WordPressTag>();
+        const posts = await requireBuildData("public snapshot: posts", getAllPosts);
+        const tags = new Map<number, ArchiveTag>();
         for (const post of posts) {
           for (const termGroup of post._embedded?.["wp:term"] ?? []) {
             for (const term of termGroup) {
-              if (term.taxonomy === "post_tag" && "id" in term) tags.set(term.id, term as WordPressTag);
+              if (term.taxonomy === "post_tag" && "id" in term) tags.set(term.id, term as ArchiveTag);
             }
           }
         }
         return [...tags.values()];
       },
-      corrections: () => optionalBuildData("/wp-json/byline/v1/corrections", getAllPublicCorrections, []),
-      pages: () => requireBuildData("/wp-json/wp/v2/pages", getAllPages),
+      corrections: () => optionalBuildData("public snapshot: corrections", getAllPublicCorrections, []),
+      pages: () => requireBuildData("public snapshot: pages", getAllPages),
       sports: async () => {
-        const coverages = await optionalBuildData("/wp-json/byline/v1/coverage", getAllPublicCoverages, []);
+        const coverages = await optionalBuildData("public snapshot: coverage", getAllPublicCoverages, []);
         return { games: [], rosters: [], teamMedia: [], teams: [], coverages };
       },
       games: (sports) => sports.games

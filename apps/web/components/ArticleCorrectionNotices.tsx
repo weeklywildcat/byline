@@ -1,8 +1,8 @@
 import { formatDisplayDate } from "@/lib/format";
-import { getCorrectionTypeLabel, type WordPressCorrection } from "@/lib/wordpress";
+import { getCorrectionTypeLabel, type ArchiveCorrection } from "@/lib/public-content";
 
 type ArticleCorrectionNoticesProps = {
-  corrections: WordPressCorrection[];
+  corrections: ArchiveCorrection[];
 };
 
 export function ArticleCorrectionNotices({ corrections }: ArticleCorrectionNoticesProps) {

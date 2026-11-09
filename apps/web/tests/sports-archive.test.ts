@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { getSportsArchiveHref, getSportsArchiveRedirects } from "@/lib/sports-archive";
 import fixture from "./fixtures/weekly-wildcat-content.json";
-import type { WordPressPage } from "@/lib/wordpress";
+import type { ArchivePage } from "@/lib/public-content";
 
-const pages = fixture.pages as WordPressPage[];
+const pages = fixture.pages as ArchivePage[];
 
 describe("sports archive Pages", () => {
   it("preserves historical team and season links using the actual migrated Page slug", () => {

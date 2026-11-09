@@ -3,7 +3,7 @@ import { bigserial, index, pgTable, timestamp, uniqueIndex, varchar } from "driz
 
 /**
  * Poll votes: transactional rows, not Payload documents. Same shape and
- * constraint as the WordPress `byline_poll_votes` table (docs/polls.md):
+ * constraint on poll and voter identity:
  * duplicate protection is the unique key, never a read-then-write. The table
  * joins Payload's Drizzle schema so migrations create it, but it is not a
  * collection: no admin screen, REST or GraphQL route can list vote rows.

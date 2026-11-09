@@ -2,7 +2,7 @@ import { SCHEDULE_MODES, type ScheduleMode } from "./vocabulary";
 
 /**
  * Appointment timing, ported from `byline_story_appointment_build()`
- * (wordpress-plugin/includes/editorial/reporting.php).
+ *.
  *
  * The mode decides which fields survive, so switching modes never leaves a
  * stale value active. A target window is date-only text and is never turned

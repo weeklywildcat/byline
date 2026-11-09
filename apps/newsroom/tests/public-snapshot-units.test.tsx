@@ -1,7 +1,7 @@
 import { mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { publicationLocalDate, publicationLocalMinute, publicStoryPath, wordpressGmtDateTime, wordpressLocalDateTime } from "@byline/content";
+import { publicationLocalDate, publicationLocalMinute, publicStoryPath, publicationUtcDateTime, publicationLocalDateTime } from "@byline/content";
 import { afterEach, describe, expect, it } from "vitest";
 import { payloadPublicStory } from "../src/preview/payload-story";
 import { DEFAULT_PREVIEW_PUBLICATION } from "../src/preview/publication";
@@ -17,8 +17,8 @@ describe("publication-local dates and the article path", () => {
   it("dates an ordinary Eastern daytime publication by its local day", () => {
     const instant = "2026-10-14T14:05:09.000Z"; // 10:05:09 a.m. EDT
     expect(publicationLocalDate(instant, NY)).toBe("2026-10-14");
-    expect(wordpressLocalDateTime(instant, NY)).toBe("2026-10-14T10:05:09");
-    expect(wordpressGmtDateTime(instant)).toBe("2026-10-14T14:05:09");
+    expect(publicationLocalDateTime(instant, NY)).toBe("2026-10-14T10:05:09");
+    expect(publicationUtcDateTime(instant)).toBe("2026-10-14T14:05:09");
     expect(publicStoryPath({ slug: "budget", sectionSlug: "news", publishedAt: instant, timeZone: NY })).toBe("/2026/10/14/news/budget/");
   });
 
@@ -26,18 +26,18 @@ describe("publication-local dates and the article path", () => {
     const instant = "2026-11-08T04:30:00.000Z"; // 11:30 p.m. EST on Nov 7
     expect(instant.slice(0, 10)).toBe("2026-11-08");
     expect(publicationLocalDate(instant, NY)).toBe("2026-11-07");
-    expect(wordpressLocalDateTime(instant, NY)).toBe("2026-11-07T23:30:00");
-    expect(wordpressGmtDateTime(instant)).toBe("2026-11-08T04:30:00");
+    expect(publicationLocalDateTime(instant, NY)).toBe("2026-11-07T23:30:00");
+    expect(publicationUtcDateTime(instant)).toBe("2026-11-08T04:30:00");
     expect(publicStoryPath({ slug: "late-game", sectionSlug: "sports", publishedAt: instant, timeZone: NY })).toBe("/2026/11/07/sports/late-game/");
   });
 
   it("follows daylight-saving transitions", () => {
     // Spring forward: 2026-03-08 02:00 EST → 03:00 EDT.
-    expect(wordpressLocalDateTime("2026-03-08T06:59:00.000Z", NY)).toBe("2026-03-08T01:59:00");
-    expect(wordpressLocalDateTime("2026-03-08T07:00:00.000Z", NY)).toBe("2026-03-08T03:00:00");
+    expect(publicationLocalDateTime("2026-03-08T06:59:00.000Z", NY)).toBe("2026-03-08T01:59:00");
+    expect(publicationLocalDateTime("2026-03-08T07:00:00.000Z", NY)).toBe("2026-03-08T03:00:00");
     // Fall back: 2026-11-01 02:00 EDT → 01:00 EST; both 1:30s are Nov 1.
-    expect(wordpressLocalDateTime("2026-11-01T05:30:00.000Z", NY)).toBe("2026-11-01T01:30:00");
-    expect(wordpressLocalDateTime("2026-11-01T06:30:00.000Z", NY)).toBe("2026-11-01T01:30:00");
+    expect(publicationLocalDateTime("2026-11-01T05:30:00.000Z", NY)).toBe("2026-11-01T01:30:00");
+    expect(publicationLocalDateTime("2026-11-01T06:30:00.000Z", NY)).toBe("2026-11-01T01:30:00");
     // 11:45 p.m. on the evening before the change, already Nov 1 in UTC.
     expect(publicStoryPath({ slug: "s", sectionSlug: "news", publishedAt: "2026-11-01T03:45:00.000Z", timeZone: NY })).toBe("/2026/10/31/news/s/");
     expect(publicationLocalMinute("2026-03-08T07:30:00.000Z", NY)).toBe("2026-03-08T03:30");

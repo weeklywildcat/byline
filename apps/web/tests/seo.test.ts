@@ -27,22 +27,22 @@ const tagValues = (metadata: ReturnType<typeof buildPageMetadata>, key: string) 
 describe("absolute social image URLs", () => {
   it("resolves mirrored WordPress media against the public origin", () => {
     const [image] = buildSocialImageMetadata(media());
-    expect(image.url).toBe(`${ORIGIN}/_wordpress-media/2026/10/photo.jpg`);
+    expect(image.url).toBe(`${ORIGIN}/_byline/media/2026/10/photo.jpg`);
   });
 
   it("never prepends the origin twice and leaves absolute URLs alone", () => {
-    for (const url of ["https://cms.weeklywildcat.com/wp-content/uploads/a.jpg", `${ORIGIN}/_wordpress-media/a.jpg`, "http://example.org/a.jpg"]) {
+    for (const url of ["https://cms.weeklywildcat.com/wp-content/uploads/a.jpg", `${ORIGIN}/_byline/media/a.jpg`, "http://example.org/a.jpg"]) {
       expect(buildSocialImageMetadata({ url })[0].url).toBe(url);
       expect(buildSocialImageMetadata(media({ source_url: url }))[0].url).toBe(url);
     }
-    expect(absoluteUrl(absoluteUrl("/_wordpress-media/a.jpg"))).toBe(`${ORIGIN}/_wordpress-media/a.jpg`);
+    expect(absoluteUrl(absoluteUrl("/_byline/media/a.jpg"))).toBe(`${ORIGIN}/_byline/media/a.jpg`);
     expect(absoluteUrl("//cdn.example.org/a.jpg")).toBe("https://cdn.example.org/a.jpg");
-    expect(absoluteUrl("_wordpress-media/a.jpg")).toBe(`${ORIGIN}/_wordpress-media/a.jpg`);
+    expect(absoluteUrl("_byline/media/a.jpg")).toBe(`${ORIGIN}/_byline/media/a.jpg`);
   });
 
   it("makes author photos and the default share image absolute", () => {
-    expect(buildSocialImageMetadata({ url: "/_wordpress-media/2026/10/author.jpg", width: 400, height: 400, alt: "Gibson Bell" })[0]).toEqual({
-      url: `${ORIGIN}/_wordpress-media/2026/10/author.jpg`, width: 400, height: 400, alt: "Gibson Bell"
+    expect(buildSocialImageMetadata({ url: "/_byline/media/2026/10/author.jpg", width: 400, height: 400, alt: "Gibson Bell" })[0]).toEqual({
+      url: `${ORIGIN}/_byline/media/2026/10/author.jpg`, width: 400, height: 400, alt: "Gibson Bell"
     });
     expect(buildSocialImageMetadata(null)[0].url).toMatch(/^https:\/\/weeklywildcat\.com\/.+\.png$/);
     expect(buildSocialImageMetadata({ url: "  " })[0].url).toMatch(/^https:\/\//);
@@ -53,8 +53,8 @@ describe("absolute social image URLs", () => {
       title: "Story", description: "A story", path: "/2026/10/14/news/story/", type: "article",
       image: media({ alt_text: "Students at the homecoming parade", media_details: { width: 1600, height: 900 } })
     });
-    expect(tagValues(metadata, "og:image")).toEqual([`${ORIGIN}/_wordpress-media/2026/10/photo.jpg`]);
-    expect(tagValues(metadata, "twitter:image")).toEqual([`${ORIGIN}/_wordpress-media/2026/10/photo.jpg`]);
+    expect(tagValues(metadata, "og:image")).toEqual([`${ORIGIN}/_byline/media/2026/10/photo.jpg`]);
+    expect(tagValues(metadata, "twitter:image")).toEqual([`${ORIGIN}/_byline/media/2026/10/photo.jpg`]);
     expect(tagValues(metadata, "og:image:width")).toEqual(["1600"]);
     expect(tagValues(metadata, "og:image:height")).toEqual(["900"]);
     expect(tagValues(metadata, "og:image:alt")).toEqual(["Students at the homecoming parade"]);
@@ -70,11 +70,11 @@ describe("profile social metadata", () => {
       description: "Editor-in-chief of the Weekly Wildcat.",
       path: "/author/gibson/",
       type: "profile",
-      image: { url: "/_wordpress-media/gibson.jpg", width: 800, height: 1000, alt: "Gibson Bell" }
+      image: { url: "/_byline/media/gibson.jpg", width: 800, height: 1000, alt: "Gibson Bell" }
     });
 
     expect(tagValues(metadata, "twitter:card")).toEqual(["summary"]);
-    expect(tagValues(metadata, "twitter:image")).toEqual([`${ORIGIN}/_wordpress-media/gibson.jpg`]);
+    expect(tagValues(metadata, "twitter:image")).toEqual([`${ORIGIN}/_byline/media/gibson.jpg`]);
   });
 });
 
@@ -151,7 +151,7 @@ describe("article authors", () => {
         pronouns: "",
         role: "Editor-in-Chief",
         showInDirectory: true,
-        profilePhoto: { id: 99, url: "/_wordpress-media/gibson.jpg", alt: "Gibson Bell", width: 800, height: 800 },
+        profilePhoto: { id: 99, url: "/_byline/media/gibson.jpg", alt: "Gibson Bell", width: 800, height: 800 },
         socials: { website: "", email: "", instagram: "", tiktok: "", linkedin: "", x: "" }
       }
     };
@@ -167,7 +167,7 @@ describe("article authors", () => {
     expect(person.image).toMatchObject({
       "@type": "ImageObject",
       "@id": `${ORIGIN}/author/gibson/#profile-image`,
-      url: `${ORIGIN}/_wordpress-media/gibson.jpg`
+      url: `${ORIGIN}/_byline/media/gibson.jpg`
     });
     expect(profile.primaryImageOfPage).toEqual({ "@id": `${ORIGIN}/author/gibson/#profile-image` });
     expect(hasPart[0]["@id"]).toBe(getNewsArticleId(story));
@@ -210,25 +210,25 @@ describe("publication structured data", () => {
 
 describe("NewsArticle image variants", () => {
   it("lists the original plus the largest size in each Google ratio the upload already has", () => {
-    const sized = (width: number, height: number) => ({ file: "", width, height, source_url: `/_wordpress-media/${width}x${height}.jpg` });
+    const sized = (width: number, height: number) => ({ file: "", width, height, source_url: `/_byline/media/${width}x${height}.jpg` });
     const candidates = getArticleImageCandidates(media({
-      source_url: "/_wordpress-media/original.jpg",
+      source_url: "/_byline/media/original.jpg",
       media_details: { width: 2560, height: 1440, sizes: { medium: sized(300, 169), large: sized(1024, 576), "1536x1536": sized(1536, 864), thumbnail: sized(150, 150) } }
     }));
-    expect(candidates.map((candidate) => candidate.url)).toEqual(["/_wordpress-media/original.jpg"]);
+    expect(candidates.map((candidate) => candidate.url)).toEqual(["/_byline/media/original.jpg"]);
 
     const fourByThree = getArticleImageCandidates(media({
-      source_url: "/_wordpress-media/original.jpg",
+      source_url: "/_byline/media/original.jpg",
       media_details: { width: 2560, height: 1920, sizes: { large: sized(1024, 768), "1536x1536": sized(1536, 1152), thumbnail: sized(150, 150) } }
     }));
-    expect(fourByThree.map((candidate) => candidate.url)).toEqual(["/_wordpress-media/original.jpg"]);
+    expect(fourByThree.map((candidate) => candidate.url)).toEqual(["/_byline/media/original.jpg"]);
 
     const mixed = getArticleImageCandidates(media({
-      source_url: "/_wordpress-media/original.jpg",
+      source_url: "/_byline/media/original.jpg",
       media_details: { width: 2000, height: 1333, sizes: { square: sized(1200, 1200), wide: sized(1600, 900), classic: sized(1200, 900), tiny: sized(100, 100) } }
     }));
     expect(mixed.map((candidate) => candidate.url)).toEqual([
-      "/_wordpress-media/original.jpg", "/_wordpress-media/1200x1200.jpg", "/_wordpress-media/1600x900.jpg", "/_wordpress-media/1200x900.jpg"
+      "/_byline/media/original.jpg", "/_byline/media/1200x1200.jpg", "/_byline/media/1600x900.jpg", "/_byline/media/1200x900.jpg"
     ]);
   });
 
@@ -245,7 +245,7 @@ describe("NewsArticle image variants", () => {
     expect(article["@id"]).toBe(`${ORIGIN}/2026/10/14/news/homecoming-week/#article`);
     expect(image["@id"]).toBe(`${ORIGIN}/2026/10/14/news/homecoming-week/#primaryimage`);
     expect(article.primaryImageOfPage).toEqual({ "@id": `${ORIGIN}/2026/10/14/news/homecoming-week/#primaryimage` });
-    expect(image.contentUrl).toBe(`${ORIGIN}/_wordpress-media/2026/10/photo.jpg`);
+    expect(image.contentUrl).toBe(`${ORIGIN}/_byline/media/2026/10/photo.jpg`);
     expect(image.creator).toEqual({ "@type": "Person", name: "Gibson Bell" });
     expect(image.license).toBe(`${ORIGIN}/image-license/`);
   });

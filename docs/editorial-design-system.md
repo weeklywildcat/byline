@@ -5,7 +5,7 @@ sans-serif labels, ink and hairlines, one accent. A dramatic photograph and a
 contextual note differ in **weight**, never in **dialect**. The rules below are
 implemented once, in `packages/ui/src/newsroom/figure.css` (tokens, captions,
 credits, labels) and the per-feature partials beside it, and they apply
-identically on the public article, in the Gutenberg canvas, in Preview as
+identically on the public article, in the editor canvas, in Preview as
 Byline and in the Payload newsroom's Story editor canvas, which loads the same
 stylesheets (`article-body.css` plus the partials) instead of restating them;
 see [article-editor.md](article-editor.md).
@@ -32,7 +32,7 @@ stays at 760 when it is reading (a timeline, a table of facts).
   left edge of the media (under a full-bleed figure it joins the 760px reading column).
 - **Credit** says who made it: Mona Sans (`--font-ui`), 0.78rem, soft muted, on its
   own line (`<p class="photo-credit">Photo: Name</p>`). The credit is **never saved
-  in block markup**: WordPress resolves it from the attachment when the article
+  in block markup**: the renderer resolves it from Media when the article
   renders (creator, then credit line, as for Core images), so a corrected credit
   reaches every story and the same photograph is never credited two ways.
 - **Source and notes** (charts, maps, documents) use the same two lines: a source
@@ -75,7 +75,7 @@ zeroed under `prefers-reduced-motion`). Use these instead of new literals.
 
 ## Motion
 
-Motion explains, it does not decorate. The only motion in a WordPress story is
+Motion explains, it does not decorate. The only motion in a story is
 the Before / After divider following the pointer, and focus and selection
 changes. Nothing animates on scroll and nothing hijacks scrolling. Scroll-driven
 storytelling is a flagship visual story's own code (see
@@ -94,7 +94,7 @@ motion respected.
 ## Authoring contract
 
 This contract binds the Payload newsroom editor too: `@byline/editor` meets it
-with shadcn components in place of Gutenberg's (empty state = `Empty` with Choose
+with shadcn components in place of the original editor's (empty state = `Empty` with Choose
 from Media / Upload; toolbar = `ButtonGroup`, `ToggleGroup`, `DropdownMenu`;
 secondary settings = `Popover`, or `Sheet` on touch; no inspector). The editor
 adds controls around the article and never restyles it.
@@ -102,7 +102,7 @@ adds controls around the article and never restyles it.
 The block canvas is the editor. A writer should be able to build and revise any
 story tool without opening the sidebar.
 
-1. **Empty state.** Gutenberg's own `MediaPlaceholder` (upload, library, drag
+1. **Empty state.** the original editor's own `MediaPlaceholder` (upload, library, drag
    and drop) with one sentence saying what the block is for. No custom upload buttons.
 2. **Selected state.** The canvas shows the block as readers will see it, using
    the real public CSS. Controls appear on the canvas, next to what they change:
@@ -121,15 +121,3 @@ story tool without opening the sidebar.
    write, not what the block is.
 8. **Accessible by default.** Keyboard operation for every pointer action, labels
    on every control, live-region announcements for add / move / remove.
-
-## Compatibility contract
-
-- Saved markup of Byline 0.3.24 and earlier must keep validating. If a block's
-  `save()` changes, keep the previous `save` in the block's `deprecated.ts` with
-  its attributes and a `migrate`. `wordpress-plugin/tests-js/legacy-story-markup.test.ts`
-  parses a corpus of real 0.3.24 content (`tests/fixtures/storytelling/`) and fails
-  on any block that no longer validates.
-- Attribute names and stable IDs (annotation IDs, etc.) never change meaning.
-- Public rendering fixes that can be done when the article renders go in
-  `includes/content/story-blocks.php` (credits, responsive `srcset`/`sizes`,
-  hiding unfinished blocks), not in saved markup.

@@ -23,7 +23,7 @@ Payload or Lexical JSON. The editor draws the **same** primitives and the
 
 | Package | Owns | Never contains |
 | --- | --- | --- |
-| `@byline/article-body` | The `byline-v1` types, the block registry (28 tools), limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, WordPress, CSS classes, components, HTML |
+| `@byline/article-body` | The `byline-v1` types, the block registry (28 tools), limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, CSS classes, components, HTML |
 | `@byline/ui` (`/article-body`, `article-body.css`, `newsroom/*.css`) | The article's measure, prose, block frames, the visual primitives (`StoryFigure`, `GalleryLayout`, `ReportedQuoteView`, `PullQuoteView`, `SupportingContext`, `DocumentFigure`, `TimelineList/Item`) and the canonical renderer | Payload or Lexical imports; editing state; "isEditing" branches |
 | `@byline/editor` | Payload block configs, the Lexical feature setup, the block editors, the Add menu, `canvas.css` (editor chrome only), and the Payload Lexical → `byline-v1` normalizer | The public renderer |
 | `apps/newsroom` | Wiring: the Story screen, the article canvas wrapper, the Media host adapter, the lead-image control | Block logic |
@@ -31,7 +31,7 @@ Payload or Lexical JSON. The editor draws the **same** primitives and the
 `@byline/article-body` is its own package because `@byline/content` already
 depends on `@byline/ui`; putting the contract there would have made a cycle.
 
-Imported WordPress stories are `legacy-html` and never pass through any of
+Archived HTML stories are `legacy-html` and never pass through any of
 this. `normalizePayloadStoryBody` returns their HTML untouched.
 
 ## One registry, no scattered switches
@@ -85,7 +85,7 @@ enabling them is a reviewed decision, not a default. There is no font, size,
 colour, background, alignment, indent, column, table, code, HTML or raw-embed
 feature, and no permanent formatting toolbar.
 
-## The block schemas (first eight; the full set of 24 is in [newsroom-blocks.md](newsroom-blocks.md))
+## Block schemas
 
 Semantic data (the contract; `packages/article-body/src/types.ts`):
 
@@ -188,7 +188,7 @@ unfinished block never becomes malformed public output.
 
 ## Timeline interaction
 
-Carried over from the WordPress Timeline (interaction, not storage): Enter moves
+Timeline keyboard behavior: Enter moves
 label → headline → explanation → the next event, and adds one after the last (up
 to 25); add above and below; duplicate; move earlier and later (toolbar and
 Alt+Shift+↑/↓); remove; mark the single Latest event; live-region announcements;
@@ -206,7 +206,7 @@ partials (`figure.css`, `context.css`, `story-base.css`, `timeline.css`,
 `.byline-gallery`, `.byline-reported-quote`, `.byline-pull-quote`,
 `.byline-key-facts`, `.byline-context`, `.byline-document`, `.byline-timeline`)
 beside the legacy `.wp-block-*` selectors at the same specificity, so existing
-WordPress content renders as before while `legacy-html` exists.
+Archived article HTML remains renderable.
 
 `packages/editor/src/canvas.css` does only two things: cancels Payload's own
 editor styling where it would change the article (its Lexical theme sizes,
@@ -244,7 +244,7 @@ not depend on Payload Views, JSX converters or node maps.
 
 ## Why Scrollytelling is not a block
 
-The WordPress Scrollytelling blocks were removed on purpose. Scroll-driven
+Scroll-driven
 stories are repository visual stories (`packages/story-presentations/src/`). No
 Scrollytelling block exists in the registry, and the normalizer reports an
 unknown block type instead of dropping it silently. Interactive is not part of
@@ -336,7 +336,7 @@ negotiation and parity), the public Astro build's client loading of repository
 interactives, the Payload-side poll vote transport (Phase 11: an open poll
 renders and hydrates with the existing widget, but there is no Payload vote
 endpoint yet), and the full browser torture-test suite. See
-[payload-migration.md](payload-migration.md).
+[architecture](architecture.md).
 
 ## Testing
 

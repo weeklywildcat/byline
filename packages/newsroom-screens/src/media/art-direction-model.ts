@@ -2,8 +2,7 @@
  * Art direction for one photo: the neutral contract between the Media
  * art-direction editor and a host, plus the editor's pure draft model.
  *
- * Ported from the WordPress photo-crops editor
- * (`wordpress-plugin/src/editorial/photo-crops/photo-crops-model.ts`) onto
+ * Built around
  * the provider-neutral `ImageArtDirectionIntent`: a focal point plus only the
  * crops an editor drew that differ from the automatic focal-point crop. No
  * URLs or renditions are ever part of the intent; prepared publication files

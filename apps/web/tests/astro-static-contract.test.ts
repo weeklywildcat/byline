@@ -20,7 +20,7 @@ describe("Astro static frontend contract", () => {
     expect(manifest.scripts.build).toContain("astro-with-publication");
     expect(manifest.scripts.postbuild).toContain("verify-build.mjs");
     expect(manifest.scripts.postbuild).toContain("verify-seo.mjs");
-    expect(manifest.scripts.postbuild).toContain("copy-wordpress-media-to-out.mjs");
+    expect(read("scripts/astro-with-publication.mjs")).toContain("materializePublicationMedia");
     expect(read("scripts/verify-static-export.mjs")).toContain("_byline/search-index.json");
   });
 
@@ -51,8 +51,6 @@ describe("Astro static frontend contract", () => {
   it("hydrates only the explicitly interactive route components", () => {
     const article = read("src/pages/[segment]/[month]/[day]/[category]/[articleSlug].astro");
     expect(article).toMatch(/<ArticleShareActions\b[^>]*\bclient:idle/);
-    expect(article).toContain("NewsroomPollHydrator client:load");
-    expect(article).toMatch(/<ReaderFeedbackForm\b[^>]*\bclient:visible/);
     expect(article).toContain("NewsletterSignupForm client:visible");
     const searchPage = read("src/pages/search/index.astro");
     expect(searchPage).toMatch(/<SearchPageClient\b[^>]*\bclient:load/);

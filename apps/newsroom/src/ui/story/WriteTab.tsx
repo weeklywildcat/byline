@@ -232,7 +232,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
             </section>
             {legacy ? (
               <Alert>
-                <AlertTitle>Imported from WordPress</AlertTitle>
+                <AlertTitle>Archived HTML</AlertTitle>
                 <AlertDescription>This story keeps the body it was published with and renders exactly as before. Converting it to the Byline editor is a separate, reviewed step.</AlertDescription>
               </Alert>
             ) : null}

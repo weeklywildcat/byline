@@ -6,7 +6,7 @@ import type { WorkflowStage } from "./vocabulary";
  * a deadline offset (applied only for people who may set deadlines), starter
  * tasks, production assignments and, for video, the format. They never create
  * sources, interviews, appointments or article text, and the result is an
- * ordinary story. Ported from wordpress-plugin/includes/editorial/presets.php
+ * ordinary story.
  * (News, Sports recap, Opinion, Photo story, Breaking) plus Video story and
  * Investigation.
  */

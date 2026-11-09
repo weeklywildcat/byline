@@ -4,10 +4,10 @@ import { getWeeklyWildcatHomeDesign, OPINION_PACKAGE_TYPE } from "@byline/design
 import { getOpinionPackageRenderer, type ResolvedOpinionPackage, type StoryView } from "@byline/ui";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
 import { resolveHomepageDocument } from "@/lib/homepage-resolution";
-import { type WordPressPost } from "@/lib/wordpress";
+import { type ArchivePost } from "@/lib/public-content";
 import { post } from "./fixtures/sports-fixture";
 
-function posts(): WordPressPost[] {
+function posts(): ArchivePost[] {
   return [
     post(1, "sports", { athlete: true }),
     post(2, "news", { sticky: true }),

@@ -13,7 +13,7 @@ import { getLeadPackageRenderer } from "@byline/ui";
 import { resolveLeadPackage, toStoryView } from "@/lib/homepage-packages";
 import { resolveHomepageDocument } from "@/lib/homepage-resolution";
 import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
-import type { WordPressCategory, WordPressPost } from "@/lib/wordpress";
+import type { ArchiveCategory, ArchivePost } from "@/lib/public-content";
 
 function readSource(relativePath: string) {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), "utf8");
@@ -25,9 +25,8 @@ const articleRenderer = readSource("../../../packages/ui/src/article-view.tsx");
 const homepageRoute = readSource("../views/page.tsx");
 const globalCss = readSource("../views/globals.css");
 const weeklyWildcatCss = readSource("../../../packages/theme-weekly-wildcat/src/styles.css");
-const pluginSource = readSource("../../../wordpress-plugin/weekly-wildcat-headless.php");
 
-function category(id: number, slug: string): WordPressCategory {
+function category(id: number, slug: string): ArchiveCategory {
   return { id, count: 1, description: "", link: "", name: slug, slug, taxonomy: "category", parent: 0 };
 }
 
@@ -73,7 +72,7 @@ function legacyPost(id: number, categorySlug: string, options: { sticky?: boolea
         }
       : {}),
     _embedded: { "wp:featuredmedia": [], "wp:term": [[category(id, categorySlug)]] }
-  } as unknown as WordPressPost;
+  } as unknown as ArchivePost;
 }
 
 // --- custom article hero ----------------------------------------------------
@@ -134,21 +133,14 @@ describe("the custom article hero is gone", () => {
     expect(globalCss).not.toContain("page-heading-enter");
   });
 
-  it("stops emitting the retired settings from WordPress", () => {
-    expect(pluginSource).not.toContain("articleHero");
-    expect(pluginSource).not.toContain("ARTICLE_HERO");
-    expect(pluginSource).not.toContain("homepageOpinionTreatment");
-    expect(pluginSource).not.toContain("HOMEPAGE_OPINION_TREATMENT");
-    // The one surviving post display setting is the sports game relationship.
-    expect(pluginSource).toContain("'primaryGameId' => absint(get_post_meta($post_id, WWH_PRIMARY_GAME_META, true))");
-  });
+
 });
 
 // --- homepage opinion lead treatment ----------------------------------------
 
 const ALL_MODULES = { polls: true, events: true, sports: true };
 
-function resolve(posts: WordPressPost[], props: unknown) {
+function resolve(posts: ArchivePost[], props: unknown) {
   return resolveLeadPackage({
     packageId: "home-lead",
     props,
@@ -167,7 +159,7 @@ describe("the homepage opinion lead treatment is gone", () => {
   // Fixtures A-D from the removal: an ordinary lead, a lead still carrying the
   // retired post meta, and designs persisting either value of the retired
   // package setting. All four must produce the same normal lead treatment.
-  const fixtures: Array<[string, WordPressPost[], unknown]> = [
+  const fixtures: Array<[string, ArchivePost[], unknown]> = [
     ["an ordinary lead", ordinaryLead, WEEKLY_WILDCAT_LEAD_DEFAULTS],
     ["a lead with the retired post meta", legacyLead, WEEKLY_WILDCAT_LEAD_DEFAULTS],
     ["a design persisting opinionTreatment: auto", legacyLead, { ...WEEKLY_WILDCAT_LEAD_DEFAULTS, presentation: { showDeck: true, opinionTreatment: "auto" } }],

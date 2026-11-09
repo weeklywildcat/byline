@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getWeeklyWildcatHomeDesign } from "@byline/design";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
-import { getPublicationTheme, getPublicationThemeVariables } from "../../../wordpress-plugin/src/publication-theme";
-import { themeTokensToCssVariables } from "@byline/ui";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -28,11 +26,5 @@ describe("fixed Weekly Wildcat homepage", () => {
     expect(getPublicationConfig().appearance).toEqual({ theme: "weekly-wildcat", tokenOverrides: {} });
     expect(Object.keys(BYLINE_THEMES)).toEqual(["weekly-wildcat"]);
     expect(getActiveTheme().tokens).toEqual(weeklyWildcatTheme.tokens);
-  });
-
-  it("uses the same fixed theme in WordPress article previews", () => {
-    expect(getPublicationTheme("byline-magazine")).toBe(weeklyWildcatTheme);
-    expect(getPublicationThemeVariables("byline-editorial", { fontBody: "Arial" }))
-      .toEqual(themeTokensToCssVariables(weeklyWildcatTheme.tokens));
   });
 });

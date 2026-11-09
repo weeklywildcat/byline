@@ -304,7 +304,7 @@ export default async function AboutPage() {
             <div className="about-prose">
               <p>
                 Our students build and run the technology behind the paper, too. Editors write and schedule stories in
-                WordPress, which readers never see. What readers visit is a separate, static website built from that
+                our private Byline newsroom. What readers visit is a separate, static website built from that
                 content. It loads fast and stays online even when we take the publishing system down for maintenance. The
                 software is called Byline, and its code is public on{" "}
                 <a href="https://github.com/weeklywildcat/byline">GitHub</a> for anyone to read or suggest improvements.

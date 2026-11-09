@@ -1,9 +1,7 @@
 # Publication media
 
 How a photo, PDF or audio file goes from a private newsroom upload to an
-immutable file the static newspaper serves. This is the source of truth for
-Phase 5 of the [Payload migration](payload-migration.md); the Media workspace
-UI is in [media-workspace.md](media-workspace.md).
+immutable file the static newspaper serves. The Media workspace UI is in [media-workspace.md](media-workspace.md).
 
 The invariant:
 
@@ -69,15 +67,9 @@ always agree. Production should use absolute mount paths.
 - The only normal write path is `PUT /api/byline/media/:id/art-direction`
   (field access refuses `artDirection` in ordinary Payload writes; the system
   and the controlled import may write it).
-- The legacy WordPress `ImageArtDirection` (with its generated `renditions`)
-  is unchanged for the production WordPress path. `artDirectionIntentFromLegacy`
-  imports a WordPress attachment's focal point and crops; its generated URLs
-  are dropped and new content-addressed files are prepared instead (Phase 8).
-
 ### The editor
 
-`MediaArtDirectionDialog` (`@byline/newsroom-screens`) ports the WordPress
-photo-crops behavior to Nova: focal point (click, drag, arrow keys, Shift for
+`MediaArtDirectionDialog` (`@byline/newsroom-screens`) provides photo crops: focal point (click, drag, arrow keys, Shift for
 bigger steps), react-easy-crop for the six shapes, Auto vs Custom, Reset to
 focal point, placement previews (Immersive, cards and lists, social and
 search), low-resolution warnings, one Save, a discard confirmation, full
@@ -315,8 +307,7 @@ BYLINE_BUILD_TOKEN=… npm run materialize:publication-media --workspace @byline
 It runs inside the Astro build wrapper for a Payload snapshot (Phase 7): after
 Astro succeeds and before `postbuild`, the closed descriptor set named by the
 native snapshot's Media manifests is acquired from
-`<BYLINE_NEWSROOM_BUILD_URL>/media`. It is not part of the WordPress path:
-WordPress snapshots keep the WordPress media materializers.
+`<BYLINE_NEWSROOM_BUILD_URL>/media`.
 
 `verify-static-export.mjs` checks that every `_byline/media` file is named by
 its own SHA-256, is within the static limit and carries no EXIF/XMP (a camera
@@ -357,18 +348,6 @@ generation (or with a file missing from the store) stops the snapshot as
 `prepare-public-snapshot` for the current public revision (never advancing it).
 Astro's SEO layer uses the manifest's explicit 16:9, 4:3 and 1:1 files and the
 prepared social image for Payload attachments.
-
-## Phase 7–9 compatibility
-
-- Snapshot v1 maps the largest natural file to the compatibility
-  `source_url` (`largestNaturalImage`) and explicit crop families to
-  `bylineImage.artDirection.renditions` (`legacyRenditionsFromManifest`; Social
-  always present), keeping the focal point and crop intent.
-- SEO and social descriptors are available to the Astro SEO layer.
-- Phase 9 can consume the manifest directly instead of WordPress shapes.
-- The materializer is the consumer; Phase 7 supplies descriptors from the
-  canonical snapshot (done). Public rendering never depends on the newsroom's local
-  storage layout.
 
 ## Object storage (later)
 

@@ -145,7 +145,7 @@ for (const file of files.filter((candidate) => /\.(?:html|css)$/.test(candidate)
     ...source.matchAll(/url\(["']?(\/[^)'"?#]+)(?:[?#][^)'" ]*)?["']?\)/gi)
   ].map((match) => match[1]);
   for (const reference of new Set(references)) {
-    if (!reference.startsWith("/_astro/") && !reference.startsWith("/_wordpress-media/") && !/\.[a-z0-9]{2,5}$/i.test(reference)) continue;
+    if (!reference.startsWith("/_astro/") && !reference.startsWith("/_byline/media/") && !/\.[a-z0-9]{2,5}$/i.test(reference)) continue;
     const target = path.join(outputRoot, decodeURIComponent(reference).replace(/^\//, ""));
     if (!(await exists(target))) missingAssets.push({ page: publicPath(file), asset: reference });
   }
@@ -186,20 +186,13 @@ for (const file of files.filter((candidate) => candidate.endsWith(".html"))) {
   });
 }
 
-const mediaItems = new Map();
-const mediaDurations = new Map();
-if (await exists(path.join(buildRoot, "media-manifest.ndjson"))) {
-  const lines = (await readFile(path.join(buildRoot, "media-manifest.ndjson"), "utf8")).split("\n").filter(Boolean);
-  for (const line of lines) {
-    const item = JSON.parse(line);
-    mediaDurations.set(item.sourceUrl, Math.max(mediaDurations.get(item.sourceUrl) ?? 0, Number(item.durationMs) || 0));
-    const current = mediaItems.get(item.sourceUrl);
-    if (!current || item.status === "materialized") mediaItems.set(item.sourceUrl, item);
-  }
-}
-for (const item of mediaItems.values()) {
-  if (item.status === "materialized" && !(await exists(path.join(outputRoot, item.localPath.replace(/^\//, ""))))) {
-    throw new Error(`Media manifest references a missing file: ${item.localPath} (${item.sourceUrl})`);
+const descriptors = JSON.parse(await readFile(path.join(buildRoot, "publication-media-descriptors.json"), "utf8").catch((error) => {
+  if (error.code !== "ENOENT") throw error;
+  return "[]";
+}));
+for (const { publicPath } of descriptors) {
+  if (!(await exists(path.join(outputRoot, publicPath.slice(1))))) {
+    throw new Error(`Prepared media is missing from the export: ${publicPath}`);
   }
 }
 
@@ -211,7 +204,7 @@ for (const file of files) {
   if (file.endsWith(".html")) sizes.html += size;
   else if (file.endsWith(".js")) sizes.js += size;
   else if (file.endsWith(".css")) sizes.css += size;
-  if (file.includes(`${path.sep}_wordpress-media${path.sep}`)) sizes.media += size;
+  if (file.includes(`${path.sep}_byline${path.sep}media${path.sep}`)) sizes.media += size;
 }
 let totalBuild = {};
 if (await exists(path.join(buildRoot, "build-duration.json"))) totalBuild = JSON.parse(await readFile(path.join(buildRoot, "build-duration.json"), "utf8"));
@@ -220,12 +213,7 @@ const metrics = {
   framework: "astro",
   ...totalBuild,
   snapshot: snapshotMetrics,
-  media: {
-    required: mediaItems.size,
-    materialized: [...mediaItems.values()].filter((item) => item.status === "materialized").length,
-    externalFallbacks: [...mediaItems.values()].filter((item) => item.status === "external-fallback").length,
-    materializationMs: Math.round([...mediaDurations.values()].reduce((sum, duration) => sum + duration, 0) * 100) / 100
-  },
+  media: { prepared: descriptors.length },
   routes: { expected: expectedRoutes.length, generated: actualRoutes.length, edgeRedirects: edgeRedirects.length },
   searchIndex: {
     schemaVersion: searchIndex.schemaVersion,
@@ -239,7 +227,7 @@ await mkdir(reportRoot, { recursive: true });
 await Promise.all([
   writeFile(path.join(reportRoot, "routes.json"), `${JSON.stringify(expectedEntries, null, 2)}\n`),
   writeFile(path.join(reportRoot, "seo.json"), `${JSON.stringify(seo, null, 2)}\n`),
-  writeFile(path.join(reportRoot, "media-manifest.json"), `${JSON.stringify({ version: 1, items: Object.fromEntries(mediaItems) }, null, 2)}\n`),
+  writeFile(path.join(reportRoot, "media-manifest.json"), `${JSON.stringify({ version: 1, items: descriptors }, null, 2)}\n`),
   writeFile(path.join(reportRoot, "build-metrics.json"), `${JSON.stringify(metrics, null, 2)}\n`)
 ]);
-console.log(`Verified ${actualRoutes.length} routes, ${seo.length} HTML documents, and ${mediaItems.size} media records.`);
+console.log(`Verified ${actualRoutes.length} routes, ${seo.length} HTML documents, and ${descriptors.length} prepared media files.`);

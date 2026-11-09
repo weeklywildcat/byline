@@ -19,7 +19,7 @@ const projects: Project[] = [
     description: `The software behind ${publication.identity.shortName}: the public website, the newsroom tools our editors use and the shared theme that gives the paper its look.`,
     details: [
       "A static Astro website with no public server to run",
-      "A WordPress plugin for editing, planning and publishing",
+      "A private Payload newsroom for editing, planning and publishing",
       "An optional Discord bot for newsroom workflows",
       "Shared packages for content, themes and design"
     ],

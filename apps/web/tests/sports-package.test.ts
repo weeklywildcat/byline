@@ -8,7 +8,7 @@ import {
 import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
 import { resolveSportsPackage } from "@/lib/sports-packages";
 import type { SportsGame } from "@/lib/headless";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 import { game, post } from "./fixtures/sports-fixture";
 
 const SPORTS_ON = { sports: true };
@@ -39,7 +39,7 @@ function homepagePosts() {
 
 // Mirrors what the homepage does: gather the design's pins, reserve them in the
 // ordered pass, then resolve the package.
-function selectionFor(posts: WordPressPost[], props: unknown) {
+function selectionFor(posts: ArchivePost[], props: unknown) {
   const pinned = collectPinnedStoryIds({
     schemaVersion: 2,
     template: "home",
@@ -51,7 +51,7 @@ function selectionFor(posts: WordPressPost[], props: unknown) {
 }
 
 function resolve(
-  posts: WordPressPost[],
+  posts: ArchivePost[],
   props: unknown = {},
   options: { recentScores?: SportsGame[]; upcomingGames?: SportsGame[]; sports?: boolean } = {}
 ) {

@@ -250,7 +250,7 @@ export interface Story {
     [k: string]: unknown;
   } | null;
   /**
-   * Imported from WordPress. It renders as published; converting it to the Byline editor is a separate, reviewed step.
+   * Archived HTML. It renders as published; converting it to the Byline editor is a separate, reviewed step.
    */
   legacyHtml?: string | null;
   legacySource?: string | null;

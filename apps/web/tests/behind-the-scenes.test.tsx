@@ -6,7 +6,7 @@ import { buildArticlePresentation } from "@/lib/article-presentation";
 import { buildRssFeed } from "@/lib/feed";
 import { buildSitemapEntries } from "@/lib/sitemap";
 import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
-import { getAllPosts, getCategoryBySlug, getContributorBySlug, getPostsByCategory, getPostsByContributor, getPostContributors, getPostHref } from "@/lib/wordpress";
+import { getAllPosts, getCategoryBySlug, getContributorBySlug, getPostsByCategory, getPostsByContributor, getPostContributors, getPostHref } from "@/lib/public-content";
 import BehindTheScenesPage, { getMetadata } from "@/views/behind-the-scenes/page";
 import AuthorPage from "@/views/author/[slug]/page";
 import CategoryPage from "@/views/category/[slug]/page";
@@ -14,8 +14,8 @@ import { getSearchPageProps } from "@/views/search/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
 import { author, category, post } from "@/tests/support/seo-fixtures";
 
-vi.mock("@/lib/wordpress", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/wordpress")>(),
+vi.mock("@/lib/public-content", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/public-content")>(),
   getAllPosts: vi.fn(), getCategoryBySlug: vi.fn(), getContributorBySlug: vi.fn(),
   getPostsByCategory: vi.fn(), getPostsByContributor: vi.fn()
 }));

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { getAuthorSocialLinks, type WordPressAuthor } from "@/lib/wordpress";
+import { getAuthorSocialLinks, type ArchiveAuthor } from "@/lib/public-content";
 
-const author: WordPressAuthor = {
+const author: ArchiveAuthor = {
   id: 12,
   name: "Alex Writer",
   slug: "alex-writer",

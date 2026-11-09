@@ -2,7 +2,7 @@
 
 These instructions apply to work under `packages/story-presentations/`. This package is shared by the public site (Astro/Vite) and the newsroom's Live Preview (Next.js): never import `import.meta.glob`, `?inline` CSS or any other bundler-specific syntax here. A story's `styles.css` and `client.ts` stay in its folder; each host loads them on that story's page alone (`apps/web/lib/story-presentation-host.tsx`, `apps/newsroom/src/preview/story-assets.ts`).
 
-This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. By default WordPress remains the source of truth for the journalism and the repository controls only presentation. The one deliberate exception is a **flagship visual story** (below), whose narrative lives here.
+This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. By default the Byline newsroom remains the source of truth for the journalism and the repository controls only presentation. The one deliberate exception is a **flagship visual story** (below), whose narrative lives here.
 
 ## When a writer asks for an immersive story
 
@@ -16,17 +16,17 @@ A request may be as informal as:
 
 Do not require the writer to understand this architecture.
 
-Start by identifying the story and reading enough of it to understand what the presentation should emphasize. If the writer gives a public URL, slug, title, or WordPress editor URL, resolve the WordPress post ID yourself when possible. Use the immutable post ID for repository overrides, never the slug or headline.
+Start by identifying the story and reading enough of it to understand what the presentation should emphasize. If the writer gives a public URL, slug, title, or Byline editor URL, resolve the Byline Story ID yourself when possible. Use the immutable post ID for repository overrides, never the slug or headline.
 
 Then decide which of these paths fits the request:
 
-1. **Built-in Immersive is enough.** If the request is only the standard fullscreen featured-image reveal with a bottom-left or centered headline, do not create a repository override. That treatment already exists as the WordPress **Story presentation → Immersive** option.
+1. **Built-in Immersive is enough.** If the request is only the standard fullscreen featured-image reveal with a bottom-left or centered headline, do not create a repository override. That treatment already exists as the Byline newsroom **Story presentation → Immersive** option.
 2. **Bespoke presentation is warranted.** If the writer wants custom art direction, unusual typography, a different composition, story-specific graphics, custom transitions, or placement beyond the built-in Immersive treatment, create a repository override.
-3. **A flagship visual story is warranted.** Only when the reporting, data, photography, graphics and scrolling must work together as one experience (scrollytelling, a sticky chart that changes with the text, a visual narrative) and mapping WordPress paragraphs to it would make the work worse. Create it with `--visual` (see below). Ask before choosing this for an ordinary story: it moves the narrative out of WordPress.
+3. **A flagship visual story is warranted.** Only when the reporting, data, photography, graphics and scrolling must work together as one experience (scrollytelling, a sticky chart that changes with the text, a visual narrative) and mapping the Byline newsroom paragraphs to it would make the work worse. Create it with `--visual` (see below). Ask before choosing this for an ordinary story: it moves the narrative out of the Byline newsroom.
 
-Not every visual request needs this directory. A Datawrapper or Flourish chart, or an embedded map, is the **Chart / Map** block in WordPress. A small self-contained interactive (calculator, quiz, custom chart) is the **Interactive** block: build one HTML file and an editor uploads it. There is no WordPress scrollytelling block; scrollytelling is always a flagship visual story.
+Use the Chart / Map block for supported hosted charts and maps. Use a Repository Interactive for a small custom interaction, and a flagship visual story for scrollytelling.
 
-A repository override always wins over the WordPress Standard/Immersive setting.
+A repository override always wins over the Byline newsroom Standard/Immersive setting.
 
 ## Before designing
 
@@ -46,7 +46,7 @@ Do not begin by copying an old custom story wholesale. Reuse shared primitives, 
 Use the scaffold unless there is a concrete reason not to:
 
 ```sh
-npm run story-presentation -- create <wordpress-post-id> <kebab-case-name>
+npm run story-presentation -- create <story-id> <kebab-case-name>
 ```
 
 It creates the story component, isolated stylesheet, and registry entry.
@@ -54,7 +54,7 @@ It creates the story component, isolated stylesheet, and registry entry.
 For a flagship visual story:
 
 ```sh
-npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> --visual
+npm run story-presentation -- create <story-id> <kebab-case-name> --visual
 ```
 
 It also creates `client.ts` and registers `defineVisualStory({ name, Component })`. Never hand-convert a presentation into a visual story by other means; `defineVisualStory` is the opt-in.
@@ -78,15 +78,15 @@ Do not type the article's:
 
 Render those values from `presentation` through the shared article primitives.
 
-The writer must be able to edit the story in WordPress after the custom presentation ships and see those edits appear automatically.
+The writer must be able to edit the story in the Byline newsroom after the custom presentation ships and see those edits appear automatically.
 
 Decorative, non-editorial interface text may be coded when appropriate, but avoid inventing labels or chapter text that changes the meaning of the story.
 
-Render the WordPress body exactly once with `ArticleBody`.
+Render the Byline newsroom body exactly once with `ArticleBody`.
 
 ## Flagship visual stories
 
-In a visual story the narrative (text, figures, graphics, data) is written in the story folder as semantic JSX and **replaces** the WordPress body on the page. Everything else above still applies: the headline, deck, byline, dates, lead image with its caption and credit, corrections, topics and series come from WordPress through `presentation` and are never typed.
+In a visual story the narrative (text, figures, graphics, data) is written in the story folder as semantic JSX and **replaces** the Byline newsroom body on the page. Everything else above still applies: the headline, deck, byline, dates, lead image with its caption and credit, corrections, topics and series come from the Byline newsroom through `presentation` and are never typed.
 
 - `presentation.body` is empty for a visual story. Never render `ArticleBody` in one.
 - Keep the narrative in the server-rendered JSX. Every word must be in the built HTML; `client.ts` only enhances what is already there and must never inject reporting.
@@ -94,8 +94,8 @@ In a visual story the narrative (text, figures, graphics, data) is written in th
 - Under `prefers-reduced-motion`, show each state without animation; the story must make sense without motion and without JavaScript.
 - Give graphics a text equivalent (`role="img"` with a `<title>`, or a table) and photographs real alt text and credited captions.
 - Import assets and data from the story folder so they ship with that story only.
-- Put a text edition or summary in the WordPress body; it feeds RSS, site search and the fallback if the registry line is removed. Pass `readingTime` to `defineVisualStory` when the WordPress body does not reflect the narrative's length.
-- A correction to the narrative is a code change: the editor records it in WordPress (the notice prints on the story) and you fix the text here.
+- Put a text edition or summary in the Byline newsroom body; it feeds RSS, site search and the fallback if the registry line is removed. Pass `readingTime` to `defineVisualStory` when the Byline newsroom body does not reflect the narrative's length.
+- A correction to the narrative is a code change: the editor records it in the Byline newsroom (the notice prints on the story) and you fix the text here.
 
 The route omits `articleBody` from the structured data for visual stories automatically; do not touch SEO.
 
@@ -113,13 +113,12 @@ Unless the design deliberately relocates them, preserve:
 - reading time
 - share actions
 - featured-image caption and photo credit
-- WordPress body
+- the Byline newsroom body
 - primary-game placement when applicable
 - corrections
 - poll
 - topics
 - update notice
-- reader feedback
 - newsletter
 - author information
 - related stories
@@ -200,7 +199,7 @@ On mobile:
 - tap targets must remain usable
 - no horizontal scrolling
 - body copy should fall back to the normal readable article measure
-- full/wide Gutenberg blocks must continue to work
+- full/wide article blocks must continue to work
 
 Use `svh`/modern viewport units where the shared reveal already does. Do not add fixed pixel viewport assumptions.
 
@@ -261,7 +260,7 @@ Check especially:
 - caption and credit length
 - contributor/byline wrapping
 - the transition from the custom opening to normal article body
-- full-width and wide Gutenberg blocks
+- full-width and wide article blocks
 - corrections and after-story modules
 - desktop and mobile
 - reduced motion
@@ -300,10 +299,10 @@ Do not weaken existing tests simply to accommodate the design.
 
 Before handing the work back, verify:
 
-- [ ] Correct WordPress post ID is registered.
+- [ ] Correct Byline Story ID is registered.
 - [ ] No editorial copy is hard-coded (visual stories: only the narrative is, never the headline, deck, byline, dates or lead-image caption).
 - [ ] A visual story never renders `ArticleBody`, and its narrative reads completely with JavaScript off and with reduced motion.
-- [ ] WordPress remains editable after the override.
+- [ ] the Byline newsroom remains editable after the override.
 - [ ] Exactly one H1 exists.
 - [ ] Featured image remains a real responsive image.
 - [ ] Caption and credit remain present.
@@ -325,9 +324,9 @@ Keep the handoff simple. Writers do not need an architecture tour.
 Tell them:
 
 - the story now has a custom presentation
-- WordPress is still where they edit all story content (for a visual story: the headline, deck, byline, photo and corrections; the narrative itself changes in the repository, so send narrative edits to a developer)
-- later WordPress edits will continue to appear in the custom presentation
+- the Byline newsroom is still where they edit all story content (for a visual story: the headline, deck, byline, photo and corrections; the narrative itself changes in the repository, so send narrative edits to a developer)
+- later the Byline newsroom edits will continue to appear in the custom presentation
 - the custom design is tied to that story's post ID
-- removing the repository override returns it to the normal WordPress-selected presentation
+- removing the repository override returns it to the normal editor-selected presentation
 
-If the writer only wanted the standard fullscreen treatment, point them to **Story presentation → Immersive** in WordPress instead of creating an override.
+If the writer only wanted the standard fullscreen treatment, point them to **Story presentation → Immersive** in the Byline newsroom instead of creating an override.

@@ -7,11 +7,11 @@ import {
   getPostCategories,
   getPostCorrections,
   getPostTags,
-  type WordPressCategory,
-  type WordPressCorrection,
-  type WordPressPost,
-  type WordPressTag
-} from "@/lib/wordpress";
+  type ArchiveCategory,
+  type ArchiveCorrection,
+  type ArchivePost,
+  type ArchiveTag
+} from "@/lib/public-content";
 
 const HIDDEN_CATEGORY_SLUGS = new Set(["uncategorized"]);
 const HIDDEN_POST_SLUGS = new Set(["hello-world"]);
@@ -26,49 +26,49 @@ const EDITORIAL_FLAG_TAG_SLUGS = new Set([
   ATHLETE_OF_THE_MONTH_TAG_SLUG
 ]);
 
-export function isHiddenCategory(category: WordPressCategory | null | undefined) {
+export function isHiddenCategory(category: ArchiveCategory | null | undefined) {
   return Boolean(category && HIDDEN_CATEGORY_SLUGS.has(category.slug));
 }
 
-export function isPublicSectionCategory(category: WordPressCategory | null | undefined) {
+export function isPublicSectionCategory(category: ArchiveCategory | null | undefined) {
   return Boolean(category && PUBLIC_SECTION_SLUGS.has(category.slug));
 }
 
-export function isHomepageSectionCategory(category: WordPressCategory | null | undefined) {
+export function isHomepageSectionCategory(category: ArchiveCategory | null | undefined) {
   return Boolean(category && (PUBLIC_SECTION_SLUGS.has(category.slug) || FOCUS_SECTION_SLUGS.has(category.slug)));
 }
 
-export function getPrimaryPublicCategory(post: WordPressPost) {
+export function getPrimaryPublicCategory(post: ArchivePost) {
   return getPostCategories(post).find((category) => isPublicSectionCategory(category)) ?? null;
 }
 
-export function getPrimaryVisibleCategory(post: WordPressPost) {
+export function getPrimaryVisibleCategory(post: ArchivePost) {
   const categories = getPostCategories(post);
   return categories.find((category) => category.slug === BEHIND_THE_SCENES.slug)
     ?? categories.find((category) => !isHiddenCategory(category)) ?? null;
 }
 
-export function hasPostTag(post: WordPressPost, slug: string) {
+export function hasPostTag(post: ArchivePost, slug: string) {
   return getPostTags(post).some((tag) => tag.slug === slug);
 }
 
-export function isSpecialCoveragePost(post: WordPressPost) {
+export function isSpecialCoveragePost(post: ArchivePost) {
   return hasPostTag(post, SPECIAL_COVERAGE_TAG_SLUG);
 }
 
-export function isAthleteSpotlightPost(post: WordPressPost) {
+export function isAthleteSpotlightPost(post: ArchivePost) {
   return hasPostTag(post, ATHLETE_SPOTLIGHT_TAG_SLUG) || hasPostTag(post, ATHLETE_OF_THE_MONTH_TAG_SLUG);
 }
 
-export function isEditorialFlagTag(tag: WordPressTag) {
+export function isEditorialFlagTag(tag: ArchiveTag) {
   return EDITORIAL_FLAG_TAG_SLUGS.has(tag.slug);
 }
 
-export function getPublicTopicTags(post: WordPressPost) {
+export function getPublicTopicTags(post: ArchivePost) {
   return getPostTags(post).filter((tag) => !isEditorialFlagTag(tag));
 }
 
-export function getAthleteSpotlightLabel(post: WordPressPost) {
+export function getAthleteSpotlightLabel(post: ArchivePost) {
   if (hasPostTag(post, ATHLETE_SPOTLIGHT_TAG_SLUG)) {
     return "Athlete of the Week";
   }
@@ -90,22 +90,22 @@ export function getAthleteSpotlightLabel(post: WordPressPost) {
   return "Athlete Spotlight";
 }
 
-function getCleanSportTagName(tag: WordPressTag) {
+function getCleanSportTagName(tag: ArchiveTag) {
   return stripHtml(tag.name).replace(/^sport\s*:\s*/i, "").trim();
 }
 
-function isSportTag(tag: WordPressTag) {
+function isSportTag(tag: ArchiveTag) {
   return tag.slug.startsWith("sport-") || /^sport\s*:/i.test(stripHtml(tag.name));
 }
 
-export function getAthleteSportLabel(post: WordPressPost) {
+export function getAthleteSportLabel(post: ArchivePost) {
   const topicTags = getPublicTopicTags(post);
   const sportTag = topicTags.find(isSportTag) ?? topicTags[0];
 
   return sportTag ? getCleanSportTagName(sportTag) : null;
 }
 
-export function isVisibleContentPost(post: WordPressPost) {
+export function isVisibleContentPost(post: ArchivePost) {
   if (nativeStory(post.id)) return true;
   if (post.status !== "publish") {
     return false;
@@ -120,43 +120,43 @@ export function isVisibleContentPost(post: WordPressPost) {
   return Boolean(getPrimaryVisibleCategory(post));
 }
 
-export function isPublicHomepagePost(post: WordPressPost) {
+export function isPublicHomepagePost(post: ArchivePost) {
   return isGeneralEditorialPost(post) && getPostCategories(post).some((category) => isHomepageSectionCategory(category));
 }
 
-export function isBehindTheScenesPost(post: WordPressPost) {
+export function isBehindTheScenesPost(post: ArchivePost) {
   return getPostCategories(post).some((category) => category.slug === BEHIND_THE_SCENES.slug);
 }
 
 // Public BTS articles remain searchable, indexable and listed on author pages.
 // Category membership only changes automatic placement in general news lists.
-export function isGeneralEditorialPost(post: WordPressPost) {
+export function isGeneralEditorialPost(post: ArchivePost) {
   return isVisibleContentPost(post) && !isBehindTheScenesPost(post);
 }
 
-export function filterGeneralEditorialPosts(posts: WordPressPost[]) {
+export function filterGeneralEditorialPosts(posts: ArchivePost[]) {
   return posts.filter(isGeneralEditorialPost);
 }
 
-export function getBehindTheScenesPosts(posts: WordPressPost[]) {
+export function getBehindTheScenesPosts(posts: ArchivePost[]) {
   return posts.filter((post) => isVisibleContentPost(post) && isBehindTheScenesPost(post))
     .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
 }
 
-export function filterVisibleContentPosts(posts: WordPressPost[]) {
+export function filterVisibleContentPosts(posts: ArchivePost[]) {
   return posts.filter(isVisibleContentPost);
 }
 
-export function filterPublicHomepagePosts(posts: WordPressPost[]) {
+export function filterPublicHomepagePosts(posts: ArchivePost[]) {
   return posts.filter(isPublicHomepagePost);
 }
 
-function correctionKey(correction: WordPressCorrection) {
+function correctionKey(correction: ArchiveCorrection) {
   return `${correction.postId ?? "unknown"}|${correction.type}|${correction.date}|${correction.text.toLowerCase().replace(/\s+/g, " ").trim()}`;
 }
 
-export type PublicCorrectionEntry = WordPressCorrection & {
-  post: WordPressPost;
+export type PublicCorrectionEntry = ArchiveCorrection & {
+  post: ArchivePost;
 };
 
 /**
@@ -164,7 +164,7 @@ export type PublicCorrectionEntry = WordPressCorrection & {
  * The join is deliberate: a correction endpoint must not be able to make an
  * unpublished headline or a private story discoverable on the public log.
  */
-export function getPublicCorrectionLog(posts: WordPressPost[], remoteCorrections: WordPressCorrection[] = []) {
+export function getPublicCorrectionLog(posts: ArchivePost[], remoteCorrections: ArchiveCorrection[] = []) {
   const visiblePosts = posts.filter(isVisibleContentPost);
   const postsById = new Map(visiblePosts.map((post) => [post.id, post]));
   const entries: PublicCorrectionEntry[] = [];
