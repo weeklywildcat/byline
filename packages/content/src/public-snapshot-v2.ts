@@ -213,11 +213,15 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
     corrections.set(storyId, list);
   }
   const imagePaths = new Set(data.media.flatMap(({ manifest }) => manifest.kind === "image" ? manifest.natural.map((file) => file.publicPath) : []));
+  const publicSite = publication.urls.publicSite;
+  let siteEnd = publicSite.length;
+  while (publicSite[siteEnd - 1] === "/") siteEnd -= 1;
+  const canonicalBase = publicSite.slice(0, siteEnd);
   for (const row of data.stories) {
     claim(row.href);
     const primary = sections.get(row.section.key);
     const expected = publicStoryPath({ slug: row.slug, sectionSlug: primary?.slug ?? "", publishedAt: row.publishedAt, timeZone: publication.timezone });
-    requireFact(expected && row.href === expected && row.url === publication.urls.publicSite.replace(/\/+$/, "") + expected, `Story ${row.id} has an invalid canonical route`);
+    requireFact(expected && row.href === expected && row.url === canonicalBase + expected, `Story ${row.id} has an invalid canonical route`);
     requireFact(same(row.section, row.sections[0]), `Story ${row.id} has an inconsistent primary Section`);
     for (const [terms, keys, index] of [[row.sections, row.sectionKeys, sections], [row.topics, row.topicKeys, topics]] as const) {
       requireFact(same(terms.map((term) => term.key), keys) && new Set(keys).size === keys.length && terms.every((term) => {

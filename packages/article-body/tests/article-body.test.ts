@@ -6,6 +6,7 @@ import {
   ARTICLE_BLOCK_TYPES,
   ARTICLE_BLOCKS,
   ARTICLE_BLOCK_LIMITS,
+  cleanLine,
   compactInline,
   finalizeBlock,
   isArticleBlockType,
@@ -22,6 +23,12 @@ import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
 const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceDir = join(import.meta.dirname, "../src");
+
+it("collapses whitespace around line feeds and preserves other spacing", () => {
+  const padding = " ".repeat(8192);
+  expect(cleanLine(`a${padding}b \r\n\t\nc`)).toBe(`a${padding}b c`);
+  expect(cleanLine("  a\t b\n c  ", 5)).toBe("a\t b ");
+});
 
 describe("the contract stays provider-neutral", () => {
   it("imports nothing but itself", () => {
