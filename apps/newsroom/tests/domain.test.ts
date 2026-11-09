@@ -63,11 +63,14 @@ describe("workflow", () => {
     expect((WORKFLOW_STAGES as readonly string[]).includes("published")).toBe(false);
   });
 
-  it("derives Published from publication state and recovers the stored stage", () => {
+  it("derives Published from publication state and projects the stored stage onto a phase", () => {
     expect(effectiveWorkflow("editing", "published")).toBe("published");
-    expect(effectiveWorkflow("editing", "draft")).toBe("editing");
+    expect(effectiveWorkflow("editing", "draft")).toBe("review");
+    expect(effectiveWorkflow("assigned", "draft")).toBe("reporting");
+    expect(effectiveWorkflow("writing", "draft")).toBe("drafting");
     expect(effectiveWorkflow(undefined, "draft")).toBe("pitch");
-    expect(workflowLabel("ready")).toBe("Ready for Review");
+    expect(workflowLabel("ready")).toBe("Ready");
+    expect(workflowLabel("editing")).toBe("Review");
   });
 
   it("keeps formats tiny and live out of them", () => {

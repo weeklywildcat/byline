@@ -3,6 +3,7 @@ import type { Where } from "payload";
 import { inIds } from "../access/story-context";
 import { atLeast, relationId, relationIds } from "../access/user";
 import { localDay } from "../domain/dates";
+import { phaseFromId } from "@byline/newsroom-screens/story/lifecycle";
 import { effectiveWorkflow } from "../domain/workflow";
 import type { StoryPlan } from "../payload-types";
 import { loadPeople, localToday, planningStory, STATUSES, storiesWithExtras, userPerson, type ScreenContext } from "./screen-models";
@@ -33,7 +34,7 @@ export async function collectionStoryIds(ctx: ScreenContext, collectionId: numbe
  * the full filter, so loading fewer stories never changes the answer.
  */
 function planMayMatch(plan: StoryPlan, filters: PlanningFilters, timeZone: string): boolean {
-  if (filters.workflow && filters.workflow !== "published" && effectiveWorkflow(plan.workflow, "draft") !== filters.workflow) return false;
+  if (filters.workflow && filters.workflow !== "published" && effectiveWorkflow(plan.workflow, "draft") !== (phaseFromId(filters.workflow) ?? filters.workflow)) return false;
   if (filters.editorId !== null && Number(relationId(plan.editor)) !== filters.editorId) return false;
   if (filters.unassigned && relationId(plan.editor) !== null) return false;
   if (filters.deadlineFrom && (!plan.deadline || plan.deadline < filters.deadlineFrom)) return false;

@@ -136,7 +136,7 @@ function storyHref(story: PlanningStory): string | null {
 }
 
 function isReadyForReview(story: PlanningStory): boolean {
-  return Boolean(story.needsReview || story.workflow.id === "ready" || story.workflow.id === "ready-for-review");
+  return Boolean(story.needsReview || story.workflow.id === "review" || story.workflow.id === "ready-for-review");
 }
 
 function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now: Date): void {

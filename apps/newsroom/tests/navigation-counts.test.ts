@@ -4,7 +4,7 @@ import { builtInStoryView, SIDEBAR_STORY_VIEWS, storyViewCount } from "@byline/n
 import { describe, expect, it } from "vitest";
 import { countStories, type CountedStory } from "../src/newsroom/navigation-counts";
 
-const label: Record<string, string> = { pitch: "Pitch", reporting: "Reporting", ready: "Ready for Review", dropped: "Dropped", published: "Published" };
+const label: Record<string, string> = { pitch: "Pitch", reporting: "Reporting", review: "Review", dropped: "Dropped", published: "Published" };
 
 /** A Stories read-model row as planningStory builds it from the same facts the counts read. */
 function story(id: number, row: CountedStory): PlanningStory {
@@ -16,14 +16,14 @@ function story(id: number, row: CountedStory): PlanningStory {
     publicationState: { id: published ? "published" : "draft", label: published ? "Published" : "Draft", isPublished: published, isScheduled: false },
     deadline: null, plannedPublication: null, modifiedAt: null,
     visual: { type: row.visualStatus === "needed" ? "none" : "photo", status: row.visualStatus as PlanningStory["visual"]["status"] },
-    openTaskCount: 0, featuredImage: null, needsReview: row.workflow === "ready"
+    openTaskCount: 0, featuredImage: null, needsReview: row.workflow === "review"
   };
 }
 
 describe("sidebar navigation counts", () => {
   const rows: CountedStory[] = [
-    { workflow: "ready", editorId: 3, visualStatus: "assigned" },
-    { workflow: "ready", editorId: null, visualStatus: "needed" },
+    { workflow: "review", editorId: 3, visualStatus: "assigned" },
+    { workflow: "review", editorId: null, visualStatus: "needed" },
     { workflow: "reporting", editorId: null, visualStatus: "in-progress" },
     { workflow: "pitch", editorId: 3, visualStatus: "needed" },
     { workflow: "published", editorId: null, visualStatus: "needed" },

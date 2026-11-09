@@ -24,8 +24,9 @@ describe("notification preferences", () => {
     for (const value of [undefined, null, "x", 3, []]) expect(resolveNotificationPreferences(value)).toEqual(defaultNotificationPreferences());
   });
 
-  it("recognizes the eight WordPress kinds plus Reporting's, Front Page's and Distribution's", () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(13);
+  it("recognizes the eight WordPress kinds plus Reporting's, Front Page's, Distribution's and Review's", () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(15);
+    expect(isNotificationKind("reviewRouting")).toBe(true);
     expect(isNotificationKind("transcriptReady")).toBe(true);
     expect(isNotificationKind("frontPageFailures")).toBe(true);
     expect(isNotificationKind("dueDigest")).toBe(true);
@@ -39,7 +40,7 @@ describe("notification text", () => {
     expect(describeNotification({ ...base, kind: "storyAssignments", detail: "editor" })).toBe("Ada Reporter made you the editor of “Budget vote delayed”");
     expect(describeNotification({ ...base, kind: "storyAssignments", detail: "byline" })).toBe("Ada Reporter added you to the byline of “Budget vote delayed”");
     expect(describeNotification({ ...base, kind: "readyForReview" })).toBe("“Budget vote delayed” is ready for your review");
-    expect(describeNotification({ ...base, kind: "storyReturned" })).toBe("Ada Reporter sent “Budget vote delayed” back for more work");
+    expect(describeNotification({ ...base, kind: "storyReturned" })).toBe("Ada Reporter requested changes on “Budget vote delayed”");
     expect(describeNotification({ ...base, kind: "mediaAssignments", detail: "Council photos" })).toBe("Ada Reporter assigned you “Council photos” on “Budget vote delayed”");
     expect(describeNotification({ ...base, kind: "highPriorityTasks", detail: "Check quote" })).toBe("Ada Reporter gave you a high-priority task: Check quote");
     expect(describeNotification({ ...base, kind: "appointments", detail: "Interview" })).toBe("Ada Reporter assigned you an appointment: Interview");
@@ -47,7 +48,7 @@ describe("notification text", () => {
   });
 
   it("copes with a story or person that can no longer be named", () => {
-    expect(describeNotification({ actor: null, story: null, detail: null, kind: "storyReturned" })).toBe("Someone sent a story back for more work");
+    expect(describeNotification({ actor: null, story: null, detail: null, kind: "storyReturned" })).toBe("Someone requested changes on a story");
     expect(describeNotification({ actor: null, story: null, detail: null, kind: "readyForReview" })).toBe("A story is ready for your review");
   });
 

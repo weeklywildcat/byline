@@ -1,24 +1,30 @@
-import { WORKFLOW_OPTIONS, WORKFLOW_STAGES, type EffectiveWorkflow, type WorkflowStage } from "./vocabulary";
+import { isStoredStage, lifecyclePhase, phaseLabel, storedStage, type EffectivePhase, type StoredStage } from "@byline/newsroom-screens/story/lifecycle";
 
-export function isWorkflowStage(value: unknown): value is WorkflowStage {
-  return typeof value === "string" && (WORKFLOW_STAGES as readonly string[]).includes(value);
+/** A stored workflow value (`story-plans.workflow`). Readers project it with `effectiveWorkflow`. */
+export function isWorkflowStage(value: unknown): value is StoredStage {
+  return isStoredStage(value);
 }
 
 /**
- * The stage a story reads as. A published story reads Published; the stored
- * stage stays put, so unpublishing recovers it. A story with no stage reads as
- * Pitch, and nothing writes that default back.
+ * The lifecycle phase a story reads as (docs/story-lifecycle.md): Pitch,
+ * Reporting, Drafting, Review, Ready, On Hold or Dropped, or Published when it
+ * is live. The stored stage stays put, so unpublishing recovers it; a story
+ * with no stage reads as Pitch, and nothing writes that default back.
  *
  * Workflow lives on the story's unversioned plan (`story-plans`), so neither
  * autosave, a draft save nor a version restore can move it: it changes only
- * when someone changes it.
+ * when someone (or the review engine) changes it.
  */
-export function effectiveWorkflow(stage: unknown, publicationStatus: unknown): EffectiveWorkflow {
-  if (publicationStatus === "published") return "published";
-  return isWorkflowStage(stage) ? stage : "pitch";
+export function effectiveWorkflow(stage: unknown, publicationStatus: unknown): EffectivePhase {
+  return lifecyclePhase(stage, publicationStatus);
 }
 
-export function workflowLabel(stage: EffectiveWorkflow): string {
-  if (stage === "published") return "Published";
-  return WORKFLOW_OPTIONS.find((option) => option.value === stage)?.label ?? "Pitch";
+export function workflowLabel(phase: EffectivePhase | string): string {
+  const resolved = typeof phase === "string" && phase !== "published" ? lifecyclePhase(phase) : (phase as EffectivePhase);
+  return phaseLabel(resolved);
+}
+
+/** The value to store for a phase id or any legacy stage id, or null. */
+export function workflowToStore(phase: unknown): StoredStage | null {
+  return storedStage(phase);
 }

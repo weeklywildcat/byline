@@ -29,6 +29,8 @@ import { StoryPlans } from "./collections/StoryPlans";
 import { Appointments, ProductionAssignments, Sources, Tasks } from "./collections/StoryWork";
 import { Sections, Topics } from "./collections/Taxonomies";
 import { Users } from "./collections/Users";
+import { NewsroomRoles, RoleAssignments, SchoolYears, StaffMemberships } from "./collections/Newsroom";
+import { ReviewComments, ReviewRuns, ReviewWorkflows } from "./collections/Review";
 import { addPollVotesTable } from "./db/poll-votes";
 import { addPresenceSessionsTable } from "./db/presence-sessions";
 import { addPublicationStateTable } from "./db/publication-state";
@@ -109,6 +111,13 @@ const collections: CollectionConfig[] = [
   FrontPageRevisions,
   DistributionItems,
   Polls,
+  SchoolYears,
+  StaffMemberships,
+  NewsroomRoles,
+  RoleAssignments,
+  ReviewWorkflows,
+  ReviewRuns,
+  ReviewComments,
   Users
 ];
 

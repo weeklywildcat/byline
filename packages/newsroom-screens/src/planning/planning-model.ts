@@ -7,6 +7,8 @@
  */
 
 import { myStory, siteDay } from "../home/newsroom-model";
+import type { StoryAttention } from "../story/attention";
+import { workflowMatches } from "../story/lifecycle";
 import type { ArticleNotesSummary } from "../story/notes-model";
 import type { MediaSummary, ReportingSummary } from "../workspace/workspace-types";
 
@@ -123,6 +125,23 @@ export type PlanningStory = {
    * may edit the story (not merely see it in the workspace). Absent on older servers.
    */
   notes?: ArticleNotesSummary | null;
+  /**
+   * The Story's attention for this reader (story/attention.ts), computed once on the server.
+   * Absent on hosts without it (WordPress); surfaces then show no attention signal.
+   */
+  attention?: StoryAttention | null;
+  /** The open review's reporter-facing state ("Waiting for Sports Editor"); absent when none. */
+  review?: StoryReviewSummary | null;
+};
+
+/** What every surface may say about a Story's open review. Never comments, never the reviewer queue. */
+export type StoryReviewSummary = {
+  state: "waiting" | "changes-requested" | "routing-failed";
+  waitingFor: string | null;
+  stepLabel: string | null;
+  since: string | null;
+  /** Whether the reader may review the open step now. */
+  canReview: boolean;
 };
 
 export type PlanningCapabilities = {
@@ -618,7 +637,7 @@ export function filterPlanningStories(
     ].join(" "));
 
     if (query && !searchText.includes(query)) return false;
-    if (applied.workflow && story.workflow.id !== applied.workflow) return false;
+    if (applied.workflow && !workflowMatches(story.workflow.id, applied.workflow)) return false;
     if (applied.writerId !== null && story.writer?.id !== applied.writerId) return false;
     if (applied.editorId !== null && story.editor?.id !== applied.editorId) return false;
     if (!inDateRange(story.deadline, applied.deadlineFrom, applied.deadlineTo)) return false;
@@ -630,7 +649,7 @@ export function filterPlanningStories(
     if (applied.mine && (!currentUserId || !myStory(story, currentUserId))) return false;
     if (applied.unassigned && story.editor !== null) return false;
     if (applied.overdue && (story.publicationState.isPublished || !isPlanningDateOverdue(story.deadline, now))) return false;
-    if (applied.needsReview && !(story.needsReview || story.workflow.id === "ready" || story.workflow.id === "ready-for-review")) return false;
+    if (applied.needsReview && !(story.needsReview || story.workflow.id === "review" || story.workflow.id === "ready-for-review")) return false;
 
     return true;
   });

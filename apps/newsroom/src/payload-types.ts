@@ -97,6 +97,13 @@ export interface Config {
     'front-page-revisions': FrontPageRevision;
     'distribution-items': DistributionItem;
     polls: Poll;
+    'school-years': SchoolYear;
+    'staff-memberships': StaffMembership;
+    'newsroom-roles': NewsroomRole;
+    'role-assignments': RoleAssignment;
+    'review-workflows': ReviewWorkflow;
+    'review-runs': ReviewRun;
+    'review-comments': ReviewComment;
     users: User;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
@@ -147,6 +154,13 @@ export interface Config {
     'front-page-revisions': FrontPageRevisionsSelect<false> | FrontPageRevisionsSelect<true>;
     'distribution-items': DistributionItemsSelect<false> | DistributionItemsSelect<true>;
     polls: PollsSelect<false> | PollsSelect<true>;
+    'school-years': SchoolYearsSelect<false> | SchoolYearsSelect<true>;
+    'staff-memberships': StaffMembershipsSelect<false> | StaffMembershipsSelect<true>;
+    'newsroom-roles': NewsroomRolesSelect<false> | NewsroomRolesSelect<true>;
+    'role-assignments': RoleAssignmentsSelect<false> | RoleAssignmentsSelect<true>;
+    'review-workflows': ReviewWorkflowsSelect<false> | ReviewWorkflowsSelect<true>;
+    'review-runs': ReviewRunsSelect<false> | ReviewRunsSelect<true>;
+    'review-comments': ReviewCommentsSelect<false> | ReviewCommentsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
@@ -561,6 +575,7 @@ export interface StoryPlan {
    * Never changes on its own. Published is shown from the story's publication state.
    */
   workflow: 'pitch' | 'assigned' | 'reporting' | 'writing' | 'editing' | 'ready' | 'on-hold' | 'dropped';
+  sidelinedFrom?: ('pitch' | 'assigned' | 'reporting' | 'writing' | 'editing' | 'ready' | 'on-hold' | 'dropped') | null;
   editor?: (number | null) | User;
   /**
    * Internal date (YYYY-MM-DD). It never schedules publication.
@@ -649,6 +664,17 @@ export interface StoryActivity {
     | 'live-coverage-resumed'
     | 'live-coverage-ended'
     | 'homepage-featured'
+    | 'review-submitted'
+    | 'review-resubmitted'
+    | 'review-claimed'
+    | 'review-changes-requested'
+    | 'review-step-approved'
+    | 'review-approved'
+    | 'review-stale'
+    | 'review-reassigned'
+    | 'review-override'
+    | 'review-routing-failed'
+    | 'review-cancelled'
     | 'distribution-assigned'
     | 'distribution-ready'
     | 'distribution-posted'
@@ -742,7 +768,9 @@ export interface Notification {
     | 'distributionAssignments'
     | 'distributionApproval'
     | 'distributionFailures'
-    | 'frontPageFailures';
+    | 'frontPageFailures'
+    | 'reviewComplete'
+    | 'reviewRouting';
   story?: (number | null) | Story;
   actor?: (number | null) | User;
   detail?: string | null;
@@ -1339,6 +1367,178 @@ export interface Poll {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "school-years".
+ */
+export interface SchoolYear {
+  id: number;
+  name: string;
+  /**
+   * First day (YYYY-MM-DD).
+   */
+  startsOn: string;
+  /**
+   * Last day (YYYY-MM-DD).
+   */
+  endsOn: string;
+  status: 'planned' | 'active' | 'archived';
+  activatedAt?: string | null;
+  activatedBy?: (number | null) | User;
+  revision: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "staff-memberships".
+ */
+export interface StaffMembership {
+  id: number;
+  schoolYear: number | SchoolYear;
+  user: number | User;
+  title?: string | null;
+  status: 'active' | 'departed';
+  departedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsroom-roles".
+ */
+export interface NewsroomRole {
+  id: number;
+  key: string;
+  name: string;
+  description?: string | null;
+  scopeKind: 'none' | 'section' | 'media';
+  waitingLabel?: string | null;
+  archived?: boolean | null;
+  revision: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "role-assignments".
+ */
+export interface RoleAssignment {
+  id: number;
+  role: number | NewsroomRole;
+  user: number | User;
+  schoolYear: number | SchoolYear;
+  scopeMode: 'global' | 'scoped';
+  sections?: (number | Section)[] | null;
+  mediaTypes?: ('photo' | 'gallery' | 'graphic' | 'video' | 'audio' | 'other')[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-workflows".
+ */
+export interface ReviewWorkflow {
+  id: number;
+  name: string;
+  description?: string | null;
+  isDefault?: boolean | null;
+  archived?: boolean | null;
+  appliesTo?: {
+    sections?: (number | Section)[] | null;
+    formats?: ('standard' | 'video' | 'audio')[] | null;
+  };
+  steps:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  revision: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-runs".
+ */
+export interface ReviewRun {
+  id: number;
+  story: number | Story;
+  workflow?: (number | null) | ReviewWorkflow;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  status: 'active' | 'changes-requested' | 'routing-failed' | 'approved' | 'cancelled';
+  round: number;
+  steps:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  reviewers?: (number | User)[] | null;
+  submittedVersion: string;
+  submittedAt: string;
+  submittedBy?: (number | null) | User;
+  decisions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  failure?: string | null;
+  statusSince?: string | null;
+  revision: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-comments".
+ */
+export interface ReviewComment {
+  id: number;
+  run: number | ReviewRun;
+  story: number | Story;
+  round: number;
+  stepId: string;
+  version: string;
+  quote?: string | null;
+  anchor?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  body: string;
+  author: number | User;
+  state: 'pending' | 'published' | 'resolved';
+  parent?: (number | null) | ReviewComment;
+  publishedAt?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1665,6 +1865,7 @@ export interface StoryPlansSelect<T extends boolean = true> {
   lastPublicPath?: T;
   story?: T;
   workflow?: T;
+  sidelinedFrom?: T;
   editor?: T;
   deadline?: T;
   plannedPublication?: T;
@@ -2295,6 +2496,127 @@ export interface PollsSelect<T extends boolean = true> {
   closesAt?: T;
   story?: T;
   legacyWordPressId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "school-years_select".
+ */
+export interface SchoolYearsSelect<T extends boolean = true> {
+  name?: T;
+  startsOn?: T;
+  endsOn?: T;
+  status?: T;
+  activatedAt?: T;
+  activatedBy?: T;
+  revision?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "staff-memberships_select".
+ */
+export interface StaffMembershipsSelect<T extends boolean = true> {
+  schoolYear?: T;
+  user?: T;
+  title?: T;
+  status?: T;
+  departedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsroom-roles_select".
+ */
+export interface NewsroomRolesSelect<T extends boolean = true> {
+  key?: T;
+  name?: T;
+  description?: T;
+  scopeKind?: T;
+  waitingLabel?: T;
+  archived?: T;
+  revision?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "role-assignments_select".
+ */
+export interface RoleAssignmentsSelect<T extends boolean = true> {
+  role?: T;
+  user?: T;
+  schoolYear?: T;
+  scopeMode?: T;
+  sections?: T;
+  mediaTypes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-workflows_select".
+ */
+export interface ReviewWorkflowsSelect<T extends boolean = true> {
+  name?: T;
+  description?: T;
+  isDefault?: T;
+  archived?: T;
+  appliesTo?:
+    | T
+    | {
+        sections?: T;
+        formats?: T;
+      };
+  steps?: T;
+  revision?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-runs_select".
+ */
+export interface ReviewRunsSelect<T extends boolean = true> {
+  story?: T;
+  workflow?: T;
+  snapshot?: T;
+  status?: T;
+  round?: T;
+  steps?: T;
+  reviewers?: T;
+  submittedVersion?: T;
+  submittedAt?: T;
+  submittedBy?: T;
+  decisions?: T;
+  failure?: T;
+  statusSince?: T;
+  revision?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-comments_select".
+ */
+export interface ReviewCommentsSelect<T extends boolean = true> {
+  run?: T;
+  story?: T;
+  round?: T;
+  stepId?: T;
+  version?: T;
+  quote?: T;
+  anchor?: T;
+  body?: T;
+  author?: T;
+  state?: T;
+  parent?: T;
+  publishedAt?: T;
+  resolvedAt?: T;
+  resolvedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

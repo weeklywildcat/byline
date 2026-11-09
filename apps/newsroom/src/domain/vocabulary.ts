@@ -5,6 +5,8 @@
  * "status" list, and none of them is the publication state.
  */
 
+import { STORED_STAGES, type EffectivePhase, type StoredStage } from "@byline/newsroom-screens/story/lifecycle";
+
 type Option<T extends string> = { readonly value: T; readonly label: string };
 
 function options<T extends string>(entries: ReadonlyArray<readonly [T, string]>): ReadonlyArray<Option<T>> {
@@ -23,16 +25,21 @@ export const ROLE_OPTIONS = options<Role>([
  * Workflow stages. `published` is derived from Payload's `_status` and is
  * never stored or selected (docs/editorial-workflow.md).
  */
-export const WORKFLOW_STAGES = ["pitch", "assigned", "reporting", "writing", "editing", "ready", "on-hold", "dropped"] as const;
-export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
-export type EffectiveWorkflow = WorkflowStage | "published";
+export const WORKFLOW_STAGES = STORED_STAGES;
+export type WorkflowStage = StoredStage;
+export type EffectiveWorkflow = EffectivePhase;
+/**
+ * The stored values, labelled by the phase each one reads as
+ * (packages/newsroom-screens/src/story/lifecycle.ts). `assigned` is legacy:
+ * it reads as Reporting and is never written again.
+ */
 export const WORKFLOW_OPTIONS = options<WorkflowStage>([
   ["pitch", "Pitch"],
-  ["assigned", "Assigned"],
+  ["assigned", "Reporting (assigned, legacy)"],
   ["reporting", "Reporting"],
-  ["writing", "Writing"],
-  ["editing", "Editing"],
-  ["ready", "Ready for Review"],
+  ["writing", "Drafting"],
+  ["editing", "Review"],
+  ["ready", "Ready"],
   ["on-hold", "On Hold"],
   ["dropped", "Dropped"]
 ]);

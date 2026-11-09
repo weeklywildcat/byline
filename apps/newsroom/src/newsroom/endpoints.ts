@@ -19,7 +19,6 @@ import { resetStoryScope, scopeManages, storyScope } from "../access/story-conte
 import { atLeast } from "../access/user";
 import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/dates";
 import { findPreset, STORY_PRESETS } from "../domain/presets";
-import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
@@ -71,7 +70,8 @@ import {
 import type { CollectionInput, InterviewInput, ResourceInput } from "@byline/newsroom-screens/collections/collection-model";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
-import { effectiveWorkflow } from "../domain/workflow";
+import { effectiveWorkflow, workflowToStore } from "../domain/workflow";
+import { moveLifecycle } from "./lifecycle";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
 import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
@@ -257,8 +257,15 @@ async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<
   }
   const data: Record<string, unknown> = {};
   if (input.status !== undefined) {
-    if (!isWorkflowStage(input.status)) throw new APIError("Choose a valid workflow stage.", 400);
-    data.workflow = input.status;
+    // Phase ids (drafting, review…) and the older stage ids (writing, editing…) both mean a phase.
+    const stored = workflowToStore(input.status);
+    if (!stored) throw new APIError("Choose a valid stage.", 400);
+    // Review and Ready come from the review engine: a reporter submits, they never pick the stage.
+    // Editors keep a manual override for exceptions (docs/story-lifecycle.md#override).
+    if ((stored === "editing" || stored === "ready") && !atLeast(ctx.user, "editor")) {
+      throw new APIError(stored === "editing" ? "Use Submit for review to send this story to an editor." : "Only an editor can mark a story Ready.", 403);
+    }
+    data.workflow = stored;
   }
   if (input.deadline !== undefined) data.deadline = input.deadline ? String(input.deadline).slice(0, 10) : null;
   const planned = input.plannedPublishAt !== undefined ? input.plannedPublishAt : input.plannedPublication;
@@ -577,6 +584,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "get", handler: handle((ctx, req) => workflowReadModel(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
+  { path: "/byline/stories/:id/lifecycle", method: "post", handler: handle(async (ctx, req) => moveLifecycle(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/contributors", method: "put", handler: handle(saveContributors) },
   { path: "/byline/stories/:id/resources", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "add")) },
   { path: "/byline/stories/:id/resources/:resourceId", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "update")) },

@@ -20,7 +20,7 @@ export type CountedStory = { workflow: string; editorId: number | null; visualSt
 /**
  * Active stories and the promoted built-in views (SIDEBAR_STORY_VIEWS), with
  * the same rules the views' shared filters apply to the Stories read model:
- * Ready for review is the `ready` stage, Unassigned has no editor, Art needed
+ * Needs review is the Review phase, Unassigned has no editor, Art needed
  * a visual status of `needed` (which is also what a story with no assignment
  * reports).
  */
@@ -29,7 +29,7 @@ export function countStories(rows: readonly CountedStory[]): Pick<NavigationCoun
   return {
     stories: active.length,
     views: {
-      review: active.filter((row) => row.workflow === "ready").length,
+      review: active.filter((row) => row.workflow === "review").length,
       unassigned: active.filter((row) => row.editorId === null).length,
       "art-needed": active.filter((row) => row.visualStatus === "needed").length
     }
