@@ -55,7 +55,7 @@ function pollChoice(doc: Doc): PollChoice | null {
   return reference ? { ...reference, status } : null;
 }
 
-export function useNewsroomEditorHost(): BylineEditorHost {
+export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["registerInserter"]): BylineEditorHost {
   const { fetchers, pick, href, editArtDirection, editDetails } = useMediaWorkspace();
   const { config } = useConfig();
   const { user } = useAuth();
@@ -132,7 +132,8 @@ export function useNewsroomEditorHost(): BylineEditorHost {
       return asset ? articleMediaFromLibrary(asset) : null;
     },
     // The Media shell owns the one art-direction editor; blocks and the lead image only name a Media ID.
-    editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null
+    editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null,
+    registerInserter
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `get` closes over `api` only
-  }), [api, currentStoryId, custom.repositoryInteractives, custom.repositoryTrackers, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
+  }), [api, registerInserter, currentStoryId, custom.repositoryInteractives, custom.repositoryTrackers, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
 }

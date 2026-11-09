@@ -141,3 +141,15 @@ describe("quote provenance", () => {
     expect(referencedSelections(null)).toEqual([]);
   });
 });
+
+describe("the public body never carries reporting provenance", () => {
+  it("drops the private reportingSelection from a Reported Quote", async () => {
+    const { normalizePayloadStoryBody } = await import("@byline/editor/normalize");
+    const state = { root: { type: "root", version: 1, direction: null, format: "", indent: 0, children: [{ type: "block", version: 2, format: "", fields: { id: "q1", blockName: "", blockType: "reportedQuote", text: "We switched to man coverage.", attribution: "Coach Smith, Head coach", reportingSelection: 4242, sourceUrl: "", sourceLabel: "" } }] } };
+    const { body } = normalizePayloadStoryBody({ contentFormat: "byline-v1", body: state }, { media: () => null });
+    const json = JSON.stringify(body);
+    expect(json).toContain("man coverage");
+    expect(json).not.toContain("reportingSelection");
+    expect(json).not.toContain("4242");
+  });
+});

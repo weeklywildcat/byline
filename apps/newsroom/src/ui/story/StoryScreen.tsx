@@ -14,13 +14,14 @@ import { TasksSection } from "@byline/newsroom-screens/workspace/TasksSection";
 import { useAuth, useConfig, useDocumentInfo, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import type { CollapsibleFieldClientComponent } from "payload";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useMemo, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import { useLeaveGuard } from "../shell/navigation";
 import { useSettleAutosave, useStoryField } from "./form";
 import { HistoryTab } from "./HistoryTab";
 import { LiveTab } from "./LiveTab";
+import { ReportingTab } from "../reporting/ReportingTab";
 import { StoryNotes } from "./StoryNotes";
 import { StoryHeader } from "./StoryHeader";
 import { WriteTab } from "./WriteTab";
@@ -34,6 +35,8 @@ export type StoryScreenContext = {
   userId: string | number | undefined;
   readOnly: boolean;
   shellQueries: QueryClient;
+  /** Opens the Reporting tab, on a transcript when given (the article's Reporting sheet uses it). */
+  openReporting?: (transcriptId?: number) => void;
 };
 
 /**
@@ -59,8 +62,16 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string };
   const shellQueries = useQueryClient();
   const liveState = useStoryField<"off" | "live" | "ended">("liveCoverage.state").value ?? "off";
+  const [tab, setTab] = useState<string>(() => {
+    const requested = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("tab") ?? "";
+    return requested === "reporting" ? "reporting" : "";
+  });
   const context: StoryScreenContext = {
     shellQueries,
+    openReporting: (transcriptId) => {
+      if (transcriptId) window.history.replaceState(null, "", `${window.location.pathname}?tab=reporting&transcript=${transcriptId}`);
+      setTab("reporting");
+    },
     api: config.routes.api,
     admin: config.routes.admin,
     timeZone: custom.newsroomTimeZone ?? "America/New_York",
@@ -77,7 +88,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   // `?appointment=<id>` opens that appointment's scheduler, as in the WordPress workspace.
   const location = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
   const appointmentId = location?.get("appointment") ?? "";
-  const defaultTab = appointmentId || location?.get("tab") === "plan" ? "plan" : "write";
+  const defaultTab = tab || (appointmentId || location?.get("tab") === "plan" ? "plan" : "write");
 
   const screen = (
     // Write spans the whole canvas (wide and full photographs measure against it);
@@ -87,10 +98,11 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
       <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
         <StoryHeader context={context} />
       </div>
-      <Tabs defaultValue={defaultTab} className="gap-4">
+      <Tabs value={tab || defaultTab} onValueChange={(next) => setTab(String(next))} className="gap-4">
         <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <TabsList>
             <TabsTrigger value="write">Write</TabsTrigger>
+            <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="production">Production</TabsTrigger>
             {liveState === "live" || liveState === "ended" ? <TabsTrigger value="live">Live{liveState === "live" ? <span aria-hidden="true" className="ml-1.5 inline-block size-1.5 rounded-full bg-destructive" /> : null}</TabsTrigger> : null}
@@ -100,6 +112,9 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
         {/* Write stays mounted so the editor keeps its state while other tabs are open. */}
         <TabsContent value="write" keepMounted>
           <WriteTab context={context} paths={childPaths} />
+        </TabsContent>
+        <TabsContent value="reporting" className="mx-auto w-full max-w-6xl px-4 md:px-8">
+          {Number.isSafeInteger(storyId) && storyId > 0 ? <ReportingTab context={context} /> : <p className="text-sm text-muted-foreground">Save the story once to start reporting on it.</p>}
         </TabsContent>
         <TabsContent value="plan" className="mx-auto w-full max-w-5xl px-4 md:px-8">
           <Workspace storyId={storyId}>

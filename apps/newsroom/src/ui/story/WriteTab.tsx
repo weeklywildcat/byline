@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { parseYouTubeVideoId } from "@byline/core";
-import { BylineEditorHostProvider } from "@byline/editor/client";
+import { BylineEditorHostProvider, type StoryBlockInserter } from "@byline/editor/client";
+import { ReportingSheet } from "../reporting/ReportingSheet";
+import type { SelectionView } from "../reporting/api";
 import { RenderFields } from "@payloadcms/ui";
 import { Plus } from "lucide-react";
 import type { ClientField, SanitizedFieldPermissions } from "payload";
-import { useState, type KeyboardEvent } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { STORY_FORMAT_OPTIONS } from "../../domain/vocabulary";
 
 import { ArticleCanvas } from "./ArticleCanvas";
@@ -111,7 +113,11 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const videoProblem = format.value === "video" && url.trim() !== "" && !parseYouTubeVideoId(url) ? "That is not a YouTube video link." : null;
   const showKicker = kickerOpen || Boolean(kicker.value?.trim());
   const showReportingNote = reportingNoteOpen || Boolean(reportingNote.value?.trim());
-  const host = useNewsroomEditorHost();
+  // The canvas hands its block inserter here; the Reporting sheet inserts a Reported Quote through it.
+  const inserter = useRef<StoryBlockInserter | null>(null);
+  const registerInserter = useCallback((next: StoryBlockInserter | null) => { inserter.current = next; }, []);
+  const host = useNewsroomEditorHost(registerInserter);
+  const insertQuote = useCallback((quote: SelectionView) => inserter.current?.("reportedQuote", { text: quote.text, attribution: quote.attribution, reportingSelection: quote.id }) ?? false, []);
 
   return (
     <BylineEditorHostProvider host={host}>
@@ -231,6 +237,9 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
 
           {legacy ? null : (
             <section aria-label="Story body" className="byline-story-body">
+              {context.readOnly || !Number.isSafeInteger(Number(context.storyId)) ? null : (
+                <div className="mx-auto mb-1 flex w-full max-w-[760px] justify-end px-4 md:px-0"><ReportingSheet context={context} insert={insertQuote} /></div>
+              )}
               <ArticleCanvas>
                 <PayloadField paths={paths} name="body" readOnly={readOnly} />
               </ArticleCanvas>
