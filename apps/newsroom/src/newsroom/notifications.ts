@@ -183,7 +183,7 @@ export async function deliverNotification(payload: Payload, id: Id, options: { c
   const storyId = relationId(row.story);
   const { headlines, names } = await nameMaps(payload, [row]);
   const admin = payload.config.routes.admin;
-  const link = `${origin()}${admin}${storyId !== null ? `/collections/stories/${storyId}` : ""}`;
+  const link = `${origin()}${admin}${storyId !== null ? `/collections/stories/${storyId}${notificationTab(row.data)}` : ""}`;
   const message = notificationEmail(factsFor(row, headlines, names), link);
   await payload.sendEmail({ to: user.email, subject: message.subject, text: message.text, html: message.html });
   await setState("sent");
@@ -207,12 +207,13 @@ export const deliverNotificationTask: TaskConfig = {
 
 /* ---------------------------------------------------------------------- inbox */
 
-/** A notification may open a particular tab of the Story screen (transcripts open Reporting). */
-function notificationTab(data: unknown): string {
-  const record = (data && typeof data === "object" ? data : {}) as { tab?: unknown; transcriptId?: unknown };
-  if (record.tab !== "reporting" && record.tab !== "publish") return "";
+/** A notification may open a particular tab of the Story screen (transcripts open Reporting; Distribution opens its item on History). */
+export function notificationTab(data: unknown): string {
+  const record = (data && typeof data === "object" ? data : {}) as { tab?: unknown; transcriptId?: unknown; distribution?: unknown };
+  if (record.tab !== "reporting" && record.tab !== "publish" && record.tab !== "history") return "";
   const transcript = Number(record.transcriptId);
-  return `?tab=${record.tab}${Number.isSafeInteger(transcript) && transcript > 0 ? `&transcript=${transcript}` : ""}`;
+  const distribution = Number(record.distribution);
+  return `?tab=${record.tab}${Number.isSafeInteger(transcript) && transcript > 0 ? `&transcript=${transcript}` : ""}${Number.isSafeInteger(distribution) && distribution > 0 ? `&distribution=${distribution}` : ""}`;
 }
 
 export type InboxItem = { id: number; kind: NotificationKind; text: string; createdAt: string; readAt: string | null; storyId: number | null; href: string | null; items: DigestItem[] };

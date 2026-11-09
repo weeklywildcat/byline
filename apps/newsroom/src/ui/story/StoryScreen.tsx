@@ -64,7 +64,7 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const liveState = useStoryField<"off" | "live" | "ended">("liveCoverage.state").value ?? "off";
   const [tab, setTab] = useState<string>(() => {
     const requested = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("tab") ?? "";
-    return requested === "reporting" ? "reporting" : "";
+    return requested === "reporting" || requested === "history" ? requested : "";
   });
   const context: StoryScreenContext = {
     shellQueries,

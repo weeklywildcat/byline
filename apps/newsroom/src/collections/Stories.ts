@@ -51,7 +51,7 @@ const syncPlan: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
         contributors,
         createdBy: (user?.id as number | undefined) ?? null,
         // A preset may seed workflow, editor and deadline (Phase 3 New Story).
-        ...((req.context?.bylinePlan ?? {}) as Partial<Pick<StoryPlan, "workflow" | "editor" | "deadline" | "plannedPublication">>)
+        ...((req.context?.bylinePlan ?? {}) as Partial<Pick<StoryPlan, "workflow" | "editor" | "deadline" | "plannedPublication" | "preset">>)
       },
       overrideAccess: true,
       context: { bylineSystem: true },
@@ -228,6 +228,7 @@ export const Stories: CollectionConfig = {
       await req.payload.db.deleteMany({ collection: "reporting-transcripts", where, req });
       await req.payload.db.deleteMany({ collection: "reporting-notes", where, req });
       await req.payload.delete({ collection: "reporting-files", where, overrideAccess: true, req });
+      await req.payload.db.deleteMany({ collection: "distribution-items", where, req });
     }]
   },
   fields: [

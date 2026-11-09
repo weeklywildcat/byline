@@ -1,6 +1,5 @@
 import { body, handle, idParam, json } from "./http";
 import { relatedSuggestions } from "./related-suggestions";
-import { storyDistribution } from "./story-distribution";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
 import { changeLiveUpdate, deleteLiveUpdate, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
@@ -148,7 +147,7 @@ export async function createStory(ctx: ScreenContext, req: PayloadRequest, given
     // The plan is created with the story; a preset seeds its stage, and its deadline only for editors.
     context: {
       bylinePlan: {
-        ...(preset ? { workflow: preset.workflow.status } : {}),
+        ...(preset ? { workflow: preset.workflow.status, preset: preset.id } : {}),
         ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {})
       }
     },
@@ -497,7 +496,6 @@ const collectionEndpoints: Endpoint[] = [
 /* ----------------------------------------------------------- endpoints */
 
 export const newsroomEndpoints: Endpoint[] = [
-  { path: "/byline/stories/:id/distribution", method: "get", handler: handle((ctx, req) => storyDistribution(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },

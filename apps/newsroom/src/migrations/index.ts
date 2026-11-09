@@ -17,6 +17,7 @@ import * as migration_20261108_165129_notifications from './20261108_165129_noti
 import * as migration_20261108_173200_public_deploy_hook from './20261108_173200_public_deploy_hook';
 import * as migration_20261109_035544_reporting from './20261109_035544_reporting';
 import * as migration_20261109_130958_front_page from './20261109_130958_front_page';
+import * as migration_20261109_134558_distribution from './20261109_134558_distribution';
 
 export const migrations = [
   {
@@ -112,6 +113,11 @@ export const migrations = [
   {
     up: migration_20261109_130958_front_page.up,
     down: migration_20261109_130958_front_page.down,
-    name: '20261109_130958_front_page'
+    name: '20261109_130958_front_page',
+  },
+  {
+    up: migration_20261109_134558_distribution.up,
+    down: migration_20261109_134558_distribution.down,
+    name: '20261109_134558_distribution'
   },
 ];

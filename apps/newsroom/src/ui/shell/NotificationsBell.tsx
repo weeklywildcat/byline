@@ -68,9 +68,7 @@ export function NotificationsBell() {
   if (!account) return null;
   const unread = inbox?.unread ?? 0;
   const EDITOR_KINDS: readonly string[] = ["publishingFailures", "distributionApproval", "frontPageFailures"];
-  // Distribution's kinds are reserved for its workflow (docs/payload-migration.md); nothing sends them yet, so they offer no setting.
-  const NOT_YET: readonly string[] = ["distributionAssignments", "distributionApproval", "distributionFailures"];
-  const kinds = NOTIFICATION_KINDS.filter((kind) => !NOT_YET.includes(kind) && (!EDITOR_KINDS.includes(kind) || atLeast(account, "editor")));
+  const kinds = NOTIFICATION_KINDS.filter((kind) => !EDITOR_KINDS.includes(kind) || atLeast(account, "editor"));
 
   /** Marks what the person can see as read (never a notification that arrived after the list loaded); `refresh` then shows any that remain. */
   const markRead = async (body: { ids: number[] } | { all: true }, refresh = false) => {

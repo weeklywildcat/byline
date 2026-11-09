@@ -73,7 +73,11 @@ export const afterStoryActivity: CollectionAfterChangeHook = async ({ req, doc, 
   // Autosaves and restores to draft don't change the main document.
   if (operation === "create" || before != null) {
     const current = await req.payload.db.findOne({ collection: "stories", where: { id: { equals: doc.id } }, req });
-    if ((current as { _status?: string } | null)?._status === "published" && before !== "published") await recordStoryActivity(req, doc.id, "story-published");
+    if ((current as { _status?: string } | null)?._status === "published" && before !== "published") {
+      await recordStoryActivity(req, doc.id, "story-published");
+      // Read (and cleared) by Distribution seeding later in this save (distribution/policy.ts).
+      req.context[`bylineWentLive:${doc.id}`] = true;
+    }
     if ((current as { _status?: string } | null)?._status === "draft" && before === "published") await recordStoryActivity(req, doc.id, "story-unpublished");
   }
   return doc;

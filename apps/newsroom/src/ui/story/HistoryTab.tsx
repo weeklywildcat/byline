@@ -118,7 +118,7 @@ export function HistoryTab({ context }: { context: StoryScreenContext }) {
       </ItemGroup>
     </section>
     {hasPublishedDoc ? <StoryFrontPage context={context} /> : null}
-    {hasPublishedDoc ? <StoryDistribution context={context} /> : null}
+    <StoryDistribution context={context} />
     {hasPublishPermission && !context.readOnly ? <StoryCorrections context={context} /> : null}
     <AlertDialog open={restoring !== null} onOpenChange={(open) => { if (!open && !busy) setRestoring(null); }}>
       <AlertDialogContent finalFocus={() => focus.current?.isConnected ? focus.current : true}>

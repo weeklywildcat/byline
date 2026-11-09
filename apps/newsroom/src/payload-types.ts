@@ -95,6 +95,7 @@ export interface Config {
     'reporting-transcripts': ReportingTranscript;
     'transcript-selections': TranscriptSelection;
     'front-page-revisions': FrontPageRevision;
+    'distribution-items': DistributionItem;
     polls: Poll;
     users: User;
     'payload-kv': PayloadKv;
@@ -144,6 +145,7 @@ export interface Config {
     'reporting-transcripts': ReportingTranscriptsSelect<false> | ReportingTranscriptsSelect<true>;
     'transcript-selections': TranscriptSelectionsSelect<false> | TranscriptSelectionsSelect<true>;
     'front-page-revisions': FrontPageRevisionsSelect<false> | FrontPageRevisionsSelect<true>;
+    'distribution-items': DistributionItemsSelect<false> | DistributionItemsSelect<true>;
     polls: PollsSelect<false> | PollsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -159,10 +161,12 @@ export interface Config {
   fallbackLocale: null;
   globals: {
     publication: Publication;
+    'distribution-settings': DistributionSetting;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     publication: PublicationSelect<false> | PublicationSelect<true>;
+    'distribution-settings': DistributionSettingsSelect<false> | DistributionSettingsSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
@@ -585,6 +589,8 @@ export interface StoryPlan {
    */
   contributors?: (number | Person)[] | null;
   createdBy?: (number | null) | User;
+  preset?: string | null;
+  distributionSeededAt?: string | null;
   /**
    * May publish live updates on this story (only live updates; never the article).
    */
@@ -1258,6 +1264,46 @@ export interface FrontPageRevision {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "distribution-items".
+ */
+export interface DistributionItem {
+  id: number;
+  story: number | Story;
+  destination: 'instagram' | 'facebook' | 'newsletter' | 'school-tvs' | 'discord' | 'youtube' | 'other';
+  expectation: 'prepare' | 'eligible' | 'optional';
+  state: 'planned' | 'draft' | 'ready' | 'scheduled' | 'posted' | 'skipped' | 'failed';
+  owner?: (number | null) | User;
+  headlineMode: 'story' | 'custom';
+  headline?: string | null;
+  textMode: 'story' | 'custom';
+  text?: string | null;
+  mediaMode: 'story' | 'custom' | 'none';
+  media?: (number | null) | Media;
+  plannedFor?: string | null;
+  scheduledFor?: string | null;
+  note?: string | null;
+  permalink?: string | null;
+  postedAt?: string | null;
+  postedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  approvedBy?: (number | null) | User;
+  sent?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  failure?: string | null;
+  failedAt?: string | null;
+  createdBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "polls".
  */
 export interface Poll {
@@ -1632,6 +1678,8 @@ export interface StoryPlansSelect<T extends boolean = true> {
       };
   contributors?: T;
   createdBy?: T;
+  preset?: T;
+  distributionSeededAt?: T;
   livePublishers?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2189,6 +2237,37 @@ export interface FrontPageRevisionsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "distribution-items_select".
+ */
+export interface DistributionItemsSelect<T extends boolean = true> {
+  story?: T;
+  destination?: T;
+  expectation?: T;
+  state?: T;
+  owner?: T;
+  headlineMode?: T;
+  headline?: T;
+  textMode?: T;
+  text?: T;
+  mediaMode?: T;
+  media?: T;
+  plannedFor?: T;
+  scheduledFor?: T;
+  note?: T;
+  permalink?: T;
+  postedAt?: T;
+  postedBy?: T;
+  approvedAt?: T;
+  approvedBy?: T;
+  sent?: T;
+  failure?: T;
+  failedAt?: T;
+  createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "polls_select".
  */
 export interface PollsSelect<T extends boolean = true> {
@@ -2459,6 +2538,45 @@ export interface Publication {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "distribution-settings".
+ */
+export interface DistributionSetting {
+  id: number;
+  customized?: boolean | null;
+  destinations?:
+    | {
+        kind: 'instagram' | 'facebook' | 'newsletter' | 'school-tvs' | 'discord' | 'youtube' | 'other';
+        enabled?: boolean | null;
+        requiresApproval?: boolean | null;
+        /**
+         * Shown to staff instead of the destination's name (for example “Morning announcements”).
+         */
+        label?: string | null;
+        /**
+         * Where “Open …” goes: the publication's profile or page.
+         */
+        accountUrl?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * For each destination the first matching rule applies. Prepare: Byline creates the work when a Story is first published. Eligible: created, not urgent. Optional: suggested on the Story only. An empty template or section list matches every Story.
+   */
+  rules?:
+    | {
+        destination: 'instagram' | 'facebook' | 'newsletter' | 'school-tvs' | 'discord' | 'youtube' | 'other';
+        level: 'prepare' | 'eligible' | 'optional';
+        presets?:
+          ('news' | 'sports-recap' | 'opinion' | 'photo-story' | 'video-story' | 'investigation' | 'breaking')[] | null;
+        sections?: (number | Section)[] | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-jobs-stats".
  */
 export interface PayloadJobsStat {
@@ -2608,6 +2726,35 @@ export interface PublicationSelect<T extends boolean = true> {
         organizationType?: T;
       };
   _status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "distribution-settings_select".
+ */
+export interface DistributionSettingsSelect<T extends boolean = true> {
+  customized?: T;
+  destinations?:
+    | T
+    | {
+        kind?: T;
+        enabled?: T;
+        requiresApproval?: T;
+        label?: T;
+        accountUrl?: T;
+        id?: T;
+      };
+  rules?:
+    | T
+    | {
+        destination?: T;
+        level?: T;
+        presets?: T;
+        sections?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

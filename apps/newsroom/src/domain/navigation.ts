@@ -61,6 +61,7 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true },
   // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
   { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
+  { key: "distribution", label: "Distribution", path: "/distribution", minimumRole: "editor", exact: true, group: "publish" },
   { key: "content-health", label: "Content Health", path: "/content-health", minimumRole: "editor", exact: true, group: "publish" }
 ];
 
@@ -136,6 +137,8 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-topics", label: "Topics", path: "/collections/topics", minimumRole: "administrator" },
   { key: "raw-work", label: "Tasks", path: "/collections/tasks", minimumRole: "administrator" },
   { key: "raw-accounts", label: "Accounts", path: "/collections/users", minimumRole: "administrator" },
+  { key: "raw-distribution", label: "Distribution items", path: "/collections/distribution-items", minimumRole: "administrator" },
+  { key: "raw-distribution-settings", label: "Distribution settings", path: "/globals/distribution-settings", minimumRole: "administrator" },
   { key: "raw-jobs", label: "Jobs", path: "/collections/payload-jobs", minimumRole: "administrator" }
 ];
 

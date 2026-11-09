@@ -39,6 +39,8 @@ import { fieldEndpoints } from "./field/endpoints";
 import { frontPageEndpoints } from "./front-page/endpoints";
 import { activateFrontPageTask } from "./front-page/server";
 import { FrontPageRevisions } from "./collections/FrontPage";
+import { DistributionItems, DistributionSettings } from "./collections/Distribution";
+import { distributionEndpoints } from "./distribution/endpoints";
 import { transcribeReportingFileTask } from "./reporting/transcription/queue";
 import { Publication } from "./globals/Publication";
 import { withPublicTracking } from "./public/tracking";
@@ -105,6 +107,7 @@ const collections: CollectionConfig[] = [
   ReportingTranscripts,
   TranscriptSelections,
   FrontPageRevisions,
+  DistributionItems,
   Polls,
   Users
 ];
@@ -127,7 +130,7 @@ export default buildConfig({
     : {}),
   collections: collections.map((collection) => withImportIdGuard(withPublicTracking(collection))),
   // The publication's public configuration (administrators; drafts stage changes, only the published Global is public).
-  globals: [Publication],
+  globals: [Publication, DistributionSettings],
   // Camera originals are larger than Payload's 20 MB multipart default, and interview recordings larger still.
   // The multipart limit is the larger of the two; Media refuses anything over its own limit (collections/Media.ts).
   upload: { limits: { fileSize: Math.max(MEDIA_UPLOAD_MAX_BYTES, REPORTING_LIMITS.fileBytes) } },
@@ -144,7 +147,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...googleEndpoints],
+  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
@@ -189,6 +192,7 @@ export default buildConfig({
         field: { Component: "/components/BylineField#BylineField", path: "/field", exact: true, meta: { title: "Field" } },
         // Front Page Desk: editorial priority over the code-owned homepage (editors).
         frontPage: { Component: "/components/BylineFrontPage#BylineFrontPage", path: "/front-page", exact: true, meta: { title: "Front Page" } },
+        distribution: { Component: "/components/BylineDistribution#BylineDistribution", path: "/distribution", exact: true, meta: { title: "Distribution" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }
