@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { createHeadlessEditor } from "@payloadcms/richtext-lexical/lexical/headless";
 import { describe, expect, it } from "vitest";
-import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, finalizeBlock, type ArticleBlock, type ArticleMediaAsset } from "@byline/article-body";
+import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, finalizeBlock, type ArticleBlock, type ArticleBody, type ArticleMediaAsset } from "@byline/article-body";
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_TRACKER_KEY, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
 import { ARTICLE_BLOCK_RENDERERS } from "@byline/ui/article-body";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, BLOCK_TO_ARTICLE, mediaIdOf } from "../src/fields";
@@ -101,6 +102,14 @@ describe("the media contract", () => {
 });
 
 describe("Payload Lexical → byline-v1", () => {
+  it("opens an empty imported body in Lexical while keeping the public body empty", () => {
+    const article: ArticleBody = { format: "byline-v1", version: 1, nodes: [], media: {} };
+    const state = lexicalFromArticleBody(article);
+    const editor = createHeadlessEditor();
+    expect(() => editor.setEditorState(editor.parseEditorState(JSON.stringify(state)))).not.toThrow();
+    expect(normalizePayloadArticleBody(state, { media })).toEqual({ body: article, issues: [] });
+  });
+
   it("round-trips the fixture story exactly, in order", () => {
     const { body, issues } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), { media, references });
     expect(issues).toEqual([]);

@@ -1,12 +1,17 @@
 import { articleMediaFromPayload, collectMediaIds, collectReferenceIds, normalizePayloadArticleBody, type NormalizeIssue } from "@byline/editor/normalize";
 import { enforcePrivilegedBlocks } from "@byline/editor/permissions";
+import { ensureEditableLexicalRoot } from "@byline/editor/serialize";
 import { blockLabel, isBlockingIssue, mediaKey, type MediaId, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
 import { repositoryInteractiveRegistry } from "@byline/story-presentations/interactives";
 import { repositoryTrackerRegistry } from "@byline/story-presentations/trackers";
-import { ValidationError, type CollectionBeforeChangeHook, type Payload, type PayloadRequest } from "payload";
+import { ValidationError, type CollectionBeforeChangeHook, type FieldHook, type Payload, type PayloadRequest } from "payload";
 import { atLeast, requestUser } from "../access/user";
 import { loadPreviewPublication } from "../preview/publication";
 import { publicEventReference, publicPollReference, publicStoryReference } from "../public/references";
+
+/** Repair previously stored empty roots on read, including drafts and historical versions. */
+export const repairEmptyStoryBody: FieldHook = ({ value, siblingData }) =>
+  siblingData?.contentFormat === "legacy-html" ? value : ensureEditableLexicalRoot(value);
 
 /**
  * Server-side rules for a Story's article body, whatever the browser did.

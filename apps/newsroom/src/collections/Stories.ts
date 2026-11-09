@@ -8,7 +8,7 @@ import { publicationMediaReport, storyMediaRequirements } from "../publication-m
 import { inIds, storyScope } from "../access/story-context";
 import { editorsOnlyField, atLeast, relationIds, requestUser } from "../access/user";
 import { articleBodyEditor } from "@byline/editor/server";
-import { guardPrivilegedBlocks, requireCompleteBody } from "../hooks/story-body";
+import { guardPrivilegedBlocks, repairEmptyStoryBody, requireCompleteBody } from "../hooks/story-body";
 import type { StoryPlan } from "../payload-types";
 import {
   CONTENT_FORMATS,
@@ -253,7 +253,11 @@ export const Stories: CollectionConfig = {
           admin: { readOnly: true, position: "sidebar" }
         },
         // The byline-v1 body: prose plus the Byline story blocks (@byline/editor). Never Payload's generic block forms.
-        { name: "body", label: false, type: "richText", editor: articleBodyEditor, admin: { condition: (data) => data?.contentFormat !== "legacy-html" } },
+        {
+          name: "body", label: false, type: "richText", editor: articleBodyEditor,
+          hooks: { afterRead: [repairEmptyStoryBody], beforeChange: [repairEmptyStoryBody] },
+          admin: { condition: (data) => data?.contentFormat !== "legacy-html" }
+        },
         {
           name: "legacyHtml",
           label: "Imported body (HTML)",

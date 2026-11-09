@@ -24,6 +24,16 @@ function inline(children: readonly Inline[]): Json[] {
 }
 
 const element = (type: string, children: Json[], extra: Json = {}): Json => ({ type, children, direction: "ltr", format: "", indent: 0, version: 1, ...extra });
+const paragraph = (children: Json[]): Json => element("paragraph", children, { textFormat: 0, textStyle: "" });
+
+/** Lexical rejects a serialized root with no children when loading the editor. */
+export function ensureEditableLexicalRoot<T>(state: T): T {
+  if (!state || typeof state !== "object" || !("root" in state)) return state;
+  const { root } = state;
+  if (!root || typeof root !== "object" || !("type" in root) || root.type !== "root") return state;
+  if (!("children" in root) || !Array.isArray(root.children) || root.children.length > 0) return state;
+  return { ...state, root: { ...root, children: [paragraph([])] } };
+}
 
 function list(node: ListNode): Json {
   return element("list", node.items.map((item, index) => element("listitem", [...inline(item.children), ...(item.list ? [list(item.list)] : [])], { value: index + 1 })), { listType: node.ordered ? "number" : "bullet", tag: node.ordered ? "ol" : "ul", start: 1 });
@@ -113,7 +123,7 @@ export function lexicalFromArticleBody(body: ArticleBody): { root: Json } {
   const children = body.nodes.map((node): Json => {
     switch (node.type) {
       case "paragraph":
-        return element("paragraph", inline(node.children), { textFormat: 0, textStyle: "" });
+        return paragraph(inline(node.children));
       case "heading":
         return element("heading", inline(node.children), { tag: `h${node.level}` });
       case "list":
@@ -122,5 +132,5 @@ export function lexicalFromArticleBody(body: ArticleBody): { root: Json } {
         return { type: "block", version: 2, format: "", fields: blockFields(node) };
     }
   });
-  return { root: element("root", children) };
+  return ensureEditableLexicalRoot({ root: element("root", children) });
 }
