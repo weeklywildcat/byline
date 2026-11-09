@@ -1,6 +1,6 @@
 import { APIError, type Where } from "payload";
 import { canChangeMaterial, reportingAudience } from "../access/reporting-context";
-import { canPublishLive } from "../access/live-context";
+import { canPublishLive, readLiveSettings } from "../access/live-context";
 import { scopeManages, scopeParticipates } from "../access/story-context";
 import { atLeast, relationId } from "../access/user";
 import { localDay } from "../domain/dates";
@@ -85,7 +85,8 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   if (!manager && !scopeParticipates(audience.scope, storyId)) throw new APIError("You are not part of this story.", 403);
   const { payload } = ctx.req;
 
-  const story = await payload.findByID({ collection: "stories", id: storyId, draft: true, select: { headline: true, _status: true, liveCoverage: true }, ...as(ctx) });
+  const story = await payload.findByID({ collection: "stories", id: storyId, draft: true, select: { headline: true, _status: true }, ...as(ctx) });
+  const liveSettings = await readLiveSettings(ctx.req, storyId);
   const byStory: Where = { story: { equals: storyId } };
   const [sourcesPage, appointmentsPage, notesPage, filesPage, plans, assignments, captured, postLive] = await Promise.all([
     payload.find({ collection: "sources", where: byStory, pagination: false, sort: "label", ...as(ctx) }),
@@ -198,7 +199,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
     .slice(0, 5);
 
   return {
-    story: { id: storyId, headline: story.headline ?? "Untitled story", published: story._status === "published", liveState: (story.liveCoverage?.state ?? "off") as "off" | "live" | "ended" },
+    story: { id: storyId, headline: story.headline ?? "Untitled story", published: story._status === "published", liveState: liveSettings.mode === "live" ? liveSettings.state : "off" },
     capabilities: {
       capture: true,
       manage: manager,

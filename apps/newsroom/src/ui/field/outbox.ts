@@ -18,7 +18,11 @@
  * The logic is pure over an `OutboxStore`; `indexedDbOutbox()` persists it.
  */
 
+import { deskNote, type PublishBlock } from "../../domain/live-coverage";
+
 export type OutboxKind = "note" | "live" | "photo" | "recording" | "file";
+/** What the reporter tapped for a live update. Frozen into the item; the server decides again when it arrives. */
+export type Delivery = "publish" | "desk";
 export type OutboxState = "queued" | "sending" | "done" | "failed";
 
 export type OutboxItem = {
@@ -33,6 +37,8 @@ export type OutboxItem = {
   durationMs?: number;
   capturedAt?: string;
   context: { appointmentId?: number; sourceId?: number; assignmentId?: number };
+  /** A live update's explicit intent. Missing (an item queued before this existed) is the desk: stale material is never silently published. */
+  delivery?: Delivery;
   /** A live update waits for this photo item and attaches its Media. */
   photoKey?: string;
   state: OutboxState;
@@ -42,7 +48,7 @@ export type OutboxItem = {
   error: string | null;
   /** Earliest time to try again (ms epoch), after a server-side failure. */
   retryAt: number;
-  result?: { id: number; status: "saved" | "posted" | "sent-to-desk" };
+  result?: OutboxResult;
   /** True when the browser would not store the item: it exists only while this page is open. */
   memoryOnly?: boolean;
 };
@@ -62,7 +68,9 @@ export class SendError extends Error {
   }
 }
 
-export type Sender = (item: OutboxItem, context: { photoId: number | null; onProgress: (fraction: number) => void }) => Promise<{ id: number; status: "saved" | "posted" | "sent-to-desk" }>;
+export type OutboxResult = { id: number; status: "saved" | "posted" | "sent-to-desk"; /** Why a "Publish now" went to the desk instead. */ reason?: PublishBlock };
+
+export type Sender = (item: OutboxItem, context: { photoId: number | null; onProgress: (fraction: number) => void }) => Promise<OutboxResult>;
 
 /** Connection trouble or a busy server: try again by itself. Anything else needs the reporter. */
 export function isRetryable(status: number): boolean {
@@ -155,14 +163,19 @@ export function outboxLabel(item: OutboxItem, online: boolean): string {
   if (item.memoryOnly && item.state !== "done") return "Not safely queued — keep this page open";
   switch (item.state) {
     case "done":
-      if (item.kind === "live") return item.result?.status === "posted" ? "Posted" : "Sent to live desk";
+      if (item.kind === "live") {
+        if (item.result?.status === "posted") return "Posted";
+        // The truth: a Publish now that could not publish says why it went to the desk instead.
+        const why = deskNote(item.result?.reason);
+        return why ? `Sent to live desk — ${why}.` : "Sent to live desk";
+      }
       return "Saved";
     case "sending":
       return item.blob ? `Uploading ${Math.round(item.progress * 100)}%` : "Sending";
     case "failed":
       return "Failed — Retry";
     case "queued":
-      if (!online) return "Queued offline";
+      if (!online) return item.kind === "live" && item.delivery === "publish" ? "Queued offline — publishes if coverage is still live" : "Queued offline";
       if (item.photoKey) return "Waiting for its photo";
       return item.error ? "Waiting to retry" : "Queued";
   }

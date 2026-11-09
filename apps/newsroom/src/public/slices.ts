@@ -1,4 +1,5 @@
 import type { PayloadRequest } from "payload";
+import { hasLiveCoverage, normalizeLiveSettings } from "../domain/live-coverage";
 import type { PublicSlice } from "./revision";
 
 /**
@@ -23,7 +24,7 @@ const relationId = (value: unknown): number | string | null => (value && typeof 
 export const STORY_PUBLIC_FIELDS = [
   "headline", "deck", "kicker", "section", "topics", "contributors", "featuredMedia", "featuredCaption",
   "contentFormat", "body", "legacyHtml", "format", "video", "presentation", "immersiveAlignment",
-  "reportingNote", "liveCoverage", "slug", "publishedAt", "updatedAt"
+  "reportingNote", "slug", "publishedAt", "updatedAt"
 ] as const;
 
 export const storyPublicSlice: PublicSlice = (row) => (isPublished(row) ? pick(row, STORY_PUBLIC_FIELDS) : null);
@@ -82,12 +83,29 @@ export const publicationGlobalSlice: PublicSlice = (row) => {
 export const pollPublicSlice: PublicSlice = (row) => row.status === "open" || row.status === "closed"
   ? pick(row, ["pollKey", "question", "options", "status", "opensAt", "closesAt"]) : null;
 
+/**
+ * Live coverage's mode and state live on the unversioned plan, so starting, ending or resuming coverage is a
+ * public change of its own (it never rides on, or publishes, article copy). Public only on a published Story
+ * in Live mode once coverage has started.
+ */
+export const storyPlanPublicSlice: PublicSlice = async (row, req) => {
+  const storyId = relationId(row.story);
+  if (storyId === null) return null;
+  const settings = normalizeLiveSettings(row.liveCoverage);
+  if (!hasLiveCoverage(settings)) return null;
+  const story = await req.payload.db.findOne({ collection: "stories", where: { id: { equals: storyId } }, req }) as Row | null;
+  if (!story || !isPublished(story)) return null;
+  return { story: storyId, ...settings };
+};
+
 export const liveUpdatePublicSlice: PublicSlice = async (row, req) => {
   if (row.state !== "published") return null;
   const storyId = relationId(row.story);
   if (storyId === null) return null;
   const story = await req.payload.db.findOne({ collection: "stories", where: { id: { equals: storyId } }, req }) as Row | null;
   if (!story || !isPublished(story)) return null;
+  const plan = await req.payload.db.findOne({ collection: "story-plans", where: { story: { equals: storyId } }, req }) as Row | null;
+  if (!hasLiveCoverage(normalizeLiveSettings(plan?.liveCoverage))) return null;
   return pick(row, ["story", "headline", "body", "photo", "publishedAt", "pinned", "updatedAt"]);
 };
 

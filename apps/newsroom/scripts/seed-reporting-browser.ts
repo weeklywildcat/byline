@@ -49,10 +49,10 @@ try {
   const section = (await payload.create({ collection: "sections", data: { name: "Sports", slug: "sports" } })).id;
   const story = (await payload.create({
     collection: "stories", draft: true, overrideAccess: true, context: { bylineSystem: true },
-    data: { headline: "Football beats Saluda in the second half", section, contributors: [alice.linkedPerson], liveCoverage: { state: "live" } } as never
+    data: { headline: "Football beats Saluda in the second half", section, contributors: [alice.linkedPerson] } as never
   })).id;
   const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: story } }, limit: 1 })).docs[0];
-  await payload.update({ collection: "story-plans", id: plan.id, data: { editor: editor.id }, overrideAccess: true, context: { bylineSystem: true } });
+  await payload.update({ collection: "story-plans", id: plan.id, data: { editor: editor.id, liveCoverage: { mode: "live", state: "off" } } as never, overrideAccess: true, context: { bylineSystem: true } });
   const system = { overrideAccess: true as const, context: { bylineSystem: true } };
   const coach = (await payload.create({ collection: "sources", data: { story, label: "Coach Smith", role: "Head coach", groundRules: "on-record", recordingPermission: true }, ...system } as never)).id;
   const tipster = (await payload.create({ collection: "sources", data: { story, label: "Booster club parent", groundRules: "off-record" }, ...system } as never)).id;

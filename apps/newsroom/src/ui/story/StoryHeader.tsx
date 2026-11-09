@@ -14,12 +14,15 @@ import { invalidateStoryData } from "@byline/newsroom-screens/story/story-query"
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, List, PanelRight } from "lucide-react";
+import { Check, List, PanelRight, Smartphone } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
 import { editorialReadiness } from "../../domain/story-readiness";
+import { LiveBadge } from "../live/LiveCoverageSection";
+import { useLiveCoverage } from "../live/LiveCoverageProvider";
 import { useShellLayout } from "../shell/layout";
+import { ShellLink } from "../shell/navigation";
 import { useStorySwitcher } from "../shell/StorySwitcher";
 import { getJson } from "./api";
 import { useStoryField } from "./form";
@@ -79,7 +82,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
   const videoUrl = useStoryField<string>("video.url");
   const presentation = useStoryField<string>("presentation");
   const alignment = useStoryField<string>("immersiveAlignment");
-  const live = useStoryField<"off" | "live" | "ended">("liveCoverage.state");
+  const liveCoverage = useLiveCoverage();
   const editorial = editorialReadiness({ headline: headline.value, section: section.value, contributors: contributors.value, format: format.value, videoUrl: videoUrl.value });
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -127,9 +130,10 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
     return line ? line.replace(/\.$/, "") : "its media is still being prepared";
   }
 
-  async function publish() {
-    if (id === undefined) return;
-    if (editorial.some((line) => line.level === "error")) { setReadinessOpen(true); return; }
+  /** The one normal publish action. Returns whether the story is now published, so Publish & go live can stop when it is not. */
+  async function publish(): Promise<boolean> {
+    if (id === undefined) return false;
+    if (editorial.some((line) => line.level === "error")) { setReadinessOpen(true); return false; }
     setPublishing(true);
     try {
       if (!modified) {
@@ -137,13 +141,13 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         if (preflight?.data?.checks.some((line) => line.state === "error")) {
           await mediaReadiness.check().catch(() => null);
           setReadinessOpen(true);
-          return;
+          return false;
         }
       }
       const before = await mediaRefusal();
       if (before) {
         setReadinessOpen(true);
-        return;
+        return false;
       }
       const result = await submit({ action: `${context.api}/stories/${id}?depth=0`, overrides: { _status: "published" } });
       if (result?.res.ok) {
@@ -152,20 +156,23 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         setHasPublishedDoc(true);
         refresh();
         toast.success(hasPublishedDoc ? "Changes published." : "Story published.");
-      } else {
-        const after = await mediaRefusal();
-        if (after) toast.error(`The story was not published: ${after}.`);
+        return true;
       }
+      const after = await mediaRefusal();
+      if (after) toast.error(`The story was not published: ${after}.`);
+      return false;
     } catch {
       const after = await mediaRefusal();
       toast.error(after ? `The story was not published: ${after}.` : "The story could not be published. Check the highlighted fields.");
+      return false;
     } finally {
       setPublishing(false);
     }
   }
+  // Publish & go live runs exactly this action (its readiness checks, nothing weaker).
+  if (liveCoverage) liveCoverage.publishRef.current = publish;
 
-  const liveState = live.value ?? "off";
-  const canManageLive = !context.readOnly && context.role !== "staff";
+  const liveDesk = liveCoverage?.desk;
 
   return (
     <header className="flex flex-col gap-2 border-b border-border pb-3">
@@ -175,12 +182,19 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Story</p>
-              {liveState === "live" ? <Badge variant="destructive">Live</Badge> : null}
+              {liveDesk?.mode === "live" && liveDesk.status !== "off" ? <LiveBadge desk={liveDesk} timeZone={context.timeZone} /> : null}
             </div>
             <p className="truncate text-sm font-medium">{headline.value?.trim() || "Untitled story"}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Field Mode for this Story: straight to it, never the generic "What are you covering?" picker. */}
+          {liveCoverage && id != null ? (
+            <Button type="button" nativeButton={false} variant="outline" size="sm" className="no-underline max-sm:min-h-11 max-sm:min-w-11" render={<ShellLink href={liveCoverage.fieldHref} />}>
+              <Smartphone data-icon="inline-start" aria-hidden="true" />
+              <span className="max-sm:sr-only">Field Mode</span>
+            </Button>
+          ) : null}
           <PreviewButton />
           <Button ref={detailsTrigger} type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={() => setDetailsOpen(true)}>
             <PanelRight data-icon="inline-start" aria-hidden="true" />
@@ -210,7 +224,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
         <SheetContent side="right" className="gap-0 overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b border-border pr-12">
             <SheetTitle>Story details</SheetTitle>
-            <SheetDescription>Appearance, publishing information and special story modes.</SheetDescription>
+            <SheetDescription>Appearance and publishing information. Live coverage is in Write.</SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-6 p-4">
             <section className="grid gap-3" aria-labelledby="details-status">
@@ -270,35 +284,6 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
               </div>
             </section>
 
-            {(context.role !== "staff" || liveState !== "off") ? <>
-              <Separator />
-              <section className="grid gap-3" aria-labelledby="details-live">
-                <DetailsHeading id="details-live">Live coverage</DetailsHeading>
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{liveState === "live" ? "Live now" : liveState === "ended" ? "Coverage ended" : "Off"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {liveState === "off" ? "Use live coverage for timestamped updates while an event is unfolding." : liveState === "live" ? "Readers see the story as active live coverage." : "The update timeline remains with the story."}
-                      </p>
-                    </div>
-                    <Badge variant={liveState === "live" ? "default" : "outline"}>{liveState === "live" ? "Live" : liveState === "ended" ? "Ended" : "Off"}</Badge>
-                  </div>
-                  {canManageLive ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" className="w-fit" onClick={() => live.setValue(liveState === "off" ? "live" : liveState === "live" ? "ended" : "live")}>
-                        {liveState === "off" ? "Start live coverage" : liveState === "live" ? "End live coverage" : "Resume live coverage"}
-                      </Button>
-                      {liveState !== "off" ? (
-                        <Button type="button" size="sm" variant="ghost" className="w-fit text-muted-foreground" onClick={() => live.setValue("off")}>
-                          Turn off live coverage
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-            </> : null}
           </div>
         </SheetContent>
       </Sheet>

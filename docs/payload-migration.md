@@ -72,7 +72,7 @@ These do not change at any phase.
 | Sections / topics | `category` / `post_tag` | `sections` / `topics` |
 | Collections (reporting projects) and their optional public coverage / series | `byline_collection` + relationship edges (`includes/editorial/collection-workspaces.php`, `collection-public.php`); legacy `byline_coverage` already migrated into Collections | `collections` (ordered `stories` membership, nested `publicPresentation`), `collection-interviews`, `collection-resources`, `tasks.collection` ([collections-workspace.md](collections-workspace.md)) |
 | Corrections | `byline_correction` + legacy inline notices (`includes/editorial/corrections.php`) | `corrections` |
-| Live coverage | `byline_live_update` child posts + coverage state meta (`includes/editorial/live-coverage.php`) | `live-updates` + `stories.liveCoverage` group |
+| Live coverage | `byline_live_update` child posts + coverage state meta (`includes/editorial/live-coverage.php`) | `live-updates` + `story-plans.liveCoverage` group (mode, state, times; unversioned) |
 | Pages | `page` + page blocks (`includes/content/pages.php`, `page-blocks.php`) | `pages` (Versions + Drafts) |
 | Media | attachments + creator/credit/copyright/license/source meta, `bylineImage.artDirection` crops (`image-art-direction.php`, `photo-credits.php`) | `media` (private source files, Library previews, prepared publication renditions; public delivery through the static build) |
 | Tasks | `byline_task` | `tasks` |
@@ -333,8 +333,12 @@ collections.
   a job), `presentation` (`standard`/`immersive`), `immersiveAlignment`
   (`bottom-left`/`center`), `reportingNote`, `publishedAt`, `legacy.wordpressId`.
 - Newsroom state is **not** on the story; see §4.3.
-- `live` is **not** a format. `liveCoverage` (`state`, `startedAt`, `endedAt`)
-  plus `live-updates` records.
+- `live` is **not** a format. Live coverage is a *Story mode* (Standard | Live) plus a
+  coverage state (Not started | Live now | Ended), kept on the **unversioned**
+  `story-plans.liveCoverage` group (`mode`, `state`, `startedAt`, `endedAt`) beside
+  `livePublishers`, plus `live-updates` records. It is not on the versioned story, so
+  going live never publishes unpublished article copy (migration `live_story_mode`;
+  [live-coverage.md](live-coverage.md)).
 - Publication uses Payload `_status`; scheduled publish/unpublish uses Payload's
   `schedulePublish`. No custom publication-status field.
 
@@ -1171,7 +1175,7 @@ The torture-test story covers scrollytelling with a repository visual story.
 | 8 | WordPress → Payload import | counts/relations/IDs reconcile; custom presentation still resolves imported ID | **Not built, by decision.** Weekly Wildcat has only a small number of existing stories and will migrate them manually; no generalized importer was necessary |
 | 9 | Snapshot v2 + structured `ArticleBody` | completed v2 and direct recovery pass the same native static-build, privacy and interactive gate | **Done.** Native v2 replaces the temporary Payload projection. The parity fixture covers every registered block (28), inline footnotes, Source references, prepared Media, public references and interactive enhancement. |
 | 10 | Shadow builds from both CMSs, diffed | route/URL/SEO/sitemap/RSS/media diffs explained | — |
-| 11 | Live updates, polls + vote table, feedback | Worker parity tests, cookie compatibility | Live desk and the public `/api/byline/live/<id>` feed built ([live-coverage.md](live-coverage.md)); Worker still points at WordPress. Polls and feedback not built |
+| 11 | Live updates, polls + vote table, feedback | Worker parity tests, cookie compatibility | Live desk and the public `/api/byline/live/<id>` feed built, and the live reporting workflow (Story mode in Write, shared with Field Mode, explicit delivery intent, Story-scoped direct publishers; [live-coverage.md](live-coverage.md)); Worker still points at WordPress. Polls and feedback not built |
 | 12 | Discord, MCP | contract suites green | — |
 | 13–14 | Rehearsal, cutover | §14 checklist of the brief | — |
 | 15–16 | Observation, retirement | WordPress read-only, then archived | — |

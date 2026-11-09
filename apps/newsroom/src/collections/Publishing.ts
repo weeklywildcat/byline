@@ -1,7 +1,8 @@
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { protectPageDescendants, publicURLHooks } from "../public/url-changes";
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig, type PayloadRequest, type Where } from "payload";
-import { canPublishLive, livePublisherStories } from "../access/live-context";
+import { canPublishLive, liveGate, livePublisherStories, storyIsPublic } from "../access/live-context";
+import { PUBLISH_BLOCK_COPY } from "../domain/live-coverage";
 import { inIds, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { administratorsOnly, atLeast, editorsOnly, relationId, requestUser, sameId, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
@@ -97,12 +98,7 @@ export const Pages: CollectionConfig = {
 
 const PUBLIC_UPDATE = "Only editors, or people this story allows to publish live updates, can change an update readers can see. Send it to the live desk as a draft.";
 
-async function storyIsPublished(req: Parameters<CollectionBeforeChangeHook>[0]["req"], story: unknown) {
-  const id = relationId(story);
-  if (id === null) return false;
-  const found = await req.payload.find({ collection: "stories", where: { id: { equals: id } }, draft: false, limit: 1, depth: 0, select: { _status: true }, overrideAccess: true, req });
-  return found.docs[0]?._status === "published";
-}
+const storyIsPublished = storyIsPublic;
 
 /**
  * Publishing is an editor's decision, here as for Stories: staff may write
@@ -113,8 +109,16 @@ async function storyIsPublished(req: Parameters<CollectionBeforeChangeHook>[0]["
 const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
   const user = requestUser(req);
   if (!user || atLeast(user, "editor") || req.context?.bylineImport === true) return data;
-  // The Story-level live grant publishes live updates on this Story only (access/live-context.ts).
-  if (await canPublishLive(req, data.story ?? originalDoc?.story)) return data;
+  // The Story-level live grant publishes live updates on this Story only (access/live-context.ts), and only
+  // while the Story's coverage accepts public updates: the shared rule the live desk and Field use too.
+  if (await canPublishLive(req, data.story ?? originalDoc?.story)) {
+    const becomesPublished = (data.state ?? originalDoc?.state ?? "published") === "published" && originalDoc?.state !== "published";
+    if (becomesPublished) {
+      const gate = await liveGate(req, data.story ?? originalDoc?.story);
+      if (gate.block) throw new APIError(`Readers can't see a new live update right now: ${PUBLISH_BLOCK_COPY[gate.block]}. Send it to the desk as a draft instead.`, 403);
+    }
+    return data;
+  }
   const state = data.state ?? originalDoc?.state ?? "published";
   if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, data.story ?? originalDoc?.story))) throw new APIError(PUBLIC_UPDATE, 403);
   return data;
