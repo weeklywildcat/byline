@@ -2,9 +2,9 @@ import { APIError } from "payload";
 import { atLeast, relationId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
 import { cleanAssignment, parseSteps, roleKey, workflowSaveProblems, type AssignmentInput } from "../domain/role-admin";
-import { NEWSROOM_ROLE_SCOPES, type NewsroomRoleScope, type ResolvedStep, type ReviewWorkflowDef, type RoleScopeMode, type StepResolution, type WorkflowStep } from "../domain/newsroom-roles";
+import { NEWSROOM_ROLE_SCOPES, selectWorkflow, type NewsroomRoleScope, type ResolvedStep, type ReviewWorkflowDef, type RoleScopeMode, type StepResolution, type WorkflowStep } from "../domain/newsroom-roles";
 import { PRODUCTION_TYPE_OPTIONS, STORY_FORMAT_OPTIONS } from "../domain/vocabulary";
-import { activeYear, routeStory, workflowDef } from "./routing";
+import { activeYear, routeStory, workflowDef, workflowDefs } from "./routing";
 import type { ScreenContext } from "./screen-models";
 
 /**
@@ -383,7 +383,10 @@ export type PreviewStep = {
 
 export type RoutingPreview = {
   story: { id: number; title: string; section: string | null };
+  /** The workflow being previewed (an unsaved draft has id 0). */
   workflow: { id: number; name: string } | null;
+  /** The saved workflow real submission would pick for this story: it differs when the one being edited wouldn't apply. */
+  actual: { id: number; name: string } | null;
   steps: PreviewStep[];
   failed: number;
 };
@@ -432,10 +435,12 @@ export async function previewRouting(ctx: ScreenContext, input: { storyId?: unkn
     throw new APIError("That story can't be previewed.", 404);
   }
   const names = new Map([...plan.directory.users.values()].map((user) => [user.id, user.name]));
+  const actual = override ? selectWorkflow(await workflowDefs(ctx.req), plan.story) : plan.workflow;
   const steps = plan.steps.map((resolved) => previewStep(resolved, names, plan.workflow && plan.workflow.id > 0 ? plan.workflow.id : null));
   return {
     story: { id: plan.story.id, title: plan.story.title, section: plan.story.sectionName },
     workflow: plan.workflow ? { id: plan.workflow.id, name: plan.workflow.name } : null,
+    actual: actual ? { id: actual.id, name: actual.name } : null,
     steps,
     failed: steps.filter((step) => step.kind === "failed").length
   };

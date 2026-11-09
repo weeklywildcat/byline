@@ -194,6 +194,7 @@ export default buildConfig({
         // (Payload refuses a custom view there); Payload's raw /collections/<slug> screens are untouched.
         collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
         people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
+        reviewWorkflows: { Component: "/components/BylineWorkflows#BylineWorkflows", path: "/review-workflows", exact: true, meta: { title: "Review workflows" } },
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
         site: { Component: "/components/BylineSite#BylineSite", path: "/site", exact: true, meta: { title: "Site" } },

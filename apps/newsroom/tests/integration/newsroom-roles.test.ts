@@ -213,6 +213,9 @@ describe("routing preview", () => {
     expect(draft.body.workflow.name).toBe("Unsaved workflow");
     expect(draft.body.steps.map((entry: { stepId: string; kind: string }) => [entry.stepId, entry.kind])).toEqual([["copy", "person"], ["edit", "person"]]);
     expect(draft.body.failed).toBe(0);
+    // Submission would not use the draft: this story is in News, which has its own saved workflow.
+    expect(draft.body.actual.name).toBe("News desk");
+    expect((await preview({ storyId: story.game })).body.actual.name).toBe("Sports desk");
   });
 
   it("explains a role nobody holds as a failure an editor can fix", async () => {
