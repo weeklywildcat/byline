@@ -1,7 +1,7 @@
 import { FIXED_PUBLIC_CONTENT_ROUTES, isCodeOwnedPublicPath } from "./routing";
 import { isCanonicalRedirectPath } from "./redirect-path";
 import { z } from "zod";
-import { mediaCredit, mediaKindOf, validateArticleBody, type ArticleBody, type PublicPollReference } from "@byline/article-body";
+import { mediaCredit, mediaKindOf, safeWebUrl, validateArticleBody, type ArticleBody, type PublicEventReference, type PublicPollReference } from "@byline/article-body";
 import { youTubeEmbedUrl, type BylinePublicationConfig, type PrimaryVideo } from "@byline/core";
 import { largestNaturalImage, publicationManifestBlobs, validatePublicationMediaManifest, type PublicationMediaManifest } from "./publication-media";
 import { stableSerialize } from "./digests";
@@ -125,7 +125,7 @@ const requireFact = (condition: unknown, detail: string) => {
 };
 const same = (left: unknown, right: unknown) => stableSerialize(left) === stableSerialize(right);
 
-export function validatePublicBuildSnapshotV2(value: unknown, options: { interactive?: (key: string) => boolean } = {}): PublicBuildSnapshotV2 {
+export function validatePublicBuildSnapshotV2(value: unknown, options: { interactive?: (key: string) => boolean; tracker?: (key: string) => boolean } = {}): PublicBuildSnapshotV2 {
   const result = publicBuildSnapshotV2Schema.safeParse(value);
   if (!result.success) throw new Error(`Invalid Byline build snapshot: ${result.error.issues.slice(0, 6).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
   const snapshot = value as PublicBuildSnapshotV2;
@@ -144,6 +144,7 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
   const people = new Map(data.people.map((row) => [row.id, row]));
   const stories = new Map(data.stories.map((row) => [row.id, row]));
   const polls = new Map(data.polls.map((row) => [row.id, row]));
+  const eventsById = new Map(data.events.map((row) => [row.id, row]));
   const sections = new Map(data.sections.map((row) => [`section-${row.id}`, row]));
   const topics = new Map(data.topics.map((row) => [`topic-${row.id}`, row]));
   const paths = new Set<string>(["/"]);
@@ -262,8 +263,13 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
     for (const reference of Object.values(row.body.references?.polls ?? {})) {
       requireFact(same(reference, polls.get(reference.id)), `Story ${row.id} has an inconsistent Poll ${reference.id}`);
     }
+    for (const [key, reference] of Object.entries(row.body.references?.events ?? {})) {
+      const target = eventsById.get(Number(key));
+      requireFact(target && same(reference, snapshotEventReference(target)), `Story ${row.id} has an inconsistent Event ${key}`);
+    }
     for (const node of row.body.nodes) {
       if (node.type === "repositoryInteractive" && options.interactive) requireFact(options.interactive(node.key), `Story ${row.id} uses unregistered interactive ${node.key}`);
+      if (node.type === "repositoryTracker" && options.tracker) requireFact(options.tracker(node.key), `Story ${row.id} uses unregistered tracker ${node.key}`);
     }
   }
   const fixedDestinations = new Set(FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path));
@@ -281,6 +287,25 @@ export function publicSnapshotContributor(person: PublicPersonSnapshot): PublicS
     href: person.hasProfilePage ? `/author/${person.slug}/` : "", role: person.newsroomRole,
     bio: person.status === "guest" ? "" : person.shortBio, photo: person.portrait,
     ...(person.publicEmail ? { contactHref: `mailto:${person.publicEmail}` } : {})
+  };
+}
+
+/** A published event in the snapshot's events dataset, as an article's Event block reads it. */
+export type PublicEventSnapshot = z.infer<typeof event>;
+
+export function snapshotEventReference(row: PublicEventSnapshot): PublicEventReference {
+  const externalUrl = row.externalUrl ? safeWebUrl(row.externalUrl) : null;
+  return {
+    id: row.id,
+    title: row.title,
+    ...(row.type ? { eventType: row.type } : {}),
+    startAt: row.startAt,
+    ...(row.endAt ? { endAt: row.endAt } : {}),
+    allDay: row.allDay,
+    ...(row.location ? { location: row.location } : {}),
+    ...(row.description ? { description: row.description } : {}),
+    ...(externalUrl ? { externalUrl } : {}),
+    eventStatus: row.status === "canceled" ? "canceled" : "scheduled"
   };
 }
 

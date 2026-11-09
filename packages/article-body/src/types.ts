@@ -30,7 +30,16 @@ export type LineBreak = { type: "lineBreak" };
  * is never stored. `text` is the note, plain text.
  */
 export type FootnoteRef = { type: "footnote"; id: string; text: string };
-export type Inline = TextRun | LinkRun | LineBreak | FootnoteRef;
+/**
+ * A Source reference at the claim it supports: a public web page, or a PDF
+ * from Media (optionally one page). Like a footnote, its visible number is
+ * derived from document order and never stored; Sources and Footnotes number
+ * independently. Never connected to the private newsroom `sources` records.
+ */
+export type SourceRef =
+  | { type: "source"; id: string; kind: "web"; url: string; label: string; note?: string }
+  | { type: "source"; id: string; kind: "document"; media: MediaId; page?: number; label: string; note?: string };
+export type Inline = TextRun | LinkRun | LineBreak | FootnoteRef | SourceRef;
 
 export type ParagraphNode = { type: "paragraph"; children: Inline[] };
 export type HeadingNode = { type: "heading"; level: 2 | 3; children: Inline[] };
@@ -62,24 +71,37 @@ export type PhotoBlock = {
 export type GalleryItem = { id: string; media: MediaId | null; caption: string; altOverride?: string };
 /** Whole photographs (`natural`) or a tidy grid of equal crops (`crop`). The responsive column count belongs to the renderer. */
 export type GalleryFit = "natural" | "crop";
-export type GalleryBlock = { type: "gallery"; id: string; items: GalleryItem[]; fit: GalleryFit };
+/**
+ * How the photographs are arranged: a responsive grid, a Photo Essay (one
+ * large whole photograph after another, each with its caption) or Featured
+ * (the first photograph dominant, the rest a grid below it). The order of
+ * `items` is the only state Featured needs: the first item is featured.
+ * Absent means `grid` (galleries saved before layouts existed).
+ */
+export type GalleryLayoutKind = "grid" | "essay" | "featured";
+export const GALLERY_LAYOUTS: readonly GalleryLayoutKind[] = ["grid", "essay", "featured"];
+export type GalleryBlock = { type: "gallery"; id: string; items: GalleryItem[]; fit: GalleryFit; layout?: GalleryLayoutKind };
 
-/** A source's words, reported in the story. */
-export type ReportedQuoteBlock = { type: "reportedQuote"; id: string; text: string; attribution: string };
+/** A source's words, reported in the story, with an optional public link to where they were said or published. */
+export type ReportedQuoteBlock = { type: "reportedQuote"; id: string; text: string; attribution: string; sourceUrl?: string; sourceLabel?: string };
 /** A line lifted from the story and set large. */
 export type PullQuoteBlock = { type: "pullQuote"; id: string; text: string; attribution?: string };
 
 export type KeyFact = { id: string; text: string };
-export type KeyFactsBlock = { type: "keyFacts"; id: string; heading: string; facts: KeyFact[] };
+/** Standard: one ruled row per fact. Compact: two columns when the article canvas is wide enough. Absent means standard. */
+export type KeyFactsPresentation = "standard" | "compact";
+export type KeyFactsBlock = { type: "keyFacts"; id: string; heading: string; facts: KeyFact[]; presentation?: KeyFactsPresentation };
 
 /**
  * Background the reader needs. The heading is the writer's ("Context", "Why it
  * matters", "What's next", "How we know"): one block, not four. The body is
- * plain paragraphs (see docs/article-editor.md, "Context body").
+ * bounded paragraphs: text with bold, italic and web links, nothing else
+ * (see docs/article-editor.md, "Context body").
  */
 export type ContextBlock = { type: "context"; id: string; heading: string; body: ParagraphNode[] };
 
-export type DocumentPageRef = { id: string; page: number; label: string };
+/** A page worth reading: its number, a short label and, optionally, the reporter's note on what matters there. */
+export type DocumentPageRef = { id: string; page: number; label: string; excerpt?: string };
 /** A source document (a PDF). The direct file link is always published; the inline preview is progressive. */
 export type DocumentBlock = {
   type: "document";
@@ -93,8 +115,15 @@ export type DocumentBlock = {
   pages: DocumentPageRef[];
 };
 
-/** `label` is editorial text ("Fall 2026", "Oct. 17"), never a date object. */
-export type TimelineEvent = { id: string; label: string; title: string; body: string; current: boolean };
+/**
+ * `label` is editorial text ("Fall 2026", "Oct. 17"), never a date object.
+ * An event may carry supporting evidence: one photograph, one public web
+ * link, one PDF (optionally a page). None is required.
+ */
+export type TimelineEventImage = { media: MediaId; altOverride?: string; caption?: string };
+export type TimelineEventLink = { url: string; label?: string };
+export type TimelineEventDocument = { media: MediaId; page?: number };
+export type TimelineEvent = { id: string; label: string; title: string; body: string; current: boolean; image?: TimelineEventImage; link?: TimelineEventLink; document?: TimelineEventDocument };
 export type TimelineBlock = { type: "timeline"; id: string; items: TimelineEvent[] };
 
 /** A compact profile or explainer moment: a portrait and the short passage that belongs with it. */
@@ -132,6 +161,9 @@ export type VisualChapterBlock = {
  * editorial `captionsConfirmed` flag exists only on a draft block (it gates
  * publishing); `finalizeBlock` removes it, so it never reaches a public body.
  */
+/** A timestamped chapter of a recording or video. `time` is whole seconds from the start; the newsroom types "1:24". */
+export type MediaChapter = { id: string; time: number; label: string };
+
 export type VideoBlock = {
   type: "video";
   id: string;
@@ -139,10 +171,12 @@ export type VideoBlock = {
   title: string;
   caption?: string;
   captionsConfirmed?: boolean;
+  chapters?: MediaChapter[];
+  transcript?: string;
 };
 
 /** A recording with the transcript that makes it publishable. */
-export type AudioBlock = { type: "audio"; id: string; media: MediaId | null; title: string; caption?: string; transcript: string };
+export type AudioBlock = { type: "audio"; id: string; media: MediaId | null; title: string; caption?: string; transcript: string; chapters?: MediaChapter[] };
 
 /** The editor's own voice. Only editors and administrators write it. */
 export type EditorsNoteBlock = { type: "editorsNote"; id: string; body: ParagraphNode[] };
@@ -151,7 +185,12 @@ export type MarginNoteBlock = { type: "marginNote"; id: string; heading?: string
 /** Detail a reader can open (methodology, a full statement). Native disclosure, closed by default. */
 export type ExpandableBlock = { type: "expandable"; id: string; heading: string; body: ParagraphNode[] };
 
-export type ChartMapMode = "interactive" | "static";
+/** `native`: a chart Byline draws from the reporter's own table. `interactive`: an allowlisted provider embed. `static`: an uploaded graphic. */
+export type ChartMapMode = "native" | "interactive" | "static";
+export type NativeChartType = "bar" | "line" | "dot";
+export const NATIVE_CHART_TYPES: readonly NativeChartType[] = ["bar", "line", "dot"];
+/** A native chart's data: the first column names each category, every other column is one series of numbers. */
+export type NativeChartData = { columns: DataTableColumn[]; rows: DataTableRow[] };
 export type ChartMapHeight = "compact" | "standard" | "tall" | "map";
 export type ChartMapProvider = "datawrapper" | "flourish" | "google-maps" | "openstreetmap";
 export type ChartMapBlock = {
@@ -172,6 +211,11 @@ export type ChartMapBlock = {
   notes?: string;
   credit?: string;
   height: ChartMapHeight;
+  /** Native mode only: which chart, and the bounded table it draws. */
+  chartType?: NativeChartType;
+  data?: NativeChartData;
+  /** Native mode only: an optional public link to the data's source. */
+  sourceUrl?: string;
 };
 
 export type DataTableColumn = { id: string; label: string };
@@ -227,6 +271,38 @@ export type RelatedCoverageBlock = { type: "relatedCoverage"; id: string; headin
 export type PollBlock = { type: "poll"; id: string; poll: MediaId | null };
 /** A registered, repository-owned interactive. Only its key and editorial text are stored. */
 export type RepositoryInteractiveBlock = { type: "repositoryInteractive"; id: string; key: string; title: string; description: string };
+/** A registered, repository-owned tracker. Its content and design live in the repository; the article stores only the key and editorial text. */
+export type RepositoryTrackerBlock = { type: "repositoryTracker"; id: string; key: string; title: string; description: string };
+/** A published school or community Event. Facts come from `references.events`; nothing is copied. */
+export type EventBlock = { type: "event"; id: string; event: MediaId | null };
+
+/** The public post providers a Social Post accepts. */
+export type SocialProvider = "instagram" | "threads" | "facebook" | "tiktok" | "x" | "bluesky";
+/**
+ * One public social post, by its canonical permalink. Provider and post id are
+ * derived from the permalink by the one parser (`parseSocialPostUrl`), never
+ * trusted from input; nothing a provider returns is ever stored.
+ */
+export type SocialPostBlock = { type: "socialPost"; id: string; url: string; provider?: SocialProvider; postId?: string; caption?: string };
+
+/** How a game ended. The winner is derived from the scores, never stored. */
+export type FinalScoreStatus = "final" | "overtime" | "tie" | "forfeit";
+export const FINAL_SCORE_STATUSES: readonly FinalScoreStatus[] = ["final", "overtime", "tie", "forfeit"];
+/** A result typed by the reporter. Article content, not a sports database: no team, game or season records. */
+export type FinalScoreBlock = {
+  type: "finalScore";
+  id: string;
+  sport?: string;
+  teamA: string;
+  teamAScore: number | null;
+  teamB: string;
+  teamBScore: number | null;
+  status: FinalScoreStatus;
+  /** Date only, `YYYY-MM-DD`: the day it was played, never an instant. */
+  date?: string;
+  location?: string;
+  note?: string;
+};
 
 export type ArticleBlock =
   | PhotoBlock
@@ -252,7 +328,11 @@ export type ArticleBlock =
   | BeforeAfterBlock
   | RelatedCoverageBlock
   | PollBlock
-  | RepositoryInteractiveBlock;
+  | RepositoryInteractiveBlock
+  | RepositoryTrackerBlock
+  | EventBlock
+  | SocialPostBlock
+  | FinalScoreBlock;
 
 export type ArticleBlockType = ArticleBlock["type"];
 export type ArticleBlockOf<T extends ArticleBlockType> = Extract<ArticleBlock, { type: T }>;
@@ -308,10 +388,25 @@ export type PublicPollReference = {
   results?: { totalVotes: number; votes: Record<string, number> };
 };
 
+/** A published Event's public facts. Times are instants; the renderer reads them in the publication's timezone. */
+export type PublicEventReference = {
+  id: MediaId;
+  title: string;
+  eventType?: string;
+  startAt: string;
+  endAt?: string;
+  allDay: boolean;
+  location?: string;
+  description?: string;
+  externalUrl?: string;
+  eventStatus: "scheduled" | "canceled";
+};
+
 /** Public-safe facts about other records the nodes name, keyed by `String(id)`. Never private data. */
 export type ArticleReferences = {
   stories?: Record<string, PublicStoryReference>;
   polls?: Record<string, PublicPollReference>;
+  events?: Record<string, PublicEventReference>;
 };
 
 export type ArticleBody = {
@@ -320,7 +415,7 @@ export type ArticleBody = {
   nodes: ArticleBodyNode[];
   /** Every asset the nodes reference, keyed by `String(id)`. */
   media: Record<string, ArticleMediaAsset>;
-  /** Related Stories and Polls the nodes name, when there are any. */
+  /** Related Stories, Polls and Events the nodes name, when there are any. */
   references?: ArticleReferences;
 };
 

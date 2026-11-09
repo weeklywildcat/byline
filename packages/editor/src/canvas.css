@@ -22,7 +22,7 @@
 }
 
 /* Editor chrome inside the article uses Nova's surface colours, not the article's same-named tokens. */
-.byline-article-canvas :is(.byline-block-chrome, .byline-row-actions, .byline-item-actions, .byline-media-empty, .byline-media-status, .byline-add-bar, .byline-gutter-inserter, .byline-document-attachment, .byline-block-note, .byline-list-footer, .byline-credit-missing, .byline-timeline-hint, .byline-confirm) {
+.byline-article-canvas :is(.byline-block-chrome, .byline-row-actions, .byline-item-actions, .byline-media-empty, .byline-media-status, .byline-add-bar, .byline-gutter-inserter, .byline-document-attachment, .byline-block-note, .byline-list-footer, .byline-credit-missing, .byline-timeline-hint, .byline-confirm, .byline-chart-editor-data, .byline-tracker-standin, .byline-social-permalink, .byline-timeline-document-field) {
   --accent: var(--byline-ui-accent);
   --muted: var(--byline-ui-muted);
 }
@@ -76,10 +76,17 @@
   position: absolute;
   transition: border-color 120ms ease-out;
 }
-.byline-article-canvas .byline-block:focus-within::after { border-color: color-mix(in srgb, var(--byline-selection) 55%, transparent); }
+.byline-article-canvas .byline-block:is(:focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"]))::after { border-color: color-mix(in srgb, var(--byline-selection) 55%, transparent); }
 .byline-article-canvas .byline-block.decorator-selected::after { border-color: var(--byline-selection); }
 
 /* The block toolbar: above the selected block, over the margin, never over the content. */
+/*
+ * "Selected" throughout: Lexical's node selection, focus inside the block, or a popup opened from
+ * the block still open (its Popover or menu holds focus in a portal, outside the block). Without the
+ * last, opening a toolbar Popover would hide the toolbar it is anchored to and collapse the room
+ * reserved above the block, moving the article under the open Popover. BlockShell sets
+ * `data-popup-held` while focus is in such a popup (through its exit animation, until focus returns).
+ */
 .byline-block-chrome {
   align-items: center;
   background: var(--popover, #fff);
@@ -108,11 +115,16 @@
 }
 .byline-block-chrome-label { align-items: center; color: var(--muted-foreground, #71717a); display: inline-flex; font-weight: 500; gap: 6px; padding: 0 6px 0 4px; white-space: nowrap; }
 .byline-block-chrome-context { color: var(--muted-foreground, #71717a); padding: 0 4px; white-space: nowrap; }
-.byline-block:is(.decorator-selected, :focus-within) .byline-block-chrome,
+.byline-block:is(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-block-chrome,
 .byline-block-chrome[data-open] { opacity: 1; pointer-events: auto; }
-/* The selected block makes room for its toolbar, so the toolbar never covers the text above. */
+/*
+ * The selected block makes room for its toolbar, so the toolbar never covers the text above.
+ * BlockShell measures the toolbar (`--byline-chrome-size`: its real height once wrapped at this
+ * column width); the room is that height, the 8px gap and a little air, never less than the
+ * article's own moment spacing. One row of tools (34px) reserves the same 46px it always did.
+ */
 @media (pointer: fine) and (min-width: 768px) {
-  .byline-article-canvas .article-body > .byline-block:is(.decorator-selected, :focus-within, :has(.byline-block-chrome[data-open])) { margin-top: max(46px, var(--story-moment-space, 36px)); }
+  .byline-article-canvas .article-body > .byline-block:is(.decorator-selected, :focus-within, :has(.byline-block-chrome[data-open]), [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) { margin-top: max(calc(var(--byline-chrome-size, 34px) + 12px), var(--story-moment-space, 36px)); }
 }
 
 /* Unfinished: one calm sentence under the selected block. */
@@ -126,7 +138,7 @@
   line-height: 1.4;
   margin: 10px 0 0;
 }
-.byline-block:is(.decorator-selected, :focus-within) .byline-block-note { display: flex; }
+.byline-block:is(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-block-note { display: flex; }
 .byline-credit-missing { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 12px; margin: 4px 0 0; }
 .byline-credit-missing a { color: inherit; text-decoration: underline; }
 
@@ -168,6 +180,60 @@
 .byline-article-canvas .byline-page-number { align-items: baseline; display: inline-flex; gap: .3em; }
 
 /* Timeline: the hint and the list footer sit in the reporting column. */
+
+/* Context's formatted paragraphs: one editable element holding the article's own <p>s. */
+.byline-article-canvas .byline-rich-field { cursor: text; display: block; position: relative; min-height: 1lh; overflow: visible; white-space: pre-wrap; }
+.byline-article-canvas .byline-rich-field > p:last-child { margin-bottom: 0; }
+.byline-article-canvas .byline-rich-field[data-empty]:not(:focus)::before { color: var(--soft-muted, #737373); content: attr(data-placeholder); pointer-events: none; position: absolute; }
+
+/* Inline Source references: like a footnote's, with a bracket. */
+.byline-article-canvas .byline-source-edit { background: transparent; border: 0; color: var(--link, #356875); cursor: pointer; font: inherit; line-height: 1; padding: 2px 3px; }
+.byline-article-canvas .byline-source-edit[data-empty] { outline: 1px dashed var(--muted-foreground, #71717a); }
+.byline-article-canvas .byline-source-edit:focus-visible { outline: 2px solid var(--byline-selection); outline-offset: 2px; }
+
+/* Document page references: label then the optional excerpt, in place. */
+.byline-article-canvas .byline-document-pages .byline-document-page-text { display: grid; gap: 2px; }
+
+/* Timeline evidence: a link and a document, each a small control in the reporting column. */
+.byline-article-canvas .byline-timeline-evidence-edit { align-items: center; background: none; border: 0; color: var(--link, #356875); cursor: pointer; display: inline-flex; font: inherit; gap: 6px; min-height: 32px; padding: 0; }
+.byline-article-canvas .byline-timeline-evidence-edit svg { height: 14px; width: 14px; }
+.byline-article-canvas .byline-timeline-document-field { align-items: center; display: inline-flex; flex-wrap: wrap; font-family: var(--byline-chrome-font); font-size: 13px; gap: 6px 10px; }
+.byline-article-canvas .byline-timeline-document-field svg { height: 14px; width: 14px; }
+.byline-article-canvas .byline-timeline-document-field label { align-items: baseline; display: inline-flex; gap: .3em; }
+.byline-article-canvas .byline-timeline-photo-media { position: relative; }
+.byline-article-canvas .byline-timeline-photo:focus-within .byline-item-actions { opacity: 1; pointer-events: auto; }
+@media (hover: hover) and (pointer: fine) {
+  .byline-article-canvas .byline-timeline-photo:hover .byline-item-actions { opacity: 1; pointer-events: auto; }
+}
+
+/* Chapters: time and label typed in the public list's own row. */
+.byline-article-canvas .byline-chapter-row { align-items: baseline; display: flex; gap: 1rem; min-height: 44px; padding-block: .5rem; position: relative; }
+.byline-article-canvas input.byline-chapter-time { flex: none; width: 4.5rem; }
+.byline-article-canvas .byline-chapter-time[aria-invalid] { text-decoration: underline wavy var(--destructive, #b91c1c); }
+
+/* Native chart: the data grid under the chart, in the editor's quieter type. */
+.byline-article-canvas .byline-chart-editor-data { font-family: var(--byline-chrome-font); margin-top: 12px; }
+.byline-article-canvas .byline-chart-editor-data > .byline-kicker { margin: 0 0 6px; }
+.byline-article-canvas .byline-chart-editor-data table { min-width: 0; }
+.byline-article-canvas .byline-chart-editor-data .byline-list-footer { display: flex; }
+/* The grid opens with the block, as the public chart keeps its numbers behind "Show the data"; a problem keeps it open. */
+.byline-article-canvas .byline-block:not(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-chart-editor-data:not([data-problem]) :is(.byline-data-table, .byline-list-footer) { display: none; }
+.byline-article-canvas .byline-visualization[data-mode="native"] .byline-visualization-placeholder { align-items: center; border: 1px dashed var(--rule-strong, #aab2bb); color: var(--muted-foreground, #71717a); display: flex; font-family: var(--byline-chrome-font); font-size: 13px; justify-content: center; min-height: 180px; padding: 16px; text-align: center; }
+
+/* Social Post: the provider's post never loads here; its permalink does. */
+.byline-article-canvas .byline-social-permalink { align-items: center; display: flex; flex-wrap: wrap; font-family: var(--byline-chrome-font); font-size: 12px; gap: 4px 12px; margin: 0; }
+.byline-article-canvas .byline-social-permalink a { align-items: center; display: inline-flex; gap: 4px; min-height: 32px; }
+.byline-article-canvas .byline-social-permalink svg { height: 14px; width: 14px; }
+.byline-article-canvas .byline-social-permalink span { color: var(--muted-foreground, #71717a); overflow-wrap: anywhere; }
+.byline-article-canvas .byline-media-empty:has([data-slot="input-group"]) { aspect-ratio: auto; min-height: 200px; }
+
+/* Final Score: scores typed exactly where the public scores print. */
+.byline-article-canvas input.byline-final-score-input { font-variant-numeric: lining-nums tabular-nums; text-align: right; width: 3ch; }
+.byline-article-canvas .byline-final-score-row[data-winner] .byline-field { font-weight: 700; }
+
+/* Repository Tracker: a faithful stand-in; the tracker itself renders in Preview. */
+.byline-article-canvas .byline-tracker-standin { align-items: center; border-block: 1px dashed var(--rule-strong, #aab2bb); color: var(--muted-foreground, #71717a); display: flex; font-family: var(--byline-chrome-font); font-size: 13px; gap: 8px; min-height: 120px; padding: 16px 0; }
+.byline-article-canvas .byline-tracker-standin svg { flex: none; height: 18px; width: 18px; }
 .byline-article-canvas .byline-timeline-hint { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 12px; grid-column: 2; margin: .3em 0 0; }
 .byline-article-canvas .byline-timeline-item[data-active] .byline-timeline-label { text-decoration: underline 1px dotted; text-underline-offset: 4px; }
 
@@ -233,7 +299,7 @@
   gap: 4px 12px;
   margin-top: 12px;
 }
-.byline-block:is(.decorator-selected, :focus-within) .byline-list-footer { display: flex; }
+.byline-block:is(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-list-footer { display: flex; }
 
 /* Unfinished media: drawn in the media's own place and proportion. */
 .byline-article-canvas .byline-media-empty {
@@ -288,7 +354,7 @@
 @media (pointer: coarse), (max-width: 767px) {
   .byline-gutter-inserter { display: none; }
   .byline-block-chrome { display: none; margin: 0 0 10px; max-width: none; position: static; }
-  .byline-block:is(.decorator-selected, :focus-within) .byline-block-chrome,
+  .byline-block:is(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-block-chrome,
   .byline-block-chrome[data-open] { display: flex; }
   .byline-block-chrome :is(button, [role="radio"], [role="button"]) { min-height: 44px; min-width: 44px; }
   .byline-article-canvas .byline-row-actions,
@@ -308,6 +374,6 @@
 }
 @media (forced-colors: active) {
   .byline-article-canvas .byline-block.decorator-selected::after { border-color: Highlight; }
-  .byline-article-canvas .byline-block:focus-within::after { border-color: Highlight; }
+  .byline-article-canvas .byline-block:is(:focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"]))::after { border-color: Highlight; }
   .byline-block-chrome { border-color: CanvasText; }
 }

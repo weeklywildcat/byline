@@ -3,10 +3,12 @@
 import { articleBlockFrameClassName, articleBlockPlacement } from "@byline/ui/article-body";
 import { isArticleBlockType, type Placement } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND, INSERT_INLINE_BLOCK_COMMAND, InlineBlockNode } from "@payloadcms/richtext-lexical/client";
+import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND, InlineBlockNode } from "@payloadcms/richtext-lexical/client";
 import {
+  $applyNodeReplacement,
   $getNodeByKey,
   $getSelection,
+  $insertNodes,
   $isRangeSelection,
   $setSelection,
   COMMAND_PRIORITY_CRITICAL,
@@ -147,10 +149,40 @@ function AddBarPlugin() {
   return editable ? <AddBlockBar editor={editor} /> : null;
 }
 
-const FootnoteIcon = () => <span aria-hidden="true" style={{ fontWeight: 700 }}>1</span>;
+// Payload's selection toolbar renders an item's ChildComponent alone inside an unlabelled
+// button, so each icon carries the button's name for assistive technology.
+const VISUALLY_HIDDEN = { border: 0, clip: "rect(0 0 0 0)", height: 1, margin: -1, overflow: "hidden", padding: 0, position: "absolute", whiteSpace: "nowrap", width: 1 } as const;
+const FootnoteIcon = () => <><span aria-hidden="true" style={{ fontWeight: 700 }}>1</span><span style={VISUALLY_HIDDEN}>Footnote</span></>;
+const SourceIcon = () => <><span aria-hidden="true" style={{ fontWeight: 700 }}>[1]</span><span style={VISUALLY_HIDDEN}>Source</span></>;
+
+/** A 24-hex id, the shape Payload gives inline blocks it creates. */
+function inlineBlockId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Puts a Footnote or Source reference after the claim it supports: at the caret, or after
+ * the selected words (which stay; Payload's insert command would replace them). Byline
+ * inserts the node itself rather than through Payload's command, which also opens Payload's
+ * generic block drawer for a new inline block; the reference's own Popover opens instead
+ * (`markCreated` below).
+ */
+function insertReference(editor: LexicalEditor, fields: Record<string, unknown>): void {
+  editor.update(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection)) return;
+    if (!selection.isCollapsed()) {
+      const end = selection.isBackward() ? selection.anchor : selection.focus;
+      selection.anchor.set(end.key, end.offset, end.type);
+      selection.focus.set(end.key, end.offset, end.type);
+    }
+    $insertNodes([$applyNodeReplacement(new InlineBlockNode({ fields: { id: inlineBlockId(), blockName: "", ...fields } as never }))]);
+  });
+}
 
 export const BylineCanvasFeatureClient = createClientFeature({
-  // "Footnote" beside Bold, Italic and Link in the selection toolbar. The reference goes where the caret is.
+  // "Footnote" and "Source" beside Bold, Italic and Link in the selection toolbar. The reference goes where the caret is.
   toolbarInline: {
     groups: [
       {
@@ -164,9 +196,19 @@ export const BylineCanvasFeatureClient = createClientFeature({
             ChildComponent: FootnoteIcon,
             isActive: () => false,
             onSelect: ({ editor }) => {
-              editor.dispatchCommand(INSERT_INLINE_BLOCK_COMMAND, { blockName: "", blockType: "footnote" });
+              insertReference(editor, { blockType: "footnote" });
             },
             order: 1
+          },
+          {
+            key: "source",
+            label: "Source",
+            ChildComponent: SourceIcon,
+            isActive: () => false,
+            onSelect: ({ editor }) => {
+              insertReference(editor, { blockType: "source", kind: "web" });
+            },
+            order: 2
           }
         ]
       }

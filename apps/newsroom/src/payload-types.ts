@@ -164,12 +164,12 @@ export interface Config {
     tasks: {
       'prepare-publication-media': TaskPreparePublicationMedia;
       'prepare-public-snapshot': TaskPreparePublicSnapshot;
+      'deploy-public-site': TaskDeployPublicSite;
       'advance-public-revision': TaskAdvancePublicRevision;
       'scan-content-health': TaskScanContentHealth;
       'refresh-video-facts': TaskRefreshVideoFacts;
       'deliver-notification': TaskDeliverNotification;
       'send-due-digest': TaskSendDueDigest;
-      'deploy-public-site': TaskDeployPublicSite;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -1108,12 +1108,12 @@ export interface PayloadJob {
           | 'inline'
           | 'prepare-publication-media'
           | 'prepare-public-snapshot'
+          | 'deploy-public-site'
           | 'advance-public-revision'
           | 'scan-content-health'
           | 'refresh-video-facts'
           | 'deliver-notification'
           | 'send-due-digest'
-          | 'deploy-public-site'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -1152,12 +1152,12 @@ export interface PayloadJob {
         | 'inline'
         | 'prepare-publication-media'
         | 'prepare-public-snapshot'
+        | 'deploy-public-site'
         | 'advance-public-revision'
         | 'scan-content-health'
         | 'refresh-video-facts'
         | 'deliver-notification'
         | 'send-due-digest'
-          | 'deploy-public-site'
         | 'schedulePublish'
       )
     | null;
@@ -2272,6 +2272,22 @@ export interface TaskPreparePublicSnapshot {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskDeploy-public-site".
+ */
+export interface TaskDeployPublicSite {
+  input: {
+    revision: number;
+    sha256: string;
+    reason: string;
+  };
+  output: {
+    outcome?: string | null;
+    revision?: number | null;
+    status?: number | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "TaskAdvance-public-revision".
  */
 export interface TaskAdvancePublicRevision {
@@ -2318,22 +2334,6 @@ export interface TaskDeliverNotification {
 export interface TaskSendDueDigest {
   input?: unknown;
   output?: unknown;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "TaskDeploy-public-site".
- */
-export interface TaskDeployPublicSite {
-  input: {
-    revision: number;
-    sha256: string;
-    reason: string;
-  };
-  output: {
-    outcome?: string | null;
-    revision?: number | null;
-    status?: number | null;
-  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2387,6 +2387,7 @@ export interface BylineGalleryBlock {
       }[]
     | null;
   fit: 'natural' | 'crop';
+  layout: 'grid' | 'essay' | 'featured';
   id?: string | null;
   blockName?: string | null;
   blockType: 'gallery';
@@ -2415,6 +2416,14 @@ export interface BylineVideoBlock {
   title: string;
   caption?: string | null;
   captionsConfirmed?: boolean | null;
+  chapters?:
+    | {
+        time?: number | null;
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  transcript?: string | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'video';
@@ -2428,9 +2437,27 @@ export interface BylineAudioBlock {
   title: string;
   caption?: string | null;
   transcript: string;
+  chapters?:
+    | {
+        time?: number | null;
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'audio';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineSocialPostBlock".
+ */
+export interface BylineSocialPostBlock {
+  url: string;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'socialPost';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2439,6 +2466,8 @@ export interface BylineAudioBlock {
 export interface BylineReportedQuoteBlock {
   text: string;
   attribution: string;
+  sourceUrl?: string | null;
+  sourceLabel?: string | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'reportedQuote';
@@ -2466,6 +2495,7 @@ export interface BylineKeyFactsBlock {
         id?: string | null;
       }[]
     | null;
+  presentation: 'standard' | 'compact';
   id?: string | null;
   blockName?: string | null;
   blockType: 'keyFacts';
@@ -2476,7 +2506,15 @@ export interface BylineKeyFactsBlock {
  */
 export interface BylineContextBlock {
   heading?: string | null;
-  body: string;
+  body?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'context';
@@ -2526,6 +2564,7 @@ export interface BylineDocumentBlock {
     | {
         page: number;
         label?: string | null;
+        excerpt?: string | null;
         id?: string | null;
       }[]
     | null;
@@ -2538,8 +2577,30 @@ export interface BylineDocumentBlock {
  * via the `definition` "BylineChartMapBlock".
  */
 export interface BylineChartMapBlock {
-  mode: 'interactive' | 'static';
+  mode: 'native' | 'interactive' | 'static';
   url?: string | null;
+  chartType: 'bar' | 'line' | 'dot';
+  columns?:
+    | {
+        label?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  rows?:
+    | {
+        cells?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  sourceUrl?: string | null;
   image?: (number | null) | Media;
   altOverride?: string | null;
   title: string;
@@ -2625,6 +2686,24 @@ export interface BylineKeyNumbersBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineFinalScoreBlock".
+ */
+export interface BylineFinalScoreBlock {
+  sport?: string | null;
+  teamA: string;
+  teamAScore?: number | null;
+  teamB: string;
+  teamBScore?: number | null;
+  status: 'final' | 'overtime' | 'tie' | 'forfeit';
+  date?: string | null;
+  location?: string | null;
+  note?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'finalScore';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineAnnotatedImageBlock".
  */
 export interface BylineAnnotatedImageBlock {
@@ -2688,6 +2767,13 @@ export interface BylineTimelineBlock {
         title?: string | null;
         body?: string | null;
         current?: boolean | null;
+        media?: (number | null) | Media;
+        altOverride?: string | null;
+        caption?: string | null;
+        linkUrl?: string | null;
+        linkLabel?: string | null;
+        document?: (number | null) | Media;
+        documentPage?: number | null;
         id?: string | null;
       }[]
     | null;
@@ -2713,6 +2799,16 @@ export interface BylineRelatedCoverageBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineEventBlock".
+ */
+export interface BylineEventBlock {
+  event: number | Event;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'event';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylinePollBlock".
  */
 export interface BylinePollBlock {
@@ -2735,6 +2831,18 @@ export interface BylineRepositoryInteractiveBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineRepositoryTrackerBlock".
+ */
+export interface BylineRepositoryTrackerBlock {
+  key: string;
+  title: string;
+  description: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'repositoryTracker';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineFootnoteInline".
  */
 export interface BylineFootnoteInline {
@@ -2742,6 +2850,21 @@ export interface BylineFootnoteInline {
   id?: string | null;
   blockName?: string | null;
   blockType: 'footnote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineSourceInline".
+ */
+export interface BylineSourceInline {
+  kind?: ('web' | 'document') | null;
+  url?: string | null;
+  media?: (number | null) | Media;
+  page?: number | null;
+  label?: string | null;
+  note?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'source';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

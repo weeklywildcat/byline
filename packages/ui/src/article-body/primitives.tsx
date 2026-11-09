@@ -33,6 +33,7 @@ export function articleBlockPlacement(block: { type: ArticleBlockType; placement
     case "video":
     case "chartMap":
     case "repositoryInteractive":
+    case "repositoryTracker":
       return "wide";
     default:
       return "column";
@@ -81,21 +82,26 @@ export function StoryFigure({ className, media, caption, credit, children }: { c
   );
 }
 
-/** A gallery's grid. Two photographs pair up; the CSS owns how many fit each width. */
-export function GalleryLayout({ count, fit, children, ...rest }: { count: number; fit: "natural" | "crop"; children: ReactNode } & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">): ReactNode {
+/**
+ * A gallery. Grid: two photographs pair up, the CSS owns how many fit each
+ * width. Photo Essay: one whole photograph after another, each with its
+ * caption. Featured: the first photograph large, the rest a grid below it.
+ */
+export function GalleryLayout({ count, fit, layout = "grid", children, ...rest }: { count: number; fit: "natural" | "crop"; layout?: "grid" | "essay" | "featured"; children: ReactNode } & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">): ReactNode {
   return (
-    <div className={join("byline-gallery", fit === "crop" && "is-cropped", count === 2 && "is-pair")} {...rest}>
+    <div className={join("byline-gallery", layout === "essay" ? "is-essay" : fit === "crop" && "is-cropped", layout === "featured" && "is-featured", layout === "grid" && count === 2 && "is-pair")} data-layout={layout} {...rest}>
       {children}
     </div>
   );
 }
 
-/** A source's words: the quote, then who said it. */
-export function ReportedQuoteView({ text, attribution }: { text: ReactNode; attribution: ReactNode }): ReactNode {
+/** A source's words: the quote, who said it, then (optionally) where it was said or published. */
+export function ReportedQuoteView({ text, attribution, source, cite }: { text: ReactNode; attribution: ReactNode; source?: ReactNode; cite?: string }): ReactNode {
   return (
-    <blockquote className="byline-reported-quote">
+    <blockquote className="byline-reported-quote" cite={cite}>
       {text}
       {attribution ? <cite>{attribution}</cite> : null}
+      {source ? <p className="byline-quote-source">{source}</p> : null}
     </blockquote>
   );
 }
@@ -116,9 +122,9 @@ export function PullQuoteView({ text, attribution }: { text: ReactNode; attribut
  * Supporting context: a rule, a small-caps label and the material. No box.
  * Context and Key Facts share it; `kind` picks the family member.
  */
-export function SupportingContext({ kind, headingId, heading, children }: { kind: "context" | "keyFacts"; headingId: string; heading: ReactNode; children: ReactNode }): ReactNode {
+export function SupportingContext({ kind, headingId, heading, presentation, children }: { kind: "context" | "keyFacts"; headingId: string; heading: ReactNode; presentation?: "standard" | "compact"; children: ReactNode }): ReactNode {
   return (
-    <aside className={kind === "keyFacts" ? "byline-key-facts" : "byline-context"} aria-labelledby={headingId}>
+    <aside className={kind === "keyFacts" ? "byline-key-facts" : "byline-context"} data-presentation={presentation === "compact" ? "compact" : undefined} aria-labelledby={headingId}>
       <h2 id={headingId}>{heading}</h2>
       {children}
     </aside>
@@ -156,13 +162,20 @@ export function TimelineList({ children, ...rest }: { children: ReactNode } & Om
   );
 }
 
-/** One event: its label, headline and explanation slots in the timeline grid. */
-export function TimelineItem({ current, newPeriod, label, title, body, ...rest }: { current: boolean; newPeriod: boolean; label: ReactNode; title: ReactNode; body: ReactNode } & Omit<ComponentPropsWithoutRef<"li">, "className" | "children" | "title">): ReactNode {
+/**
+ * One event: its label, headline and explanation slots in the timeline grid,
+ * then its optional evidence (a link, a document) and a small supporting
+ * photograph, which sits beside the event in a wide column and after it, in
+ * reading order, in a narrow one.
+ */
+export function TimelineItem({ current, newPeriod, label, title, body, evidence, media, ...rest }: { current: boolean; newPeriod: boolean; label: ReactNode; title: ReactNode; body: ReactNode; evidence?: ReactNode; media?: ReactNode } & Omit<ComponentPropsWithoutRef<"li">, "className" | "children" | "title">): ReactNode {
   return (
-    <li className={join("byline-timeline-item", current && "is-current", newPeriod && "is-new-period")} {...rest}>
+    <li className={join("byline-timeline-item", current && "is-current", newPeriod && "is-new-period", Boolean(media) && "has-media")} {...rest}>
       {label}
       {title}
       {body}
+      {evidence ? <div className="byline-timeline-evidence">{evidence}</div> : null}
+      {media ? <div className="byline-timeline-media">{media}</div> : null}
     </li>
   );
 }
@@ -204,7 +217,7 @@ export const youTubeNoCookieEmbed = (videoId: string): string => `https://www.yo
 export const youTubeWatch = (videoId: string): string => `https://www.youtube.com/watch?v=${videoId}`;
 
 /** A YouTube video. `player` is the privacy-enhanced iframe on the public page; the editor passes a placeholder. */
-export function VideoFigure({ videoId, title, player, caption }: { videoId: string; title: ReactNode; player: ReactNode; caption?: ReactNode }): ReactNode {
+export function VideoFigure({ videoId, title, player, caption, chapters, transcript }: { videoId: string; title: ReactNode; player: ReactNode; caption?: ReactNode; chapters?: ReactNode; transcript?: ReactNode }): ReactNode {
   return (
     <figure className="byline-video" data-video-id={videoId}>
       <div className="byline-video-frame">{player}</div>
@@ -213,6 +226,13 @@ export function VideoFigure({ videoId, title, player, caption }: { videoId: stri
         {caption}
         <p className="byline-video-link"><a href={youTubeWatch(videoId)} rel="noopener">Watch on YouTube</a></p>
       </figcaption>
+      {chapters}
+      {transcript ? (
+        <details className="byline-audio-transcript byline-video-transcript">
+          <summary>Transcript</summary>
+          <div className="byline-audio-transcript-text">{transcript}</div>
+        </details>
+      ) : null}
     </figure>
   );
 }
@@ -232,7 +252,7 @@ export function YouTubePlayer({ videoId, title }: { videoId: string; title: stri
 }
 
 /** A recording: title and context above, the native player, the transcript in a native disclosure. */
-export function AudioFigure({ title, caption, player, transcript, editing = false }: { title: ReactNode; caption?: ReactNode; player: ReactNode; transcript: ReactNode; editing?: boolean }): ReactNode {
+export function AudioFigure({ title, caption, player, transcript, chapters, editing = false }: { title: ReactNode; caption?: ReactNode; player: ReactNode; transcript: ReactNode; chapters?: ReactNode; editing?: boolean }): ReactNode {
   return (
     <figure className="byline-audio">
       <figcaption className="byline-audio-details">
@@ -241,6 +261,7 @@ export function AudioFigure({ title, caption, player, transcript, editing = fals
         {caption}
       </figcaption>
       {player}
+      {chapters}
       <details className="byline-audio-transcript" open={editing || undefined}>
         <summary>Transcript</summary>
         <div className="byline-audio-transcript-text">{transcript}</div>
@@ -288,8 +309,10 @@ export function ExpandableView({ heading, children, editing = false }: { heading
 }
 
 /** A chart or map: title, dek, the graphic or its slot, the summary in words, then source, notes and credit. */
-export function ChartMapFigure({ mode, provider, src, height, title, dek, media, link, summary, source, notes, credit }: {
-  mode: "interactive" | "static";
+export function ChartMapFigure({ mode, provider, src, height, title, titleId, summaryId, dek, media, link, summary, source, notes, credit }: {
+  mode: "native" | "interactive" | "static";
+  titleId?: string;
+  summaryId?: string;
   provider?: string;
   src?: string;
   height: string;
@@ -303,13 +326,13 @@ export function ChartMapFigure({ mode, provider, src, height, title, dek, media,
   credit?: ReactNode;
 }): ReactNode {
   return (
-    <figure className="byline-visualization" data-mode={mode === "interactive" ? "embed" : "static"} data-provider={provider} data-src={mode === "interactive" ? src : undefined} data-height={height}>
-      <h3 className="byline-visualization-title">{title}</h3>
+    <figure className="byline-visualization" data-mode={mode === "interactive" ? "embed" : mode} data-provider={provider} data-src={mode === "interactive" ? src : undefined} data-height={mode === "native" ? undefined : height}>
+      <h3 className="byline-visualization-title" id={titleId}>{title}</h3>
       {dek ? <p className="byline-visualization-dek">{dek}</p> : null}
       <div className="byline-visualization-media">{media}</div>
       {link}
       <figcaption>
-        <div className="byline-visualization-summary">{summary}</div>
+        <div className="byline-visualization-summary" id={summaryId}>{summary}</div>
         {source ? <p className="byline-visualization-source">{source}</p> : null}
         {notes ? <p className="byline-visualization-notes">{notes}</p> : null}
         {credit ? <p className="photo-credit">{credit}</p> : null}

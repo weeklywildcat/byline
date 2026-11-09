@@ -1,7 +1,8 @@
 ---
 import { renderRepositoryInteractive } from "@byline/story-presentations/interactives";
-import { getNativeSnapshot, publicInteractiveRegistry, nativeStory, nativeStoryRoute } from "@/lib/native-snapshot";
-import { hasInteractiveClient } from "@/lib/repository-interactive-client";
+import { getNativeSnapshot, publicInteractiveRegistry, publicTrackerRegistry, nativeStory, nativeStoryRoute } from "@/lib/native-snapshot";
+import { hasInteractiveClient, hasTrackerClient } from "@/lib/repository-interactive-client";
+import { renderPublicTracker, trackerStylesheet } from "@/lib/repository-tracker-host";
 import { nativeArticleJsonLd, nativeArticleMetadata } from "@/lib/native-article-seo";
 import { nativeArticleDate, nativeArticlePresentation, nativeBodyImage } from "@/lib/native-article";
 import { articleRenderInputs, routeCacheKey } from "@/lib/route-cache";
@@ -45,11 +46,18 @@ const id = story?.id ?? post!.id;
 const { presentation, primaryGame } = story ? { presentation: nativeArticlePresentation(story), primaryGame: null } : articleRenderInputs(snapshot!, post!);
 const metadata = story ? nativeArticleMetadata(story) : await getMetadata({ params: Promise.resolve(params) });
 const interactiveRegistry = publicInteractiveRegistry();
+const trackerRegistry = publicTrackerRegistry();
 if (presentation.body.format === "byline-v1") {
   for (const node of presentation.body.nodes) {
-    if (node.type !== "repositoryInteractive") continue;
-    const entry = interactiveRegistry[node.key];
-    if (!entry || (entry.client && !hasInteractiveClient(node.key))) throw new Error(`Story ${id} has no public host for Repository Interactive ${node.key}`);
+    if (node.type === "repositoryInteractive") {
+      const entry = interactiveRegistry[node.key];
+      if (!entry || (entry.client && !hasInteractiveClient(node.key))) throw new Error(`Story ${id} has no public host for Repository Interactive ${node.key}`);
+    }
+    if (node.type === "repositoryTracker") {
+      // An unknown tracker, or one whose declared styles or client are missing, fails the build: never a blank tracker.
+      const entry = trackerRegistry[node.key];
+      if (!entry || (entry.client && !hasTrackerClient(node.key)) || (entry.styles && !trackerStylesheet(node.key))) throw new Error(`Story ${id} has no public host for Repository Tracker ${node.key}`);
+    }
   }
 }
 const showPrimaryGame = Boolean(primaryGame && post && !getPostGameScoreGameIds(post).includes(primaryGame.id));
@@ -63,7 +71,7 @@ const visualStory = isVisualStory(getStoryPresentation(id));
 const slots = {
   shareActions: React.createElement("div", { id: "article-share-island-slot" }),
   primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
-  bodyHost: story ? { imageSources: nativeBodyImage, formatDate: nativeArticleDate, renderInteractive: renderRepositoryInteractive(interactiveRegistry) } : undefined,
+  bodyHost: story ? { imageSources: nativeBodyImage, formatDate: nativeArticleDate, timeZone: publication.timezone, locale: publication.locale, renderInteractive: renderRepositoryInteractive(interactiveRegistry), renderTracker: renderPublicTracker(trackerRegistry) } : undefined,
   poll: story ? null : React.createElement("div", { id: "article-poll-island-slot" }),
   feedback: publication.features.readerFeedback !== false ? React.createElement("div", { id: "article-feedback-island-slot" }) : null,
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
@@ -84,8 +92,12 @@ const slots = {
       import("@byline/ui/article-enhancements").then(({ enhanceArticleStory }) => enhanceArticleStory(body));
     }
     const interactives = body?.querySelectorAll<HTMLElement>("[data-repository-interactive]");
-    if (interactives?.length) {
-      import("@/lib/repository-interactive-client").then(({ startRepositoryInteractives }) => startRepositoryInteractives(interactives));
+    const trackers = body?.querySelectorAll<HTMLElement>("[data-repository-tracker]");
+    if (interactives?.length || trackers?.length) {
+      import("@/lib/repository-interactive-client").then(({ startRepositoryInteractives, startRepositoryTrackers }) => {
+        if (interactives?.length) void startRepositoryInteractives(interactives);
+        if (trackers?.length) void startRepositoryTrackers(trackers);
+      });
     }
     // A flagship visual story's own client code, if it has any, downloads on its page alone.
     const visualStory = document.querySelector<HTMLElement>("[data-visual-story]");

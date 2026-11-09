@@ -215,7 +215,8 @@ Media directories, and Playwright Chromium. Run
 An installed Chrome channel can be selected with
 `BYLINE_PARITY_CHROME_CHANNEL=chrome`.
 
-The gate publishes a Story with all 24 blocks and three inline footnotes,
+The gate publishes a Story with every registered block (the shared fixture),
+inline footnotes and Source references,
 plus people, Media, Pages, a Collection, a Correction, an Event and
 timezone-sensitive coverage. It clears only the completed pointer between
 builds. It compares accepted v2 content except `generatedAt`, prepared Media

@@ -2,10 +2,17 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2 } from "@byline/content";
 import { repositoryInteractiveRegistry } from "@byline/story-presentations/interactives";
+import { repositoryTrackerRegistry } from "@byline/story-presentations/trackers";
 
 export type NativeSnapshotPointer = {
   schemaVersion: typeof PUBLIC_SNAPSHOT_SCHEMA_VERSION; revision: number; generatedAt: string; digest: string; bytes: number; url: string;
 };
+
+const fixtureMode = () => process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture";
+
+export function publicTrackerRegistry() {
+  return repositoryTrackerRegistry({ fixtures: fixtureMode() });
+}
 
 export function publicInteractiveRegistry() {
   return repositoryInteractiveRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture" });
@@ -18,7 +25,8 @@ export function parseNativeSnapshot(bytes: Uint8Array, pointer?: NativeSnapshotP
     if (createHash("sha256").update(bytes).digest("hex") !== pointer.digest) throw new Error("Snapshot artifact SHA-256 digest mismatch.");
   }
   const registry = publicInteractiveRegistry();
-  const snapshot = validatePublicBuildSnapshotV2(JSON.parse(Buffer.from(bytes).toString("utf8")), { interactive: (key) => Object.hasOwn(registry, key) });
+  const trackers = publicTrackerRegistry();
+  const snapshot = validatePublicBuildSnapshotV2(JSON.parse(Buffer.from(bytes).toString("utf8")), { interactive: (key) => Object.hasOwn(registry, key), tracker: (key) => Object.hasOwn(trackers, key) });
   if (pointer && (snapshot.revision !== pointer.revision || Date.parse(snapshot.generatedAt) !== Date.parse(pointer.generatedAt))) throw new Error("Snapshot artifact does not match its pointer revision or generation time.");
   if (snapshot.revision < minimumRevision) throw new Error("Snapshot is stale for the expected revision.");
   return snapshot;

@@ -9,3 +9,7 @@ export * from "./data-table";
 export * from "./references";
 export * from "./footnotes";
 export * from "./validate";
+export * from "./social";
+export * from "./evidence";
+export * from "./native-chart";
+export * from "./final-score";

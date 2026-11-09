@@ -1,5 +1,6 @@
 import { mediaKey } from "./media";
-import type { ArticleBlock, ArticleBody, ArticleBodyNode, ArticleReferences, MediaId, PublicPollReference, PublicStoryReference } from "./types";
+import { sourceRefs } from "./evidence";
+import type { ArticleBlock, ArticleBody, ArticleBodyNode, ArticleReferences, MediaId, PublicEventReference, PublicPollReference, PublicStoryReference } from "./types";
 import { isArticleBlock } from "./types";
 
 /**
@@ -21,6 +22,8 @@ export function blockMediaIds(block: ArticleBlock): MediaId[] {
       return present(block.media);
     case "gallery":
       return block.items.flatMap((item) => present(item.media));
+    case "timeline":
+      return block.items.flatMap((event) => [...present(event.image?.media), ...present(event.document?.media)]);
     case "chartMap":
       return present(block.image);
     case "beforeAfter":
@@ -29,7 +32,6 @@ export function blockMediaIds(block: ArticleBlock): MediaId[] {
     case "pullQuote":
     case "keyFacts":
     case "context":
-    case "timeline":
     case "video":
     case "editorsNote":
     case "marginNote":
@@ -40,6 +42,10 @@ export function blockMediaIds(block: ArticleBlock): MediaId[] {
     case "relatedCoverage":
     case "poll":
     case "repositoryInteractive":
+    case "repositoryTracker":
+    case "event":
+    case "socialPost":
+    case "finalScore":
       return [];
     default:
       return assertNever(block);
@@ -54,6 +60,15 @@ export function blockPollIds(block: ArticleBlock): MediaId[] {
   return block.type === "poll" ? present(block.poll) : [];
 }
 
+export function blockEventIds(block: ArticleBlock): MediaId[] {
+  return block.type === "event" ? present(block.event) : [];
+}
+
+/** Media named inline: the PDFs Source references point at. */
+export function inlineMediaIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
+  return sourceRefs(nodes).flatMap((ref) => (ref.kind === "document" ? present(ref.media) : []));
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled block: ${JSON.stringify(value)}`);
 }
@@ -61,7 +76,7 @@ function assertNever(value: never): never {
 const unique = (ids: MediaId[]): MediaId[] => [...new Map(ids.map((id) => [mediaKey(id), id])).values()];
 
 export function bodyMediaIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
-  return unique(nodes.filter(isArticleBlock).flatMap(blockMediaIds));
+  return unique([...nodes.filter(isArticleBlock).flatMap(blockMediaIds), ...inlineMediaIds(nodes)]);
 }
 
 export function bodyStoryIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
@@ -72,22 +87,31 @@ export function bodyPollIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
   return unique(nodes.filter(isArticleBlock).flatMap(blockPollIds));
 }
 
-/** Whether a body names no private or unresolved record: every Story and Poll it points at is in its reference table. */
-export function missingReferences(body: Pick<ArticleBody, "nodes" | "references">): { stories: MediaId[]; polls: MediaId[] } {
+export function bodyEventIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
+  return unique(nodes.filter(isArticleBlock).flatMap(blockEventIds));
+}
+
+/** Whether a body names no private or unresolved record: every Story, Poll and Event it points at is in its reference table. */
+export function missingReferences(body: Pick<ArticleBody, "nodes" | "references">): { stories: MediaId[]; polls: MediaId[]; events: MediaId[] } {
   const stories = body.references?.stories ?? {};
   const polls = body.references?.polls ?? {};
+  const events = body.references?.events ?? {};
   return {
     stories: bodyStoryIds(body.nodes).filter((id) => !(mediaKey(id) in stories)),
-    polls: bodyPollIds(body.nodes).filter((id) => !(mediaKey(id) in polls))
+    polls: bodyPollIds(body.nodes).filter((id) => !(mediaKey(id) in polls)),
+    events: bodyEventIds(body.nodes).filter((id) => !(mediaKey(id) in events))
   };
 }
 
-/** What a host resolves while normalizing: the public-safe Story and Poll facts, or null when gone or not public. */
+/** What a host resolves while normalizing: the public-safe Story, Poll and Event facts, or null when gone or not public. */
 export type ReferenceLookup = {
   story?: (id: MediaId) => PublicStoryReference | null | undefined;
   poll?: (id: MediaId) => PublicPollReference | null | undefined;
+  event?: (id: MediaId) => PublicEventReference | null | undefined;
   /** Whether a repository interactive with this key is registered. */
   interactive?: (key: string) => boolean;
+  /** Whether a repository tracker with this key is registered. */
+  tracker?: (key: string) => boolean;
 };
 
 export type { ArticleReferences };

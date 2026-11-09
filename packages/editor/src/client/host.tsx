@@ -1,6 +1,6 @@
 "use client";
 
-import type { ArticleMediaAsset, MediaId, PublicPollReference, PublicStoryReference } from "@byline/article-body";
+import type { ArticleMediaAsset, MediaId, PublicEventReference, PublicPollReference, PublicStoryReference } from "@byline/article-body";
 import { mediaKey } from "@byline/article-body";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
@@ -37,6 +37,12 @@ export type BylineEditorHost = {
   canUsePrivilegedBlocks?: boolean;
   /** Published Stories to link from Related Coverage: searchable, never the story being edited. */
   searchStories?: (query: string) => Promise<StoryChoice[]>;
+  /**
+   * Published Stories Byline's own related-story rules rank for this story
+   * (shared section and topics, newest first). Offered, never inserted: a
+   * writer still chooses each one.
+   */
+  suggestStories?: () => Promise<StoryChoice[]>;
   /** One Story's public facts, or null when it is not published or is gone. */
   loadStory?: (id: MediaId) => Promise<StoryChoice | null>;
   /** The Polls a writer may place in a story (open or closed). */
@@ -44,11 +50,22 @@ export type BylineEditorHost = {
   loadPoll?: (id: MediaId) => Promise<PollChoice | null>;
   /** The repository's registered interactives, as plain data (never their code). */
   interactives?: ReadonlyArray<{ key: string; name: string; description: string }>;
+  /** The repository's registered trackers, as plain data (never their components, styles or client code). */
+  trackers?: ReadonlyArray<{ key: string; name: string; description: string }>;
+  /** Published Events, searchable by title. */
+  searchEvents?: (query: string) => Promise<EventChoice[]>;
+  /** One Event's public facts, or null when it is not published or is gone. */
+  loadEvent?: (id: MediaId) => Promise<EventChoice | null>;
+  /** The publication's timezone and locale, for event times on the canvas. */
+  timeZone?: string;
+  locale?: string;
 };
 
 /** A published Story as the picker and the canvas show it. Facts come from the Story, never from the block. */
 export type StoryChoice = PublicStoryReference & { thumbnailAsset?: ArticleMediaAsset | null };
 export type PollChoice = PublicPollReference & { status: "draft" | "open" | "closed" };
+/** A published Event as the picker and the canvas show it. Facts come from the Event, never from the block. */
+export type EventChoice = PublicEventReference;
 
 type Entry<T = ArticleMediaAsset> = { status: "loading" | "ready" | "missing"; asset: T | null };
 
@@ -61,7 +78,7 @@ type RecordStore<T> = {
 
 type MediaStore = RecordStore<ArticleMediaAsset> & { primeAssets: (assets: ArticleMediaAsset[]) => void };
 
-type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; announce: (message: string) => void };
+type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; events: RecordStore<EventChoice>; announce: (message: string) => void };
 
 const HostContext = createContext<EditorHostContext | null>(null);
 
@@ -108,6 +125,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
   }, []);
   const stories = useMemo(() => createRecordStore<StoryChoice>(async (id) => (await hostRef.current.loadStory?.(id)) ?? null), []);
   const polls = useMemo(() => createRecordStore<PollChoice>(async (id) => (await hostRef.current.loadPoll?.(id)) ?? null), []);
+  const events = useMemo(() => createRecordStore<EventChoice>(async (id) => (await hostRef.current.loadEvent?.(id)) ?? null), []);
   // One polite live region for block edits (added, moved, removed): decorators render
   // through portals, so the announcer lives here, above the editor.
   const [message, setMessage] = useState("");
@@ -115,7 +133,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
     setMessage("");
     window.requestAnimationFrame(() => setMessage(next));
   }, []);
-  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, announce }), [announce, host, polls, stories, store]);
+  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, events, announce }), [announce, events, host, polls, stories, store]);
   return (
     <HostContext value={value}>
       {children}
@@ -155,6 +173,13 @@ export function usePollChoice(id: MediaId | null): Entry<PollChoice> {
   const { polls } = useBylineEditorHost();
   const read = useCallback(() => (id === null ? MISSING_NONE : polls.get(id)), [id, polls]);
   return useSyncExternalStore(polls.subscribe, read, read);
+}
+
+/** One Event's public facts for display, loaded once. */
+export function useEventChoice(id: MediaId | null): Entry<EventChoice> {
+  const { events } = useBylineEditorHost();
+  const read = useCallback(() => (id === null ? MISSING_NONE : events.get(id)), [id, events]);
+  return useSyncExternalStore(events.subscribe, read, read);
 }
 
 /** Picks media through Byline's picker and primes the cache with what was chosen. */

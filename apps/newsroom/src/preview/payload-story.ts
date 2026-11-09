@@ -16,7 +16,7 @@ import {
 } from "@byline/content/story";
 import { formatVideoDuration, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
 import { publicStoryPath } from "@byline/content";
-import { publicPollReference, publicStoryReference } from "../public/references";
+import { publicEventReference, publicPollReference, publicStoryReference } from "../public/references";
 import { articleMediaFromPayload, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { PreviewPublication } from "./publication";
 
@@ -153,19 +153,21 @@ function primaryVideo(story: Doc, title: string) {
  * resolvers read only these. A populated relationship inside a block is told
  * by its shape: Media has a MIME type, a Story a headline, a Poll a key.
  */
-function populatedBodyRecords(body: unknown): { media: Map<string, Doc>; stories: Map<string, Doc>; polls: Map<string, Doc> } {
-  const found = { media: new Map<string, Doc>(), stories: new Map<string, Doc>(), polls: new Map<string, Doc>() };
+function populatedBodyRecords(body: unknown): { media: Map<string, Doc>; stories: Map<string, Doc>; polls: Map<string, Doc>; events: Map<string, Doc> } {
+  const found = { media: new Map<string, Doc>(), stories: new Map<string, Doc>(), polls: new Map<string, Doc>(), events: new Map<string, Doc>() };
   const take = (value: unknown) => {
     const doc = populated(value as Relation);
     if (!doc) return;
     const key = mediaKey(doc.id as MediaId);
     if (typeof doc.mimeType === "string") found.media.set(key, doc);
     else if (typeof doc.pollKey === "string") found.polls.set(key, doc);
+    else if (typeof doc.startAt === "string" && typeof doc.title === "string") found.events.set(key, doc);
     else if (typeof doc.headline === "string") found.stories.set(key, doc);
   };
   const visit = (node: unknown) => {
     if (!isDoc(node)) return;
-    if (node.type === "block" && isDoc(node.fields)) {
+    // Blocks, and inline blocks (a Source reference's PDF), hold populated relationships.
+    if ((node.type === "block" || node.type === "inlineBlock") && isDoc(node.fields)) {
       for (const value of Object.values(node.fields)) {
         take(value);
         if (Array.isArray(value)) for (const row of value) if (isDoc(row)) for (const inner of Object.values(row)) take(inner);
@@ -181,6 +183,8 @@ export type PayloadStoryOptions = {
   publication: PreviewPublication;
   /** The keys of the repository interactives this host knows (the registry the preview renders with). */
   interactiveKeys?: ReadonlySet<string> | readonly string[];
+  /** The keys of the repository trackers this host knows. */
+  trackerKeys?: ReadonlySet<string> | readonly string[];
   corrections?: PublicCorrection[];
   /** "Now" for an unpublished story's dates. */
   now?: Date;
@@ -203,6 +207,7 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
   const featured = populated(doc.featuredMedia as Relation);
   const records = populatedBodyRecords(doc.body);
   const interactiveKeys = new Set(options.interactiveKeys ?? []);
+  const trackerKeys = new Set(options.trackerKeys ?? []);
   const { body, issues } = normalizePayloadStoryBody(
     { contentFormat: doc.contentFormat, body: doc.body, legacyHtml: doc.legacyHtml },
     {
@@ -218,7 +223,10 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
           return projected?.reference ?? null;
         },
         poll: (id) => publicPollReference(records.polls.get(mediaKey(id)), new Date(options.now ?? Date.now())),
-        interactive: (key) => interactiveKeys.has(key)
+        // Live Preview populates relationships from the published Event (draft: false reads); a draft Event never resolves.
+        event: (id) => publicEventReference(records.events.get(mediaKey(id))),
+        interactive: (key) => interactiveKeys.has(key),
+        tracker: (key) => trackerKeys.has(key)
       }
     }
   );

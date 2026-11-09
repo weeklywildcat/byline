@@ -4,6 +4,7 @@ import {
   ARTICLE_BODY_VERSION,
   ARTICLE_BLOCK_LIMITS,
   blockLabel,
+  blockEventIds,
   blockMediaIds,
   blockPollIds,
   blockStoryIds,
@@ -11,6 +12,7 @@ import {
   cleanText,
   compactInline,
   finalizeBlock,
+  finalizeSourceRef,
   hasInlineText,
   isArticleBlock,
   isArticleBlockType,
@@ -30,6 +32,7 @@ import {
   type MediaId,
   type PublicArticleBody,
   type ReferenceLookup,
+  type SourceRef,
   type TextRun
 } from "@byline/article-body";
 import { articleBlockFromFields, mediaIdOf } from "./fields";
@@ -53,6 +56,8 @@ export type NormalizeIssue =
   | { kind: "unsupported-format"; format: string; path: string }
   | { kind: "unsafe-link"; href: string; path: string }
   | { kind: "footnote"; code: "footnote-empty" | "footnote-duplicate"; path: string }
+  /** A Source reference that is not finished (left out) or a copied one (renamed). An incomplete source blocks publishing. */
+  | { kind: "source"; code: "source-incomplete" | "source-duplicate"; message: string; path: string }
   | { kind: "block"; issue: BlockIssue };
 
 export type MediaResolver = (id: MediaId) => ArticleMediaAsset | null | undefined;
@@ -87,9 +92,36 @@ function storedBlocks(state: unknown): ArticleBlock[] {
   return blocks;
 }
 
-/** Every Media ID a body references (every block that names Media), for the host to resolve before normalizing. */
+/** A stored Source reference's fields as the semantic reference (unfinished). */
+function storedSource(fields: LexicalNode, id: string): SourceRef {
+  const label = typeof fields.label === "string" ? fields.label : "";
+  const note = typeof fields.note === "string" && fields.note.trim() ? { note: fields.note } : {};
+  if (fields.kind === "document") {
+    const page = typeof fields.page === "number" ? fields.page : typeof fields.page === "string" && /^\d+$/.test(fields.page) ? Number(fields.page) : undefined;
+    return { type: "source", id, kind: "document", media: mediaIdOf(fields.media) as MediaId, ...(page ? { page } : {}), label, ...note };
+  }
+  return { type: "source", id, kind: "web", url: typeof fields.url === "string" ? fields.url : "", label, ...note };
+}
+
+/** Every inline Source reference stored anywhere in the body, in reading order. */
+function storedSources(state: unknown): SourceRef[] {
+  const found: SourceRef[] = [];
+  const visit = (node: LexicalNode) => {
+    if (node.type === "inlineBlock") {
+      const fields = asNode(node.fields);
+      if (fields.blockType === "source") found.push(storedSource(fields, typeof fields.id === "string" ? fields.id : ""));
+      return;
+    }
+    if (node.type === "block") return;
+    childrenOf(node).forEach(visit);
+  };
+  rootChildren(state).forEach(visit);
+  return found;
+}
+
+/** Every Media ID a body references (every block that names Media, and the PDFs inline sources point at), for the host to resolve before normalizing. */
 export function collectMediaIds(state: unknown): MediaId[] {
-  return bodyMediaIds(storedBlocks(state));
+  return [...new Map(collectMediaUses(state).map(({ id }) => [mediaKey(id), id])).values()];
 }
 
 export type StoredMediaUse = { id: MediaId; hasAltOverride: boolean };
@@ -101,8 +133,8 @@ export type StoredMediaUse = { id: MediaId; hasAltOverride: boolean };
  * valid source: the public renderer already gives an `altOverride` precedence.
  */
 export function collectMediaUses(state: unknown): StoredMediaUse[] {
-  return storedBlocks(state).flatMap((block): StoredMediaUse[] => {
-    const use = (id: MediaId | null, altOverride?: string): StoredMediaUse[] => id === null ? [] : [{ id, hasAltOverride: Boolean(altOverride?.trim()) }];
+  const use = (id: MediaId | null, altOverride?: string): StoredMediaUse[] => id === null ? [] : [{ id, hasAltOverride: Boolean(altOverride?.trim()) }];
+  const blockUses = storedBlocks(state).flatMap((block): StoredMediaUse[] => {
     switch (block.type) {
       case "photo":
       case "portraitText":
@@ -111,12 +143,16 @@ export function collectMediaUses(state: unknown): StoredMediaUse[] {
         return use(block.media, block.altOverride);
       case "gallery":
         return block.items.flatMap((item) => use(item.media, item.altOverride));
+      case "timeline":
+        return block.items.flatMap((event) => [...(event.image ? use(event.image.media, event.image.altOverride) : []), ...(event.document ? use(event.document.media) : [])]);
       case "chartMap":
         return use(block.image, block.altOverride);
       default:
         return blockMediaIds(block).map((id) => ({ id, hasAltOverride: false }));
     }
   });
+  const sourceUses = storedSources(state).flatMap((ref) => ref.kind === "document" ? use(ref.media) : []);
+  return [...blockUses, ...sourceUses];
 }
 
 /** Editorial labels for each block type that uses a Media asset. */
@@ -126,11 +162,11 @@ export function collectMediaUsageLabels(state: unknown, id: MediaId): string[] {
     .map((block) => blockLabel(block.type)))];
 }
 
-/** Every Story and Poll a body names, for the host to resolve into public-safe references before normalizing. */
-export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[] } {
+/** Every Story, Poll and Event a body names, for the host to resolve into public-safe references before normalizing. */
+export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[]; events: MediaId[] } {
   const blocks = storedBlocks(state);
   const unique = (ids: MediaId[]) => [...new Map(ids.map((id) => [mediaKey(id), id])).values()];
-  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)) };
+  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)), events: unique(blocks.flatMap(blockEventIds)) };
 }
 
 /** A Payload Media document as the renderer's media record. `src` is the host's choice of URL. */
@@ -164,7 +200,7 @@ export function articleMediaFromPayload(doc: Record<string, unknown>, src: (doc:
  */
 export type NormalizeOptions = {
   media: MediaResolver;
-  /** Public-safe Story and Poll facts, and the registered repository interactives. Without it, blocks that need them are left out. */
+  /** Public-safe Story, Poll and Event facts, and the registered repository interactives and trackers. Without it, blocks that need them are left out. */
   references?: ReferenceLookup;
 };
 
@@ -177,6 +213,7 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
   const issues: NormalizeIssue[] = [];
   const references: ArticleReferences = {};
   const footnoteIds = new Set<string>();
+  const sourceIds = new Set<string>();
   const media: ArticleBody["media"] = {};
   const resolve = (id: MediaId): ArticleMediaAsset | null => {
     const asset = options.media(id) ?? null;
@@ -205,6 +242,23 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
           break;
         case "inlineBlock": {
           const fields = asNode(node.fields);
+          if (fields.blockType === "source") {
+            let id = typeof fields.id === "string" && fields.id ? fields.id : `source-${here}`;
+            const { ref, problem } = finalizeSourceRef(storedSource(fields, id), resolve);
+            if (!ref) {
+              issues.push({ kind: "source", code: "source-incomplete", message: problem ?? "This source is not finished.", path: here });
+              break;
+            }
+            if (sourceIds.has(id)) {
+              issues.push({ kind: "source", code: "source-duplicate", message: "A copied source was renumbered.", path: here });
+              let suffix = 2;
+              while (sourceIds.has(`${id}-${suffix}`)) suffix += 1;
+              id = `${id}-${suffix}`;
+            }
+            sourceIds.add(id);
+            out.push({ ...ref, id });
+            break;
+          }
           if (fields.blockType !== "footnote") {
             issues.push({ kind: "unsupported-node", nodeType: `inlineBlock:${String(fields.blockType)}`, path: here });
             break;
@@ -278,7 +332,13 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
       if (poll) (references.polls ??= {})[mediaKey(id)] = poll;
       return poll;
     },
-    interactive: (key) => options.references?.interactive?.(key) === true
+    event: (id) => {
+      const event = options.references?.event?.(id) ?? null;
+      if (event) (references.events ??= {})[mediaKey(id)] = event;
+      return event;
+    },
+    interactive: (key) => options.references?.interactive?.(key) === true,
+    tracker: (key) => options.references?.tracker?.(key) === true
   };
 
   const nodes: ArticleBodyNode[] = [];
@@ -327,9 +387,15 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
   });
 
   // Only references the published nodes still name stay in the table (a dropped related story leaves none behind).
-  const kept = { stories: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockStoryIds(node) : [])).map(mediaKey)), polls: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockPollIds(node) : [])).map(mediaKey)) };
+  const kept = {
+    stories: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockStoryIds(node) : [])).map(mediaKey)),
+    polls: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockPollIds(node) : [])).map(mediaKey)),
+    events: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockEventIds(node) : [])).map(mediaKey))
+  };
   for (const key of Object.keys(references.stories ?? {})) if (!kept.stories.has(key)) delete references.stories![key];
   for (const key of Object.keys(references.polls ?? {})) if (!kept.polls.has(key)) delete references.polls![key];
+  for (const key of Object.keys(references.events ?? {})) if (!kept.events.has(key)) delete references.events![key];
+  if (references.events && !Object.keys(references.events).length) delete references.events;
   // A related story's thumbnail is Media too: resolved like any other, or left off.
   for (const [key, story] of Object.entries(references.stories ?? {})) {
     if (story.thumbnail !== undefined && !resolve(story.thumbnail)) references.stories![key] = { ...story, thumbnail: undefined };
@@ -338,7 +404,9 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
   // Only media the published nodes (and kept thumbnails) still reference stays in the table.
   const used = new Set([...bodyMediaIds(nodes), ...Object.values(references.stories ?? {}).flatMap((story) => (story.thumbnail === undefined ? [] : [story.thumbnail]))].map(mediaKey));
   for (const key of Object.keys(media)) if (!used.has(key)) delete media[key];
-  const hasReferences = Boolean(Object.keys(references.stories ?? {}).length || Object.keys(references.polls ?? {}).length);
+  if (references.stories && !Object.keys(references.stories).length) delete references.stories;
+  if (references.polls && !Object.keys(references.polls).length) delete references.polls;
+  const hasReferences = Boolean(Object.keys(references.stories ?? {}).length || Object.keys(references.polls ?? {}).length || Object.keys(references.events ?? {}).length);
   const body: ArticleBody = { format: ARTICLE_BODY_FORMAT, version: ARTICLE_BODY_VERSION, nodes, media, ...(hasReferences ? { references } : {}) };
   return { body, issues };
 }

@@ -40,7 +40,7 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
   };
   const replace = async () => use(await pick({ kind: "document", multiple: false, title: "Replace the document", confirmLabel: "Use this PDF" }));
   const addPage = () => {
-    const change = insertItem(pages, pages.length, { id: newRowId(), page: null, label: "" }, LIMITS.documentPagesMax);
+    const change = insertItem(pages, pages.length, { id: newRowId(), page: null, label: "", excerpt: "" }, LIMITS.documentPagesMax);
     set({ pages: change.items });
     announce(`Page reference added. ${change.items.length} in all.`);
     focusIn(root(), `[data-page-index="${change.focus}"] input`);
@@ -64,7 +64,7 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
       actions={
         <ButtonGroup>
           <ToolTextButton label="Replace" icon={<FilePlus2 />} onClick={() => void replace()} />
-          <ToolTextButton label="Page reference" icon={<Plus />} disabled={pages.length >= LIMITS.documentPagesMax} onClick={addPage} />
+          <span data-add-page="" className="contents"><ToolTextButton label="Add page" icon={<Plus />} disabled={pages.length >= LIMITS.documentPagesMax} onClick={addPage} /></span>
         </ButtonGroup>
       }
     >
@@ -103,10 +103,20 @@ export function DocumentEditor({ node, id, nodeKey }: BlockEditorProps) {
                         }}
                       />
                     </label>
-                    <InlineText label={`What is on page ${ref.page ?? index + 1}`} placeholder="What the reader will find there" value={ref.label} maxLength={LIMITS.documentPageLabel} readOnly={readOnly} onEnter={addPage} onChange={(label) => set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, label } : row)) })} />
+                    <span className="byline-document-page-text">
+                      <InlineText className="byline-document-page-label" label={`What is on page ${ref.page ?? index + 1}`} placeholder="What the reader will find there" value={ref.label} maxLength={LIMITS.documentPageLabel} readOnly={readOnly} onEnter={() => focusIn(root(), `[data-page-index="${index}"] .byline-document-page-excerpt`, true)} onChange={(label) => set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, label } : row)) })} />
+                      <InlineText className="byline-document-page-excerpt" label={`What matters on page ${ref.page ?? index + 1} (optional)`} placeholder="Why it matters, or the passage in your words (optional)" value={ref.excerpt} maxLength={LIMITS.documentPageExcerpt} readOnly={readOnly} multiline onEnter={addPage} onChange={(excerpt) => set({ pages: pages.map((row) => (row.id === ref.id ? { ...row, excerpt } : row)) })} />
+                    </span>
                     {readOnly ? null : (
                       <ButtonGroup className="byline-row-actions" data-byline-chrome="">
-                        <ToolButton label="Remove page reference" onClick={() => { set({ pages: removeItem(pages, index).items }); announce("Page reference removed."); }}><Trash2 /></ToolButton>
+                        <ToolButton label={`Remove page reference ${index + 1}`} onClick={() => {
+                          const change = removeItem(pages, index);
+                          set({ pages: change.items });
+                          announce(`Page reference removed. ${change.items.length} left.`);
+                          // Focus stays in the list: the reference now in this place, else the toolbar's Add page.
+                          if (change.items.length) focusIn(root(), `[data-page-index="${change.focus}"] input`);
+                          else window.requestAnimationFrame(() => root()?.querySelector<HTMLElement>("[data-add-page] button")?.focus());
+                        }}><Trash2 /></ToolButton>
                       </ButtonGroup>
                     )}
                   </li>

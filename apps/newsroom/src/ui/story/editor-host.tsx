@@ -4,7 +4,7 @@ import { mediaCredit, type ArticleMediaAsset, type MediaId } from "@byline/artic
 import type { BylineEditorHost, PollChoice, StoryChoice } from "@byline/editor/client";
 import { articleMediaFromPayload } from "@byline/editor/normalize";
 import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
-import { publicPollReference, publicStoryReference } from "../../public/references";
+import { publicEventReference, publicPollReference, publicStoryReference } from "../../public/references";
 import { DEFAULT_MEDIA_ROUTE, type MediaLibraryAsset } from "@byline/newsroom-screens/media/media-library-model";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -62,7 +62,7 @@ export function useNewsroomEditorHost(): BylineEditorHost {
   const queryClient = useQueryClient();
   const { id: currentStoryId } = useDocumentInfo();
   const api = config.routes.api;
-  const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string; repositoryInteractives?: BylineEditorHost["interactives"] };
+  const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string; repositoryInteractives?: BylineEditorHost["interactives"]; repositoryTrackers?: BylineEditorHost["trackers"] };
   const timeZone = custom.newsroomTimeZone ?? "America/New_York";
   const role = typeof user?.role === "string" ? user.role : "staff";
   const get = async (path: string, params: Record<string, string | number> = {}): Promise<Doc | null> => {
@@ -74,6 +74,22 @@ export function useNewsroomEditorHost(): BylineEditorHost {
     // The server restores what a staff writer may not change; this only avoids offering it.
     canUsePrivilegedBlocks: role === "editor" || role === "administrator",
     interactives: custom.repositoryInteractives ?? [],
+    trackers: custom.repositoryTrackers ?? [],
+    timeZone,
+    // Byline's own related-story rules, for Related Coverage's Suggested list. Never inserted without a choice.
+    suggestStories: currentStoryId ? async () => {
+      const found = await get(`/byline/stories/${String(currentStoryId)}/related-suggestions`);
+      return ((found?.stories as StoryChoice[] | undefined) ?? []).filter((story) => String(story.id) !== String(currentStoryId));
+    } : undefined,
+    // Published events only: a draft or trashed event is never offered (and never resolves).
+    searchEvents: async (query) => {
+      const found = await get("/events", { depth: 0, limit: 10, draft: "false", sort: "-startAt", "where[and][0][_status][equals]": "published", ...(query.trim() ? { "where[and][1][title][like]": query.trim() } : {}) });
+      return ((found?.docs as unknown[]) ?? []).flatMap((doc) => publicEventReference(doc) ?? []);
+    },
+    loadEvent: async (id: MediaId) => {
+      const doc = await get(`/events/${String(id)}`, { depth: 0, draft: "false" });
+      return doc ? publicEventReference(doc) : null;
+    },
     searchStories: async (query) => {
       const found = await get("/stories", {
         depth: 1,
@@ -118,5 +134,5 @@ export function useNewsroomEditorHost(): BylineEditorHost {
     // The Media shell owns the one art-direction editor; blocks and the lead image only name a Media ID.
     editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `get` closes over `api` only
-  }), [api, currentStoryId, custom.repositoryInteractives, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
+  }), [api, currentStoryId, custom.repositoryInteractives, custom.repositoryTrackers, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
 }

@@ -1,3 +1,4 @@
+import { relatedSuggestions } from "./related-suggestions";
 import { storyDistribution } from "./story-distribution";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
@@ -593,6 +594,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },
   { path: "/byline/stories", method: "post", handler: handle(createStory) },
   // Live Preview's presentation context: corrections, related/More by candidates, series. Not part of the typing loop.
+  { path: "/byline/stories/:id/related-suggestions", method: "get", handler: handle((ctx, req) => relatedSuggestions(ctx, idParam(req))) },
   { path: "/byline/stories/:id/preview-context", method: "get", handler: handle((ctx, req) => storyPreviewContext(ctx, idParam(req), parsePreviewContextQuery(new URL(req.url ?? "http://x").searchParams))) },
   { path: "/byline/stories/:id/activity", method: "get", handler: handle(async (ctx, req) => {
     const storyId = idParam(req);

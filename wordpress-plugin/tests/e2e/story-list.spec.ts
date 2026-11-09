@@ -23,6 +23,12 @@ test("Stories List keeps readable dense rows, separators, horizontal work signal
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(listUrl);
+  // Measure the Stories layout after dismissing the temporary migration notice.
+  const moveNotice = page.locator(".notice").filter({ has: page.getByRole("heading", { name: "We've moved to Byline!", exact: true }) });
+  if (await moveNotice.isVisible()) {
+    await moveNotice.getByRole("button", { name: "Dismiss this notice" }).click();
+    await expect(moveNotice).toBeHidden();
+  }
   await page.getByRole("searchbox", { name: "Search stories" }).fill(unique);
   const table = page.getByRole("table", { name: "Stories", exact: true });
   const rows = table.locator("tbody tr");

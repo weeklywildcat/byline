@@ -1,0 +1,12 @@
+/* Scoped to the tracker; loaded only on stories that place it. Hairlines and type, no boxes. */
+.tracker-fixture-sidewalk-project { font-family: var(--font-ui, system-ui, sans-serif); font-size: .95rem; }
+.tracker-fixture-sidewalk-project-progress { margin: 0 0 .75rem; }
+.tracker-fixture-sidewalk-project ol { list-style: none; margin: 0; padding: 0; }
+.tracker-fixture-sidewalk-project li { border-block-start: 1px solid var(--rule, #e2e2e2); display: grid; gap: .15rem 1rem; grid-template-columns: 6rem minmax(0, 1fr); margin: 0; padding-block: .6rem; }
+.tracker-fixture-sidewalk-project-status { color: var(--muted, #545454); font-size: .72rem; font-weight: 700; grid-row: span 2; letter-spacing: .08em; text-transform: uppercase; }
+.tracker-fixture-sidewalk-project li[data-status="underway"] .tracker-fixture-sidewalk-project-status { color: var(--accent, #73192a); }
+.tracker-fixture-sidewalk-project-name { font-weight: 600; }
+.tracker-fixture-sidewalk-project-detail { color: var(--muted, #545454); font-family: var(--font-serif, Georgia, serif); }
+.tracker-fixture-sidewalk-project label { align-items: center; display: inline-flex; gap: .5rem; margin-block-end: .75rem; min-height: 44px; }
+.tracker-fixture-sidewalk-project label:focus-within { outline: 2px solid var(--accent, #73192a); outline-offset: 3px; }
+.tracker-fixture-sidewalk-project[data-remaining-only="true"] li[data-status="done"] { display: none; }

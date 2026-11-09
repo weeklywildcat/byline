@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { UNDO_COMMAND } from "@payloadcms/richtext-lexical/lexical";
 import { ArrowDown, ArrowUp, Ellipsis, Trash2 } from "lucide-react";
-import { cloneElement, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
+import { cloneElement, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useAnnounce } from "./host";
 import { BlockIcon } from "./icons";
@@ -42,6 +42,64 @@ export function useCoarseLayout(): boolean {
 
 type Node = ReturnType<typeof useBlockNode>;
 
+/** A Popover, menu or Sheet: portaled outside the block that opened it. */
+const POPUP = '[data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="sheet-content"], [role="dialog"], [role="menu"]';
+
+/**
+ * Keeps the block frame's editing state honest about what CSS cannot see
+ * (canvas.css reads both):
+ *
+ * - `--byline-chrome-size`: the toolbar's rendered height, so the selected
+ *   block reserves exactly the room its toolbar needs above it. A toolbar that
+ *   wraps at a narrower column, or grows when an action appears, never covers
+ *   the text above.
+ * - `data-popup-held`: focus left the block for a popup the block opened.
+ *   The popup is portaled, so `:focus-within` is false while it is open and
+ *   through its exit animation, until focus returns to its trigger; without
+ *   this the toolbar it is anchored to would fade and the reserved room
+ *   collapse, moving the article under it. Cleared as soon as focus or a
+ *   pointer lands anywhere else.
+ */
+function useBlockFrame() {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const chrome = ref.current;
+    const frame = chrome?.closest<HTMLElement>(".byline-block");
+    if (!chrome || !frame) return;
+    const write = () => frame.style.setProperty("--byline-chrome-size", `${Math.ceil(chrome.offsetHeight)}px`);
+    write();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(write);
+    observer?.observe(chrome);
+
+    const doc = frame.ownerDocument;
+    const release = () => {
+      frame.removeAttribute("data-popup-held");
+      doc.removeEventListener("focusin", onElsewhere, true);
+      doc.removeEventListener("pointerdown", onElsewhere, true);
+    };
+    const inside = (target: EventTarget | null) => target instanceof Element && (frame.contains(target) || Boolean(target.closest(POPUP)));
+    function onElsewhere(event: Event) {
+      if (!inside(event.target)) release();
+      else if (event.type === "focusin" && frame!.contains(event.target as Element)) release();
+    }
+    const onFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (!(next instanceof Element) || frame.contains(next) || !next.closest(POPUP)) return;
+      frame.setAttribute("data-popup-held", "");
+      doc.addEventListener("focusin", onElsewhere, true);
+      doc.addEventListener("pointerdown", onElsewhere, true);
+    };
+    frame.addEventListener("focusout", onFocusOut);
+    return () => {
+      observer?.disconnect();
+      frame.removeEventListener("focusout", onFocusOut);
+      release();
+      frame.style.removeProperty("--byline-chrome-size");
+    };
+  }, []);
+  return ref;
+}
+
 export function BlockShell({ type, node, actions, issues, children, menuItems }: {
   type: ArticleBlockType;
   node: Node;
@@ -56,6 +114,7 @@ export function BlockShell({ type, node, actions, issues, children, menuItems }:
   const definition = ARTICLE_BLOCKS[type];
   const announce = useAnnounce();
   const [menuOpen, setMenuOpen] = useState(false);
+  const chromeRef = useBlockFrame();
   const omitted = issues?.find((issue) => issue.effect === "omitted");
   const note = omitted ?? issues?.[0];
 
@@ -72,7 +131,7 @@ export function BlockShell({ type, node, actions, issues, children, menuItems }:
   return (
     <>
       {node.editable ? (
-        <div className="byline-block-chrome" role="toolbar" aria-label={`${definition.label} tools`} data-open={menuOpen || undefined} data-byline-chrome="" contentEditable={false}>
+        <div ref={chromeRef} className="byline-block-chrome" role="toolbar" aria-label={`${definition.label} tools`} data-open={menuOpen || undefined} data-byline-chrome="" contentEditable={false}>
           <span className="byline-block-chrome-label">
             <BlockIcon icon={definition.icon} />
             {definition.label}
@@ -141,7 +200,8 @@ export { ButtonGroup };
  */
 export function SettingsSurface({ open, onOpenChange, trigger, title, description, align = "start", children }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** `details.reason` is Base UI's ("escape-key", "outside-press", …) when it closes the surface. */
+  onOpenChange: (open: boolean, details?: { reason?: string }) => void;
   /** The element that opens it. On touch it is given an `onClick` that opens the Sheet. */
   trigger: ReactElement;
   title: string;

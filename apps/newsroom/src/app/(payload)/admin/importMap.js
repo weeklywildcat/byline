@@ -5,6 +5,7 @@ import { BylineCanvasFeatureClient as BylineCanvasFeatureClient_912e458499222de5
 import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { BylineStoryBlock as BylineStoryBlock_912e458499222de558607667cd1dfb4f } from '@byline/editor/client'
 import { BylineFootnote as BylineFootnote_912e458499222de558607667cd1dfb4f } from '@byline/editor/client'
+import { BylineSource as BylineSource_912e458499222de558607667cd1dfb4f } from '@byline/editor/client'
 import { InlineToolbarFeatureClient as InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { OrderedListFeatureClient as OrderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { UnorderedListFeatureClient as UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
@@ -42,6 +43,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@byline/editor/client#BylineStoryBlock": BylineStoryBlock_912e458499222de558607667cd1dfb4f,
   "@byline/editor/client#BylineFootnote": BylineFootnote_912e458499222de558607667cd1dfb4f,
+  "@byline/editor/client#BylineSource": BylineSource_912e458499222de558607667cd1dfb4f,
   "@payloadcms/richtext-lexical/client#InlineToolbarFeatureClient": InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#OrderedListFeatureClient": OrderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#UnorderedListFeatureClient": UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,

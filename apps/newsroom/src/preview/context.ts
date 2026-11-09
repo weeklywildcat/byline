@@ -58,6 +58,21 @@ export function parsePreviewContextQuery(params: URLSearchParams): PreviewContex
 
 const published = { _status: { equals: "published" } } satisfies Where;
 
+/**
+ * Published stories that share this story's section or topics, newest first,
+ * read with the user's own access: the candidates Byline's related-story rules
+ * (`relatedStories` in @byline/content) rank. Shared by Live Preview's "Related"
+ * and Related Coverage's Suggested list, so there is one candidate set.
+ */
+export async function relatedCandidateDocs(ctx: ScreenContext, storyId: number, query: Pick<PreviewContextQuery, "section" | "topics">) {
+  const relatedWhere: Where[] = [];
+  if (query.section) relatedWhere.push({ section: { equals: query.section } });
+  if (query.topics.length) relatedWhere.push({ topics: { in: query.topics } });
+  if (!relatedWhere.length) return [];
+  const { docs } = await ctx.req.payload.find({ collection: "stories", where: { and: [published, { id: { not_equals: storyId } }, { or: relatedWhere }] }, depth: SUMMARY_DEPTH, limit: RELATED_LIMIT, sort: "-publishedAt", draft: false, req: ctx.req, overrideAccess: false });
+  return docs;
+}
+
 export async function storyPreviewContext(ctx: ScreenContext, storyId: number, query: PreviewContextQuery): Promise<StoryPreviewContext> {
   const { payload } = ctx.req;
   const asUser = { req: ctx.req, overrideAccess: false as const };
@@ -69,15 +84,9 @@ export async function storyPreviewContext(ctx: ScreenContext, storyId: number, q
     throw new APIError("You don't have access to this story.", 403);
   }
 
-  const relatedWhere: Where[] = [];
-  if (query.section) relatedWhere.push({ section: { equals: query.section } });
-  if (query.topics.length) relatedWhere.push({ topics: { in: query.topics } });
-
   const [corrections, related, byContributors, collections] = await Promise.all([
     payload.find({ collection: "corrections", where: { story: { equals: storyId } }, depth: 0, pagination: false, sort: "date", ...asUser }),
-    relatedWhere.length
-      ? payload.find({ collection: "stories", where: { and: [published, { id: { not_equals: storyId } }, { or: relatedWhere }] }, depth: SUMMARY_DEPTH, limit: RELATED_LIMIT, sort: "-publishedAt", draft: false, ...asUser })
-      : Promise.resolve({ docs: [] }),
+    relatedCandidateDocs(ctx, storyId, query).then((docs) => ({ docs })),
     query.contributors.length
       ? payload.find({ collection: "stories", where: { and: [published, { id: { not_equals: storyId } }, { contributors: { in: query.contributors } }] }, depth: SUMMARY_DEPTH, limit: CONTRIBUTOR_STORIES_LIMIT, sort: "-publishedAt", draft: false, ...asUser })
       : Promise.resolve({ docs: [] }),

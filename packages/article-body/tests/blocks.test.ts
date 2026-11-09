@@ -24,28 +24,28 @@ import {
   type MediaLookup,
   type TableData
 } from "../src";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "../src/fixtures";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES, FIXTURE_TRACKER_KEY } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
-const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
+const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const paragraph = (text: string) => ({ type: "paragraph" as const, children: [{ type: "text" as const, text }] });
 const finalize = (block: ArticleBlock) => finalizeBlock(block, lookup, refs);
 const codes = (block: ArticleBlock) => finalize(block).issues.map((issue) => `${issue.effect}:${issue.code}`);
 
 describe("the final registry", () => {
-  it("has the 24 tools, grouped the way writers look for them", () => {
-    expect(ARTICLE_BLOCK_TYPES).toHaveLength(24);
+  it("has the 28 tools, grouped the way writers look for them", () => {
+    expect(ARTICLE_BLOCK_TYPES).toHaveLength(28);
     const groups = ARTICLE_BLOCK_FAMILIES.map((family) => [family.label, ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id).map((type) => ARTICLE_BLOCKS[type].label)]);
     expect(groups).toEqual([
-      ["Media", ["Photo", "Photo Gallery", "Portrait + Text", "Video", "Audio"]],
+      ["Media", ["Photo", "Photo Gallery", "Portrait + Text", "Video", "Audio", "Social Post"]],
       ["Explain", ["Reported Quote", "Pull Quote", "Key Facts", "Context", "Editor's Note", "Margin Note", "Expandable", "Document (PDF)"]],
-      ["Data & visual", ["Chart / Map", "Data Table", "Comparison", "Key Numbers", "Annotated Image", "Before / After"]],
-      ["Structure & interact", ["Visual Chapter", "Timeline", "Related Coverage", "Poll", "Repository Interactive"]]
+      ["Data & visual", ["Chart / Map", "Data Table", "Comparison", "Key Numbers", "Final Score", "Annotated Image", "Before / After"]],
+      ["Structure & interact", ["Visual Chapter", "Timeline", "Related Coverage", "Event", "Poll", "Repository Interactive", "Repository Tracker"]]
     ]);
   });
 
   it("marks exactly the editors-only blocks as privileged", () => {
-    expect([...PRIVILEGED_BLOCK_TYPES].sort()).toEqual(["editorsNote", "repositoryInteractive"]);
+    expect([...PRIVILEGED_BLOCK_TYPES].sort()).toEqual(["editorsNote", "repositoryInteractive", "repositoryTracker"]);
   });
 
   it("finds tools by reporter language", () => {
@@ -338,7 +338,7 @@ describe("the runtime validator", () => {
   it("accepts the complete fixture, with every block, footnote and reference", () => {
     const result = validateArticleBody(body);
     expect(result.ok ? [] : result.errors).toEqual([]);
-    expect(missingReferences(body)).toEqual({ stories: [], polls: [] });
+    expect(missingReferences(body)).toEqual({ stories: [], polls: [], events: [] });
   });
 
   it("rejects an unknown block or node type", () => {

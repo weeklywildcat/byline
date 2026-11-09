@@ -9,7 +9,7 @@ import { StoryActivity } from "./collections/StoryActivity";
 import { Redirects } from "./collections/Redirects";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describeRepositoryInteractives, describeStoryPresentations, repositoryInteractiveRegistry, storyPresentationRegistry } from "@byline/story-presentations";
+import { describeRepositoryInteractives, describeRepositoryTrackers, describeStoryPresentations, repositoryInteractiveRegistry, repositoryTrackerRegistry, storyPresentationRegistry } from "@byline/story-presentations";
 import { postgresAdapter } from "@payloadcms/db-postgres";
 import { nodemailerAdapter } from "@payloadcms/email-nodemailer";
 import nodemailer from "nodemailer";
@@ -142,7 +142,9 @@ export default buildConfig({
       // components themselves never enter the admin bundle). Fixtures (story IDs 6 and 10) are development only.
       storyPresentations: describeStoryPresentations(storyPresentationRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" })),
       // The repository's registered interactives as plain data, for the Repository Interactive block's picker.
-      repositoryInteractives: describeRepositoryInteractives(repositoryInteractiveRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" }))
+      repositoryInteractives: describeRepositoryInteractives(repositoryInteractiveRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" })),
+      // The registered repository trackers as plain data (key, name, description): never their components, styles or client code.
+      repositoryTrackers: describeRepositoryTrackers(repositoryTrackerRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" }))
     },
     // Byline's Nova surfaces are light; Payload's chrome follows so the two never clash.
     theme: "light",

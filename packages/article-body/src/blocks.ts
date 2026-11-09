@@ -15,6 +15,7 @@ export const ARTICLE_BLOCK_TYPES = [
   "portraitText",
   "video",
   "audio",
+  "socialPost",
   // Explain
   "reportedQuote",
   "pullQuote",
@@ -29,14 +30,17 @@ export const ARTICLE_BLOCK_TYPES = [
   "dataTable",
   "comparison",
   "keyNumbers",
+  "finalScore",
   "annotatedImage",
   "beforeAfter",
   // Structure & interact
   "visualChapter",
   "timeline",
   "relatedCoverage",
+  "event",
   "poll",
-  "repositoryInteractive"
+  "repositoryInteractive",
+  "repositoryTracker"
 ] as const satisfies readonly ArticleBlockType[];
 
 /** Editorial tasks, in the order the Add menu shows them. */
@@ -53,7 +57,8 @@ export type ArticleBlockIcon =
   | "photo" | "gallery" | "portrait" | "video" | "audio"
   | "quote" | "pullQuote" | "facts" | "context" | "editorsNote" | "marginNote" | "expandable" | "document"
   | "chart" | "table" | "comparison" | "numbers" | "annotated" | "beforeAfter"
-  | "chapter" | "timeline" | "related" | "poll" | "interactive";
+  | "chapter" | "timeline" | "related" | "poll" | "interactive"
+  | "social" | "score" | "event" | "tracker" | "source";
 
 export type ArticleBlockDefinition = {
   type: ArticleBlockType;
@@ -73,11 +78,12 @@ const define = <T extends ArticleBlockType>(definition: ArticleBlockDefinition &
 
 export const ARTICLE_BLOCKS: { readonly [K in ArticleBlockType]: ArticleBlockDefinition & { type: K } } = {
   photo: define({ type: "photo", label: "Photo", description: "One photograph with this story's caption.", family: "media", aliases: ["image", "picture", "photograph", "wide photo", "full photo"], icon: "photo" }),
-  gallery: define({ type: "gallery", label: "Photo Gallery", description: "Two or more photographs shown together.", family: "media", aliases: ["gallery", "photos", "photo pair", "pair", "photo essay", "slideshow"], icon: "gallery" }),
+  gallery: define({ type: "gallery", label: "Photo Gallery", description: "Two or more photographs: a grid, a photo essay or one featured photo.", family: "media", aliases: ["gallery", "photos", "photo pair", "pair", "photo essay", "essay", "featured photo", "slideshow"], icon: "gallery" }),
   portraitText: define({ type: "portraitText", label: "Portrait + Text", description: "A portrait beside the short passage that goes with it.", family: "media", aliases: ["profile", "portrait", "headshot", "bio", "person", "who is"], icon: "portrait" }),
   video: define({ type: "video", label: "Video", description: "A YouTube video, played right in the story.", family: "media", aliases: ["youtube", "clip", "film", "footage", "watch"], icon: "video" }),
-  audio: define({ type: "audio", label: "Audio", description: "A recording with its transcript.", family: "media", aliases: ["interview", "recording", "podcast", "sound", "listen", "transcript"], icon: "audio" }),
-  reportedQuote: define({ type: "reportedQuote", label: "Reported Quote", description: "A source's words, with who said them.", family: "explain", aliases: ["quote", "quotation", "source", "said"], icon: "quote" }),
+  audio: define({ type: "audio", label: "Audio", description: "A recording with its transcript.", family: "media", aliases: ["interview", "recording", "podcast", "sound", "listen", "transcript", "chapters"], icon: "audio" }),
+  socialPost: define({ type: "socialPost", label: "Social Post", description: "A public Instagram, Threads, Facebook, TikTok, X or Bluesky post.", family: "media", aliases: ["social", "instagram", "threads", "facebook", "tiktok", "x", "twitter", "tweet", "bluesky", "post", "embed", "reel"], icon: "social" }),
+  reportedQuote: define({ type: "reportedQuote", label: "Reported Quote", description: "A source's words, with who said them and where.", family: "explain", aliases: ["quote", "quotation", "source", "said", "statement"], icon: "quote" }),
   pullQuote: define({ type: "pullQuote", label: "Pull Quote", description: "A line from the story, set large between rules.", family: "explain", aliases: ["quote", "pullquote", "callout"], icon: "pullQuote" }),
   keyFacts: define({ type: "keyFacts", label: "Key Facts", description: "Verified facts, one per row.", family: "explain", aliases: ["facts", "fact box", "by the numbers", "at a glance"], icon: "facts" }),
   context: define({ type: "context", label: "Context", description: "Background in a few sentences, under a heading you choose.", family: "explain", aliases: ["why it matters", "what's next", "whats next", "how we know", "background", "explainer"], icon: "context" }),
@@ -85,17 +91,20 @@ export const ARTICLE_BLOCKS: { readonly [K in ArticleBlockType]: ArticleBlockDef
   marginNote: define({ type: "marginNote", label: "Margin Note", description: "Extra information that should not interrupt the story.", family: "explain", aliases: ["aside", "sidebar", "side note", "also", "by the way"], icon: "marginNote" }),
   expandable: define({ type: "expandable", label: "Expandable", description: "Detail a reader can open: methodology, a full statement.", family: "explain", aliases: ["methodology", "read more", "full statement", "details", "how we analyzed", "more"], icon: "expandable" }),
   document: define({ type: "document", label: "Document (PDF)", description: "A source document readers can open, with the pages that matter.", family: "explain", aliases: ["document", "doc", "pdf", "file", "records", "evidence"], icon: "document" }),
-  chartMap: define({ type: "chartMap", label: "Chart / Map", description: "A chart or map, with what it shows in words.", family: "data", aliases: ["chart", "graph", "map", "datawrapper", "flourish", "google maps", "visualization", "infographic"], icon: "chart" }),
+  chartMap: define({ type: "chartMap", label: "Chart / Map", description: "A chart made from your numbers, an embedded chart or map, or a graphic.", family: "data", aliases: ["chart", "graph", "bar chart", "line chart", "dot plot", "map", "datawrapper", "flourish", "google maps", "visualization", "infographic", "spreadsheet"], icon: "chart" }),
   dataTable: define({ type: "dataTable", label: "Data Table", description: "Rows and columns of figures, with headers.", family: "data", aliases: ["table", "spreadsheet", "data", "grid", "rows", "csv"], icon: "table" }),
   comparison: define({ type: "comparison", label: "Comparison", description: "Two sides explained next to each other.", family: "data", aliases: ["compare", "versus", "vs", "then and now", "current proposed", "two sides"], icon: "comparison" }),
+  finalScore: define({ type: "finalScore", label: "Final Score", description: "A game's result: two teams, two scores.", family: "data", aliases: ["score", "final", "sports", "result", "game", "recap", "matchup", "scoreboard"], icon: "score" }),
   keyNumbers: define({ type: "keyNumbers", label: "Key Numbers", description: "The few figures a reader should remember.", family: "data", aliases: ["numbers", "stats", "statistics", "figures", "by the numbers", "big numbers"], icon: "numbers" }),
   annotatedImage: define({ type: "annotatedImage", label: "Annotated Image", description: "A photograph with numbered notes on the parts that matter.", family: "data", aliases: ["annotate", "labels", "callouts", "markers", "diagram", "explain photo"], icon: "annotated" }),
   beforeAfter: define({ type: "beforeAfter", label: "Before / After", description: "Two photographs with a slider to compare them.", family: "data", aliases: ["compare", "slider", "then and now", "change", "before and after", "comparison"], icon: "beforeAfter" }),
   visualChapter: define({ type: "visualChapter", label: "Visual Chapter", description: "A full-width photograph that opens a new part of the story.", family: "structure", aliases: ["chapter", "section", "divider", "break", "title card", "part"], icon: "chapter" }),
   timeline: define({ type: "timeline", label: "Timeline", description: "Events in order, each with a date label and what happened.", family: "structure", aliases: ["timeline", "chronology", "history", "events", "what happened"], icon: "timeline" }),
   relatedCoverage: define({ type: "relatedCoverage", label: "Related Coverage", description: "Up to three of our own stories worth reading next.", family: "structure", aliases: ["related", "read more", "see also", "more stories", "previous coverage", "links"], icon: "related" }),
+  event: define({ type: "event", label: "Event", description: "A published school or community event, with its date and place.", family: "structure", aliases: ["event", "date", "calendar", "concert", "meeting", "game day", "when", "schedule"], icon: "event" }),
   poll: define({ type: "poll", label: "Poll", description: "A reader poll from the Polls list.", family: "structure", aliases: ["survey", "vote", "question", "opinion", "reader poll"], icon: "poll" }),
-  repositoryInteractive: define({ type: "repositoryInteractive", label: "Repository Interactive", description: "A custom interactive built by the developers.", family: "structure", aliases: ["interactive", "custom", "app", "widget", "game", "calculator"], icon: "interactive", privileged: true })
+  repositoryInteractive: define({ type: "repositoryInteractive", label: "Repository Interactive", description: "A custom interactive built by the developers.", family: "structure", aliases: ["interactive", "custom", "app", "widget", "game", "calculator"], icon: "interactive", privileged: true }),
+  repositoryTracker: define({ type: "repositoryTracker", label: "Repository Tracker", description: "A progress tracker built and updated by the developers.", family: "structure", aliases: ["tracker", "progress", "project", "status", "database", "interactive", "construction"], icon: "tracker", privileged: true })
 };
 
 export function articleBlockDefinition(type: string): ArticleBlockDefinition | null {
@@ -130,11 +139,14 @@ export const ARTICLE_BLOCK_LIMITS = {
   documentSource: 200,
   documentPagesMax: 12,
   documentPageLabel: 160,
+  documentPageExcerpt: 400,
   timelineMin: 2,
   timelineMax: 25,
   timelineLabel: 60,
   timelineTitle: 200,
   timelineBody: 1500,
+  timelineLinkLabel: 120,
+  webUrl: 2048,
   portraitHeading: 160,
   portraitBody: 2400,
   chapterEyebrow: 80,
@@ -143,6 +155,10 @@ export const ARTICLE_BLOCK_LIMITS = {
   videoTitle: 200,
   audioTitle: 200,
   audioTranscript: 40000,
+  videoTranscript: 40000,
+  chaptersMax: 20,
+  chapterLabel: 120,
+  chapterTimeMax: 86399,
   noteBody: 2400,
   expandableHeading: 160,
   expandableBody: 6000,
@@ -152,6 +168,11 @@ export const ARTICLE_BLOCK_LIMITS = {
   chartSource: 200,
   chartNotes: 600,
   chartCredit: 200,
+  chartSeriesMax: 4,
+  chartRowsMin: 2,
+  chartRowsMax: 40,
+  chartLabel: 80,
+  chartCell: 40,
   tableColumnsMin: 2,
   tableColumnsMax: 8,
   tableRowsMax: 40,
@@ -178,6 +199,18 @@ export const ARTICLE_BLOCK_LIMITS = {
   interactiveKey: 64,
   interactiveTitle: 200,
   interactiveDescription: 1000,
+  trackerKey: 64,
+  trackerTitle: 200,
+  trackerDescription: 1000,
+  quoteSourceLabel: 120,
+  sourceLabel: 160,
+  sourceNote: 400,
+  socialCaption: 600,
+  finalScoreTeam: 80,
+  finalScoreMax: 999,
+  finalScoreSport: 40,
+  finalScoreLocation: 120,
+  finalScoreNote: 160,
   footnote: 1000
 } as const;
 

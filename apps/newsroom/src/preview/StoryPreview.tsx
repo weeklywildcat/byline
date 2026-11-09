@@ -3,7 +3,7 @@
 import { buildArticlePresentation, type ArticlePresentation, type PublicSeriesInput } from "@byline/content/story";
 import { useLivePreview } from "@payloadcms/live-preview-react";
 import { ArticleShareActionsView, NewsletterSignupView, ReaderFeedbackView, type ArticleViewSlots } from "@byline/ui";
-import { StoryArticle, renderRepositoryInteractive, repositoryInteractiveRegistry, resolveStoryPresentation, storyPresentationRegistry, type RepositoryInteractiveClient, type RepositoryInteractiveRegistry } from "@byline/story-presentations";
+import { StoryArticle, renderRepositoryInteractive, renderRepositoryTracker, repositoryInteractiveRegistry, repositoryTrackerRegistry, resolveStoryPresentation, storyPresentationRegistry, type RepositoryInteractiveClient, type RepositoryInteractiveRegistry, type RepositoryTrackerRegistry } from "@byline/story-presentations";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { STORY_LIVE_PREVIEW_DEPTH } from "./config";
 import { payloadPresentationContext, payloadPublicStory, payloadStorySummary, type PayloadImage } from "./payload-story";
@@ -83,9 +83,9 @@ function useStoryContext(doc: StoryDoc | null): StoryPreviewContext | null {
 
 type Built = { ok: true; presentation: ArticlePresentation } | { ok: false; error: string };
 
-function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: PreviewPublication, interactives: RepositoryInteractiveRegistry): Built {
+function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: PreviewPublication, interactives: RepositoryInteractiveRegistry, trackers: RepositoryTrackerRegistry): Built {
   try {
-    const { story } = payloadPublicStory(doc, { publication, corrections: context?.corrections, interactiveKeys: Object.keys(interactives) });
+    const { story } = payloadPublicStory(doc, { publication, corrections: context?.corrections, interactiveKeys: Object.keys(interactives), trackerKeys: Object.keys(trackers) });
     const self = { ...payloadStorySummary(doc, publication), listed: true };
     const series: PublicSeriesInput<PayloadImage>[] = (context?.series ?? []).map((entry) => ({
       id: entry.id,
@@ -108,12 +108,17 @@ function build(doc: StoryDoc, context: StoryPreviewContext | null, publication: 
 }
 
 /** The inert equivalents of the public site's interactive slots: same look, nothing is sent anywhere. */
-function inertSlots(publication: PreviewPublication, interactives: RepositoryInteractiveRegistry): ArticleViewSlots {
+function inertSlots(publication: PreviewPublication, interactives: RepositoryInteractiveRegistry, trackers: RepositoryTrackerRegistry): ArticleViewSlots {
   return {
-    // Dates read in the publication's own locale and timezone; a repository interactive draws its static fallback.
+    // Dates read in the publication's own locale and timezone; a repository interactive or tracker draws its server-rendered content.
+    // `preview`: social posts keep their facade; the private preview never contacts a social provider.
     bodyHost: {
       formatDate: (iso) => new Intl.DateTimeFormat(publication.locale, { dateStyle: "medium", timeZone: publication.timeZone }).format(new Date(iso)),
-      renderInteractive: renderRepositoryInteractive(interactives)
+      timeZone: publication.timeZone,
+      locale: publication.locale,
+      preview: true,
+      renderInteractive: renderRepositoryInteractive(interactives),
+      renderTracker: renderRepositoryTracker(trackers)
     },
     shareActions: <ArticleShareActionsView copyLabel="Copy link" copyIcon="ph:link" status="" />,
     poll: null,
@@ -164,8 +169,11 @@ function useKeepPreviewInPlace(publicSite: string) {
  * browser enhancement. Re-run whenever the body changes.
  */
 const loadInteractiveClient = (name: string) => import(`../../../../packages/story-presentations/src/interactives/${name}/client.ts`) as Promise<{ default: RepositoryInteractiveClient }>;
+const loadTrackerClient = (name: string) => import(`../../../../packages/story-presentations/src/trackers/${name}/client.ts`) as Promise<{ default: RepositoryInteractiveClient }>;
+// A tracker's stylesheet is a side effect of loading its chunk, requested only when a story that places it is shown.
+const loadTrackerStyles = (name: string) => import(`../../../../packages/story-presentations/src/trackers/${name}/styles.css`);
 
-function useArticleEnhancements(presentation: ArticlePresentation | null, interactives: RepositoryInteractiveRegistry) {
+function useArticleEnhancements(presentation: ArticlePresentation | null, interactives: RepositoryInteractiveRegistry, trackers: RepositoryTrackerRegistry) {
   const body = presentation?.body ?? null;
   const html = body?.format === "legacy-html" ? body.html : body;
   useEffect(() => {
@@ -190,13 +198,27 @@ function useArticleEnhancements(presentation: ArticlePresentation | null, intera
           if (typeof stop === "function") stops.push(stop);
         }).catch(() => undefined);
       }
+      // A repository tracker's own stylesheet and browser enhancement, the same way.
+      for (const element of root.querySelectorAll<HTMLElement>("[data-repository-tracker]")) {
+        const key = element.dataset.repositoryTracker ?? "";
+        const entry = trackers[key];
+        const mount = element.querySelector<HTMLElement>("[data-tracker-root]");
+        if (!entry || !mount) continue;
+        if (entry.styles) void loadTrackerStyles(key).catch(() => undefined);
+        if (!entry.client) continue;
+        void loadTrackerClient(key).then((module) => {
+          if (disposed) return;
+          const stop = module.default(mount);
+          if (typeof stop === "function") stops.push(stop);
+        }).catch(() => undefined);
+      }
       cleanup = () => stops.forEach((stop) => stop());
     })();
     return () => {
       disposed = true;
       cleanup?.();
     };
-  }, [html, interactives]);
+  }, [html, interactives, trackers]);
 }
 
 /* ------------------------------------------------------------------- states */
@@ -247,8 +269,9 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   const context = useStoryContext(doc);
   const registry = useMemo(() => storyPresentationRegistry({ fixtures }), [fixtures]);
   const interactives = useMemo(() => repositoryInteractiveRegistry({ fixtures }), [fixtures]);
+  const trackers = useMemo(() => repositoryTrackerRegistry({ fixtures }), [fixtures]);
 
-  const built = useMemo(() => (doc ? build(doc, context, publication, interactives) : null), [doc, context, publication, interactives]);
+  const built = useMemo(() => (doc ? build(doc, context, publication, interactives, trackers) : null), [doc, context, publication, interactives, trackers]);
   // The last article that rendered, kept only as a rendering fallback (never edited, never saved).
   const lastGood = useRef<ArticlePresentation | null>(null);
   if (built?.ok) lastGood.current = built.presentation;
@@ -257,9 +280,9 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   const resolution = presentation ? resolveStoryPresentation(presentation, registry) : null;
   const assets = useStoryAssets(resolution?.entry ?? null);
   useKeepPreviewInPlace(publication.publicSite);
-  useArticleEnhancements(presentation, interactives);
+  useArticleEnhancements(presentation, interactives, trackers);
 
-  const slots = useMemo(() => inertSlots(publication, interactives), [publication, interactives]);
+  const slots = useMemo(() => inertSlots(publication, interactives, trackers), [publication, interactives, trackers]);
   const onRetry = useCallback(() => reload(), []);
 
   if (!presentation) {

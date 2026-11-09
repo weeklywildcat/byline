@@ -29,7 +29,12 @@ export const BLOCK_ICON_PATHS: Record<ArticleBlockIcon, readonly string[]> = {
   chapter: ["M3 4h18v16H3z", "M7 15h10", "M7 12h6", "m3 17 4-4 3 3 3-3 8 8"],
   related: ["M5 6h14", "M5 10h9", "M5 15h14", "M5 19h9", "M17 9l3 1.5-3 1.5z"],
   poll: ["M4 5h12", "M4 5v2", "M4 11h16", "M4 17h8", "M4 8h8", "M4 14h14", "M4 20h8"],
-  interactive: ["M4 5h16v14H4z", "m10 10 4 2-4 2z", "M4 9h16"]
+  interactive: ["M4 5h16v14H4z", "m10 10 4 2-4 2z", "M4 9h16"],
+  social: ["M7 4h10v16H7z", "M10 8h4", "M10 12h4", "M10 16h2", "M3 9v6", "M21 9v6"],
+  score: ["M3 6h18", "M3 18h18", "M5 10h6", "M5 14h6", "M15 10h4", "M15 14h4"],
+  event: ["M4 6h16v14H4z", "M4 10h16", "M8 3v5", "M16 3v5", "M8 14h3v3H8z"],
+  tracker: ["M4 7h16", "M4 17h16", "M6 7v.01", "M11 7v.01", "M16 7v.01", "M6 12h8", "M4 12h1", "M17 12h3"],
+  source: ["M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1", "M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"]
 };
 
 export function blockIconSvg(icon: ArticleBlockIcon, color = "currentColor"): string {

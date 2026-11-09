@@ -13,6 +13,10 @@ const text = (value: string, format = 0): Json => ({ type: "text", text: value, 
 function inline(children: readonly Inline[]): Json[] {
   return children.map((child) => {
     if (child.type === "footnote") return { type: "inlineBlock", version: 1, fields: { id: child.id, blockType: "footnote", blockName: "", text: child.text } };
+    if (child.type === "source") {
+      const target = child.kind === "web" ? { url: child.url, media: null, page: null } : { url: "", media: child.media, page: child.page ?? null };
+      return { type: "inlineBlock", version: 1, fields: { id: child.id, blockType: "source", blockName: "", kind: child.kind, ...target, label: child.label, note: child.note ?? "" } };
+    }
     if (child.type === "lineBreak") return { type: "linebreak", version: 1 };
     if (child.type === "link") return { type: "link", version: 3, direction: "ltr", format: "", indent: 0, fields: { url: child.href, linkType: "custom", newTab: false }, children: child.children.map((run) => text(run.text, (run.bold ? 1 : 0) | (run.italic ? 2 : 0))) };
     return text(child.text, (child.bold ? 1 : 0) | (child.italic ? 2 : 0));
@@ -34,27 +38,43 @@ export function blockFields(block: ArticleBlock): Json {
     case "photo":
       return { ...base, media: block.media, caption: block.caption, altOverride: block.altOverride ?? "", placement: block.placement };
     case "gallery":
-      return { ...base, fit: block.fit, items: block.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, altOverride: item.altOverride ?? "" })) };
+      return { ...base, fit: block.fit, layout: block.layout ?? "grid", items: block.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, altOverride: item.altOverride ?? "" })) };
     case "reportedQuote":
-      return { ...base, text: block.text, attribution: block.attribution };
+      return { ...base, text: block.text, attribution: block.attribution, sourceUrl: block.sourceUrl ?? "", sourceLabel: block.sourceLabel ?? "" };
     case "pullQuote":
       return { ...base, text: block.text, attribution: block.attribution ?? "" };
     case "keyFacts":
-      return { ...base, heading: block.heading, facts: block.facts.map((fact) => ({ ...fact })) };
+      return { ...base, heading: block.heading, facts: block.facts.map((fact) => ({ ...fact })), presentation: block.presentation ?? "standard" };
     case "context":
-      return { ...base, heading: block.heading, body: bodyText(block.body) };
+      return { ...base, heading: block.heading, body: block.body.map((paragraph) => ({ ...paragraph, children: paragraph.children.map((child) => ({ ...child })) })) };
     case "document":
-      return { ...base, media: block.media, title: block.title ?? "", context: block.context ?? "", source: block.source ?? "", pages: block.pages.map((ref) => ({ ...ref })) };
+      return { ...base, media: block.media, title: block.title ?? "", context: block.context ?? "", source: block.source ?? "", pages: block.pages.map((ref) => ({ id: ref.id, page: ref.page, label: ref.label, excerpt: ref.excerpt ?? "" })) };
     case "timeline":
-      return { ...base, items: block.items.map((item) => ({ ...item })) };
+      return {
+        ...base,
+        items: block.items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          title: item.title,
+          body: item.body,
+          current: item.current,
+          media: item.image?.media ?? null,
+          altOverride: item.image?.altOverride ?? "",
+          caption: item.image?.caption ?? "",
+          linkUrl: item.link?.url ?? "",
+          linkLabel: item.link?.label ?? "",
+          document: item.document?.media ?? null,
+          documentPage: item.document?.page ?? null
+        }))
+      };
     case "portraitText":
       return { ...base, media: block.media, altOverride: block.altOverride ?? "", heading: block.heading ?? "", body: bodyText(block.body), caption: block.caption ?? "", side: block.side };
     case "visualChapter":
       return { ...base, media: block.media, altOverride: block.altOverride ?? "", eyebrow: block.eyebrow ?? "", heading: block.heading, dek: block.dek ?? "", placement: block.placement, align: block.align };
     case "video":
-      return { ...base, url: block.videoId ? `https://www.youtube.com/watch?v=${block.videoId}` : "", title: block.title, caption: block.caption ?? "", captionsConfirmed: block.captionsConfirmed ?? true };
+      return { ...base, url: block.videoId ? `https://www.youtube.com/watch?v=${block.videoId}` : "", title: block.title, caption: block.caption ?? "", captionsConfirmed: block.captionsConfirmed ?? true, chapters: (block.chapters ?? []).map((chapter) => ({ ...chapter })), transcript: block.transcript ?? "" };
     case "audio":
-      return { ...base, media: block.media, title: block.title, caption: block.caption ?? "", transcript: block.transcript };
+      return { ...base, media: block.media, title: block.title, caption: block.caption ?? "", transcript: block.transcript, chapters: (block.chapters ?? []).map((chapter) => ({ ...chapter })) };
     case "editorsNote":
       return { ...base, body: bodyText(block.body) };
     case "marginNote":
@@ -62,7 +82,7 @@ export function blockFields(block: ArticleBlock): Json {
     case "expandable":
       return { ...base, heading: block.heading, body: bodyText(block.body) };
     case "chartMap":
-      return { ...base, mode: block.mode, url: block.url ?? "", image: block.image, altOverride: block.altOverride ?? "", title: block.title, dek: block.dek ?? "", summary: block.summary, source: block.source ?? "", notes: block.notes ?? "", credit: block.credit ?? "", height: block.height };
+      return { ...base, mode: block.mode, url: block.url ?? "", image: block.image, altOverride: block.altOverride ?? "", title: block.title, dek: block.dek ?? "", summary: block.summary, source: block.source ?? "", notes: block.notes ?? "", credit: block.credit ?? "", height: block.height, chartType: block.chartType ?? "bar", columns: (block.data?.columns ?? []).map((column) => ({ ...column })), rows: (block.data?.rows ?? []).map((row) => ({ id: row.id, cells: [...row.cells] })), sourceUrl: block.sourceUrl ?? "" };
     case "dataTable":
       return { ...base, title: block.title, description: block.description ?? "", columns: block.columns.map((column) => ({ ...column })), rows: block.rows.map((row) => ({ id: row.id, cells: [...row.cells] })), presentation: block.presentation, rowHeaders: block.rowHeaders, source: block.source ?? "", notes: block.notes ?? "" };
     case "comparison":
@@ -78,7 +98,14 @@ export function blockFields(block: ArticleBlock): Json {
     case "poll":
       return { ...base, poll: block.poll };
     case "repositoryInteractive":
+    case "repositoryTracker":
       return { ...base, key: block.key, title: block.title, description: block.description };
+    case "event":
+      return { ...base, event: block.event };
+    case "socialPost":
+      return { ...base, url: block.url, caption: block.caption ?? "" };
+    case "finalScore":
+      return { ...base, sport: block.sport ?? "", teamA: block.teamA, teamAScore: block.teamAScore, teamB: block.teamB, teamBScore: block.teamBScore, status: block.status, date: block.date ?? "", location: block.location ?? "", note: block.note ?? "" };
   }
 }
 

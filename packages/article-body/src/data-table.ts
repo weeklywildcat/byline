@@ -9,6 +9,11 @@ import type { DataTableColumn, DataTableRow } from "./types";
  */
 export type TableData = { columns: DataTableColumn[]; rows: DataTableRow[] };
 
+/** The bounds a grid edits within: a Data Table's by default; a native chart's are smaller. */
+export type TableBounds = { columnsMin: number; columnsMax: number; rowsMax: number };
+export const DATA_TABLE_BOUNDS: TableBounds = { columnsMin: LIMITS.tableColumnsMin, columnsMax: LIMITS.tableColumnsMax, rowsMax: LIMITS.tableRowsMax };
+export const NATIVE_CHART_BOUNDS: TableBounds = { columnsMin: 2, columnsMax: LIMITS.chartSeriesMax + 1, rowsMax: LIMITS.chartRowsMax };
+
 /** Cells in a row always match the column count: shorter rows are padded, longer ones trimmed. */
 export function squareRows(columns: readonly DataTableColumn[], rows: readonly DataTableRow[]): DataTableRow[] {
   return rows.map((row) => ({ id: row.id, cells: Array.from({ length: columns.length }, (_, index) => row.cells[index] ?? "") }));
@@ -61,14 +66,14 @@ export function isTablePaste(text: string): boolean {
  * are added as needed up to the bounds; anything beyond them is left out and
  * reported in `clipped`. Column labels are row -1 (the header).
  */
-export function pasteGrid(table: TableData, grid: readonly (readonly string[])[], at: { row: number; column: number }, ids: () => string): TableData & { clipped: boolean } {
+export function pasteGrid(table: TableData, grid: readonly (readonly string[])[], at: { row: number; column: number }, ids: () => string, bounds: TableBounds = DATA_TABLE_BOUNDS): TableData & { clipped: boolean } {
   let columns = table.columns.map((column) => ({ ...column }));
   let rows = squareRows(columns, table.rows).map((row) => ({ ...row, cells: [...row.cells] }));
   let clipped = false;
   const width = Math.max(0, ...grid.map((cells) => cells.length));
   const needed = at.column + width;
-  while (columns.length < Math.min(needed, LIMITS.tableColumnsMax)) columns = [...columns, { id: ids(), label: "" }];
-  if (needed > LIMITS.tableColumnsMax) clipped = true;
+  while (columns.length < Math.min(needed, bounds.columnsMax)) columns = [...columns, { id: ids(), label: "" }];
+  if (needed > bounds.columnsMax) clipped = true;
   rows = squareRows(columns, rows);
   grid.forEach((cells, offset) => {
     const target = at.row + offset;
@@ -80,7 +85,7 @@ export function pasteGrid(table: TableData, grid: readonly (readonly string[])[]
         columns[column] = { ...(columns[column] as DataTableColumn), label: text.slice(0, LIMITS.tableCell) };
         return;
       }
-      while (rows.length <= target && rows.length < LIMITS.tableRowsMax) rows.push({ id: ids(), cells: Array.from({ length: columns.length }, () => "") });
+      while (rows.length <= target && rows.length < bounds.rowsMax) rows.push({ id: ids(), cells: Array.from({ length: columns.length }, () => "") });
       const row = rows[target];
       if (!row) {
         clipped = true;
@@ -92,15 +97,15 @@ export function pasteGrid(table: TableData, grid: readonly (readonly string[])[]
   return { columns, rows, clipped };
 }
 
-export function addColumn(table: TableData, index: number, ids: () => string): TableData | null {
-  if (table.columns.length >= LIMITS.tableColumnsMax) return null;
+export function addColumn(table: TableData, index: number, ids: () => string, bounds: TableBounds = DATA_TABLE_BOUNDS): TableData | null {
+  if (table.columns.length >= bounds.columnsMax) return null;
   const at = Math.max(0, Math.min(index, table.columns.length));
   const columns = [...table.columns.slice(0, at), { id: ids(), label: "" }, ...table.columns.slice(at)];
   return { columns, rows: table.rows.map((row) => ({ id: row.id, cells: [...row.cells.slice(0, at), "", ...row.cells.slice(at)] })) };
 }
 
-export function removeColumn(table: TableData, index: number): TableData | null {
-  if (table.columns.length <= LIMITS.tableColumnsMin || index < 0 || index >= table.columns.length) return null;
+export function removeColumn(table: TableData, index: number, bounds: TableBounds = DATA_TABLE_BOUNDS): TableData | null {
+  if (table.columns.length <= bounds.columnsMin || index < 0 || index >= table.columns.length) return null;
   return { columns: table.columns.filter((_, i) => i !== index), rows: table.rows.map((row) => ({ id: row.id, cells: row.cells.filter((_, i) => i !== index) })) };
 }
 
@@ -115,8 +120,8 @@ export function moveColumn(table: TableData, index: number, direction: -1 | 1): 
   return { columns: swap(table.columns), rows: table.rows.map((row) => ({ id: row.id, cells: swap(row.cells) })) };
 }
 
-export function addRow(table: TableData, index: number, id: string): TableData | null {
-  if (table.rows.length >= LIMITS.tableRowsMax) return null;
+export function addRow(table: TableData, index: number, id: string, bounds: TableBounds = DATA_TABLE_BOUNDS): TableData | null {
+  if (table.rows.length >= bounds.rowsMax) return null;
   const at = Math.max(0, Math.min(index, table.rows.length));
   return { columns: table.columns, rows: [...table.rows.slice(0, at), { id, cells: table.columns.map(() => "") }, ...table.rows.slice(at)] };
 }

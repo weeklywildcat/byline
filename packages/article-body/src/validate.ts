@@ -1,7 +1,11 @@
 import { ARTICLE_BLOCK_LIMITS as L, ARTICLE_BLOCK_TYPES } from "./blocks";
 import { mediaKey } from "./media";
-import { blockMediaIds, missingReferences } from "./references";
+import { blockMediaIds, inlineMediaIds, missingReferences } from "./references";
 import { safeHref } from "./text";
+import { safeWebUrl, sourceRefs } from "./evidence";
+import { calendarDate, finalScoreProblem } from "./final-score";
+import { chartDataProblem } from "./native-chart";
+import { isCanonicalSocialPost } from "./social";
 import { ARTICLE_BODY_FORMAT, ARTICLE_BODY_VERSION, isArticleBlock, type ArticleBlockType, type ArticleBody } from "./types";
 import { visualizationHeights, visualizationUrl } from "./visualization";
 
@@ -42,6 +46,8 @@ const bool: Field = { check: (value, path, errors) => (typeof value === "boolean
 const mediaRef: Field = { check: (value, path, errors) => (typeof value === "number" && Number.isSafeInteger(value) ? undefined : typeof value === "string" && value !== "" ? undefined : fail(errors, path, "must be a Media id")) };
 const optMediaRef: Field = { optional: true, check: mediaRef.check };
 const percent: Field = { check: (value, path, errors) => (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100 ? undefined : fail(errors, path, "must be between 0 and 100")) };
+const webUrl = (optional = true): Field => ({ optional, check: (value, path, errors) => (typeof value === "string" && safeWebUrl(value) === value ? undefined : fail(errors, path, "must be a web address (http or https)")) });
+const optPositiveInt: Field = { optional: true, check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 1 ? undefined : fail(errors, path, "must be a whole number of 1 or more")) };
 const positiveInt: Field = { check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 1 ? undefined : fail(errors, path, "must be a whole number of 1 or more")) };
 
 function closed(spec: Record<string, Field>): Check {
@@ -84,6 +90,9 @@ const inlineCheck: Check = (value, path, errors) => {
       return;
     case "footnote":
       return closed({ type: pick(["footnote"]), id: idField, text: req(L.footnote) })(value, path, errors);
+    case "source":
+      if (value.kind === "web") return closed({ type: pick(["source"]), id: idField, kind: pick(["web"]), url: webUrl(false), label: req(L.sourceLabel, true), note: opt(L.sourceNote) })(value, path, errors);
+      return closed({ type: pick(["source"]), id: idField, kind: pick(["document"]), media: mediaRef, page: optPositiveInt, label: req(L.sourceLabel, true), note: opt(L.sourceNote) })(value, path, errors);
     default:
       fail(errors, `${path}.type`, `unknown inline node "${String(value.type)}"`);
   }
@@ -91,7 +100,7 @@ const inlineCheck: Check = (value, path, errors) => {
 const inlines: Field = { check: (value, path, errors) => (Array.isArray(value) ? value.forEach((child, index) => inlineCheck(child, `${path}[${index}]`, errors)) : fail(errors, path, "must be a list")) };
 
 const paragraph: Field = object({ type: pick(["paragraph"]), children: inlines });
-/** Plain paragraphs inside a block: text, links and line breaks only (no footnotes). */
+/** Plain paragraphs inside a block: text, links and line breaks only (no footnotes or sources). */
 const paragraphs = (max: number): Field => ({
   check: (value, path, errors) => {
     if (!Array.isArray(value)) return fail(errors, path, "must be a list");
@@ -100,7 +109,7 @@ const paragraphs = (max: number): Field => ({
       paragraph.check(entry, `${path}[${index}]`, errors);
       if (isRecord(entry) && Array.isArray(entry.children)) {
         for (const child of entry.children) {
-          if (isRecord(child) && child.type === "footnote") fail(errors, `${path}[${index}]`, "footnotes belong in the story's own paragraphs");
+          if (isRecord(child) && (child.type === "footnote" || child.type === "source")) fail(errors, `${path}[${index}]`, `${child.type === "source" ? "sources" : "footnotes"} belong in the story's own paragraphs`);
           if (isRecord(child) && typeof child.text === "string") total += child.text.length;
         }
       }
@@ -110,26 +119,31 @@ const paragraphs = (max: number): Field => ({
   }
 });
 
+const chapterList: Field = { optional: true, check: list(object({ id: idField, time: { check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= L.chapterTimeMax ? undefined : fail(errors, path, "must be whole seconds")) }, label: req(L.chapterLabel, true) }), 1, L.chaptersMax).check };
+const tableData = (rowsMin: number, rowsMax: number, columnsMin: number, columnsMax: number, cell: number): Field => object({
+  columns: list(object({ id: idField, label: str(cell, { line: true }) }), columnsMin, columnsMax),
+  rows: list(object({ id: idField, cells: { check: (value, path, errors) => (Array.isArray(value) ? value.forEach((entry, index) => str(cell, { line: true }).check(entry, `${path}[${index}]`, errors)) : fail(errors, path, "must be a list")) } }), rowsMin, rowsMax)
+}, true);
 const side = object({ label: str(L.comparisonLabel), title: req(L.comparisonTitle, true), body: paragraphs(L.comparisonBody) });
 
 const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> } = {
   photo: { type: pick(["photo"]), id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true), placement: pick(["column", "wide", "full"]) },
-  gallery: { type: pick(["gallery"]), id: idField, fit: pick(["natural", "crop"]), items: list(object({ id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true) }), L.galleryMin, L.galleryMax) },
+  gallery: { type: pick(["gallery"]), id: idField, fit: pick(["natural", "crop"]), layout: pick(["grid", "essay", "featured"], true), items: list(object({ id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true) }), L.galleryMin, L.galleryMax) },
   portraitText: { type: pick(["portraitText"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), heading: opt(L.portraitHeading, true), body: paragraphs(L.portraitBody), caption: opt(L.caption), side: pick(["left", "right"]) },
-  video: { type: pick(["video"]), id: idField, videoId: { check: (value, path, errors) => (typeof value === "string" && /^[A-Za-z0-9_-]{11}$/.test(value) ? undefined : fail(errors, path, "must be a YouTube video id")) }, title: req(L.videoTitle, true), caption: opt(L.caption) },
-  audio: { type: pick(["audio"]), id: idField, media: mediaRef, title: req(L.audioTitle, true), caption: opt(L.caption), transcript: req(L.audioTranscript) },
-  reportedQuote: { type: pick(["reportedQuote"]), id: idField, text: req(L.quote), attribution: req(L.attribution, true) },
+  video: { type: pick(["video"]), id: idField, videoId: { check: (value, path, errors) => (typeof value === "string" && /^[A-Za-z0-9_-]{11}$/.test(value) ? undefined : fail(errors, path, "must be a YouTube video id")) }, title: req(L.videoTitle, true), caption: opt(L.caption), chapters: chapterList, transcript: opt(L.videoTranscript) },
+  audio: { type: pick(["audio"]), id: idField, media: mediaRef, title: req(L.audioTitle, true), caption: opt(L.caption), transcript: req(L.audioTranscript), chapters: chapterList },
+  reportedQuote: { type: pick(["reportedQuote"]), id: idField, text: req(L.quote), attribution: req(L.attribution, true), sourceUrl: webUrl(), sourceLabel: opt(L.quoteSourceLabel, true) },
   pullQuote: { type: pick(["pullQuote"]), id: idField, text: req(L.quote), attribution: opt(L.attribution, true) },
-  keyFacts: { type: pick(["keyFacts"]), id: idField, heading: req(L.heading, true), facts: list(object({ id: idField, text: req(L.fact) }), 1, L.factsMax) },
+  keyFacts: { type: pick(["keyFacts"]), id: idField, heading: req(L.heading, true), facts: list(object({ id: idField, text: req(L.fact) }), 1, L.factsMax), presentation: pick(["standard", "compact"], true) },
   context: { type: pick(["context"]), id: idField, heading: req(L.heading, true), body: paragraphs(L.contextBody) },
   editorsNote: { type: pick(["editorsNote"]), id: idField, body: paragraphs(L.noteBody) },
   marginNote: { type: pick(["marginNote"]), id: idField, heading: opt(L.heading, true), body: paragraphs(L.noteBody) },
   expandable: { type: pick(["expandable"]), id: idField, heading: req(L.expandableHeading, true), body: paragraphs(L.expandableBody) },
-  document: { type: pick(["document"]), id: idField, media: mediaRef, title: opt(L.documentTitle, true), context: opt(L.documentContext), source: opt(L.documentSource, true), pages: list(object({ id: idField, page: positiveInt, label: str(L.documentPageLabel, { line: true }) }), 0, L.documentPagesMax) },
+  document: { type: pick(["document"]), id: idField, media: mediaRef, title: opt(L.documentTitle, true), context: opt(L.documentContext), source: opt(L.documentSource, true), pages: list(object({ id: idField, page: positiveInt, label: str(L.documentPageLabel, { line: true }), excerpt: opt(L.documentPageExcerpt) }), 0, L.documentPagesMax) },
   chartMap: {
     type: pick(["chartMap"]),
     id: idField,
-    mode: pick(["interactive", "static"]),
+    mode: pick(["native", "interactive", "static"]),
     url: { optional: true, check: (value, path, errors) => (typeof value === "string" && visualizationUrl(value)?.src === value ? undefined : fail(errors, path, "must be an allowed provider embed address")) },
     provider: pick(["datawrapper", "flourish", "google-maps", "openstreetmap"], true),
     image: { check: (value, path, errors) => (value === null ? undefined : mediaRef.check(value, path, errors)) },
@@ -140,7 +154,10 @@ const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> }
     source: opt(L.chartSource, true),
     notes: opt(L.chartNotes),
     credit: opt(L.chartCredit, true),
-    height: pick(Object.keys(visualizationHeights))
+    height: pick(Object.keys(visualizationHeights)),
+    chartType: pick(["bar", "line", "dot"], true),
+    data: tableData(L.chartRowsMin, L.chartRowsMax, 2, L.chartSeriesMax + 1, L.chartLabel),
+    sourceUrl: webUrl()
   },
   dataTable: {
     type: pick(["dataTable"]),
@@ -159,10 +176,39 @@ const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> }
   annotatedImage: { type: pick(["annotatedImage"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), caption: str(L.caption), placement: pick(["wide", "full"]), markers: list(object({ id: idField, x: percent, y: percent, title: str(L.annotationTitle, { line: true }), body: str(L.annotationBody) }), 1, L.annotationsMax) },
   beforeAfter: { type: pick(["beforeAfter"]), id: idField, before: mediaRef, after: mediaRef, beforeLabel: req(L.comparisonPhotoLabel, true), afterLabel: req(L.comparisonPhotoLabel, true), fit: pick(["cover", "contain"]), caption: str(L.caption), placement: pick(["wide", "full"]) },
   visualChapter: { type: pick(["visualChapter"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), eyebrow: opt(L.chapterEyebrow, true), heading: req(L.chapterHeading, true), dek: opt(L.chapterDek), placement: pick(["wide", "full"]), align: pick(["bottom-left", "center"]) },
-  timeline: { type: pick(["timeline"]), id: idField, items: list(object({ id: idField, label: str(L.timelineLabel, { line: true }), title: str(L.timelineTitle, { line: true }), body: str(L.timelineBody), current: bool }), L.timelineMin, L.timelineMax) },
+  timeline: {
+    type: pick(["timeline"]),
+    id: idField,
+    items: list(object({
+      id: idField,
+      label: str(L.timelineLabel, { line: true }),
+      title: str(L.timelineTitle, { line: true }),
+      body: str(L.timelineBody),
+      current: bool,
+      image: object({ media: mediaRef, altOverride: opt(L.altText, true), caption: opt(L.caption) }, true),
+      link: object({ url: webUrl(false), label: opt(L.timelineLinkLabel, true) }, true),
+      document: object({ media: mediaRef, page: optPositiveInt }, true)
+    }), L.timelineMin, L.timelineMax)
+  },
   relatedCoverage: { type: pick(["relatedCoverage"]), id: idField, heading: req(L.heading, true), stories: list(object({ id: idField, story: mediaRef }), L.relatedMin, L.relatedMax) },
   poll: { type: pick(["poll"]), id: idField, poll: mediaRef },
-  repositoryInteractive: { type: pick(["repositoryInteractive"]), id: idField, key: req(L.interactiveKey, true), title: req(L.interactiveTitle, true), description: req(L.interactiveDescription) }
+  repositoryInteractive: { type: pick(["repositoryInteractive"]), id: idField, key: req(L.interactiveKey, true), title: req(L.interactiveTitle, true), description: req(L.interactiveDescription) },
+  repositoryTracker: { type: pick(["repositoryTracker"]), id: idField, key: req(L.trackerKey, true), title: req(L.trackerTitle, true), description: req(L.trackerDescription) },
+  event: { type: pick(["event"]), id: idField, event: mediaRef },
+  socialPost: { type: pick(["socialPost"]), id: idField, url: req(L.webUrl, true), provider: pick(["instagram", "threads", "facebook", "tiktok", "x", "bluesky"]), postId: req(200, true), caption: opt(L.socialCaption) },
+  finalScore: {
+    type: pick(["finalScore"]),
+    id: idField,
+    sport: opt(L.finalScoreSport, true),
+    teamA: req(L.finalScoreTeam, true),
+    teamAScore: { check: (value, path, errors) => (value === null || (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= L.finalScoreMax) ? undefined : fail(errors, path, `must be a score from 0 to ${L.finalScoreMax}, or null`)) },
+    teamB: req(L.finalScoreTeam, true),
+    teamBScore: { check: (value, path, errors) => (value === null || (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= L.finalScoreMax) ? undefined : fail(errors, path, `must be a score from 0 to ${L.finalScoreMax}, or null`)) },
+    status: pick(["final", "overtime", "tie", "forfeit"]),
+    date: { optional: true, check: (value, path, errors) => (calendarDate(value) ? undefined : fail(errors, path, "must be a date (YYYY-MM-DD)")) },
+    location: opt(L.finalScoreLocation, true),
+    note: opt(L.finalScoreNote, true)
+  }
 };
 
 const blockCheck: Check = (value, path, errors) => {
@@ -217,6 +263,19 @@ const pollReference = closed({
   results: object({ totalVotes: { check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? undefined : fail(errors, path, "must be a count")) }, votes: { check: (value, path, errors) => (isRecord(value) && Object.values(value).every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0) ? undefined : fail(errors, path, "must map answers to counts")) } }, true)
 });
 
+const eventReference = closed({
+  id: mediaRef,
+  title: req(200, true),
+  eventType: str(60, { optional: true, min: 1, line: true }),
+  startAt: { check: (value, path, errors) => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? undefined : fail(errors, path, "must be a date and time")) },
+  endAt: { optional: true, check: (value, path, errors) => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? undefined : fail(errors, path, "must be a date and time")) },
+  allDay: bool,
+  location: str(200, { optional: true, min: 1, line: true }),
+  description: str(2000, { optional: true, min: 1 }),
+  externalUrl: webUrl(),
+  eventStatus: pick(["scheduled", "canceled"])
+});
+
 const table = (entry: Check): Field => ({ check: (value, path, errors) => (isRecord(value) ? Object.entries(value).forEach(([key, item]) => entry(item, `${path}.${key}`, errors)) : fail(errors, path, "must be an object")) });
 
 export type ArticleBodyValidation = { ok: true; body: ArticleBody } | { ok: false; errors: string[] };
@@ -228,7 +287,7 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
     version: { check: (version, path, errs) => (version === ARTICLE_BODY_VERSION ? undefined : fail(errs, path, `must be ${ARTICLE_BODY_VERSION}`)) },
     nodes: { check: (nodes, path, errs) => (Array.isArray(nodes) ? nodes.forEach((node, index) => nodeCheck(node, `${path}[${index}]`, errs)) : fail(errs, path, "must be a list")) },
     media: table(mediaAsset),
-    references: object({ stories: { optional: true, check: table(storyReference).check }, polls: { optional: true, check: table(pollReference).check } }, true)
+    references: object({ stories: { optional: true, check: table(storyReference).check }, polls: { optional: true, check: table(pollReference).check }, events: { optional: true, check: table(eventReference).check } }, true)
   })(value, "body", errors);
   if (errors.length) return { ok: false, errors };
 
@@ -242,9 +301,26 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
   for (const [key, poll] of Object.entries(body.references?.polls ?? {})) if (poll.options.map((option) => option.id).length !== new Set(poll.options.map((option) => option.id)).size) errors.push(`body.references.polls.${key}: repeated answer id`);
   for (const block of blocks) for (const id of blockMediaIds(block)) if (!(mediaKey(id) in body.media)) errors.push(`${block.type} ${block.id}: Media ${String(id)} is not in the media table`);
   for (const [key, story] of Object.entries(body.references?.stories ?? {})) if (story.thumbnail !== undefined && !(mediaKey(story.thumbnail) in body.media)) errors.push(`body.references.stories.${key}: thumbnail ${String(story.thumbnail)} is not in the media table`);
+  for (const [key, event] of Object.entries(body.references?.events ?? {})) if (mediaKey(event.id) !== key) errors.push(`body.references.events.${key}: key does not match the event's id`);
+  for (const id of inlineMediaIds(body.nodes)) if (!(mediaKey(id) in body.media)) errors.push(`source: Media ${String(id)} is not in the media table`);
+  for (const block of blocks) {
+    if (block.type === "socialPost" && !isCanonicalSocialPost(block.url, block.provider, block.postId)) errors.push(`socialPost ${block.id}: not a canonical supported post address`);
+    if (block.type === "finalScore") {
+      const problem = finalScoreProblem(block);
+      if (problem) errors.push(`finalScore ${block.id}: ${problem}`);
+    }
+    if (block.type === "chartMap" && block.mode === "native") {
+      const problem = block.data && block.chartType ? chartDataProblem(block.data) : "a native chart needs a chart type and data";
+      if (problem) errors.push(`chartMap ${block.id}: ${problem}`);
+    }
+    if (block.type === "chartMap" && block.mode !== "native" && (block.data || block.chartType)) errors.push(`chartMap ${block.id}: only a native chart has data`);
+  }
   const missing = missingReferences(body);
   for (const id of missing.stories) errors.push(`related coverage: Story ${String(id)} is not in the reference table`);
   for (const id of missing.polls) errors.push(`poll: Poll ${String(id)} is not in the reference table`);
+  for (const id of missing.events) errors.push(`event: Event ${String(id)} is not in the reference table`);
+  const sourceIds = sourceRefs(body.nodes).map((ref) => ref.id);
+  if (new Set(sourceIds).size !== sourceIds.length) errors.push("body.nodes: two sources share an id");
   const footnoteIds = body.nodes.flatMap((node) => (node.type === "paragraph" || node.type === "heading" ? node.children : node.type === "list" ? node.items.flatMap((item) => item.children) : [])).flatMap((child) => (child.type === "footnote" ? [child.id] : []));
   if (new Set(footnoteIds).size !== footnoteIds.length) errors.push("body.nodes: two footnotes share an id");
   return errors.length ? { ok: false, errors } : { ok: true, body };

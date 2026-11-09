@@ -20,9 +20,12 @@ export default defineConfig({
       "@byline/ui/live-updates": fileURLToPath(new URL("../../packages/ui/src/live-updates.ts", import.meta.url)),
       "@byline/ui/homepage": fileURLToPath(new URL("../../packages/ui/src/homepage/index.ts", import.meta.url)),
       "@byline/ui/article-body": fileURLToPath(new URL("../../packages/ui/src/article-body/index.ts", import.meta.url)),
+      "@byline/ui/article-enhancement-selector": fileURLToPath(new URL("../../packages/ui/src/article-enhancements/selector.ts", import.meta.url)),
+      "@byline/ui/article-enhancements": fileURLToPath(new URL("../../packages/ui/src/article-enhancements/index.ts", import.meta.url)),
       "@byline/article-body/fixtures": fileURLToPath(new URL("../../packages/article-body/src/fixtures.ts", import.meta.url)),
       "@byline/article-body": fileURLToPath(new URL("../../packages/article-body/src/index.ts", import.meta.url)),
       "@byline/story-presentations/interactives": fileURLToPath(new URL("../../packages/story-presentations/src/interactives/registry.ts", import.meta.url)),
+      "@byline/story-presentations/trackers": fileURLToPath(new URL("../../packages/story-presentations/src/trackers/registry.ts", import.meta.url)),
       "@byline/story-presentations": fileURLToPath(new URL("../../packages/story-presentations/src/index.ts", import.meta.url)),
       "@byline/ui": fileURLToPath(new URL("../../packages/ui/src/index.ts", import.meta.url)),
       "@": fileURLToPath(new URL(".", import.meta.url))

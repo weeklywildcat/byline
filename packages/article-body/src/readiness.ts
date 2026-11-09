@@ -1,5 +1,9 @@
 import { ARTICLE_BLOCK_LIMITS as LIMITS, ARTICLE_BLOCKS, DEFAULT_HEADINGS } from "./blocks";
 import { squareRows } from "./data-table";
+import { safeWebUrl, sortChapters } from "./evidence";
+import { calendarDate, finalScoreProblem, scoreValue } from "./final-score";
+import { chartDataProblem } from "./native-chart";
+import { parseSocialPostUrl } from "./social";
 import { isDocumentAsset, isImageAsset, mediaKey } from "./media";
 import type { ReferenceLookup } from "./references";
 import { cleanLine, cleanText, hasInlineText } from "./text";
@@ -15,8 +19,10 @@ import type {
   DocumentPageRef,
   GalleryItem,
   KeyNumber,
+  MediaChapter,
   MediaId,
   ParagraphNode,
+  SourceRef,
   TimelineEvent
 } from "./types";
 
@@ -55,6 +61,41 @@ const clampPercent = (value: unknown): number => {
 
 const paragraphs = (body: readonly ParagraphNode[]): ParagraphNode[] => body.filter((paragraph) => hasInlineText(paragraph.children));
 
+/** Chapters with a time and a label, in time order, within bounds. A half-written chapter is dropped (and reported). */
+function chapters(list: readonly MediaChapter[] | undefined, drop: (itemId: string) => void): MediaChapter[] | undefined {
+  const kept: MediaChapter[] = [];
+  for (const chapter of list ?? []) {
+    const label = cleanLine(chapter.label, LIMITS.chapterLabel);
+    if (!Number.isInteger(chapter.time) || chapter.time < 0 || chapter.time > LIMITS.chapterTimeMax || !label) {
+      if (label || Number.isInteger(chapter.time)) drop(chapter.id);
+      continue;
+    }
+    kept.push({ id: chapter.id, time: chapter.time, label });
+  }
+  const sorted = sortChapters(kept).slice(0, LIMITS.chaptersMax);
+  return sorted.length ? sorted : undefined;
+}
+
+/**
+ * One inline Source reference, finished or not. A web source needs a safe
+ * address and a label; a document source a PDF from Media and a label. The
+ * normalizer reports a source that is not finished; publishing refuses it.
+ */
+export function finalizeSourceRef(ref: SourceRef, media: MediaLookup): { ref: SourceRef | null; problem?: string } {
+  const label = cleanLine(ref.label, LIMITS.sourceLabel);
+  const note = optional(cleanText(ref.note, LIMITS.sourceNote));
+  if (ref.kind === "web") {
+    const url = safeWebUrl(ref.url);
+    if (!url) return { ref: null, problem: "A web source needs a working address (https://…)." };
+    if (!label) return { ref: null, problem: "Give the source a short title." };
+    return { ref: { type: "source", id: ref.id, kind: "web", url, label, ...(note ? { note } : {}) } };
+  }
+  if (ref.media === null || ref.media === undefined || !isDocumentAsset(media(ref.media))) return { ref: null, problem: "A document source needs a PDF from Media." };
+  if (!label) return { ref: null, problem: "Give the source a short title." };
+  const page = Number.isInteger(ref.page) && (ref.page as number) > 0 ? ref.page : undefined;
+  return { ref: { type: "source", id: ref.id, kind: "document", media: ref.media, ...(page ? { page } : {}), label, ...(note ? { note } : {}) } };
+}
+
 export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: ReferenceLookup = {}): Finalized {
   const issues: BlockIssue[] = [];
   const issue = (effect: BlockIssue["effect"], code: string, message: string, itemId?: string) => issues.push({ blockId: block.id, type: block.type, effect, code, message, ...(itemId ? { itemId } : {}) });
@@ -89,7 +130,8 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
         items.push({ id: item.id, media: item.media, caption: cleanText(item.caption, LIMITS.caption), altOverride: optional(cleanLine(item.altOverride, LIMITS.altText)) });
       }
       if (items.length < LIMITS.galleryMin) return omit("gallery-too-small", `A gallery needs at least ${LIMITS.galleryMin} photographs.`);
-      return { block: { type: "gallery", id: block.id, items: items.slice(0, LIMITS.galleryMax), fit: block.fit === "crop" ? "crop" : "natural" }, issues };
+      const layout = block.layout === "essay" || block.layout === "featured" ? block.layout : "grid";
+      return { block: { type: "gallery", id: block.id, items: items.slice(0, LIMITS.galleryMax), fit: block.fit === "crop" ? "crop" : "natural", layout }, issues };
     }
     case "portraitText": {
       const problem = image(block.media, ["portrait-missing", "Choose the portrait photograph."], ["portrait-unavailable", "This photograph is no longer in Media. Choose another."]);
@@ -136,7 +178,9 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       if (!title) return omit("video-title", "Give the video a title.");
       // Required by accessibility policy: the editor confirms captions exist before this publishes.
       if (block.captionsConfirmed !== true) return omit("video-captions", "Confirm the video has captions before publishing.");
-      return { block: { type: "video", id: block.id, videoId: block.videoId, title, caption: optional(cleanText(block.caption, LIMITS.caption)) }, issues };
+      const marks = chapters(block.chapters, (itemId) => issue("dropped", "chapter-incomplete", "A chapter needs a time and a label. It is left out.", itemId));
+      const transcript = optional(cleanText(block.transcript, LIMITS.videoTranscript));
+      return { block: { type: "video", id: block.id, videoId: block.videoId, title, caption: optional(cleanText(block.caption, LIMITS.caption)), ...(marks ? { chapters: marks } : {}), ...(transcript ? { transcript } : {}) }, issues };
     }
     case "audio": {
       if (block.media === null || block.media === undefined) return omit("audio-missing", "Choose an audio file.");
@@ -145,14 +189,21 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       if (!title) return omit("audio-title", "Give the recording a title.");
       const transcript = cleanText(block.transcript, LIMITS.audioTranscript);
       if (!transcript) return omit("audio-transcript", "A transcript is required to publish audio.");
-      return { block: { type: "audio", id: block.id, media: block.media, title, caption: optional(cleanText(block.caption, LIMITS.caption)), transcript }, issues };
+      const marks = chapters(block.chapters, (itemId) => issue("dropped", "chapter-incomplete", "A chapter needs a time and a label. It is left out.", itemId));
+      return { block: { type: "audio", id: block.id, media: block.media, title, caption: optional(cleanText(block.caption, LIMITS.caption)), transcript, ...(marks ? { chapters: marks } : {}) }, issues };
     }
     case "reportedQuote": {
       const text = cleanText(block.text, LIMITS.quote);
       const attribution = cleanLine(block.attribution, LIMITS.attribution);
       if (!text) return omit("quote-empty", "Type the quote.");
       if (!attribution) return omit("quote-unattributed", "Say who said it.");
-      return { block: { type: "reportedQuote", id: block.id, text, attribution }, issues };
+      let sourceUrl: string | undefined;
+      if (block.sourceUrl?.trim()) {
+        sourceUrl = safeWebUrl(block.sourceUrl) ?? undefined;
+        if (!sourceUrl) issue("dropped", "quote-source-invalid", "The source link is not a web address (https://…). It is left out.");
+      }
+      const sourceLabel = sourceUrl ? optional(cleanLine(block.sourceLabel, LIMITS.quoteSourceLabel)) : undefined;
+      return { block: { type: "reportedQuote", id: block.id, text, attribution, ...(sourceUrl ? { sourceUrl } : {}), ...(sourceLabel ? { sourceLabel } : {}) }, issues };
     }
     case "pullQuote": {
       const text = cleanText(block.text, LIMITS.quote);
@@ -162,7 +213,7 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
     case "keyFacts": {
       const facts = block.facts.map((fact) => ({ id: fact.id, text: cleanText(fact.text, LIMITS.fact) })).filter((fact) => fact.text);
       if (!facts.length) return omit("facts-empty", "Add at least one fact.");
-      return { block: { type: "keyFacts", id: block.id, heading: cleanLine(block.heading, LIMITS.heading) || DEFAULT_HEADINGS.keyFacts, facts: facts.slice(0, LIMITS.factsMax) }, issues };
+      return { block: { type: "keyFacts", id: block.id, heading: cleanLine(block.heading, LIMITS.heading) || DEFAULT_HEADINGS.keyFacts, facts: facts.slice(0, LIMITS.factsMax), presentation: block.presentation === "compact" ? "compact" : "standard" }, issues };
     }
     case "context": {
       const body = paragraphs(block.body);
@@ -195,7 +246,8 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
           issue("dropped", "document-page-invalid", "A page reference without a page number is left out.", ref.id);
           continue;
         }
-        pages.push({ id: ref.id, page: ref.page, label: cleanLine(ref.label, LIMITS.documentPageLabel) });
+        const excerpt = optional(cleanText(ref.excerpt, LIMITS.documentPageExcerpt));
+        pages.push({ id: ref.id, page: ref.page, label: cleanLine(ref.label, LIMITS.documentPageLabel), ...(excerpt ? { excerpt } : {}) });
       }
       return {
         block: {
@@ -218,6 +270,20 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       const height = block.height in visualizationHeights ? block.height : "standard";
       const common = { id: block.id, title, dek: optional(cleanText(block.dek, LIMITS.chartDek)), summary, source: optional(cleanLine(block.source, LIMITS.chartSource)), notes: optional(cleanText(block.notes, LIMITS.chartNotes)), credit: optional(cleanLine(block.credit, LIMITS.chartCredit)), height } as const;
       let fallback: MediaId | null = block.image ?? null;
+      if (block.mode === "native") {
+        const data = { columns: (block.data?.columns ?? []).slice(0, LIMITS.chartSeriesMax + 1).map((column) => ({ id: column.id, label: cleanLine(column.label, LIMITS.chartLabel) })), rows: [] as DataTableRow[] };
+        data.rows = squareRows(data.columns, block.data?.rows ?? []).map((row) => ({ id: row.id, cells: row.cells.map((cell, index) => cleanLine(cell, index === 0 ? LIMITS.chartLabel : LIMITS.chartCell)) })).filter((row) => row.cells.some(Boolean));
+        const wrong = chartDataProblem(data);
+        if (wrong) return omit("chart-data", wrong);
+        if (!common.source) return omit("chart-source", "Say where the numbers come from.");
+        let sourceUrl: string | undefined;
+        if (block.sourceUrl?.trim()) {
+          sourceUrl = safeWebUrl(block.sourceUrl) ?? undefined;
+          if (!sourceUrl) issue("dropped", "chart-source-url-invalid", "The source link is not a web address (https://…). It is left out.");
+        }
+        const chartType = block.chartType === "line" || block.chartType === "dot" ? block.chartType : "bar";
+        return { block: { type: "chartMap", mode: "native", image: null, title, dek: common.dek, summary, source: common.source, notes: common.notes, height: "standard", id: block.id, chartType, data, ...(sourceUrl ? { sourceUrl } : {}) }, issues };
+      }
       if (block.mode === "static") {
         const problem = image(fallback, ["chart-image", "Choose the graphic."], ["chart-image-unavailable", "This graphic is no longer in Media. Choose another."]);
         if (problem) return problem;
@@ -332,7 +398,26 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       const items: TimelineEvent[] = [];
       let current = false;
       for (const event of block.items) {
-        const clean = { id: event.id, label: cleanLine(event.label, LIMITS.timelineLabel), title: cleanLine(event.title, LIMITS.timelineTitle), body: cleanText(event.body, LIMITS.timelineBody), current: false };
+        const clean: TimelineEvent = { id: event.id, label: cleanLine(event.label, LIMITS.timelineLabel), title: cleanLine(event.title, LIMITS.timelineTitle), body: cleanText(event.body, LIMITS.timelineBody), current: false };
+        if (event.image) {
+          if (isImageAsset(media(event.image.media))) {
+            const caption = optional(cleanText(event.image.caption, LIMITS.caption));
+            const altOverride = optional(cleanLine(event.image.altOverride, LIMITS.altText));
+            clean.image = { media: event.image.media, ...(altOverride ? { altOverride } : {}), ...(caption ? { caption } : {}) };
+          } else issue("dropped", "timeline-photo-unavailable", "An event's photograph is no longer in Media and is left out.", event.id);
+        }
+        if (event.link?.url.trim()) {
+          const url = safeWebUrl(event.link.url);
+          const label = optional(cleanLine(event.link.label, LIMITS.timelineLinkLabel));
+          if (url) clean.link = { url, ...(label ? { label } : {}) };
+          else issue("dropped", "timeline-link-invalid", "An event's link is not a web address (https://…). It is left out.", event.id);
+        }
+        if (event.document) {
+          if (isDocumentAsset(media(event.document.media))) {
+            const page = Number.isInteger(event.document.page) && (event.document.page as number) > 0 ? event.document.page : undefined;
+            clean.document = { media: event.document.media, ...(page ? { page } : {}) };
+          } else issue("dropped", "timeline-document-unavailable", "An event's document is not a PDF in Media and is left out.", event.id);
+        }
         if (isStubEvent(clean)) {
           if (clean.label) issue("dropped", "timeline-stub", "An event with only a date label is left out. Add what happened.", event.id);
           continue;
@@ -385,10 +470,48 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       if (!description) return omit("interactive-description", "Describe what it shows in words, for readers who cannot use it.");
       return { block: { type: "repositoryInteractive", id: block.id, key, title, description }, issues };
     }
+    case "repositoryTracker": {
+      const key = cleanLine(block.key, LIMITS.trackerKey);
+      if (!key) return omit("tracker-key", "Choose a tracker.");
+      if (refs.tracker?.(key) !== true) return omit("tracker-unregistered", "This tracker is not in the site's code. It cannot publish until a developer adds it.");
+      const title = cleanLine(block.title, LIMITS.trackerTitle);
+      const description = cleanText(block.description, LIMITS.trackerDescription);
+      if (!title) return omit("tracker-title", "Give the tracker a title.");
+      if (!description) return omit("tracker-description", "Describe what it tracks in words, for readers who cannot see it.");
+      return { block: { type: "repositoryTracker", id: block.id, key, title, description }, issues };
+    }
+    case "event": {
+      if (block.event === null || block.event === undefined) return omit("event-missing", "Choose an event.");
+      if (!refs.event?.(block.event)) return omit("event-unavailable", "This event is not published, or is gone. Choose a published event.");
+      return { block: { type: "event", id: block.id, event: block.event }, issues };
+    }
+    case "socialPost": {
+      const parsed = parseSocialPostUrl(block.url);
+      if (!parsed.ok) return omit("social-url", parsed.message);
+      const caption = optional(cleanText(block.caption, LIMITS.socialCaption));
+      return { block: { type: "socialPost", id: block.id, url: parsed.url, provider: parsed.provider, postId: parsed.postId, ...(caption ? { caption } : {}) }, issues };
+    }
+    case "finalScore": {
+      const status = FINAL_STATUSES.has(block.status) ? block.status : "final";
+      const teamA = cleanLine(block.teamA, LIMITS.finalScoreTeam);
+      const teamB = cleanLine(block.teamB, LIMITS.finalScoreTeam);
+      const teamAScore = scoreValue(block.teamAScore);
+      const teamBScore = scoreValue(block.teamBScore);
+      const wrong = finalScoreProblem({ teamA, teamB, teamAScore, teamBScore, status });
+      if (wrong) return omit("score-incomplete", wrong);
+      const date = calendarDate(block.date);
+      if (block.date && !date) issue("dropped", "score-date-invalid", "The game date is not a real date. It is left out.");
+      const sport = optional(cleanLine(block.sport, LIMITS.finalScoreSport));
+      const location = optional(cleanLine(block.location, LIMITS.finalScoreLocation));
+      const note = optional(cleanLine(block.note, LIMITS.finalScoreNote));
+      return { block: { type: "finalScore", id: block.id, ...(sport ? { sport } : {}), teamA, teamAScore, teamB, teamBScore, status, ...(date ? { date } : {}), ...(location ? { location } : {}), ...(note ? { note } : {}) }, issues };
+    }
     default:
       return assertNever(block);
   }
 }
+
+const FINAL_STATUSES: ReadonlySet<string> = new Set(["final", "overtime", "tie", "forfeit"]);
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled block: ${JSON.stringify(value)}`);
@@ -400,7 +523,10 @@ function assertNever(value: never): never {
  * graphic or number the writer chose). An empty marker, row or page reference
  * is harmless and publishes without it.
  */
-const BLOCKING_DROPS: ReadonlySet<string> = new Set(["related-unavailable", "gallery-item-unavailable", "chart-fallback-unavailable", "number-incomplete"]);
+const BLOCKING_DROPS: ReadonlySet<string> = new Set([
+  "related-unavailable", "gallery-item-unavailable", "chart-fallback-unavailable", "number-incomplete",
+  "quote-source-invalid", "chart-source-url-invalid", "timeline-photo-unavailable", "timeline-link-invalid", "timeline-document-unavailable", "score-date-invalid"
+]);
 export function isBlockingIssue(issue: Pick<BlockIssue, "effect" | "code">): boolean {
   return issue.effect === "omitted" || BLOCKING_DROPS.has(issue.code);
 }

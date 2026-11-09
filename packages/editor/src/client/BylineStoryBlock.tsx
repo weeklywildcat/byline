@@ -4,9 +4,11 @@ import { isArticleBlockType, type ArticleBlockType } from "@byline/article-body"
 import { useBlockComponentContext } from "@payloadcms/richtext-lexical/client";
 import type { ComponentType } from "react";
 import { DocumentEditor } from "./blocks/document";
-import { AudioEditor, ChartMapEditor, RepositoryInteractiveEditor, VideoEditor } from "./blocks/embeds";
+import { AudioEditor, ChartMapEditor, RepositoryInteractiveEditor, RepositoryTrackerEditor, VideoEditor } from "./blocks/embeds";
 import { ComparisonEditor, EditorsNoteEditor, ExpandableEditor, KeyNumbersEditor, MarginNoteEditor } from "./blocks/explain";
-import { PollEditor, RelatedCoverageEditor } from "./blocks/relations";
+import { EventEditor, PollEditor, RelatedCoverageEditor } from "./blocks/relations";
+import { FinalScoreEditor } from "./blocks/score";
+import { SocialPostEditor } from "./blocks/social";
 import { DataTableEditor } from "./blocks/table";
 import { AnnotatedImageEditor, BeforeAfterEditor, PortraitTextEditor, VisualChapterEditor } from "./blocks/visual";
 import { GalleryEditor, PhotoEditor } from "./blocks/media";
@@ -44,7 +46,11 @@ export const BLOCK_EDITORS: { readonly [K in ArticleBlockType]: ComponentType<Bl
   beforeAfter: BeforeAfterEditor,
   relatedCoverage: RelatedCoverageEditor,
   poll: PollEditor,
-  repositoryInteractive: RepositoryInteractiveEditor
+  repositoryInteractive: RepositoryInteractiveEditor,
+  repositoryTracker: RepositoryTrackerEditor,
+  event: EventEditor,
+  socialPost: SocialPostEditor,
+  finalScore: FinalScoreEditor
 };
 
 /**
