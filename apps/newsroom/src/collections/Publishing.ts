@@ -2,7 +2,7 @@ import { recordStoryActivity } from "../newsroom/story-activity";
 import { protectPageDescendants, publicURLHooks } from "../public/url-changes";
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig, type PayloadRequest, type Where } from "payload";
 import { canPublishLive, liveGate, livePublisherStories, storyIsPublic } from "../access/live-context";
-import { PUBLISH_BLOCK_COPY } from "../domain/live-coverage";
+import { DESK_REASON_OPTIONS, PUBLISH_BLOCK_COPY } from "../domain/live-coverage";
 import { inIds, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { administratorsOnly, atLeast, editorsOnly, relationId, requestUser, sameId, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
@@ -109,18 +109,22 @@ const storyIsPublished = storyIsPublic;
 const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
   const user = requestUser(req);
   if (!user || atLeast(user, "editor") || req.context?.bylineImport === true) return data;
+  // An update never moves between Stories (a later hook restores the original), so every decision below is about the
+  // Story the update is already on, never a Story named in the request: no permission or coverage check can be
+  // satisfied by a different Story than the one that gets written.
+  const story = originalDoc ? originalDoc.story : data.story;
   // The Story-level live grant publishes live updates on this Story only (access/live-context.ts), and only
   // while the Story's coverage accepts public updates: the shared rule the live desk and Field use too.
-  if (await canPublishLive(req, data.story ?? originalDoc?.story)) {
+  if (await canPublishLive(req, story)) {
     const becomesPublished = (data.state ?? originalDoc?.state ?? "published") === "published" && originalDoc?.state !== "published";
     if (becomesPublished) {
-      const gate = await liveGate(req, data.story ?? originalDoc?.story);
+      const gate = await liveGate(req, story);
       if (gate.block) throw new APIError(`Readers can't see a new live update right now: ${PUBLISH_BLOCK_COPY[gate.block]}. Send it to the desk as a draft instead.`, 403);
     }
     return data;
   }
   const state = data.state ?? originalDoc?.state ?? "published";
-  if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, data.story ?? originalDoc?.story))) throw new APIError(PUBLIC_UPDATE, 403);
+  if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, story))) throw new APIError(PUBLIC_UPDATE, 403);
   return data;
 };
 
@@ -204,6 +208,9 @@ export const LiveUpdates: CollectionConfig = {
     { name: "pinned", type: "checkbox", defaultValue: false, admin: { description: "Pinning replaces the previous key update." } },
     // The Field outbox's idempotency key: a retried "Post live" finds this update instead of posting twice.
     { name: "clientKey", type: "text", unique: true, index: true, admin: { hidden: true }, access: { update: () => false } },
+    // Why a requested "Publish now" became a desk draft (domain/live-coverage.ts). Stored when decided, so a retried
+    // request (a lost response) explains it the same way instead of recalculating against newer coverage state.
+    { name: "deskReason", type: "select", options: [...DESK_REASON_OPTIONS], admin: { hidden: true }, access: { create: ({ req }) => req.context?.bylineSystem === true, update: () => false } },
     legacyIdField()
   ]
 };

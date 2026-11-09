@@ -215,7 +215,8 @@ export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: 
     const existing = (await payload.find({ collection: "live-updates", where: { clientKey: { equals: clientKey } }, limit: 1, depth: 0, overrideAccess: true, req: ctx.req })).docs[0];
     if (existing) {
       if (String(relationId(existing.author)) !== String(ctx.user.id)) throw new APIError("That capture key is already in use.", 409);
-      return { id: existing.id, status: existing.state === "published" ? "posted" as const : "sent-to-desk" as const, duplicate: true };
+      // The reason was decided and stored with the first request; a retry repeats it rather than recalculating against newer state.
+      return { id: existing.id, status: existing.state === "published" ? "posted" as const : "sent-to-desk" as const, ...(existing.deskReason ? { reason: existing.deskReason } : {}), duplicate: true };
     }
   }
   try {

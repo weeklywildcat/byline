@@ -988,6 +988,8 @@ export interface LiveUpdate {
    */
   pinned?: boolean | null;
   clientKey?: string | null;
+  deskReason?:
+    ('story-not-public' | 'not-live-mode' | 'coverage-not-started' | 'coverage-ended' | 'permission-revoked') | null;
   legacyWordPressId?: number | null;
   updatedAt: string;
   createdAt: string;
@@ -2038,6 +2040,7 @@ export interface LiveUpdatesSelect<T extends boolean = true> {
   publishedAt?: T;
   pinned?: T;
   clientKey?: T;
+  deskReason?: T;
   legacyWordPressId?: T;
   updatedAt?: T;
   createdAt?: T;

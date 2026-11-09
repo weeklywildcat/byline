@@ -19,6 +19,7 @@ import * as migration_20261109_035544_reporting from './20261109_035544_reportin
 import * as migration_20261109_130958_front_page from './20261109_130958_front_page';
 import * as migration_20261109_134558_distribution from './20261109_134558_distribution';
 import * as migration_20261109_161224_live_story_mode from './20261109_161224_live_story_mode';
+import * as migration_20261109_164800_live_desk_reason from './20261109_164800_live_desk_reason';
 
 export const migrations = [
   {
@@ -124,6 +125,11 @@ export const migrations = [
   {
     up: migration_20261109_161224_live_story_mode.up,
     down: migration_20261109_161224_live_story_mode.down,
-    name: '20261109_161224_live_story_mode'
+    name: '20261109_161224_live_story_mode',
+  },
+  {
+    up: migration_20261109_164800_live_desk_reason.up,
+    down: migration_20261109_164800_live_desk_reason.down,
+    name: '20261109_164800_live_desk_reason'
   },
 ];

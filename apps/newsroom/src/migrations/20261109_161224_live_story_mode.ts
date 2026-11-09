@@ -38,6 +38,10 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
    CREATE TYPE "public"."enum_stories_live_coverage_state" AS ENUM('off', 'live', 'ended');
   CREATE TYPE "public"."enum__stories_v_version_live_coverage_state" AS ENUM('off', 'live', 'ended');
   ALTER TABLE "story_activity" ALTER COLUMN "action" SET DATA TYPE text;
+  -- The older enum cannot hold the new activity kinds. A published update maps to its closest older kind; the
+  -- coverage and mode entries have no older equivalent, so they go (the live updates and coverage state stay).
+  UPDATE "story_activity" SET "action" = 'live-published-from-field' WHERE "action" = 'live-published';
+  DELETE FROM "story_activity" WHERE "action" IN ('live-mode-changed', 'live-coverage-started', 'live-coverage-resumed', 'live-coverage-ended');
   DROP TYPE "public"."enum_story_activity_action";
   CREATE TYPE "public"."enum_story_activity_action" AS ENUM('story-created', 'story-published', 'story-unpublished', 'workflow-changed', 'editor-changed', 'contributors-changed', 'task-created', 'task-completed', 'task-reopened', 'source-added', 'source-updated', 'appointment-added', 'appointment-updated', 'appointment-completed', 'production-added', 'production-changed', 'publication-scheduled', 'publication-rescheduled', 'publication-cancelled', 'version-restored', 'url-changed', 'correction-added', 'correction-updated', 'correction-removed', 'recording-captured', 'file-captured', 'transcript-completed', 'transcript-imported', 'quote-verified', 'off-record-override', 'material-made-confidential', 'material-made-normal', 'live-submitted', 'live-published-from-field', 'live-queued-sent', 'live-publishers-changed', 'homepage-featured', 'distribution-assigned', 'distribution-ready', 'distribution-posted', 'distribution-failed', 'distribution-skipped');
   ALTER TABLE "story_activity" ALTER COLUMN "action" SET DATA TYPE "public"."enum_story_activity_action" USING "action"::"public"."enum_story_activity_action";

@@ -1,5 +1,7 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { LIVE_MODE_OPTIONS, type LiveMode } from "../../domain/live-coverage";
@@ -13,6 +15,18 @@ import { useLiveCoverage } from "./LiveCoverageProvider";
 export function StoryModeControl() {
   const live = useLiveCoverage();
   const desk = live?.desk;
+  // A failed load must not look like "this Story has no live controls": say so, and offer to try again.
+  if (live && !desk && live.error) {
+    return (
+      <Alert variant="destructive" className="mx-auto w-[calc(100%-2rem)] max-w-[760px] md:w-full" role="alert" data-live-error="">
+        <AlertTitle>Live coverage controls couldn't load</AlertTitle>
+        <AlertDescription>
+          <p>{live.error.message || "Byline couldn't reach the live desk."}</p>
+          <Button type="button" variant="outline" size="sm" className="mt-2 max-sm:min-h-11" onClick={live.retry}>Try again</Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
   if (!live || !desk) return null;
   const canChange = desk.canControl && !live.readOnly;
   if (!canChange && desk.mode === "standard") return null;

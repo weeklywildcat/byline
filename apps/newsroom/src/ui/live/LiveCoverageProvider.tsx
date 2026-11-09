@@ -27,6 +27,8 @@ type LiveCoverageContext = {
   desk: LiveDeskResponse | undefined;
   loading: boolean;
   error: Error | null;
+  /** Asks the server for the live desk again (after a failed load). */
+  retry: () => void;
   busy: boolean;
   /** Where Field Mode opens this Story (never a free-form return URL). */
   fieldHref: string;
@@ -95,11 +97,11 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
   }, [change, desk]);
 
   const value = useMemo<LiveCoverageContext>(() => ({
-    api, admin, storyId, timeZone, readOnly, userId, desk, loading: query.isPending, error: query.error, busy,
+    api, admin, storyId, timeZone, readOnly, userId, desk, loading: query.isPending, error: query.error, retry: () => void query.refetch(), busy,
     fieldHref: `${admin}/field?story=${storyId}&from=story`,
     publishRef, setMode, goLive,
     openSetup: () => setSetup("setup"), openPublishers: () => setSetup("manage"), requestEnd: () => setConfirm("end")
-  }), [admin, api, busy, desk, goLive, publishRef, query.error, query.isPending, readOnly, setMode, storyId, timeZone, userId]);
+  }), [admin, api, busy, desk, goLive, publishRef, query.error, query.isPending, query.refetch, readOnly, setMode, storyId, timeZone, userId]);
 
   return (
     <Context value={value}>
