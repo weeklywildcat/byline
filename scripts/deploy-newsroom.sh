@@ -23,6 +23,7 @@ if [[ "${BYLINE_DEPLOY_REEXEC:-0}" != "1" ]]; then
   printf 'Updating main...\n'
   git fetch origin main
   git merge --ff-only origin/main
+  [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || fail "local main has commits that are not on origin/main"
   export BYLINE_DEPLOY_REEXEC=1
   exec bash "$repo_root/scripts/deploy-newsroom.sh"
 fi
