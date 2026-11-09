@@ -169,6 +169,7 @@ export interface Config {
       'refresh-video-facts': TaskRefreshVideoFacts;
       'deliver-notification': TaskDeliverNotification;
       'send-due-digest': TaskSendDueDigest;
+      'deploy-public-site': TaskDeployPublicSite;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -1112,6 +1113,7 @@ export interface PayloadJob {
           | 'refresh-video-facts'
           | 'deliver-notification'
           | 'send-due-digest'
+          | 'deploy-public-site'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -1155,6 +1157,7 @@ export interface PayloadJob {
         | 'refresh-video-facts'
         | 'deliver-notification'
         | 'send-due-digest'
+          | 'deploy-public-site'
         | 'schedulePublish'
       )
     | null;
@@ -2315,6 +2318,22 @@ export interface TaskDeliverNotification {
 export interface TaskSendDueDigest {
   input?: unknown;
   output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskDeploy-public-site".
+ */
+export interface TaskDeployPublicSite {
+  input: {
+    revision: number;
+    sha256: string;
+    reason: string;
+  };
+  output: {
+    outcome?: string | null;
+    revision?: number | null;
+    status?: number | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

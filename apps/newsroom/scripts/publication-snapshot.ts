@@ -19,6 +19,7 @@ import { readPublicationState } from "../src/db/publication-state";
 import { isPublicSnapshotError } from "../src/public/snapshot/errors";
 import { runPublicSnapshotPreparation, usableCompletedPointer } from "../src/public/snapshot/prepare";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK, queuePublicSnapshot } from "../src/public/queue";
+import { DEPLOY_PUBLIC_SITE_TASK, deployHookConfigured } from "../src/public/deployment";
 import { SnapshotStore } from "../src/public/snapshot/store";
 import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "../src/public/snapshot/version";
 
@@ -39,6 +40,14 @@ async function status() {
     overrideAccess: true,
     select: { processing: true, hasError: true, totalTried: true, createdAt: true }
   });
+  const deployments = await payload.find({
+    collection: "payload-jobs",
+    where: { and: [{ taskSlug: { equals: DEPLOY_PUBLIC_SITE_TASK } }, { completedAt: { exists: false } }] },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true,
+    select: { processing: true, hasError: true, totalTried: true, createdAt: true }
+  });
   const artifacts = await store.list();
   return {
     currentRevision: state.currentRevision,
@@ -50,7 +59,11 @@ async function status() {
       : null,
     pointerCorrupt: state.pointerCorrupt,
     retainedArtifacts: artifacts.length,
-    pendingJobs: jobs.docs.map((job) => ({ id: job.id, processing: job.processing === true, hasError: job.hasError === true, attempts: job.totalTried ?? 0, queuedAt: job.createdAt }))
+    pendingJobs: jobs.docs.map((job) => ({ id: job.id, processing: job.processing === true, hasError: job.hasError === true, attempts: job.totalTried ?? 0, queuedAt: job.createdAt })),
+    deployment: {
+      configured: deployHookConfigured(),
+      pendingJobs: deployments.docs.map((job) => ({ id: job.id, processing: job.processing === true, hasError: job.hasError === true, attempts: job.totalTried ?? 0, queuedAt: job.createdAt }))
+    }
   };
 }
 

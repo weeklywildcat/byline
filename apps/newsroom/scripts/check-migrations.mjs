@@ -2,7 +2,7 @@
 // covers. Run against an EMPTY database: it applies every committed migration,
 // then asks Payload for a new one and fails if Payload had anything to write.
 import { spawnSync } from "node:child_process";
-import { readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 
 const dir = new URL("../src/migrations/", import.meta.url);
 const before = new Set(readdirSync(dir));
@@ -17,8 +17,13 @@ payload(["migrate"]);
 payload(["migrate:create", "uncommitted-schema-change", "--skip-empty"]);
 const added = readdirSync(dir).filter((name) => !before.has(name));
 if (added.length > 0) {
-  for (const name of added) rmSync(new URL(name, dir));
-  console.error("The Payload schema changed without a migration. Run `npm run migrate:create --workspace @byline/newsroom -- <name>` and commit it.");
+  console.error("The Payload schema changed without a migration. Generated drift:");
+  for (const name of added) {
+    const file = new URL(name, dir);
+    if (name.endsWith(".ts")) console.error(`\n--- ${name} ---\n${readFileSync(file, "utf8")}`);
+    rmSync(file);
+  }
+  console.error("Run `npm run migrate:create --workspace @byline/newsroom -- <name>` and commit the generated migration.");
   process.exit(1);
 }
 console.log("Committed migrations match the Payload config.");

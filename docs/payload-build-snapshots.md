@@ -102,6 +102,28 @@ Credential failures, corrupt artifacts, unsupported schemas and newsroom
 outages fail the build. Both acquisition paths converge on
 `.byline-build/public-snapshot.json`.
 
+
+## Public-site deployment hook
+
+Snapshot preparation and static deployment are separate durable jobs on the
+`publication` queue. When `prepare-public-snapshot` finishes with a current
+`ready` or `reused` Snapshot v2 pointer, it queues `deploy-public-site`.
+That task POSTs the private HTTPS `BYLINE_DEPLOY_HOOK_URL` and retries provider
+or network failures independently of snapshot preparation.
+
+All deploy jobs share one exclusive, superseding concurrency key. A newer
+pending revision replaces an older pending deploy, and a job that reaches the
+front of the queue re-reads `byline_publication_state` before sending HTTP. If
+the public revision moved on, the obsolete deploy is skipped; the newer
+snapshot will queue its own deployment. This keeps a Cloudflare/provider
+outage from invalidating a good immutable snapshot and avoids deploying a
+known-stale revision.
+
+The hook URL is a credential-like deployment secret. Keep it only in the
+newsroom/worker environment; never store it in the Publication Global or
+expose it to the static build. If the variable is absent, snapshot production
+continues normally and no deploy job is queued.
+
 Set `BYLINE_NEWSROOM_BUILD_URL` to the newsroom's build API root and
 `BYLINE_BUILD_TOKEN` to the shared credential. `BYLINE_EXPECTED_REVISION`
 can set a minimum public revision. An offline file supplied with the Payload

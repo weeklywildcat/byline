@@ -38,6 +38,14 @@ The web process and the build process must share the same `.next` volume when
 the build is performed as a one-shot container. The web and media worker must
 share the private Media and prepared publication-media volumes.
 
+
+The `publication-worker` also owns public-site deploy-hook delivery. Set
+`BYLINE_DEPLOY_HOOK_URL` to the provider's private production deploy-hook URL
+(for Weekly Wildcat, the Cloudflare Workers Builds hook). A successful current
+snapshot queues a coalescing `deploy-public-site` job; transient HTTP/network
+failures retry in the publication queue. The URL must be HTTPS and must not be
+committed to the repository.
+
 Typical commands are:
 
 ```sh

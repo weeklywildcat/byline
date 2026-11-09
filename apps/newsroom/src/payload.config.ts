@@ -35,6 +35,7 @@ import { Events } from "./collections/Events";
 import { Publication } from "./globals/Publication";
 import { withPublicTracking } from "./public/tracking";
 import { preparePublicSnapshotTask } from "./public/snapshot/task";
+import { deployPublicSiteTask } from "./public/deployment";
 import { advancePublicRevisionTask } from "./public/scheduled";
 import { proseEditor } from "./editor/prose";
 import { dropClientIds } from "./hooks/imported-ids";
@@ -175,7 +176,7 @@ export default buildConfig({
   },
   jobs: {
     // Per-asset exclusive keys with `supersedes` (prepare-publication-media): one preparation per asset at a time;
-    // one exclusive, superseding key for the public snapshot (prepare-public-snapshot).
+    // one exclusive, superseding key for the public snapshot (prepare-public-snapshot), and one for deploy-hook delivery (deploy-public-site).
     enableConcurrencyControl: true,
     // Job API access stays administrator-only; Byline queues its own work as the system.
     access: {
@@ -188,10 +189,11 @@ export default buildConfig({
       admin: { ...defaultJobsCollection.admin, group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") }
     }),
     // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
-    // (public snapshots), `default` → `jobs:scheduled` (Payload's scheduled publish).
+    // (public snapshots + deploy hook), `default` → `jobs:scheduled` (Payload's scheduled publish).
     tasks: [
       withFailureNotice(preparePublicationMediaTask, "Media preparation"),
       withFailureNotice(preparePublicSnapshotTask, "Public snapshot preparation"),
+      withFailureNotice(deployPublicSiteTask, "Public site deployment"),
       advancePublicRevisionTask, contentHealthTask, refreshVideoFactsTask, deliverNotificationTask, sendDueDigestTask
     ]
   },
