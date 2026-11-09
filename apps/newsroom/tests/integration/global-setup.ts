@@ -9,7 +9,7 @@ import pg from "pg";
  * PostgreSQL the current user can create databases on; databases named after
  * it are dropped and recreated. Never point it at real data.
  */
-export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people", "_publication_media", "_migration", "_snapshot", "_presence", "_story_body", "_health", "_notifications", "_live"] as const;
+export const TEST_DATABASE_SUFFIXES = ["", "_screens", "_planning", "_schedule", "_publication", "_media", "_collections", "_people", "_publication_media", "_migration", "_snapshot", "_presence", "_story_body", "_health", "_notifications", "_live", "_reporting", "_field", "_front_page", "_distribution"] as const;
 
 export default async function setup() {
   const url = new URL(process.env.BYLINE_TEST_DATABASE_URL ?? "postgres://localhost:5432/byline_newsroom_test");
@@ -34,10 +34,15 @@ export default async function setup() {
   // Prepared publication files: a second, separate throwaway store.
   const publication = mkdtempSync(path.join(tmpdir(), "byline-newsroom-publication-"));
   process.env.BYLINE_PUBLICATION_MEDIA_DIR = publication;
+  // Private reporting files: a third throwaway store (never Media's, never published).
+  const reporting = mkdtempSync(path.join(tmpdir(), "byline-newsroom-reporting-"));
+  process.env.BYLINE_REPORTING_LOCAL_DIR = reporting;
+  delete process.env.BYLINE_TRANSCRIPTION_PROVIDER;
   delete process.env.BYLINE_BUILD_TOKEN;
   delete process.env.BYLINE_GOOGLE_CLIENT_ID;
   return () => {
     rmSync(media, { recursive: true, force: true });
     rmSync(publication, { recursive: true, force: true });
+    rmSync(reporting, { recursive: true, force: true });
   };
 }

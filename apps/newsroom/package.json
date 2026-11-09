@@ -21,6 +21,7 @@
     "jobs:publication": "payload run scripts/publication-snapshot.ts queue && payload jobs:run --cron '*/5 * * * * *' --queue publication --limit 1",
     "jobs:maintenance": "payload jobs:run --cron '* * * * *' --queue maintenance --limit 5 --handle-schedules",
     "jobs:scheduled": "payload jobs:run --cron '* * * * *' --queue default --limit 10",
+    "jobs:reporting": "payload jobs:run --cron '*/10 * * * * *' --queue reporting --limit 1",
     "publication-media:requeue": "payload run scripts/requeue-publication-media.ts",
     "import:wordpress": "payload run scripts/import-wordpress-native.ts --",
     "publication:snapshot:prepare": "payload run scripts/publication-snapshot.ts prepare",

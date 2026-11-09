@@ -12,7 +12,14 @@ const summaries = {
   "production-added": "Added a production assignment", "production-changed": "Changed a production assignment's status",
   "publication-scheduled": "Scheduled publication", "publication-rescheduled": "Rescheduled publication", "publication-cancelled": "Cancelled scheduled publication",
   "version-restored": "Restored a version", "url-changed": "Changed the public URL",
-  "correction-added": "Added a public notice", "correction-updated": "Edited a public notice", "correction-removed": "Removed a public notice"
+  "correction-added": "Added a public notice", "correction-updated": "Edited a public notice", "correction-removed": "Removed a public notice",
+  "recording-captured": "Captured a recording", "file-captured": "Added a reporting file", "transcript-completed": "Transcript completed", "transcript-imported": "Imported a transcript",
+  "quote-verified": "Verified a quote", "off-record-override": "Approved public use of off-the-record words",
+  "material-made-confidential": "Made reporting material confidential", "material-made-normal": "Made reporting material visible to the story team",
+  "live-submitted": "Sent a live update to the desk", "live-published-from-field": "Posted a live update from the field", "live-queued-sent": "Sent a queued live update",
+  "live-publishers-changed": "Changed who may publish live updates",
+  "homepage-featured": "Proposed featuring on the homepage",
+  "distribution-assigned": "Assigned distribution", "distribution-ready": "Marked distribution ready", "distribution-posted": "Recorded a distribution as posted", "distribution-failed": "Distribution failed", "distribution-skipped": "Skipped a distribution"
 } as const;
 export type ActivityAction = keyof typeof summaries;
 export const activityActions = Object.keys(summaries) as ActivityAction[];

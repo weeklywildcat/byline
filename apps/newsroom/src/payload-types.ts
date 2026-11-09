@@ -90,6 +90,10 @@ export interface Config {
     sources: Source;
     appointments: Appointment;
     'production-assignments': ProductionAssignment;
+    'reporting-notes': ReportingNote;
+    'reporting-files': ReportingFile;
+    'reporting-transcripts': ReportingTranscript;
+    'transcript-selections': TranscriptSelection;
     polls: Poll;
     users: User;
     'payload-kv': PayloadKv;
@@ -134,6 +138,10 @@ export interface Config {
     sources: SourcesSelect<false> | SourcesSelect<true>;
     appointments: AppointmentsSelect<false> | AppointmentsSelect<true>;
     'production-assignments': ProductionAssignmentsSelect<false> | ProductionAssignmentsSelect<true>;
+    'reporting-notes': ReportingNotesSelect<false> | ReportingNotesSelect<true>;
+    'reporting-files': ReportingFilesSelect<false> | ReportingFilesSelect<true>;
+    'reporting-transcripts': ReportingTranscriptsSelect<false> | ReportingTranscriptsSelect<true>;
+    'transcript-selections': TranscriptSelectionsSelect<false> | TranscriptSelectionsSelect<true>;
     polls: PollsSelect<false> | PollsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -170,6 +178,7 @@ export interface Config {
       'refresh-video-facts': TaskRefreshVideoFacts;
       'deliver-notification': TaskDeliverNotification;
       'send-due-digest': TaskSendDueDigest;
+      'transcribe-reporting-file': TaskTranscribeReportingFile;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -422,6 +431,12 @@ export interface Media {
     failureMessage?: string | null;
   };
   uploadedBy?: (number | null) | User;
+  capture?: {
+    story?: (number | null) | Story;
+    assignment?: (number | null) | ProductionAssignment;
+    originalHash?: string | null;
+    clientKey?: string | null;
+  };
   legacyWordPressId?: number | null;
   folder?: (number | null) | FolderInterface;
   updatedAt: string;
@@ -494,6 +509,24 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "production-assignments".
+ */
+export interface ProductionAssignment {
+  id: number;
+  story: number | Story;
+  type: 'photo' | 'gallery' | 'graphic' | 'video' | 'audio' | 'other';
+  title: string;
+  assignees?: (number | User)[] | null;
+  deadline?: string | null;
+  status: 'needed' | 'assigned' | 'in-progress' | 'uploaded' | 'selected' | 'done';
+  notes?: string | null;
+  media?: (number | Media)[] | null;
+  legacyAssignmentId?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-folders".
  */
 export interface FolderInterface {
@@ -549,6 +582,10 @@ export interface StoryPlan {
    */
   contributors?: (number | Person)[] | null;
   createdBy?: (number | null) | User;
+  /**
+   * May publish live updates on this story (only live updates; never the article).
+   */
+  livePublishers?: (number | User)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -583,7 +620,25 @@ export interface StoryActivity {
     | 'url-changed'
     | 'correction-added'
     | 'correction-updated'
-    | 'correction-removed';
+    | 'correction-removed'
+    | 'recording-captured'
+    | 'file-captured'
+    | 'transcript-completed'
+    | 'transcript-imported'
+    | 'quote-verified'
+    | 'off-record-override'
+    | 'material-made-confidential'
+    | 'material-made-normal'
+    | 'live-submitted'
+    | 'live-published-from-field'
+    | 'live-queued-sent'
+    | 'live-publishers-changed'
+    | 'homepage-featured'
+    | 'distribution-assigned'
+    | 'distribution-ready'
+    | 'distribution-posted'
+    | 'distribution-failed'
+    | 'distribution-skipped';
   actor?: (number | null) | User;
   recordId?: number | null;
   updatedAt: string;
@@ -667,7 +722,12 @@ export interface Notification {
     | 'highPriorityTasks'
     | 'appointments'
     | 'publishingFailures'
-    | 'dueDigest';
+    | 'dueDigest'
+    | 'transcriptReady'
+    | 'distributionAssignments'
+    | 'distributionApproval'
+    | 'distributionFailures'
+    | 'frontPageFailures';
   story?: (number | null) | Story;
   actor?: (number | null) | User;
   detail?: string | null;
@@ -912,6 +972,7 @@ export interface LiveUpdate {
    * Pinning replaces the previous key update.
    */
   pinned?: boolean | null;
+  clientKey?: string | null;
   legacyWordPressId?: number | null;
   updatedAt: string;
   createdAt: string;
@@ -957,6 +1018,9 @@ export interface Source {
     | null;
   assignees?: (number | User)[] | null;
   notes?: string | null;
+  groundRules?: ('unspecified' | 'on-record' | 'background' | 'off-record') | null;
+  recordingPermission?: boolean | null;
+  groundRulesNote?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -992,19 +1056,174 @@ export interface Appointment {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "production-assignments".
+ * via the `definition` "reporting-notes".
  */
-export interface ProductionAssignment {
+export interface ReportingNote {
   id: number;
   story: number | Story;
-  type: 'photo' | 'gallery' | 'graphic' | 'video' | 'audio' | 'other';
-  title: string;
-  assignees?: (number | User)[] | null;
-  deadline?: string | null;
-  status: 'needed' | 'assigned' | 'in-progress' | 'uploaded' | 'selected' | 'done';
-  notes?: string | null;
-  media?: (number | Media)[] | null;
-  legacyAssignmentId?: string | null;
+  text: string;
+  source?: (number | null) | Source;
+  appointment?: (number | null) | Appointment;
+  /**
+   * Only the creator, the story's assigned editor and administrators can see confidential material.
+   */
+  confidential: boolean;
+  createdBy?: (number | null) | User;
+  capturedAt?: string | null;
+  clientKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reporting-files".
+ */
+export interface ReportingFile {
+  id: number;
+  story: number | Story;
+  kind: 'audio' | 'document' | 'image' | 'other';
+  originalFilename?: string | null;
+  source?: (number | null) | Source;
+  appointment?: (number | null) | Appointment;
+  /**
+   * Only the creator, the story's assigned editor and administrators can see confidential material.
+   */
+  confidential: boolean;
+  /**
+   * The ground rules in force when this was captured (a snapshot).
+   */
+  groundRules?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: (number | null) | User;
+  capturedAt?: string | null;
+  durationMs?: number | null;
+  sha256?: string | null;
+  clientKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  sizes?: {};
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reporting-transcripts".
+ */
+export interface ReportingTranscript {
+  id: number;
+  story: number | Story;
+  file: number | ReportingFile;
+  source?: (number | null) | Source;
+  appointment?: (number | null) | Appointment;
+  /**
+   * Only the creator, the story's assigned editor and administrators can see confidential material.
+   */
+  confidential: boolean;
+  /**
+   * The ground rules in force when this was captured (a snapshot).
+   */
+  groundRules?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  state: 'queued' | 'processing' | 'ready' | 'failed';
+  origin: 'machine' | 'manual';
+  provider?: string | null;
+  model?: string | null;
+  language?: string | null;
+  durationMs?: number | null;
+  segments?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  searchText?: string | null;
+  failure?: string | null;
+  attempts?: number | null;
+  completedAt?: string | null;
+  createdBy?: (number | null) | User;
+  capturedAt?: string | null;
+  editedBy?: (number | null) | User;
+  editedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transcript-selections".
+ */
+export interface TranscriptSelection {
+  id: number;
+  story: number | Story;
+  transcript: number | ReportingTranscript;
+  file?: (number | null) | ReportingFile;
+  source?: (number | null) | Source;
+  kind: 'highlight' | 'quote';
+  text: string;
+  attribution?: string | null;
+  speaker?: string | null;
+  startMs?: number | null;
+  endMs?: number | null;
+  segmentIds?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  note?: string | null;
+  /**
+   * The ground rules in force when this was captured (a snapshot).
+   */
+  groundRules?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Only the creator, the story's assigned editor and administrators can see confidential material.
+   */
+  confidential: boolean;
+  state: 'saved' | 'verified';
+  verifiedBy?: (number | null) | User;
+  verifiedAt?: string | null;
+  offRecordOverride?: {
+    by?: (number | null) | User;
+    at?: string | null;
+    reason?: string | null;
+  };
+  usedIn?: (number | Story)[] | null;
+  createdBy?: (number | null) | User;
+  capturedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1114,6 +1333,7 @@ export interface PayloadJob {
           | 'refresh-video-facts'
           | 'deliver-notification'
           | 'send-due-digest'
+          | 'transcribe-reporting-file'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -1158,6 +1378,7 @@ export interface PayloadJob {
         | 'refresh-video-facts'
         | 'deliver-notification'
         | 'send-due-digest'
+        | 'transcribe-reporting-file'
         | 'schedulePublish'
       )
     | null;
@@ -1380,6 +1601,7 @@ export interface StoryPlansSelect<T extends boolean = true> {
       };
   contributors?: T;
   createdBy?: T;
+  livePublishers?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1516,6 +1738,14 @@ export interface MediaSelect<T extends boolean = true> {
         failureMessage?: T;
       };
   uploadedBy?: T;
+  capture?:
+    | T
+    | {
+        story?: T;
+        assignment?: T;
+        originalHash?: T;
+        clientKey?: T;
+      };
   legacyWordPressId?: T;
   folder?: T;
   updatedAt?: T;
@@ -1721,6 +1951,7 @@ export interface LiveUpdatesSelect<T extends boolean = true> {
   state?: T;
   publishedAt?: T;
   pinned?: T;
+  clientKey?: T;
   legacyWordPressId?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1753,6 +1984,9 @@ export interface SourcesSelect<T extends boolean = true> {
   status?: T;
   assignees?: T;
   notes?: T;
+  groundRules?: T;
+  recordingPermission?: T;
+  groundRulesNote?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1792,6 +2026,116 @@ export interface ProductionAssignmentsSelect<T extends boolean = true> {
   notes?: T;
   media?: T;
   legacyAssignmentId?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reporting-notes_select".
+ */
+export interface ReportingNotesSelect<T extends boolean = true> {
+  story?: T;
+  text?: T;
+  source?: T;
+  appointment?: T;
+  confidential?: T;
+  createdBy?: T;
+  capturedAt?: T;
+  clientKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reporting-files_select".
+ */
+export interface ReportingFilesSelect<T extends boolean = true> {
+  story?: T;
+  kind?: T;
+  originalFilename?: T;
+  source?: T;
+  appointment?: T;
+  confidential?: T;
+  groundRules?: T;
+  createdBy?: T;
+  capturedAt?: T;
+  durationMs?: T;
+  sha256?: T;
+  clientKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+  sizes?: T | {};
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reporting-transcripts_select".
+ */
+export interface ReportingTranscriptsSelect<T extends boolean = true> {
+  story?: T;
+  file?: T;
+  source?: T;
+  appointment?: T;
+  confidential?: T;
+  groundRules?: T;
+  state?: T;
+  origin?: T;
+  provider?: T;
+  model?: T;
+  language?: T;
+  durationMs?: T;
+  segments?: T;
+  searchText?: T;
+  failure?: T;
+  attempts?: T;
+  completedAt?: T;
+  createdBy?: T;
+  capturedAt?: T;
+  editedBy?: T;
+  editedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transcript-selections_select".
+ */
+export interface TranscriptSelectionsSelect<T extends boolean = true> {
+  story?: T;
+  transcript?: T;
+  file?: T;
+  source?: T;
+  kind?: T;
+  text?: T;
+  attribution?: T;
+  speaker?: T;
+  startMs?: T;
+  endMs?: T;
+  segmentIds?: T;
+  note?: T;
+  groundRules?: T;
+  confidential?: T;
+  state?: T;
+  verifiedBy?: T;
+  verifiedAt?: T;
+  offRecordOverride?:
+    | T
+    | {
+        by?: T;
+        at?: T;
+        reason?: T;
+      };
+  usedIn?: T;
+  createdBy?: T;
+  capturedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2337,6 +2681,16 @@ export interface TaskSendDueDigest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskTranscribe-reporting-file".
+ */
+export interface TaskTranscribeReportingFile {
+  input: {
+    transcriptId: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "TaskSchedulePublish".
  */
 export interface TaskSchedulePublish {
@@ -2468,6 +2822,7 @@ export interface BylineReportedQuoteBlock {
   attribution: string;
   sourceUrl?: string | null;
   sourceLabel?: string | null;
+  reportingSelection?: number | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'reportedQuote';

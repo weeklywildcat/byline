@@ -207,6 +207,14 @@ export const deliverNotificationTask: TaskConfig = {
 
 /* ---------------------------------------------------------------------- inbox */
 
+/** A notification may open a particular tab of the Story screen (transcripts open Reporting). */
+function notificationTab(data: unknown): string {
+  const record = (data && typeof data === "object" ? data : {}) as { tab?: unknown; transcriptId?: unknown };
+  if (record.tab !== "reporting" && record.tab !== "publish") return "";
+  const transcript = Number(record.transcriptId);
+  return `?tab=${record.tab}${Number.isSafeInteger(transcript) && transcript > 0 ? `&transcript=${transcript}` : ""}`;
+}
+
 export type InboxItem = { id: number; kind: NotificationKind; text: string; createdAt: string; readAt: string | null; storyId: number | null; href: string | null; items: DigestItem[] };
 export type InboxResponse = { unread: number; items: InboxItem[]; hasMore: boolean; emailConfigured: boolean };
 
@@ -232,7 +240,7 @@ export async function inbox(ctx: ScreenContext, options: { unreadOnly?: boolean;
       const storyId = relationId(row.story);
       return {
         id: Number(row.id), kind: facts.kind, text: describeNotification(facts), createdAt: String(row.createdAt), readAt: row.readAt ?? null,
-        storyId: storyId === null ? null : Number(storyId), href: storyId === null ? null : `${admin}/collections/stories/${storyId}`, items: facts.items ? [...facts.items] : []
+        storyId: storyId === null ? null : Number(storyId), href: storyId === null ? null : `${admin}/collections/stories/${storyId}${notificationTab(row.data)}`, items: facts.items ? [...facts.items] : []
       };
     })
   };

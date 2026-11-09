@@ -1,7 +1,8 @@
 import type { LiveCoverage } from "@byline/core";
 import { APIError, type Payload, type Where } from "payload";
 import { scopeManages, scopeParticipates, storyScope } from "../access/story-context";
-import { atLeast, relationId } from "../access/user";
+import { relationId } from "../access/user";
+import { canPublishLive } from "../access/live-context";
 import { PreparedMediaCatalog } from "../public/snapshot/media";
 import { liveCoverageProjection, readLiveUpdates } from "../public/snapshot/live";
 import { lexicalToPlainText, LIVE_TEXT_MAX, plainTextToLexical } from "./live-text";
@@ -65,8 +66,9 @@ export async function liveDesk(ctx: ScreenContext, storyId: number): Promise<Liv
   const manager = await authorize(ctx, storyId);
   const { payload } = ctx.req;
   const story = await payload.findByID({ collection: "stories", id: storyId, draft: true, select: { liveCoverage: true, _status: true }, ...as(ctx) });
-  // Drafts are private working copies: only those who manage the story see them.
-  const where: Where = { and: [{ story: { equals: storyId } }, ...(manager ? [] : [{ state: { equals: "published" } }])] };
+  const publisher = await canPublishLive(ctx.req, storyId);
+  // Drafts are private working copies: the story's managers and live publishers see them all; anyone else only their own.
+  const where: Where = { and: [{ story: { equals: storyId } }, ...(manager || publisher ? [] : [{ or: [{ state: { equals: "published" } }, { author: { equals: ctx.user.id } }] }])] };
   const page = await payload.find({ collection: "live-updates", where, sort: "-publishedAt", limit: PAGE, depth: 1, req: ctx.req, overrideAccess: false });
   const authors = page.docs.map((row) => relationId(row.author)).filter((id): id is number | string => id !== null);
   const users = authors.length ? (await payload.find({ collection: "users", where: { id: { in: authors } }, select: { name: true, linkedPerson: true }, pagination: false, ...as(ctx) })).docs : [];
@@ -78,7 +80,7 @@ export async function liveDesk(ctx: ScreenContext, storyId: number): Promise<Liv
     endedAt: story.liveCoverage?.endedAt ?? null,
     storyPublished: story._status === "published",
     canManage: manager,
-    canPublish: atLeast(ctx.user, "editor"),
+    canPublish: publisher,
     hasMore: page.hasNextPage,
     updates: page.docs.map((row): LiveDeskUpdate => {
       const author = Number(relationId(row.author)) || 0;
@@ -93,27 +95,28 @@ export async function liveDesk(ctx: ScreenContext, storyId: number): Promise<Liv
   };
 }
 
-/** What a person may set: staff and anyone without publishing rights always write drafts. */
-function stateFor(ctx: ScreenContext, requested: unknown, fallback: "draft" | "published") {
-  if (!atLeast(ctx.user, "editor")) return "draft" as const;
+/** What a person may set: anyone without the publish right (editors, or this Story's live grant) always writes drafts. */
+async function stateFor(ctx: ScreenContext, storyId: number, requested: unknown, fallback: "draft" | "published") {
+  if (!(await canPublishLive(ctx.req, storyId))) return "draft" as const;
   return requested === "draft" || requested === "published" ? requested : fallback;
 }
 
 export async function postLiveUpdate(ctx: ScreenContext, storyId: number, input: LiveUpdateInput): Promise<{ id: number }> {
-  if (!(await authorize(ctx, storyId))) throw new APIError("Only the people on this story can post updates.", 403);
+  // Anyone on the story may write; only those who may publish make it public (the collection enforces it too).
+  await authorize(ctx, storyId);
   const text = clean(input.text, LIVE_TEXT_MAX);
   if (!text) throw new APIError("Write the update readers should see.", 400);
   const photo = input.photoId === undefined || input.photoId === null || input.photoId === 0 ? null : positive(input.photoId);
   if (input.photoId && !photo) throw new APIError("Choose a photo from Media.", 400);
   const created = await ctx.req.payload.create({
     collection: "live-updates", ...as(ctx),
-    data: { story: storyId, headline: clean(input.title, 200) || undefined, body: plainTextToLexical(text) as never, photo: photo ?? undefined, pinned: input.pinned === true, state: stateFor(ctx, input.state, "published") }
+    data: { story: storyId, headline: clean(input.title, 200) || undefined, body: plainTextToLexical(text) as never, photo: photo ?? undefined, pinned: input.pinned === true, state: await stateFor(ctx, storyId, input.state, "published") }
   });
   return { id: created.id };
 }
 
 export async function changeLiveUpdate(ctx: ScreenContext, storyId: number, updateId: number, input: LiveUpdateInput): Promise<{ id: number }> {
-  if (!(await authorize(ctx, storyId))) throw new APIError("Only the people on this story can change updates.", 403);
+  await authorize(ctx, storyId);
   const existing = await ctx.req.payload.find({ collection: "live-updates", where: { and: [{ id: { equals: updateId } }, { story: { equals: storyId } }] }, limit: 1, ...as(ctx) });
   if (!existing.docs[0]) throw new APIError("That update is not on this story.", 404);
   const data: Record<string, unknown> = {};
@@ -129,13 +132,13 @@ export async function changeLiveUpdate(ctx: ScreenContext, storyId: number, upda
     data.photo = photo;
   }
   if (input.pinned !== undefined) data.pinned = input.pinned === true;
-  if (input.state !== undefined) data.state = stateFor(ctx, input.state, existing.docs[0].state === "draft" ? "draft" : "published");
+  if (input.state !== undefined) data.state = await stateFor(ctx, storyId, input.state, existing.docs[0].state === "draft" ? "draft" : "published");
   await ctx.req.payload.update({ collection: "live-updates", id: updateId, data: data as never, ...as(ctx) });
   return { id: updateId };
 }
 
 export async function deleteLiveUpdate(ctx: ScreenContext, storyId: number, updateId: number): Promise<{ id: number }> {
-  if (!(await authorize(ctx, storyId))) throw new APIError("Only the people on this story can remove updates.", 403);
+  await authorize(ctx, storyId);
   const existing = await ctx.req.payload.find({ collection: "live-updates", where: { and: [{ id: { equals: updateId } }, { story: { equals: storyId } }] }, limit: 1, select: {}, ...as(ctx) });
   if (!existing.docs[0]) throw new APIError("That update is not on this story.", 404);
   await ctx.req.payload.delete({ collection: "live-updates", id: updateId, ...as(ctx) });

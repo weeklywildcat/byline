@@ -1,7 +1,8 @@
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { protectPageDescendants, publicURLHooks } from "../public/url-changes";
-import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig } from "payload";
-import { inIds, scopeManages, storyScope } from "../access/story-context";
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig, type PayloadRequest, type Where } from "payload";
+import { canPublishLive, livePublisherStories } from "../access/live-context";
+import { inIds, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { administratorsOnly, atLeast, editorsOnly, relationId, requestUser, sameId, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
 import { CORRECTION_TYPE_OPTIONS } from "../domain/vocabulary";
@@ -94,7 +95,7 @@ export const Pages: CollectionConfig = {
   ]
 };
 
-const PUBLIC_UPDATE = "Only editors can change an update readers can see. Save it as a draft for an editor to publish.";
+const PUBLIC_UPDATE = "Only editors, or people this story allows to publish live updates, can change an update readers can see. Send it to the live desk as a draft.";
 
 async function storyIsPublished(req: Parameters<CollectionBeforeChangeHook>[0]["req"], story: unknown) {
   const id = relationId(story);
@@ -112,6 +113,8 @@ async function storyIsPublished(req: Parameters<CollectionBeforeChangeHook>[0]["
 const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
   const user = requestUser(req);
   if (!user || atLeast(user, "editor") || req.context?.bylineImport === true) return data;
+  // The Story-level live grant publishes live updates on this Story only (access/live-context.ts).
+  if (await canPublishLive(req, data.story ?? originalDoc?.story)) return data;
   const state = data.state ?? originalDoc?.state ?? "published";
   if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, data.story ?? originalDoc?.story))) throw new APIError(PUBLIC_UPDATE, 403);
   return data;
@@ -122,8 +125,18 @@ const guardPublicDelete: CollectionBeforeDeleteHook = async ({ id, req }) => {
   if (!user || atLeast(user, "editor")) return;
   const found = await req.payload.find({ collection: "live-updates", where: { id: { equals: id } }, limit: 1, depth: 0, select: { story: true, state: true }, overrideAccess: true, req });
   const row = found.docs[0];
+  if (row && (await canPublishLive(req, row.story))) return;
   if (row?.state === "published" && (await storyIsPublished(req, row.story))) throw new APIError(PUBLIC_UPDATE, 403);
 };
+
+/** Managers change any update on their Stories; live publishers any on theirs; everyone else only their own. */
+async function liveWriters(req: PayloadRequest): Promise<boolean | Where> {
+  const scope = await storyScope(req);
+  if (!scope) return false;
+  if (scope.all) return true;
+  const granted = await livePublisherStories(req);
+  return { or: [inIds("story", scope.managed), inIds("story", granted), { author: { equals: scope.user.id } }] };
+}
 
 /** Pinning replaces the previous key update: pin one and the story's others are unpinned. */
 const replacePinned: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
@@ -150,21 +163,15 @@ export const LiveUpdates: CollectionConfig = {
       if (!scope) return false;
       return scope.all ? true : inIds("story", [...scope.managed, ...scope.participant]);
     },
+    // Anyone on the Story writes (drafts, unless they may publish); publishing is decided in guardPublicUpdate.
     create: async ({ req, data }) => {
       const scope = await storyScope(req);
       if (!scope) return false;
-      return data ? scopeManages(scope, data.story) : scope.all || scope.managed.length > 0;
+      if (!data) return scope.all || scope.managed.length > 0 || scope.participant.length > 0;
+      return scopeManages(scope, data.story) || scopeParticipates(scope, data.story) || (await canPublishLive(req, data.story));
     },
-    update: async ({ req }) => {
-      const scope = await storyScope(req);
-      if (!scope) return false;
-      return scope.all ? true : inIds("story", scope.managed);
-    },
-    delete: async ({ req }) => {
-      const scope = await storyScope(req);
-      if (!scope) return false;
-      return scope.all ? true : inIds("story", scope.managed);
-    }
+    update: ({ req }) => liveWriters(req),
+    delete: ({ req }) => liveWriters(req)
   },
   hooks: {
     afterChange: [replacePinned],
@@ -191,6 +198,8 @@ export const LiveUpdates: CollectionConfig = {
     { name: "state", type: "select", defaultValue: "published", options: [{ value: "draft", label: "Draft" }, { value: "published", label: "Published" }], index: true },
     { name: "publishedAt", type: "date", index: true },
     { name: "pinned", type: "checkbox", defaultValue: false, admin: { description: "Pinning replaces the previous key update." } },
+    // The Field outbox's idempotency key: a retried "Post live" finds this update instead of posting twice.
+    { name: "clientKey", type: "text", unique: true, index: true, admin: { hidden: true }, access: { update: () => false } },
     legacyIdField()
   ]
 };

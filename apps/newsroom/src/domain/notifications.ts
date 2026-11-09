@@ -10,7 +10,10 @@
  * leaves a stale title behind and nothing private is copied into the message.
  */
 
-export const NOTIFICATION_KINDS = ["storyAssignments", "readyForReview", "storyReturned", "mediaAssignments", "highPriorityTasks", "appointments", "publishingFailures", "dueDigest"] as const;
+export const NOTIFICATION_KINDS = [
+  "storyAssignments", "readyForReview", "storyReturned", "mediaAssignments", "highPriorityTasks", "appointments", "publishingFailures", "dueDigest",
+  "transcriptReady", "distributionAssignments", "distributionApproval", "distributionFailures", "frontPageFailures"
+] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const NOTIFICATION_LABELS: Record<NotificationKind, { label: string; description: string }> = {
@@ -21,7 +24,12 @@ export const NOTIFICATION_LABELS: Record<NotificationKind, { label: string; desc
   highPriorityTasks: { label: "High-priority tasks", description: "A high or urgent task is assigned to you." },
   appointments: { label: "Appointments", description: "You are assigned an interview or appointment." },
   publishingFailures: { label: "Publishing failures", description: "Editors only: public snapshot or media preparation failed." },
-  dueDigest: { label: "Daily due digest", description: "A morning summary of your work due today or overdue." }
+  dueDigest: { label: "Daily due digest", description: "A morning summary of your work due today or overdue." },
+  transcriptReady: { label: "Transcripts", description: "A recording you uploaded has been transcribed." },
+  distributionAssignments: { label: "Distribution assignments", description: "You are made the owner of a story's social or newsletter distribution." },
+  distributionApproval: { label: "Distribution approval", description: "Editors only: a distribution draft is waiting for your approval." },
+  distributionFailures: { label: "Distribution failures", description: "A distribution you own (or edit) failed." },
+  frontPageFailures: { label: "Front Page failures", description: "Editors only: a scheduled homepage change could not be activated." }
 };
 
 export type NotificationChannel = "inApp" | "email";
@@ -79,6 +87,16 @@ export function describeNotification(facts: NotificationFacts): string {
       return `${who(facts)} assigned you an appointment${facts.detail ? `: ${facts.detail}` : ""}`;
     case "publishingFailures":
       return `${facts.detail ?? "Publishing"} failed`;
+    case "transcriptReady":
+      return `The transcript of ${facts.detail ? `“${facts.detail}”` : "your recording"} is ready`;
+    case "distributionAssignments":
+      return `${who(facts)} made you the owner of ${facts.detail ?? "a distribution"} for ${quoted(facts)}`;
+    case "distributionApproval":
+      return `${who(facts)} asked you to approve ${facts.detail ?? "a distribution"} for ${quoted(facts)}`;
+    case "distributionFailures":
+      return `${facts.detail ?? "A distribution"} for ${quoted(facts)} failed`;
+    case "frontPageFailures":
+      return `A scheduled homepage change could not be activated${facts.detail ? `: ${facts.detail}` : ""}`;
     case "dueDigest": {
       const count = facts.items?.length ?? 0;
       return count === 1 ? "1 item is due today or overdue" : `${count} items are due today or overdue`;

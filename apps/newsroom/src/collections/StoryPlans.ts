@@ -114,6 +114,17 @@ export const StoryPlans: CollectionConfig = {
       admin: { readOnly: true, description: "Copied from the story's latest save; used for access." },
       access: { update: systemOnly, create: systemOnly }
     },
-    { name: "createdBy", type: "relationship", relationTo: "users", index: true, admin: { readOnly: true }, access: { update: systemOnly, create: systemOnly } }
+    { name: "createdBy", type: "relationship", relationTo: "users", index: true, admin: { readOnly: true }, access: { update: systemOnly, create: systemOnly } },
+    {
+      // "May publish live updates" (access/live-context.ts): this Story's live updates only. Editors control it.
+      name: "livePublishers",
+      type: "relationship",
+      relationTo: "users",
+      hasMany: true,
+      maxRows: 12,
+      index: true,
+      admin: { description: "May publish live updates on this story (only live updates; never the article)." },
+      access: { update: editorsOnlyField, create: systemOnly }
+    }
   ]
 };

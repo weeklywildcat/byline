@@ -67,7 +67,8 @@ export function NotificationsBell() {
 
   if (!account) return null;
   const unread = inbox?.unread ?? 0;
-  const kinds = NOTIFICATION_KINDS.filter((kind) => kind !== "publishingFailures" || atLeast(account, "editor"));
+  const EDITOR_KINDS: readonly string[] = ["publishingFailures", "distributionApproval", "frontPageFailures"];
+  const kinds = NOTIFICATION_KINDS.filter((kind) => !EDITOR_KINDS.includes(kind) || atLeast(account, "editor"));
 
   /** Marks what the person can see as read (never a notification that arrived after the list loaded); `refresh` then shows any that remain. */
   const markRead = async (body: { ids: number[] } | { all: true }, refresh = false) => {

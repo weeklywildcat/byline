@@ -3,6 +3,8 @@ import { requireStoryFacts } from "../newsroom/story-readiness";
 import { queueFactsAfterStoryChange } from "../newsroom/video-facts";
 import { notifyAfterStoryChange } from "../newsroom/notification-hooks";
 import { publicURLHooks } from "../public/url-changes";
+import { guardOffRecordQuotes, syncQuoteProvenance } from "../reporting/provenance";
+import { seedDistributionAfterStoryChange } from "../distribution/policy";
 import { APIError, ValidationError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from "payload";
 import { publicationMediaReport, storyMediaRequirements } from "../publication-media/readiness";
 import { inIds, storyScope } from "../access/story-context";
@@ -213,14 +215,19 @@ export const Stories: CollectionConfig = {
         endedAt: state === "ended" ? previous?.endedAt ?? now : null
       };
       return data;
-    }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
-    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange],
+    }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, guardOffRecordQuotes, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange],
     beforeDelete: [async ({ id, req }) => {
       // A hard delete removes private dependents; the ordinary trash update keeps them.
       const where = { story: { equals: id } };
       await req.payload.db.deleteMany({ collection: "story-notes", where, req });
       await req.payload.db.deleteMany({ collection: "story-activity", where, req });
       await req.payload.db.deleteMany({ collection: "notifications", where, req });
+      // Private reporting and distribution go with a permanently deleted Story (files leave the disk too).
+      await req.payload.db.deleteMany({ collection: "transcript-selections", where, req });
+      await req.payload.db.deleteMany({ collection: "reporting-transcripts", where, req });
+      await req.payload.db.deleteMany({ collection: "reporting-notes", where, req });
+      await req.payload.delete({ collection: "reporting-files", where, overrideAccess: true, req });
     }]
   },
   fields: [
