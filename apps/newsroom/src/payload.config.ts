@@ -35,6 +35,7 @@ import { addPublicationStateTable } from "./db/publication-state";
 import { Events } from "./collections/Events";
 import { ReportingFiles, ReportingNotes, ReportingTranscripts, TranscriptSelections } from "./collections/Reporting";
 import { reportingEndpoints } from "./reporting/endpoints";
+import { fieldEndpoints } from "./field/endpoints";
 import { transcribeReportingFileTask } from "./reporting/transcription/queue";
 import { Publication } from "./globals/Publication";
 import { withPublicTracking } from "./public/tracking";
@@ -139,7 +140,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...googleEndpoints],
+  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
@@ -180,6 +181,8 @@ export default buildConfig({
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
         site: { Component: "/components/BylineSite#BylineSite", path: "/site", exact: true, meta: { title: "Site" } },
+        // Field Mode: a phone-first capture shell, without the desktop template.
+        field: { Component: "/components/BylineField#BylineField", path: "/field", exact: true, meta: { title: "Field" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
       }

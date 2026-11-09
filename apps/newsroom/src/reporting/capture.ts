@@ -159,7 +159,7 @@ export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, in
   try {
     const metadata = await sharp(file.data).metadata();
     const local = exifCapturedAt(metadata.exif);
-    if (local) capturedAt = localToInstant(local.replace("T", " ").slice(0, 16), ctx.timeZone);
+    if (local) capturedAt = localToInstant(local, ctx.timeZone);
   } catch {
     capturedAt = null;
   }

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avat
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, HeartPulse, LogOut, UserRound, Wrench } from "lucide-react";
+import { ChevronsUpDown, HeartPulse, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
 import { useState } from "react";
 import { ShellLink, useShellNavigation } from "./navigation";
 
@@ -77,7 +77,10 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            {user.profileHref ? <><DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem><DropdownMenuSeparator /></> : null}
+            {user.profileHref ? <DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem> : null}
+            {/* Field Mode: the reporter's phone-first capture screen (its own shell, docs/field-mode.md). */}
+            <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><Smartphone aria-hidden="true" />Field Mode</DropdownMenuItem>
+            <DropdownMenuSeparator />
             {account && account.role !== "staff" ? <DropdownMenuItem render={<ShellLink href={`${admin}/content-health`} />}><HeartPulse aria-hidden="true" />Content Health</DropdownMenuItem> : null}
             {systemHref ? (
               <>

@@ -49,14 +49,15 @@ try {
   const section = (await payload.create({ collection: "sections", data: { name: "Sports", slug: "sports" } })).id;
   const story = (await payload.create({
     collection: "stories", draft: true, overrideAccess: true, context: { bylineSystem: true },
-    data: { headline: "Football beats Saluda in the second half", section, contributors: [alice.linkedPerson] } as never
+    data: { headline: "Football beats Saluda in the second half", section, contributors: [alice.linkedPerson], liveCoverage: { state: "live" } } as never
   })).id;
   const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: story } }, limit: 1 })).docs[0];
   await payload.update({ collection: "story-plans", id: plan.id, data: { editor: editor.id }, overrideAccess: true, context: { bylineSystem: true } });
   const system = { overrideAccess: true as const, context: { bylineSystem: true } };
   const coach = (await payload.create({ collection: "sources", data: { story, label: "Coach Smith", role: "Head coach", groundRules: "on-record", recordingPermission: true }, ...system } as never)).id;
   const tipster = (await payload.create({ collection: "sources", data: { story, label: "Booster club parent", groundRules: "off-record" }, ...system } as never)).id;
-  const interview = (await payload.create({ collection: "appointments", data: { story, title: "Interview Coach Smith", kind: "interview", source: coach, scheduleMode: "exact", startAt: new Date(Date.now() + 2 * 3600_000).toISOString() }, ...system } as never)).id;
+  const interview = (await payload.create({ collection: "appointments", data: { story, title: "Interview Coach Smith", kind: "interview", source: coach, scheduleMode: "exact", startAt: new Date(Date.now() + 1 * 3600_000).toISOString(), location: "Wildcat Stadium", assignees: [alice.id] }, ...system } as never)).id;
+  await payload.create({ collection: "production-assignments", data: { story, title: "Game photos", type: "photo", assignees: [alice.id], status: "assigned", deadline: new Date(Date.now() + 5 * 3600_000).toISOString() }, ...system } as never);
   await payload.create({ collection: "appointments", data: { story, title: "Records request follow-up", kind: "reporting", scheduleMode: "window", windowStart: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }, ...system } as never);
   await payload.create({ collection: "reporting-notes", data: { story, text: "Ask the superintendent about the funding source for the new turf.", source: null, createdBy: alice.id, capturedAt: new Date().toISOString() } as never, ...system });
   const file = await payload.create({
