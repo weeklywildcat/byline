@@ -1,4 +1,5 @@
 import type { ReviewTarget, StepResolution, WorkflowStep } from "./newsroom-roles";
+import { MEDIA_BLOCK_LABELS } from "./review-blocks";
 
 /**
  * Review runs (docs/review.md). A run is one submission of a Story through an
@@ -35,7 +36,9 @@ export type RunStep = {
   staleReason: string | null;
 };
 
-export type RunSnapshot = { workflowId: number; workflowName: string; steps: WorkflowStep[] };
+/** A Media file as it was when a version was submitted: its name and publication revision, which changes when the file or its crop does. */
+export type MediaStamp = { id: number; filename: string; revision: number };
+export type RunSnapshot = { workflowId: number; workflowName: string; steps: WorkflowStep[]; /** Per submitted version, the Media it showed. */ media?: Record<string, MediaStamp[]> };
 
 export type ReviewDecision = { round: number; stepId: string; decision: "approved" | "changes-requested"; by: number; at: string; version: string; summary: string | null };
 
@@ -97,7 +100,9 @@ export function storyFingerprint(story: Record<string, unknown>): ApprovalFinger
   const copy: string[] = [];
   const visuals: string[] = [];
   for (const key of ["headline", "deck", "kicker", "reportingNote", "legacyHtml"] as const) copy.push(`${key}:${normalizeText(story[key])}`);
-  visuals.push(`lead:${idOf(story.featuredMedia)}`, `caption:${normalizeText(story.featuredCaption)}`);
+  // The lead image is a visual; its caption is words.
+  visuals.push(`lead:${idOf(story.featuredMedia)}`);
+  copy.push(`caption:${normalizeText(story.featuredCaption)}`);
   const video = story.video as { url?: unknown } | undefined;
   visuals.push(`video:${normalizeText(video?.url)}`);
   walkBody((story.body as { root?: unknown } | undefined)?.root, copy, visuals);
@@ -106,6 +111,22 @@ export function storyFingerprint(story: Record<string, unknown>): ApprovalFinger
 
 const VISUAL_NODE = /^(upload|image|gallery|video|embed|chart|map|interactive|social|audio)$/i;
 
+/** Block field names that are what a reader *sees* rather than reads: which file, and how it is shown. */
+const VISUAL_KEYS = new Set(["media", "image", "document", "altOverride", "placement", "fit", "layout", "side", "align", "x", "y"]);
+
+/** Split a media block's fields: the file and its presentation are visuals, every string a reader reads (captions, headings, transcripts) is copy. */
+function splitFields(value: unknown, copy: string[], visuals: string[], key = ""): void {
+  if (key === "id" || key === "blockType") return;
+  if (VISUAL_KEYS.has(key)) {
+    visuals.push(`${key}=${typeof value === "object" && value !== null && "id" in value ? idOf(value) : JSON.stringify(value ?? null)}`);
+    return;
+  }
+  if (typeof value === "string") copy.push(`${key}:${normalizeText(value)}`);
+  else if (Array.isArray(value)) value.forEach((item) => splitFields(item, copy, visuals, key));
+  else if (value && typeof value === "object") for (const [name, item] of Object.entries(value)) splitFields(item, copy, visuals, name);
+  else if (value !== null && value !== undefined) copy.push(`${key}:${String(value)}`);
+}
+
 function walkBody(node: unknown, copy: string[], visuals: string[]): void {
   if (!node || typeof node !== "object") return;
   const record = node as Record<string, unknown>;
@@ -113,6 +134,11 @@ function walkBody(node: unknown, copy: string[], visuals: string[]): void {
   const blockType = typeof (record.fields as { blockType?: unknown } | undefined)?.blockType === "string" ? String((record.fields as { blockType: string }).blockType) : "";
   if (type === "text" && typeof record.text === "string") copy.push(normalizeText(record.text));
   else if (type === "linebreak" || type === "paragraph" || type === "heading" || type === "quote" || type === "listitem") copy.push(`<${type}>`);
+  if (type === "block" && blockType in MEDIA_BLOCK_LABELS) {
+    visuals.push(`block:${blockType}`);
+    splitFields(record.fields, copy, visuals);
+    return;
+  }
   if (VISUAL_NODE.test(type) || (blockType && VISUAL_NODE.test(blockType))) {
     visuals.push(JSON.stringify({ type, blockType, value: idOf(record.value), fields: record.fields ?? null }));
     return;

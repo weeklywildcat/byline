@@ -4,6 +4,8 @@ import { scopeManages, storyScope } from "../access/story-context";
 import { atLeast, relationId, sameId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
 import { nextApplicableStep, resolveStep, selectWorkflow, type ReviewWorkflowDef, type RoutingDirectory, type RoutingStory } from "../domain/newsroom-roles";
+import { buildReviewBlocks, mediaIdsOf, type SubmittedStory } from "../domain/review-blocks";
+import { compareVersions, copySummary, visualSummary, type VersionComparison } from "../domain/review-diff";
 import {
   activateStep,
   changedCategories,
@@ -15,12 +17,14 @@ import {
   storyFingerprint,
   type ApprovalFingerprint,
   type ReviewDecision,
+  type MediaStamp,
   type RunSnapshot,
   type RunStep
 } from "../domain/review";
 import type { ReviewComment, ReviewRun, Story, StoryPlan, User } from "../payload-types";
 import { runDecisions, runSteps, writerIds } from "./attention";
 import { editorRecipients, notify } from "./notifications";
+import { mediaPreview } from "./media-library";
 import { routingDirectory, routingStory, workflowDefs } from "./routing";
 import { loadPeople, planFor, type ScreenContext } from "./screen-models";
 import { recordStoryActivity } from "./story-activity";
@@ -51,6 +55,17 @@ async function latestRun(req: PayloadRequest, storyId: number): Promise<ReviewRu
   const found = await req.payload.find({ collection: "review-runs", where: { and: [{ story: { equals: storyId } }, { status: { not_equals: "cancelled" } }] }, sort: "-createdAt", limit: 1, req, ...system });
   return found.docs[0] ?? null;
 }
+
+/** The Media a version shows, as they were when it was submitted: enough to tell later whether a file or its crop changed underneath the review. */
+async function mediaStamps(req: PayloadRequest, version: Story | null): Promise<MediaStamp[]> {
+  if (!version) return [];
+  const ids = mediaIdsOf(buildReviewBlocks(version as unknown as SubmittedStory));
+  if (!ids.length) return [];
+  const found = await req.payload.find({ collection: "media", where: { id: { in: ids } }, select: { filename: true, publicationRevision: true }, pagination: false, req, ...system });
+  return found.docs.map((doc) => ({ id: doc.id, filename: doc.filename ?? "", revision: doc.publicationRevision ?? 0 }));
+}
+
+const withStamps = (snapshot: RunSnapshot, version: string, stamps: MediaStamp[]): RunSnapshot => ({ ...snapshot, media: { ...(snapshot.media ?? {}), [version]: stamps } });
 
 async function latestVersionId(req: PayloadRequest, storyId: number): Promise<string | null> {
   const found = await req.payload.findVersions({ collection: "stories", where: { parent: { equals: storyId } }, sort: ["-updatedAt", "-id"], limit: 1, select: { updatedAt: true }, req, ...system });
@@ -160,6 +175,7 @@ export async function submitForReview(ctx: ScreenContext, storyId: number): Prom
     if (problems.length) throw new APIError("Before sending this story", 422, { problems });
 
     const versionId = await sealVersion(ctx, storyId);
+    const stamps = await mediaStamps(ctx.req, await versionDoc(ctx.req, versionId));
     const people = await loadPeople(ctx);
     const [story, directory] = await Promise.all([routingStory(ctx.req, storyId, people), routingDirectory(ctx.req)]);
     const now = new Date().toISOString();
@@ -180,7 +196,7 @@ export async function submitForReview(ctx: ScreenContext, storyId: number): Prom
       const activation = activateFrom(reset, snapshot, gate, story, directory, prefer);
       const updated = await ctx.req.payload.update({
         collection: "review-runs", id: run.id, req: ctx.req, ...system,
-        data: { steps: activation.steps, status: activation.status, failure: activation.failure, reviewers: activation.reviewers, participants: participantsOf(run, activation.reviewers), submittedVersion: versionId, submittedAt: now, submittedBy: Number(ctx.user.id), round: (run.round ?? 1) + 1, revision: (run.revision ?? 1) + 1, statusSince: now }
+        data: { steps: activation.steps, status: activation.status, failure: activation.failure, reviewers: activation.reviewers, participants: participantsOf(run, activation.reviewers), snapshot: withStamps(snapshot, versionId, stamps), submittedVersion: versionId, submittedAt: now, submittedBy: Number(ctx.user.id), round: (run.round ?? 1) + 1, revision: (run.revision ?? 1) + 1, statusSince: now }
       });
       await recordStoryActivity(ctx.req, storyId, run.status === "routing-failed" ? "review-submitted" : "review-resubmitted", run.id);
       if (activation.status === "routing-failed") {
@@ -203,7 +219,7 @@ export async function submitForReview(ctx: ScreenContext, storyId: number): Prom
     const created = await ctx.req.payload.create({
       collection: "review-runs", req: ctx.req, ...system,
       data: {
-        story: storyId, workflow: workflow?.id ?? null, snapshot, status: activation.status, round: 1, steps: activation.steps, reviewers: activation.reviewers, participants: activation.reviewers,
+        story: storyId, workflow: workflow?.id ?? null, snapshot: withStamps(snapshot, versionId, stamps), status: activation.status, round: 1, steps: activation.steps, reviewers: activation.reviewers, participants: activation.reviewers,
         submittedVersion: versionId, submittedAt: now, submittedBy: Number(ctx.user.id), decisions: [], failure: activation.failure, statusSince: now, revision: 1
       }
     });
@@ -453,7 +469,7 @@ export type ReviewState = {
   };
   comments: ReviewCommentView[];
   /** For a reviewer who reviewed an earlier round: what changed since. */
-  changesSinceYourReview: { version: string; categories: string[]; summary: string } | null;
+  changesSinceYourReview: { version: string; categories: string[]; summary: string; /** Word-level and media comparison; null for imported (legacy HTML) stories, which only get the summary. */ comparison: VersionComparison | null; copySummary: string; visualSummary: string } | null;
   viewer: {
     isWriter: boolean; isEditor: boolean; canSubmit: boolean; submitLabel: string;
     canReview: boolean; canClaim: boolean; mustClaim: boolean;
@@ -523,7 +539,9 @@ export async function reviewState(ctx: ScreenContext, storyId: number): Promise<
       const [then, now] = await Promise.all([versionDoc(ctx.req, mine.version), versionDoc(ctx.req, run.submittedVersion)]);
       if (then && now) {
         const categories = changedCategories(storyFingerprint(then as unknown as Record<string, unknown>), storyFingerprint(now as unknown as Record<string, unknown>));
-        changesSinceYourReview = { version: mine.version, categories, summary: describeChanges(categories) };
+        const imported = !(then as Story).body && !(now as Story).body;
+        const comparison = imported ? null : compareVersions(buildReviewBlocks(then as unknown as SubmittedStory), buildReviewBlocks(now as unknown as SubmittedStory));
+        changesSinceYourReview = { version: mine.version, categories, summary: describeChanges(categories), comparison, copySummary: comparison ? copySummary(comparison.counts) : "", visualSummary: comparison ? visualSummary(comparison.visuals) : "" };
       }
     }
   }
@@ -553,12 +571,49 @@ export async function reviewState(ctx: ScreenContext, storyId: number): Promise<
   };
 }
 
-/** The exact submitted version, for the immutable review view. Reviewers, the Story's managers and editors. */
-export async function submittedVersion(ctx: ScreenContext, storyId: number): Promise<{ version: string; submittedAt: string; story: Story | null }> {
+export type SubmittedMedia = {
+  id: number;
+  filename: string;
+  kind: "image" | "video" | "audio" | "document" | "other";
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  alt: string;
+  credit: string;
+  previewUrl: string | null;
+  url: string | null;
+  /** "changed": the file or its crop was edited after this version was submitted. "missing": it was deleted. "unknown": the review predates this check. */
+  state: "unchanged" | "changed" | "missing" | "unknown";
+};
+
+function kindOf(mimeType: string): SubmittedMedia["kind"] {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType === "application/pdf") return "document";
+  return "other";
+}
+
+/** The exact submitted version, for the immutable review view, with the Media it shows. Reviewers, the Story's managers and editors. */
+export async function submittedVersion(ctx: ScreenContext, storyId: number): Promise<{ version: string; submittedAt: string; story: Story | null; media: SubmittedMedia[] }> {
   const run = (await openRun(ctx.req, storyId)) ?? (await latestRun(ctx.req, storyId));
   if (!run) throw new APIError("This story hasn't been submitted for review.", 404);
   const scope = await storyScope(ctx.req);
   const involved = runSteps(run).some((step) => step.assigneeId === Number(ctx.user.id) || step.queue?.userIds.includes(Number(ctx.user.id)) || step.approval?.by === Number(ctx.user.id));
   if (!scopeManages(scope, storyId) && !involved) throw new APIError("You can't read this review.", 403);
-  return { version: run.submittedVersion, submittedAt: run.submittedAt, story: await versionDoc(ctx.req, run.submittedVersion) };
+  const story = await versionDoc(ctx.req, run.submittedVersion);
+  const ids = story ? mediaIdsOf(buildReviewBlocks(story as unknown as SubmittedStory)) : [];
+  // The Media this exact version names, nothing else: authorized by the review itself, not by Media access.
+  const docs = ids.length ? (await ctx.req.payload.find({ collection: "media", where: { id: { in: ids } }, pagination: false, req: ctx.req, ...system })).docs : [];
+  const stamps = new Map(((run.snapshot as RunSnapshot | null)?.media?.[run.submittedVersion] ?? []).map((stamp) => [stamp.id, stamp]));
+  const known = (run.snapshot as RunSnapshot | null)?.media?.[run.submittedVersion] !== undefined;
+  const byId = new Map(docs.map((doc) => [doc.id, doc]));
+  const media = ids.map((id): SubmittedMedia => {
+    const doc = byId.get(id);
+    if (!doc) return { id, filename: "", kind: "other", mimeType: "", width: null, height: null, alt: "", credit: "", previewUrl: null, url: null, state: "missing" };
+    const stamp = stamps.get(id);
+    const state: SubmittedMedia["state"] = !known || !stamp ? "unknown" : stamp.revision !== (doc.publicationRevision ?? 0) || stamp.filename !== (doc.filename ?? "") ? "changed" : "unchanged";
+    return { id, filename: doc.filename ?? `File ${id}`, kind: kindOf(doc.mimeType ?? ""), mimeType: doc.mimeType ?? "", width: doc.width ?? null, height: doc.height ?? null, alt: doc.alt ?? "", credit: doc.creator || doc.credit || "", previewUrl: mediaPreview(doc), url: doc.url ?? null, state };
+  });
+  return { version: run.submittedVersion, submittedAt: run.submittedAt, story, media };
 }

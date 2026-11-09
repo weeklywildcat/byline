@@ -77,7 +77,8 @@ export const NEEDS_METADATA: Where = {
 
 type Lookup = { users: Map<string, string>; folders: Map<string, MediaFolder> };
 
-function previewUrl(media: Media): string | null {
+/** A browser-sized URL for an image, or null when only a large original exists. Shared with the review view. */
+export function mediaPreview(media: Media): string | null {
   const size = (media.sizes as Record<string, { url?: string | null } | undefined> | undefined)?.[LIBRARY_PREVIEW_SIZE];
   if (size?.url) return size.url;
   if (mediaKind(media.mimeType) === "image" && typeof media.filesize === "number" && media.filesize <= ORIGINAL_AS_PREVIEW_MAX_BYTES) return media.url ?? null;
@@ -111,7 +112,7 @@ export function libraryAsset(ctx: ScreenContext, media: Media, lookup: Lookup): 
     filesize: media.filesize ?? null,
     width: media.width ?? null,
     height: media.height ?? null,
-    previewUrl: previewUrl(media),
+    previewUrl: mediaPreview(media),
     url: media.url ?? null,
     ...asset,
     capturedAt: media.capturedAt ?? null,

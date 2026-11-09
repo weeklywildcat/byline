@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquarePlus, PanelRight } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import { toast } from "sonner";
 import { getJson } from "../story/api";
 import { FocusedHeader } from "../story/StoryHeader";
 import type { StoryScreenContext } from "../story/StoryScreen";
+import type { SubmittedMedia } from "../../newsroom/review";
 import { useReviewActions, useStoryReview, type ReviewCommentView, type ReviewState } from "./api";
 import { ReviewPipeline, ReviewThreads, when } from "./ReviewParts";
 import { reviewBlocks, selectionAnchor, SubmittedArticle, type BlockMark, type SubmittedStory } from "./SubmittedArticle";
@@ -39,7 +41,7 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
   const review = useStoryReview(context);
   const submitted = useQuery({
     queryKey: ["byline", "story-review-submitted", storyId, review.data?.run?.submittedVersion ?? null],
-    queryFn: () => getJson<{ version: string; submittedAt: string; story: SubmittedStory | null }>(context.api, `/byline/stories/${storyId}/review/submitted`),
+    queryFn: () => getJson<{ version: string; submittedAt: string; story: SubmittedStory | null; media: SubmittedMedia[] }>(context.api, `/byline/stories/${storyId}/review/submitted`),
     enabled: Boolean(review.data?.run)
   });
   const actions = useReviewActions(context);
@@ -50,11 +52,16 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
   const [panelOpen, setPanelOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summary, setSummary] = useState("");
+  // "Whole story" is the submitted words, where comments are made; "Changes" is only what moved since this reviewer last looked.
+  const [lens, setLens] = useState<"story" | "changes">("story");
   const wide = width >= REVIEW_RAIL_AT;
 
   const state = review.data;
   const run = state?.run ?? null;
   const blocks = useMemo(() => (submitted.data?.story ? reviewBlocks(submitted.data.story) : []), [submitted.data]);
+  const files = useMemo(() => new Map((submitted.data?.media ?? []).map((file) => [file.id, file])), [submitted.data]);
+  const comparison = review.data?.changesSinceYourReview?.comparison ?? null;
+  const changes = useMemo(() => (comparison ? { blocks: new Map(comparison.blocks.map((change) => [change.id, change])), removed: comparison.removed } : null), [comparison]);
   const marks = useMemo(() => {
     const map = new Map<string, BlockMark[]>();
     const add = (comment: ReviewCommentView) => {
@@ -80,7 +87,8 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
   const busy = actions.decide.isPending || actions.claim.isPending;
 
   function onSelect() {
-    if (!canDecide || !articleRef.current) return;
+    // Comment anchors are offsets into the submitted words, which the Changes lens interleaves with deleted ones.
+    if (!canDecide || lens !== "story" || !articleRef.current) return;
     const found = selectionAnchor(articleRef.current);
     if (found) { setAnchor(found); setDraft(""); }
   }
@@ -115,7 +123,12 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
       {state.changesSinceYourReview ? (
         <Alert data-changes-since="">
           <AlertTitle>Changes since your last review</AlertTitle>
-          <AlertDescription>{state.changesSinceYourReview.summary}</AlertDescription>
+          <AlertDescription>
+            <span className="block">{state.changesSinceYourReview.summary}</span>
+            {state.changesSinceYourReview.copySummary ? <span className="block">Text: {state.changesSinceYourReview.copySummary}.</span> : null}
+            {state.changesSinceYourReview.visualSummary ? <span className="block">Visuals: {state.changesSinceYourReview.visualSummary}.</span> : null}
+            {state.changesSinceYourReview.comparison && state.changesSinceYourReview.categories.length ? <Button type="button" size="xs" variant="link" className="h-auto p-0" onClick={() => setLens("changes")}>Show only what changed</Button> : null}
+          </AlertDescription>
         </Alert>
       ) : null}
       {canDecide ? <>
@@ -157,10 +170,21 @@ export function ReviewMode({ context, storyTitle, onBack, width }: { context: St
         </>}
       />
       <div className={wide ? "grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-8" : undefined}>
+        <div className="min-w-0">
+        {changes ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3" data-review-lens="">
+            <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="What to read" value={[lens]} onValueChange={(next: unknown[]) => { if (next[0] === "story" || next[0] === "changes") setLens(next[0]); }}>
+              <ToggleGroupItem value="story">Whole story</ToggleGroupItem>
+              <ToggleGroupItem value="changes">Changes since your review</ToggleGroupItem>
+            </ToggleGroup>
+            {lens === "changes" ? <span className="text-sm text-muted-foreground">Switch to Whole story to comment.</span> : null}
+          </div>
+        ) : null}
         <div ref={articleRef} className="min-w-0" onMouseUp={onSelect} onKeyUp={(event) => { if (event.shiftKey) onSelect(); }}>
           {submitted.isPending ? <ReviewSkeleton /> : submitted.data?.story
-            ? <SubmittedArticle blocks={blocks} marks={marks} onMark={(id) => { setFocused(id); if (!wide) setPanelOpen(true); }} />
+            ? <SubmittedArticle blocks={blocks} marks={marks} media={files} changes={changes} changesOnly={lens === "changes"} onMark={(id) => { setFocused(id); if (!wide) setPanelOpen(true); }} />
             : <Alert><AlertTitle>The submitted version isn't available</AlertTitle><AlertDescription>It may have been removed from the story's history. Ask the writer to resubmit.</AlertDescription></Alert>}
+        </div>
         </div>
         {wide ? <aside aria-label="Review" className="sticky top-24 min-w-0 border-l border-border pl-6">{panel}</aside> : null}
       </div>
