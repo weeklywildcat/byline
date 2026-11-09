@@ -8,6 +8,11 @@ import {
   SPECIAL_COVERAGE_PACKAGE_TYPE,
   SPORTS_PACKAGE_TYPE,
   collectPinnedStoryIds,
+  homepageSlots,
+  validatePlacements,
+  type HomepagePlacements,
+  type HomepageSlot,
+  type PlacementIssue,
   parseBriefPackageProps,
   parseInFocusPackageProps,
   parseLeadPackageProps,
@@ -37,6 +42,7 @@ import { publicationText, type HomepagePublicationInput } from "./publication";
 import {
   resolveCompatibilityHomepageSelection,
   storyHasSection,
+  type HomepageOccupiedPositions,
   type HomepageSelection
 } from "./selection";
 import { storyView, type HomepageStoryInput } from "./story";
@@ -165,9 +171,33 @@ export type HomepagePackageResolutionContext = {
   compatibilitySelection: boolean;
   publication: HomepagePublicationInput;
   coverages?: readonly HomepageCoverageInput[];
+  /**
+   * Front Page placements for this package: position → pinned Story. For list
+   * packages position 0 is the lead; the lead package uses -1 for its lead and
+   * 0.. for The Latest. Pinned Stories are already reserved page-wide, so
+   * automatic selection never picks them; it fills the other positions.
+   */
+  pins?: ReadonlyMap<number, HomepageStoryInput>;
 };
 
+/** Pinned Stories in their exact positions, automatic Stories in the remaining ones, in order, without gaps. */
+function withPins(automatic: readonly HomepageStoryInput[], limit: number, pins: ReadonlyMap<number, HomepageStoryInput> | undefined, offset = 0): HomepageStoryInput[] {
+  if (!pins || !pins.size) return [...automatic];
+  const out: HomepageStoryInput[] = [];
+  let next = 0;
+  for (let index = 0; index < limit; index++) {
+    const pinned = pins.get(index + offset);
+    if (pinned) out.push(pinned);
+    else if (next < automatic.length) out.push(automatic[next++]!);
+  }
+  return out;
+}
+
 function selectStories(source: BylineStorySource, limit: number, context: HomepagePackageResolutionContext) {
+  return withPins(selectAutomaticStories(source, limit, context), limit, context.pins);
+}
+
+function selectAutomaticStories(source: BylineStorySource, limit: number, context: HomepagePackageResolutionContext) {
   const manual = manualStories(source, context.stories);
 
   if (manual) return manual.slice(0, limit);
@@ -214,7 +244,7 @@ export function resolveLeadPackage(
           context.coverages ?? []
         );
   const leadStory = resolvesStories
-    ? manualLead ?? leadCandidates.find((story) => !used.has(story.id)) ?? null
+    ? context.pins?.get(-1) ?? manualLead ?? leadCandidates.find((story) => !used.has(story.id)) ?? null
     : null;
 
   if (leadStory) used.add(leadStory.id);
@@ -227,9 +257,14 @@ export function resolveLeadPackage(
     context.compatibilitySelection,
     context.coverages ?? []
   );
-  const latestStories = (manualLatest ? latestCandidates : latestCandidates.filter((story) => !used.has(story.id)))
-    .filter((story) => story.id !== leadStory?.id)
-    .slice(0, config.latest.limit);
+  const latestStories = withPins(
+    (manualLatest ? latestCandidates : latestCandidates.filter((story) => !used.has(story.id)))
+      .filter((story) => story.id !== leadStory?.id)
+      .slice(0, config.latest.limit),
+    config.latest.limit,
+    // Latest positions are 0.. (the lead is -1).
+    new Map([...(context.pins ?? new Map())].filter(([position]) => position >= 0))
+  );
 
   return {
     packageId,
@@ -541,11 +576,45 @@ export type HomepageDocumentResolutionInput = {
   publication: HomepagePublicationInput;
   sportsSchedule: HomepageSportsSchedule;
   coverages?: readonly HomepageCoverageInput[];
+  /** Front Page placements (slot id → Story id). Absent or empty: the automatic homepage, exactly as before. */
+  placements?: HomepagePlacements;
 };
+
+/** Which Story ended up in each slot, and whether an editor pinned it there. */
+export type ResolvedHomepageSlot = { id: string; packageId: string; label: string; storyId: number | null; pinned: boolean };
 
 export type ResolvedHomepageDocument = {
   packages: ResolvedHomepagePackage[];
+  slots: ResolvedHomepageSlot[];
+  /** Placements that could not apply (removed slot, unavailable Story, duplicate, or a package the publication does not show). */
+  placementIssues: Array<PlacementIssue | { slotId: string; storyId: number; reason: "not-rendered" }>;
 };
+
+/** Which compatibility bucket a package's positions come from (docs/weekly-wildcat-homepage-inventory.md). */
+const OCCUPIED_BUCKET: Partial<Record<string, keyof HomepageOccupiedPositions | "latest-or-lead">> = {
+  [LEAD_PACKAGE_TYPE]: "latest-or-lead",
+  [BRIEF_PACKAGE_TYPE]: "brief",
+  [IN_FOCUS_PACKAGE_TYPE]: "inFocus",
+  [SPECIAL_COVERAGE_PACKAGE_TYPE]: "specialCoverage",
+  [OPINION_PACKAGE_TYPE]: "opinion",
+  [SPORTS_PACKAGE_TYPE]: "field",
+  [MORE_PACKAGE_TYPE]: "more"
+};
+
+function slotStoryId(slot: HomepageSlot, entry: ResolvedHomepagePackage | undefined): number | null {
+  if (!entry) return null;
+  const pick = (stories: ReadonlyArray<{ id: number } | null | undefined>, index: number) => stories[index]?.id ?? null;
+  switch (entry.type) {
+    case LEAD_PACKAGE_TYPE: return slot.role === "lead" ? entry.package.lead?.id ?? null : pick(entry.package.latest.stories, slot.index);
+    case BRIEF_PACKAGE_TYPE:
+    case OPINION_PACKAGE_TYPE:
+    case MORE_PACKAGE_TYPE:
+    case SPORTS_PACKAGE_TYPE: return pick([entry.package.lead, ...entry.package.rail], slot.index);
+    case IN_FOCUS_PACKAGE_TYPE: return entry.package.story?.id ?? null;
+    case SPECIAL_COVERAGE_PACKAGE_TYPE: return pick(entry.package.stories, slot.index);
+    default: return null;
+  }
+}
 
 /**
  * Resolves one complete design document in document order.
@@ -561,20 +630,41 @@ export type ResolvedHomepageDocument = {
  * neither host can drift from the other.
  */
 export function resolveHomepageDocument(input: HomepageDocumentResolutionInput): ResolvedHomepageDocument {
+  const slots = homepageSlots(input.document);
+  const byId = new Map(input.stories.map((story) => [story.id, story]));
+  // 1. Validate placements; 2. reserve their Stories page-wide (with the design's own manual pins).
+  const { valid, issues } = validatePlacements(slots, input.placements, (storyId) => byId.has(storyId));
   const pinnedStoryIds = collectPinnedStoryIds(input.document);
-  const selection = resolveCompatibilityHomepageSelection(input.stories, pinnedStoryIds);
+  for (const storyId of valid.values()) pinnedStoryIds.add(storyId);
+  const pinsByPackage = new Map<string, Map<number, HomepageStoryInput>>();
+  for (const slot of slots) {
+    const storyId = valid.get(slot.id);
+    if (storyId === undefined) continue;
+    const pins = pinsByPackage.get(slot.packageId) ?? new Map<number, HomepageStoryInput>();
+    pins.set(slot.role === "lead" ? -1 : slot.index, byId.get(storyId)!);
+    pinsByPackage.set(slot.packageId, pins);
+  }
+  const occupied: HomepageOccupiedPositions = {};
+  for (const slot of slots) {
+    if (!valid.has(slot.id)) continue;
+    const bucket = OCCUPIED_BUCKET[slot.packageType] === "latest-or-lead" ? (slot.role === "lead" ? "lead" : "latest") : OCCUPIED_BUCKET[slot.packageType];
+    if (bucket && bucket !== "latest-or-lead") occupied[bucket] = (occupied[bucket] ?? 0) + 1;
+  }
+  const selection = resolveCompatibilityHomepageSelection(input.stories, pinnedStoryIds, occupied);
   const compatibilitySelection = documentUsesCompatibilitySelection(input.document);
   const usedStoryIds = new Set(pinnedStoryIds);
   const resolved: ResolvedHomepagePackage[] = [];
 
   for (const entry of input.document.packages) {
+    // 3. Each package puts its pinned Stories in their exact positions; 4. automatic selection fills the rest.
     const context: HomepagePackageResolutionContext = {
       stories: input.stories,
       selection,
       usedStoryIds,
       compatibilitySelection,
       publication: input.publication,
-      coverages: input.coverages ?? []
+      coverages: input.coverages ?? [],
+      pins: pinsByPackage.get(entry.id)
     };
     let resolvedEntry: ResolvedHomepagePackage;
 
@@ -617,8 +707,15 @@ export function resolveHomepageDocument(input: HomepageDocumentResolutionInput):
     }
 
     resolved.push(resolvedEntry);
+    // 5. One page-wide used set: no Story appears twice.
     claimResolvedStories(usedStoryIds, resolvedEntry);
   }
 
-  return { packages: resolved };
+  const packages = new Map(resolved.map((entry) => [entry.package.packageId, entry]));
+  const resolvedSlots: ResolvedHomepageSlot[] = slots.map((slot) => {
+    const storyId = slotStoryId(slot, packages.get(slot.packageId));
+    return { id: slot.id, packageId: slot.packageId, label: slot.label, storyId, pinned: storyId !== null && valid.get(slot.id) === storyId };
+  });
+  const notRendered = [...valid].filter(([slotId, storyId]) => !resolvedSlots.some((slot) => slot.id === slotId && slot.storyId === storyId)).map(([slotId, storyId]) => ({ slotId, storyId, reason: "not-rendered" as const }));
+  return { packages: resolved, slots: resolvedSlots, placementIssues: [...issues, ...notRendered] };
 }

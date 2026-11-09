@@ -16,6 +16,7 @@ import type { Story } from "../../payload-types";
 import { getJson, postJson } from "./api";
 import { formatDay, SectionHeading } from "./parts";
 import { StoryDistribution } from "./StoryDistribution";
+import { StoryFrontPage } from "./StoryFrontPage";
 import { StoryCorrections } from "./StoryCorrections";
 import type { StoryScreenContext } from "./StoryScreen";
 
@@ -116,6 +117,7 @@ export function HistoryTab({ context }: { context: StoryScreenContext }) {
         </Collapsible>)}
       </ItemGroup>
     </section>
+    {hasPublishedDoc ? <StoryFrontPage context={context} /> : null}
     {hasPublishedDoc ? <StoryDistribution context={context} /> : null}
     {hasPublishPermission && !context.readOnly ? <StoryCorrections context={context} /> : null}
     <AlertDialog open={restoring !== null} onOpenChange={(open) => { if (!open && !busy) setRestoring(null); }}>

@@ -105,9 +105,16 @@ const datasets = obj({
   pages: z.array(page), corrections: z.array(correction.extend({ storyId: id })), collections: z.array(collection),
   events: z.array(event), polls: z.array(poll), media: z.array(media), redirects: z.array(redirect)
 });
+/**
+ * The active Front Page placements (docs/front-page.md): editorial intent only,
+ * slot id → published Story id, applied by the one homepage resolver. Absent
+ * when the homepage is fully automatic. Never drafts, schedules or history.
+ */
+const frontPage = obj({ placements: z.record(z.string().regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/).max(80), id), activatedAt: instant });
 export const publicBuildSnapshotV2Schema = obj({
   schemaVersion: z.literal(PUBLIC_SNAPSHOT_SCHEMA_VERSION), revision: count, generatedAt: instant, publication, datasets,
-  counts: z.record(datasets.keyof(), count)
+  counts: z.record(datasets.keyof(), count),
+  frontPage: frontPage.optional()
 });
 
 export type PublicStorySnapshot = PublicStory<number> & Omit<z.infer<typeof story>, keyof PublicStory<number>> & { id: number; section: PublicTerm; videoMetadata: PrimaryVideo | null };
@@ -282,6 +289,12 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
     requireFact(paths.has(row.to) || fixedDestinations.has(row.to), `redirect target ${row.to} has no public record`);
   }
   for (const row of data.redirects) claim(row.from);
+  // Front Page placements name only published Stories in this snapshot, each at most once.
+  if (snapshot.frontPage) {
+    const placed = Object.values(snapshot.frontPage.placements);
+    for (const storyId of placed) requireFact(stories.has(storyId), `front page places Story ${storyId}, which is not in the snapshot`);
+    requireFact(new Set(placed).size === placed.length, "front page places a Story twice");
+  }
   return snapshot;
 }
 

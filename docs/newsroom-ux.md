@@ -31,6 +31,17 @@ provider is configured in Payload, so no send, newsletter or delivery controls
 are offered. The legacy shared adapter still has no standalone task list or
 secondary format write; Tasks and Write own those actions.
 
+## Reporting, Field Mode and Front Page
+
+The Story screen has a **Reporting** tab ([reporting](reporting.md)): one
+notebook of notes, recordings, documents, photos, links and live updates, with
+transcripts, verified quotes and the article's Reporting sheet. Field Mode
+(`/admin/field`, [Field Mode](field-mode.md)) is phone-first capture with an
+offline outbox. The Front Page Desk (`/admin/front-page`, [front page](front-page.md))
+pins published Stories into the code-owned homepage's slots and publishes or
+schedules those changes. Distribution's richer workflow is not built yet; its
+copy actions are unchanged.
+
 ## Notifications
 
 The bell in the Byline header is each person's inbox and settings. The same
@@ -46,6 +57,8 @@ eight notifications as WordPress, each on by default, in the inbox and by email:
 | Appointments | New assignees of an appointment | Assigned or reassigned |
 | Publishing failures | Editors and administrators | Public snapshot or media preparation fails for good |
 | Daily due digest | Anyone with something due | 07:00 on the worker clock: open tasks, media work and story deadlines due today or overdue, and today's appointments |
+| Transcripts | Whoever uploaded or requested the recording | A transcript finishes (asynchronous, so the uploader is told) |
+| Front Page failures | Editors | A scheduled homepage change could not be activated |
 
 Nobody is notified of their own change, and imports notify nobody. A
 notification stores only references (story, actor, a short detail); headlines

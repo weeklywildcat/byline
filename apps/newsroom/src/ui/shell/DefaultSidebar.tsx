@@ -53,10 +53,20 @@ export function DefaultSidebar({ items, active, homeHref, user, systemHref, logo
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
-                {items.map((item) => <NavLink key={item.key} item={item} active={item.key === active} count={countFor(item.key)} />)}
+                {items.filter((item) => !item.group).map((item) => <NavLink key={item.key} item={item} active={item.key === active} count={countFor(item.key)} />)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {items.some((item) => item.group === "publish") ? (
+            <SidebarGroup>
+              <SidebarGroupLabel>Publish</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {items.filter((item) => item.group === "publish").map((item) => <NavLink key={item.key} item={item} active={item.key === active} />)}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : null}
         </nav>
         {stories ? <SavedViews storiesHref={stories.href} counts={counts?.views} /> : null}
       </SidebarContent>

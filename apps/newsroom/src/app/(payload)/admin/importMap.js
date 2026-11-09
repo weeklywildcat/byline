@@ -32,6 +32,7 @@ import { BylineProfile as BylineProfile_f370a8ad138a4aa17aed328f28cde22c } from 
 import { BylineContentHealth as BylineContentHealth_0d02e28469bc7e97b4989a1d5441b912 } from '../../../components/BylineContentHealth'
 import { BylineSite as BylineSite_e0f1ba5d56b7344672f93a4ac3cda105 } from '../../../components/BylineSite'
 import { BylineField as BylineField_145c1626d5f07e50642d1c29328c2cc6 } from '../../../components/BylineField'
+import { BylineFrontPage as BylineFrontPage_f30d95788dc47e89b60f18532bf4e2fb } from '../../../components/BylineFrontPage'
 import { SystemAdministration as SystemAdministration_b8606e8d06c732ec95be4959d2dbc53e } from '../../../components/SystemAdministration'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
@@ -71,6 +72,7 @@ export const importMap = {
   "/components/BylineContentHealth#BylineContentHealth": BylineContentHealth_0d02e28469bc7e97b4989a1d5441b912,
   "/components/BylineSite#BylineSite": BylineSite_e0f1ba5d56b7344672f93a4ac3cda105,
   "/components/BylineField#BylineField": BylineField_145c1626d5f07e50642d1c29328c2cc6,
+  "/components/BylineFrontPage#BylineFrontPage": BylineFrontPage_f30d95788dc47e89b60f18532bf4e2fb,
   "/components/SystemAdministration#SystemAdministration": SystemAdministration_b8606e8d06c732ec95be4959d2dbc53e,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

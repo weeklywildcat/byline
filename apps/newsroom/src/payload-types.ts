@@ -94,6 +94,7 @@ export interface Config {
     'reporting-files': ReportingFile;
     'reporting-transcripts': ReportingTranscript;
     'transcript-selections': TranscriptSelection;
+    'front-page-revisions': FrontPageRevision;
     polls: Poll;
     users: User;
     'payload-kv': PayloadKv;
@@ -142,6 +143,7 @@ export interface Config {
     'reporting-files': ReportingFilesSelect<false> | ReportingFilesSelect<true>;
     'reporting-transcripts': ReportingTranscriptsSelect<false> | ReportingTranscriptsSelect<true>;
     'transcript-selections': TranscriptSelectionsSelect<false> | TranscriptSelectionsSelect<true>;
+    'front-page-revisions': FrontPageRevisionsSelect<false> | FrontPageRevisionsSelect<true>;
     polls: PollsSelect<false> | PollsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -179,6 +181,7 @@ export interface Config {
       'deliver-notification': TaskDeliverNotification;
       'send-due-digest': TaskSendDueDigest;
       'transcribe-reporting-file': TaskTranscribeReportingFile;
+      'activate-front-page': TaskActivateFrontPage;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -1229,6 +1232,32 @@ export interface TranscriptSelection {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-page-revisions".
+ */
+export interface FrontPageRevision {
+  id: number;
+  state: 'draft' | 'scheduled' | 'active' | 'archived';
+  placements:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  scheduledAt?: string | null;
+  activatedAt?: string | null;
+  createdBy?: (number | null) | User;
+  publishedBy?: (number | null) | User;
+  summary?: string | null;
+  basedOn?: (number | null) | FrontPageRevision;
+  failure?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "polls".
  */
 export interface Poll {
@@ -1334,6 +1363,7 @@ export interface PayloadJob {
           | 'deliver-notification'
           | 'send-due-digest'
           | 'transcribe-reporting-file'
+          | 'activate-front-page'
           | 'schedulePublish';
         taskID: string;
         input?:
@@ -1379,6 +1409,7 @@ export interface PayloadJob {
         | 'deliver-notification'
         | 'send-due-digest'
         | 'transcribe-reporting-file'
+        | 'activate-front-page'
         | 'schedulePublish'
       )
     | null;
@@ -2141,6 +2172,23 @@ export interface TranscriptSelectionsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-page-revisions_select".
+ */
+export interface FrontPageRevisionsSelect<T extends boolean = true> {
+  state?: T;
+  placements?: T;
+  scheduledAt?: T;
+  activatedAt?: T;
+  createdBy?: T;
+  publishedBy?: T;
+  summary?: T;
+  basedOn?: T;
+  failure?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "polls_select".
  */
 export interface PollsSelect<T extends boolean = true> {
@@ -2686,6 +2734,17 @@ export interface TaskSendDueDigest {
 export interface TaskTranscribeReportingFile {
   input: {
     transcriptId: number;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskActivate-front-page".
+ */
+export interface TaskActivateFrontPage {
+  input: {
+    revisionId: number;
+    at?: string | null;
   };
   output?: unknown;
 }

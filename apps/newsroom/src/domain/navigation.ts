@@ -8,6 +8,8 @@ export type NavItem = {
   readonly minimumRole: Role;
   /** Active only on exactly its path (Collections: Payload's raw `/collections/<slug>` screens are not it). */
   readonly exact?: boolean;
+  /** Editors' coordination desks are grouped under "Publish"; everything else is the main group. */
+  readonly group?: "publish";
 };
 
 const RANK: Record<Role, number> = { staff: 1, editor: 2, administrator: 3 };
@@ -56,7 +58,10 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
   { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
   { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true },
-  { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true }
+  { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true },
+  // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
+  { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
+  { key: "content-health", label: "Content Health", path: "/content-health", minimumRole: "editor", exact: true, group: "publish" }
 ];
 
 export function navigationFor(role: Role): NavItem[] {

@@ -5,6 +5,7 @@ import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { PollWidget } from "@/components/PollWidget";
 import { optionalBuildData } from "@/lib/build-data";
+import { getNativeSnapshot } from "@/lib/native-snapshot";
 import { filterPublicHomepagePosts, getBehindTheScenesPosts } from "@/lib/content";
 import {
   getSchoolEvents,
@@ -81,12 +82,15 @@ export async function getHomepagePageData() {
   const organizationSchema = getOrganizationSchema();
   const posts = filterPublicHomepagePosts(allPosts);
 
+  // Front Page placements arrive only through the build snapshot (never a runtime request); without them the homepage is automatic.
+  const placements = getNativeSnapshot()?.frontPage?.placements;
   const resolvedHome = resolveHomepageDocument({
     document: homeDesign,
     posts,
     coverages,
     publication,
-    sportsSchedule
+    sportsSchedule,
+    ...(placements ? { placements } : {})
   });
 
   return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema, behindTheScenesPosts: getBehindTheScenesPosts(allPosts).slice(0, 2) };

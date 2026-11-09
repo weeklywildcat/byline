@@ -29,7 +29,7 @@ import path from "node:path";
 import { sql } from "@payloadcms/db-postgres";
 import { APIError, commitTransaction, initTransaction, killTransaction, type Where } from "payload";
 import { atLeast, relationId, relationIds, sameId } from "../access/user";
-import { AUDIO_MIME_TYPES, IMAGE_MIME_TYPES, LIBRARY_PREVIEW_SIZE, MEDIA_MIME_TYPES } from "../collections/Media";
+import { AUDIO_MIME_TYPES, IMAGE_MIME_TYPES, LIBRARY_PREVIEW_SIZE, MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../collections/Media";
 import { MEDIA_FOLDERS_SLUG } from "../collections/MediaFolders";
 import { addDays, localDay, localToInstant } from "../domain/dates";
 import { PRODUCTION_TYPE_OPTIONS } from "../domain/vocabulary";
@@ -230,9 +230,14 @@ export async function mediaNavigator(ctx: ScreenContext): Promise<MediaNavigator
 }
 
 /** Payload's multipart limit (MEDIA_UPLOAD_MAX_BYTES, 50 MB); the upload flow says so before sending a larger file. */
+/**
+ * Media's own limit. Payload's multipart limit is shared with private reporting
+ * files (larger, for interview audio), so it is capped here: Media refuses
+ * anything at or above MEDIA_UPLOAD_MAX_BYTES (collections/Media.ts).
+ */
 export function uploadLimit(ctx: ScreenContext): number {
   const configured = (ctx.req.payload.config.upload as { limits?: { fileSize?: number } } | undefined)?.limits?.fileSize;
-  return typeof configured === "number" && configured > 0 ? configured : 20 * 1024 * 1024;
+  return Math.min(typeof configured === "number" && configured > 0 ? configured : 20 * 1024 * 1024, MEDIA_UPLOAD_MAX_BYTES);
 }
 
 /** People who have uploaded anything, for the Uploader filter. */

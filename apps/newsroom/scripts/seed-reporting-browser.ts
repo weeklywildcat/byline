@@ -85,6 +85,17 @@ try {
     data: { story, transcript: transcript.id, file: file.id, source: coach, kind: "quote", text: "It came down to execution and the kids' effort.", attribution: "Coach Smith, Head coach", speaker: "SPEAKER_00", startMs: 41000, endMs: 58000, segmentIds: ["s4"], groundRules: file.groundRules, state: "saved", createdBy: alice.id } as never
   });
   void tipster;
+  // Published stories for the Front Page Desk.
+  const news = (await payload.create({ collection: "sections", data: { name: "News", slug: "news" } })).id;
+  const opinion = (await payload.create({ collection: "sections", data: { name: "Opinion", slug: "opinion" } })).id;
+  const headlines: Array<[string, number]> = [
+    ["School board approves new turf for Wildcat Stadium", news], ["Seniors launch food drive across three campuses", news], ["Band heads to state finals for first time since 2019", news],
+    ["Editorial: Late buses are a solvable problem", opinion], ["Column: What the new schedule gets right", opinion], ["Wildcats clinch region title with late field goal", section],
+    ["Robotics team wins regional design award", news], ["Library extends weekend hours for exam season", news]
+  ];
+  for (const [index, [headline, sectionId]] of headlines.entries()) {
+    await payload.create({ collection: "stories", overrideAccess: true, context: { bylineSystem: true }, data: { headline, slug: `fp-${index}`, deck: `${headline}. A short deck for the homepage preview.`, section: sectionId, contributors: [alice.linkedPerson], _status: "published", publishedAt: new Date(Date.now() - (index + 1) * 3_600_000).toISOString() } as never });
+  }
   console.log(JSON.stringify({ story, transcript: transcript.id, accounts: ["editor@example.test", "alice@example.test", "admin@example.test", "bob@example.test"] }));
 } finally {
   await payload.db.destroy?.();

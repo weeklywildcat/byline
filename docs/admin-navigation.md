@@ -77,3 +77,16 @@ and offers its context in a sheet:
 - `calendar-workspace`: the Calendar: icon rail plus its controls.
 - `media-workspace`: Media: icon rail plus the Media navigator.
 - `collection-workspace`: an open Collection: icon rail plus the switcher.
+
+
+## Payload migration: Publish group and Field Mode
+
+Editors' primary navigation has a **Publish** group for the desks that
+coordinate many Stories: **Front Page** (`/admin/front-page`, see
+[front page](front-page.md)) and **Content Health** (moved there from the
+account menu). Ordinary Story-level work (Reporting, the Story's Front page
+status and Feature action) stays on the Story itself. There is no Studio.
+
+**Field Mode** (`/admin/field`, see [Field Mode](field-mode.md)) is a separate,
+reporter-oriented entry in the account menu and ⌘K, with its own small shell.
+Reporting is not a global destination: it is the Story screen's Reporting tab.

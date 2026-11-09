@@ -10,3 +10,4 @@ export * from "./more-package";
 export * from "./newsletter-package";
 export * from "./pins";
 export * from "./home-design";
+export * from "./slots";

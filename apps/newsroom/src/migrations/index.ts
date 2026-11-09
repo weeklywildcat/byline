@@ -16,6 +16,7 @@ import * as migration_20261108_163507_video_facts from './20261108_163507_video_
 import * as migration_20261108_165129_notifications from './20261108_165129_notifications';
 import * as migration_20261108_173200_public_deploy_hook from './20261108_173200_public_deploy_hook';
 import * as migration_20261109_035544_reporting from './20261109_035544_reporting';
+import * as migration_20261109_130958_front_page from './20261109_130958_front_page';
 
 export const migrations = [
   {
@@ -106,6 +107,11 @@ export const migrations = [
   {
     up: migration_20261109_035544_reporting.up,
     down: migration_20261109_035544_reporting.down,
-    name: '20261109_035544_reporting'
+    name: '20261109_035544_reporting',
+  },
+  {
+    up: migration_20261109_130958_front_page.up,
+    down: migration_20261109_130958_front_page.down,
+    name: '20261109_130958_front_page'
   },
 ];
