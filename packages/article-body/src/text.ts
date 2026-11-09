@@ -10,7 +10,7 @@ export function cleanText(value: unknown, max?: number): string {
 
 /** One line of text (labels, headings, attributions): inner line breaks become spaces. */
 export function cleanLine(value: unknown, max?: number): string {
-  return cleanText(typeof value === "string" ? value.replace(/\s*\n\s*/g, " ") : value, max);
+  return cleanText(typeof value === "string" ? value.replace(/\s+/g, (space) => space.includes("\n") ? " " : space) : value, max);
 }
 
 /** Plain text split into paragraphs at blank lines; single line breaks are kept inside a paragraph. */
