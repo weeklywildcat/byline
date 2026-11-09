@@ -3,6 +3,7 @@ import { APIError } from "payload";
 import { scopeManages, storyScope } from "../access/story-context";
 import { atLeast, sameId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
+import { cancelOpenRun } from "./review";
 import { planFor, type ScreenContext } from "./screen-models";
 
 /**
@@ -70,6 +71,8 @@ export async function moveLifecycle(ctx: ScreenContext, storyId: number, input: 
       overrideAccess: true,
       context: { bylineSystem: true, bylineActor: ctx.user.id }
     });
+    // A Story put aside leaves review; Resume sends it back to Drafting to be resubmitted.
+    if (target === "on-hold" || target === "dropped") await cancelOpenRun(ctx.req, storyId, "review-cancelled");
     return { phase: target, label: phaseLabel(target), revision: Date.parse(updated.updatedAt) };
   });
 }

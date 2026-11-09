@@ -20,6 +20,7 @@ import {
 } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
 import { storyLivePreview } from "../preview/config";
+import { staleApprovalsAfterStoryChange } from "../newsroom/review";
 
 /**
  * Keep the story's plan in step: create it with the story, and copy the
@@ -204,7 +205,7 @@ export const Stories: CollectionConfig = {
       delete req.context.bylineVersionRestore;
       return data;
     }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, guardOffRecordQuotes, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
-    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange, staleApprovalsAfterStoryChange],
     beforeDelete: [async ({ id, req }) => {
       // A hard delete removes private dependents; the ordinary trash update keeps them.
       const where = { story: { equals: id } };

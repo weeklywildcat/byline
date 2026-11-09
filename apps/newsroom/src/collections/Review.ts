@@ -62,8 +62,10 @@ export const ReviewRuns: CollectionConfig = {
     { name: "status", type: "select", required: true, defaultValue: "active", index: true, options: RUN_STATUSES.map((value) => ({ value, label: value })) },
     { name: "round", type: "number", required: true, defaultValue: 1 },
     { name: "steps", type: "json", required: true },
-    // Everyone who may act on the open step now; story access (access/story-context.ts) reads this.
+    // Everyone who may act on the open step now (queues, notifications).
     { name: "reviewers", type: "relationship", relationTo: "users", hasMany: true, index: true },
+    // Everyone routed to or acting on this review; while it is open they may read the Story (access/story-context.ts).
+    { name: "participants", type: "relationship", relationTo: "users", hasMany: true, index: true },
     // The exact immutable Payload version under review (the `_stories_v` row id).
     { name: "submittedVersion", type: "text", required: true, index: true },
     { name: "submittedAt", type: "date", required: true },

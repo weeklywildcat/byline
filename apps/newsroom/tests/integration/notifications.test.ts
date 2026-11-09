@@ -98,13 +98,15 @@ describe("triggers", () => {
     expect(await received("editor")).toHaveLength(0);
   });
 
-  it("tells the editor when a story moves into review, and the writers when it is sent back", async () => {
+  it("tells the editor when a story is moved into review by hand, and the writers when it is sent back", async () => {
     expect((await workflow("alice", "budget", { status: "writing" })).status).toBe(200);
     expect(await received("chief", "readyForReview")).toHaveLength(0);
-    expect((await workflow("alice", "budget", { status: "editing" })).status).toBe(200);
+    // Reporters submit for review (the review engine notifies the routed reviewer); a manual move is an editor's override.
+    expect((await workflow("alice", "budget", { status: "editing" })).status).toBe(403);
+    expect((await workflow("editor", "budget", { status: "editing" })).status).toBe(200);
     expect(await received("chief", "readyForReview")).toHaveLength(1);
-    // Editing to Ready is still the same review: no second notice.
-    expect((await workflow("alice", "budget", { status: "ready" })).status).toBe(200);
+    // Review to Ready is the same review finishing: no second review notice.
+    expect((await workflow("editor", "budget", { status: "ready" })).status).toBe(200);
     expect(await received("chief", "readyForReview")).toHaveLength(1);
 
     expect((await workflow("chief", "budget", { status: "writing" })).status).toBe(200);

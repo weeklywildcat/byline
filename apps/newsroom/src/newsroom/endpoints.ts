@@ -72,6 +72,7 @@ import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, p
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
 import { effectiveWorkflow, workflowToStore } from "../domain/workflow";
 import { moveLifecycle } from "./lifecycle";
+import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
 import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
@@ -275,6 +276,8 @@ async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<
   const editor = atLeast(ctx.user, "editor");
   if (!editor && ("deadline" in data || "plannedPublication" in data || "editor" in data)) throw new APIError("Only editors set deadlines, publication plans and editors.", 403);
   const updated = await req.payload.update({ collection: "story-plans", id: plan.id, data, ...asUser(ctx) });
+  // An editor's manual stage change is an override: an open review closes and says so in Activity.
+  if (data.workflow !== undefined && data.workflow !== plan.workflow) await cancelOpenRun(req, storyId, "review-override");
   const story = await req.payload.findByID({ collection: "stories", id: storyId, draft: true, depth: 0, select: { _status: true, headline: true }, ...asUser(ctx) });
   const published = story._status === "published";
   return {
@@ -585,6 +588,14 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/workflow", method: "get", handler: handle((ctx, req) => workflowReadModel(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
   { path: "/byline/stories/:id/lifecycle", method: "post", handler: handle(async (ctx, req) => moveLifecycle(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review", method: "get", handler: handle((ctx, req) => reviewState(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/submitted", method: "get", handler: handle((ctx, req) => submittedVersion(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/submit", method: "post", handler: handle((ctx, req) => submitForReview(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/claim", method: "post", handler: handle(async (ctx, req) => claimReview(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review/comments", method: "post", handler: handle(async (ctx, req) => addReviewComment(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review/comments/:comment", method: "patch", handler: handle(async (ctx, req) => changeReviewComment(ctx, idParam(req), idParam(req, "comment"), await body(req))) },
+  { path: "/byline/stories/:id/review/comments/:comment", method: "delete", handler: handle((ctx, req) => changeReviewComment(ctx, idParam(req), idParam(req, "comment"), { remove: true })) },
+  { path: "/byline/stories/:id/review/decision", method: "post", handler: handle(async (ctx, req) => decideReview(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/contributors", method: "put", handler: handle(saveContributors) },
   { path: "/byline/stories/:id/resources", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "add")) },
   { path: "/byline/stories/:id/resources/:resourceId", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "update")) },

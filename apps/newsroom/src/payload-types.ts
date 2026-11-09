@@ -1488,6 +1488,7 @@ export interface ReviewRun {
     | boolean
     | null;
   reviewers?: (number | User)[] | null;
+  participants?: (number | User)[] | null;
   submittedVersion: string;
   submittedAt: string;
   submittedBy?: (number | null) | User;
@@ -2588,6 +2589,7 @@ export interface ReviewRunsSelect<T extends boolean = true> {
   round?: T;
   steps?: T;
   reviewers?: T;
+  participants?: T;
   submittedVersion?: T;
   submittedAt?: T;
   submittedBy?: T;
