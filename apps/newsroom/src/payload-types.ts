@@ -271,14 +271,6 @@ export interface Story {
   immersiveAlignment?: ('bottom-left' | 'center') | null;
   reportingNote?: string | null;
   /**
-   * Live coverage is a timeline of updates on this story, not a story format.
-   */
-  liveCoverage?: {
-    state?: ('off' | 'live' | 'ended') | null;
-    startedAt?: string | null;
-    endedAt?: string | null;
-  };
-  /**
    * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
    */
   slug: string;
@@ -595,6 +587,15 @@ export interface StoryPlan {
    * May publish live updates on this story (only live updates; never the article).
    */
   livePublishers?: (number | User)[] | null;
+  /**
+   * Story mode and coverage state. Live is a mode of this story, not a second story.
+   */
+  liveCoverage?: {
+    mode?: ('standard' | 'live') | null;
+    state?: ('off' | 'live' | 'ended') | null;
+    startedAt?: string | null;
+    endedAt?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -642,6 +643,11 @@ export interface StoryActivity {
     | 'live-published-from-field'
     | 'live-queued-sent'
     | 'live-publishers-changed'
+    | 'live-published'
+    | 'live-mode-changed'
+    | 'live-coverage-started'
+    | 'live-coverage-resumed'
+    | 'live-coverage-ended'
     | 'homepage-featured'
     | 'distribution-assigned'
     | 'distribution-ready'
@@ -1638,13 +1644,6 @@ export interface StoriesSelect<T extends boolean = true> {
   presentation?: T;
   immersiveAlignment?: T;
   reportingNote?: T;
-  liveCoverage?:
-    | T
-    | {
-        state?: T;
-        startedAt?: T;
-        endedAt?: T;
-      };
   slug?: T;
   publishedAt?: T;
   plan?: T;
@@ -1681,6 +1680,14 @@ export interface StoryPlansSelect<T extends boolean = true> {
   preset?: T;
   distributionSeededAt?: T;
   livePublishers?: T;
+  liveCoverage?:
+    | T
+    | {
+        mode?: T;
+        state?: T;
+        startedAt?: T;
+        endedAt?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

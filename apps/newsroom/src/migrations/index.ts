@@ -18,6 +18,7 @@ import * as migration_20261108_173200_public_deploy_hook from './20261108_173200
 import * as migration_20261109_035544_reporting from './20261109_035544_reporting';
 import * as migration_20261109_130958_front_page from './20261109_130958_front_page';
 import * as migration_20261109_134558_distribution from './20261109_134558_distribution';
+import * as migration_20261109_161224_live_story_mode from './20261109_161224_live_story_mode';
 
 export const migrations = [
   {
@@ -118,6 +119,11 @@ export const migrations = [
   {
     up: migration_20261109_134558_distribution.up,
     down: migration_20261109_134558_distribution.down,
-    name: '20261109_134558_distribution'
+    name: '20261109_134558_distribution',
+  },
+  {
+    up: migration_20261109_161224_live_story_mode.up,
+    down: migration_20261109_161224_live_story_mode.down,
+    name: '20261109_161224_live_story_mode'
   },
 ];

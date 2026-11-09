@@ -2,7 +2,7 @@ import { body, handle, idParam, json } from "./http";
 import { relatedSuggestions } from "./related-suggestions";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
-import { changeLiveUpdate, deleteLiveUpdate, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
+import { changeLiveCoverage, changeLiveUpdate, deleteLiveUpdate, liveCandidates, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
 import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
@@ -498,6 +498,8 @@ const collectionEndpoints: Endpoint[] = [
 export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live/coverage", method: "post", handler: handle(async (ctx, req) => changeLiveCoverage(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live/publishers", method: "get", handler: handle(async (ctx, req) => ({ people: await liveCandidates(ctx, idParam(req)) })) },
   { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
   { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
   // Public, read-only, published-only: what the Worker serves at /api/live/<id> between builds. No credentials, no cookies.

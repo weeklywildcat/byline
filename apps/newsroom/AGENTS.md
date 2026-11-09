@@ -203,9 +203,19 @@ snapshot; nothing in this app serves public reading.
 - **Field Mode** ([docs/field-mode.md](../../docs/field-mode.md)) is `/admin/field`
   without the desktop template; keep its bundle free of the editor, Front Page
   and Distribution. Every capture goes through the IndexedDB outbox with a
-  client key; never report "Posted" before the server says published. The
-  Story-level live grant (`livePublishers`, `access/live-context.ts`) covers
+  client key; never report "Posted" before the server says published. A live
+  outbox item freezes the reporter's `delivery` (`publish` | `desk`) and the server
+  re-decides at send time (`canPublishLiveNow`); never infer it from permission.
+  The Story-level live grant (`livePublishers`, `access/live-context.ts`) covers
   live updates only.
+- **Live coverage** ([docs/live-coverage.md](../../docs/live-coverage.md)) is a
+  mode of the one Story, never a tab, collection or second Story. Story mode
+  (Standard | Live) and coverage state (Not started | Live now | Ended) are separate
+  and live on `story-plans.liveCoverage`, **not** the versioned Story, so going live
+  never publishes unpublished article copy. Transitions are `domain/live-coverage.ts`,
+  editor-only through `changeLiveCoverage`; "may this go public now" is the one
+  `publishBlock`/`canPublishLiveNow` rule shared by Write, Field and the
+  `live-updates` guard. Write and Field share `src/ui/live`; do not fork the desk.
 - **Front Page** ([docs/front-page.md](../../docs/front-page.md)) is editorial
   priority, not design: placements (slot id → Story id) through the one
   resolver; revisions are activated only by Publish or the scheduled job, which

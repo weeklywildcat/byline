@@ -21,6 +21,11 @@ async function account(key: string, role: User["role"], person = true) {
   const user = await payload.create({ collection: "users", data: { email: `live-${key}@example.test`, password: `pw-${key}-123456`, name: `${key} Account`, role, enabled: true, linkedPerson: people[key] ?? null } });
   accounts[key] = { ...user, collection: "users" } as User;
 }
+/** Coverage mode and state live on the unversioned plan, so tests set them there. */
+async function setLive(storyId: number, liveCoverage: { mode?: "standard" | "live"; state?: "off" | "live" | "ended"; startedAt?: string | null; endedAt?: string | null }) {
+  const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, overrideAccess: true })).docs[0];
+  await payload.update({ collection: "story-plans", id: plan.id, data: { liveCoverage } as never, overrideAccess: true, context: { bylineSystem: true } });
+}
 const reqAs = (key: string | null) => createLocalReq(key ? { user: accounts[key] } : {}, payload);
 
 async function call(method: string, path: string, key: string | null, { data, routeParams = {} }: { data?: unknown; routeParams?: Record<string, string> } = {}) {
@@ -48,10 +53,12 @@ beforeAll(async () => {
   await account("stranger", "staff");
   const section = (await payload.create({ collection: "sections", data: { name: "News", slug: "news" } })).id;
   // A published story in live coverage with Alice (a manager) and a participant (Bob holds a task on it).
-  story.game = (await payload.create({ collection: "stories", data: { headline: "Homecoming game live", section, contributors: [people.alice], _status: "published", liveCoverage: { state: "live" } } as never, overrideAccess: true })).id;
+  story.game = (await payload.create({ collection: "stories", data: { headline: "Homecoming game live", section, contributors: [people.alice], _status: "published" } as never, overrideAccess: true })).id;
+  await setLive(story.game, { mode: "live", state: "live", startedAt: new Date().toISOString() });
   await payload.create({ collection: "tasks", data: { story: story.game, title: "Shoot the halftime show", assignees: [accounts.bob.id] }, req: await reqAs("editor"), overrideAccess: false });
   // A draft story and one with coverage off.
-  story.draft = (await payload.create({ collection: "stories", draft: true, data: { headline: "Not yet published", section, contributors: [people.alice], liveCoverage: { state: "live" } } as never, overrideAccess: true })).id;
+  story.draft = (await payload.create({ collection: "stories", draft: true, data: { headline: "Not yet published", section, contributors: [people.alice] } as never, overrideAccess: true })).id;
+  await setLive(story.draft, { mode: "live", state: "off" });
   story.off = (await payload.create({ collection: "stories", data: { headline: "No coverage", section, contributors: [people.alice], _status: "published" } as never, overrideAccess: true })).id;
 }, 300_000);
 
@@ -194,13 +201,14 @@ describe("the public feed", () => {
     expect((await feed("off")).status).toBe(404);
     expect((await call("get", "/byline/live/:id", null, { routeParams: { id: "999999" } })).status).toBe(404);
     expect((await call("get", "/byline/live/:id", null, { routeParams: { id: "abc" } })).status).toBe(404);
-    const trashed = (await payload.create({ collection: "stories", data: { headline: "Trashed", section: 1, contributors: [people.alice], _status: "published", liveCoverage: { state: "live" } } as never, overrideAccess: true })).id;
+    const trashed = (await payload.create({ collection: "stories", data: { headline: "Trashed", section: 1, contributors: [people.alice], _status: "published" } as never, overrideAccess: true })).id;
+    await setLive(trashed, { mode: "live", state: "live", startedAt: new Date().toISOString() });
     await payload.update({ collection: "stories", id: trashed, data: { deletedAt: new Date().toISOString() }, overrideAccess: true });
     expect((await call("get", "/byline/live/:id", null, { routeParams: { id: String(trashed) } })).status).toBe(404);
   });
 
   it("keeps ended coverage and its updates", async () => {
-    await payload.update({ collection: "stories", id: story.game, data: { liveCoverage: { state: "ended" } } as never, overrideAccess: true });
+    await setLive(story.game, { state: "ended", endedAt: new Date().toISOString() });
     const live = normalizeLiveCoverage((await feed("game")).body);
     expect(live!.status).toBe("ended");
     expect(live!.endedAt).not.toBe("");
@@ -208,6 +216,7 @@ describe("the public feed", () => {
   });
 
   it("a published update advances the public revision, a draft does not", async () => {
+    await setLive(story.game, { state: "live", endedAt: null });
     const before = await readCurrentRevision(payload);
     await post("alice", "game", { text: "Another private draft" });
     expect(await readCurrentRevision(payload)).toBe(before);

@@ -15,7 +15,6 @@ import type { StoryPlan } from "../payload-types";
 import {
   CONTENT_FORMATS,
   IMMERSIVE_ALIGNMENT_OPTIONS,
-  LIVE_COVERAGE_STATE_OPTIONS,
   STORY_FORMAT_OPTIONS,
   STORY_PRESENTATION_OPTIONS
 } from "../domain/vocabulary";
@@ -204,17 +203,6 @@ export const Stories: CollectionConfig = {
       data.versionRestored = Boolean(restore);
       delete req.context.bylineVersionRestore;
       return data;
-    }, ({ data, originalDoc, req }) => {
-      if (!data.liveCoverage || req.context.bylineImport === true) return data;
-      const previous = originalDoc?.liveCoverage;
-      const state = data.liveCoverage.state ?? previous?.state ?? "off";
-      const now = new Date().toISOString();
-      data.liveCoverage = {
-        state,
-        startedAt: state === "off" ? null : previous?.startedAt ?? now,
-        endedAt: state === "ended" ? previous?.endedAt ?? now : null
-      };
-      return data;
     }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, guardOffRecordQuotes, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
     afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange],
     beforeDelete: [async ({ id, req }) => {
@@ -307,16 +295,6 @@ export const Stories: CollectionConfig = {
           ]
         },
         { name: "reportingNote", label: "How we reported this", type: "textarea", maxLength: 4000 },
-        {
-          name: "liveCoverage",
-          type: "group",
-          admin: { description: "Live coverage is a timeline of updates on this story, not a story format." },
-          fields: [
-            { name: "state", type: "select", defaultValue: "off", options: [...LIVE_COVERAGE_STATE_OPTIONS], access: { create: editorsOnlyField, update: editorsOnlyField } },
-            { name: "startedAt", type: "date", access: { create: () => false, update: () => false }, admin: { readOnly: true } },
-            { name: "endedAt", type: "date", access: { create: () => false, update: () => false }, admin: { readOnly: true } }
-          ]
-        },
         slugField("headline", "stories"),
         { name: "publishedAt", type: "date", index: true, access: { create: editorsOnlyField, update: editorsOnlyField }, admin: { position: "sidebar", description: "First publication. Part of the article URL." } },
       ]

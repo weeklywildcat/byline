@@ -38,7 +38,7 @@ const compare = {
   headline: "Headline", deck: "Deck", kicker: "Kicker", slug: "Slug", publishedAt: "First publication date",
   section: "Section", topics: "Topics", contributors: "Byline", featuredMedia: "Lead image", featuredCaption: "Lead caption",
   format: "Format", video: "Video", presentation: "Presentation", immersiveAlignment: "Headline position",
-  reportingNote: "Reporting note", body: "Story body", liveCoverage: "Live coverage"
+  reportingNote: "Reporting note", body: "Story body"
 } satisfies Partial<Record<keyof Story, string>>;
 
 export async function storyVersion(ctx: ScreenContext, story: number, version: number) {
