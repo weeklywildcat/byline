@@ -62,7 +62,7 @@ function marked(text: string, ranges: Array<[number, number]>, current: [number,
     if (start < at) return;
     if (start > at) parts.push(text.slice(at, start));
     const isCurrent = current !== null && current[0] === start && current[1] === end;
-    parts.push(<mark key={index} data-current={isCurrent ? "" : undefined} className={isCurrent ? "rounded-sm bg-primary text-primary-foreground" : "rounded-sm bg-accent text-accent-foreground"}>{text.slice(start, end)}</mark>);
+    parts.push(<mark key={index} data-current={isCurrent ? "" : undefined} className={isCurrent ? "rounded-sm bg-primary text-primary-foreground" : "rounded-sm bg-primary/15 text-foreground"}>{text.slice(start, end)}</mark>);
     at = end;
   });
   if (at < text.length) parts.push(text.slice(at));
@@ -76,7 +76,13 @@ function marked(text: string, ranges: Array<[number, number]>, current: [number,
  * and a selection becomes a highlight or a quote snapshot. The Source and its
  * ground rules travel beside it (a panel on wide screens, a Sheet on narrow).
  */
-export function TranscriptView({ context, transcriptId, onBack }: { context: StoryScreenContext; transcriptId: number; onBack: () => void }) {
+export function TranscriptView(props: { context: StoryScreenContext; transcriptId: number; onBack: () => void }) {
+  // The measured element exists from the first render (useElementWidth measures on mount), loading or not.
+  const [frameRef, width] = useElementWidth<HTMLDivElement>();
+  return <div ref={frameRef} className="min-w-0" data-transcript-frame=""><TranscriptBody {...props} width={width} /></div>;
+}
+
+function TranscriptBody({ context, transcriptId, onBack, width }: { context: StoryScreenContext; transcriptId: number; onBack: () => void; width: number }) {
   const cache = useQueryClient();
   const storyId = Number(context.storyId);
   const detailQuery = useQuery({
@@ -88,7 +94,6 @@ export function TranscriptView({ context, transcriptId, onBack }: { context: Sto
   const detail = detailQuery.data;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
-  const [frameRef, width] = useElementWidth<HTMLDivElement>();
   const [position, setPosition] = useState(0);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
@@ -192,7 +197,7 @@ export function TranscriptView({ context, transcriptId, onBack }: { context: Sto
   );
 
   return (
-    <div ref={frameRef} className="flex min-w-0 flex-col gap-3" data-transcript-view="">
+    <div className="flex min-w-0 flex-col gap-3" data-transcript-view="">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <BackButton onBack={onBack} />
         <div className="min-w-0 flex-1">
@@ -228,7 +233,7 @@ export function TranscriptView({ context, transcriptId, onBack }: { context: Sto
         </div>
       )}
       <Sheet open={contextOpen && !wide} onOpenChange={setContextOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
           <SheetHeader><SheetTitle>Source & quotes</SheetTitle><SheetDescription>Who is speaking, the ground rules, and the quotes saved from this recording.</SheetDescription></SheetHeader>
           <div className="px-4 pb-6">{contextPanel}</div>
         </SheetContent>
@@ -365,7 +370,7 @@ function SpeakerEditor({ segment, speakers, sourceName, canEdit, transcriptId, a
       <PopoverContent align="start" className="w-72">
         <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
           <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
-          <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} autoFocus />
+          <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
           {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={apply.isPending}>This passage</Button>

@@ -44,7 +44,7 @@ export function ReportingSheet({ context, insert }: { context: StoryScreenContex
   return (
     <Sheet open={open} onOpenChange={(next) => { setOpen(next); if (!next) stop(); }}>
       <SheetTrigger render={<Button ref={trigger} type="button" variant="ghost" size="sm" className="text-muted-foreground" />}><BookOpenText data-icon="inline-start" />Reporting</SheetTrigger>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md" finalFocus={trigger}>
+      <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md" finalFocus={trigger}>
         <SheetHeader>
           <SheetTitle>Reporting</SheetTitle>
           <SheetDescription>Quotes saved from this story's interviews. Only the quote and who said it go into the article.</SheetDescription>

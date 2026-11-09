@@ -48,10 +48,15 @@ const size = (bytes: number) => (bytes >= 1_048_576 ? `${(bytes / 1_048_576).toF
  * carries the Story, Source, Appointment and ground rules forward.
  */
 export function ReportingTab({ context }: { context: StoryScreenContext }) {
+  // Measured from the first render (useElementWidth measures on mount), whatever the body shows.
+  const [frameRef, width] = useElementWidth<HTMLDivElement>();
+  return <div ref={frameRef} className="min-w-0" data-reporting-frame=""><ReportingBody context={context} width={width} /></div>;
+}
+
+function ReportingBody({ context, width }: { context: StoryScreenContext; width: number }) {
   const storyId = Number(context.storyId);
   const cache = useQueryClient();
   const query = useQuery({ queryKey: reportingKey(storyId), queryFn: () => loadReporting(context.api, storyId), refetchInterval: 20_000 });
-  const [frameRef, width] = useElementWidth<HTMLDivElement>();
   const [filter, setFilter] = useState<MaterialFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search, 150);
@@ -126,7 +131,7 @@ export function ReportingTab({ context }: { context: StoryScreenContext }) {
   const transcription = data.capabilities.transcription;
 
   return (
-    <div ref={frameRef} className="flex min-w-0 flex-col gap-4" data-reporting="">
+    <div className="flex min-w-0 flex-col gap-4" data-reporting="">
       <input ref={fileInput} type="file" multiple hidden onChange={(event) => { onFiles("file", event.target.files); event.target.value = ""; }} aria-label="Upload a file" />
       <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={(event) => { onFiles("photo", event.target.files); event.target.value = ""; }} aria-label="Upload a photo" />
       <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) enqueue("transcript", file, file.name); pendingBound.current = null; event.target.value = ""; }} aria-label="Import a transcript" />
@@ -192,7 +197,7 @@ export function ReportingTab({ context }: { context: StoryScreenContext }) {
         {wide ? <aside aria-label="Sources and appointments" className="min-w-0 border-l pl-4">{planning}</aside> : null}
       </div>
       <Sheet open={railOpen && !wide} onOpenChange={setRailOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-sm">
+        <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
           <SheetHeader><SheetTitle>Sources & appointments</SheetTitle><SheetDescription>Who the story is reporting on, and when. Capture from one and it is filed with it.</SheetDescription></SheetHeader>
           <div className="px-4 pb-6">{planning}</div>
         </SheetContent>
@@ -315,7 +320,7 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
   const transcript = file?.transcript ?? null;
 
   return (
-    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-start gap-x-3 py-2.5" data-material={item.kind} data-key={item.key}>
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 py-2.5" data-material={item.kind} data-key={item.key}>
       <span className="pt-0.5 text-muted-foreground [&_svg]:size-4">{iconFor(item)}</span>
       <div className="min-w-0">
         {editing && item.kind === "note" ? (
@@ -335,7 +340,8 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
           </>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {/* Actions sit under the words, never beside them, so text keeps the full measure at any width. */}
+      <div className="col-start-2 flex flex-wrap items-center gap-1.5 empty:hidden">
         {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>{transcript.state === "ready" ? "Open transcript" : transcript.state === "failed" ? "Transcript failed" : "Transcribing…"}</Button> : null}
         {file && !transcript && file.fileKind === "audio" && editable ? <>
           {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
@@ -387,15 +393,18 @@ function FileFacts({ file }: { file: ReportingFileMaterial }) {
   );
 }
 
-function AppointmentRow({ appointment, data, timeZone, capture, canCapture }: { appointment: ReportingAppointment; data: ReportingData; timeZone: string; capture: (from?: Bound) => { note: () => void; record: () => void }; canCapture: boolean }) {
+function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stacked }: { appointment: ReportingAppointment; data: ReportingData; timeZone: string; capture: (from?: Bound) => { note: () => void; record: () => void }; canCapture: boolean; stacked?: boolean }) {
   const source = data.sources.find((entry) => entry.id === appointment.sourceId);
   const from: Bound = { appointmentId: appointment.id, ...(source ? { sourceId: source.id } : {}), label: appointment.title };
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
+  const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
+  // In the narrow rail the title gets its own line; buttons never squeeze it.
+  if (stacked) return <div className="grid gap-1 py-2"><p className="text-sm font-medium">{appointment.title}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <CalendarClock aria-hidden="true" className="size-4 text-muted-foreground" />
       <p className="min-w-0 flex-1 text-sm"><span className="font-medium">{appointment.title}</span> <span className="text-muted-foreground">· {time}</span></p>
-      {canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null}
+      {actions}
     </div>
   );
 }
@@ -413,7 +422,7 @@ function PlanningContext({ context, data, capture, canCapture, refresh }: { cont
       <section aria-label="Appointments" className="grid gap-1">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Appointments</h3>
         {data.appointments.length === 0 ? <p className="text-muted-foreground">No appointments yet.</p> : (
-          <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} /></li>)}</ul>
+          <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked /></li>)}</ul>
         )}
       </section>
     </div>
