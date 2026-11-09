@@ -229,6 +229,13 @@ export const Stories: CollectionConfig = {
       await req.payload.db.deleteMany({ collection: "reporting-notes", where, req });
       await req.payload.delete({ collection: "reporting-files", where, overrideAccess: true, req });
       await req.payload.db.deleteMany({ collection: "distribution-items", where, req });
+      // Required Story references cannot be nulled by Payload's foreign keys.
+      await req.payload.db.deleteMany({ collection: "corrections", where, req });
+      await req.payload.db.deleteMany({ collection: "live-updates", where, req });
+      await req.payload.db.deleteMany({ collection: "sources", where, req });
+      await req.payload.db.deleteMany({ collection: "appointments", where, req });
+      await req.payload.db.deleteMany({ collection: "production-assignments", where, req });
+      await req.payload.db.deleteMany({ collection: "story-plans", where, req });
     }]
   },
   fields: [

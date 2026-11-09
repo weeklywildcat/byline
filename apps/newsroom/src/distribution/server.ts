@@ -1,8 +1,9 @@
 import { GAP_LABELS, mediaKind } from "@byline/newsroom-screens/media/media-library-model";
-import { APIError, type PayloadRequest, type Where } from "payload";
+import { sql, type PostgresAdapter } from "@payloadcms/db-postgres";
+import { APIError, commitTransaction, initTransaction, killTransaction, type PayloadRequest, type Where } from "payload";
 import { scopeManages, storyScope, type StoryScope } from "../access/story-context";
 import { atLeast, relationId, sameId, type NewsroomUser } from "../access/user";
-import { instantToLocal, localDay, localToInstant } from "../domain/dates";
+import { addDays, instantToLocal, localDay, localToInstant } from "../domain/dates";
 import { editorRecipients, notify } from "../newsroom/notifications";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { recordStoryActivity } from "../newsroom/story-activity";
@@ -66,7 +67,7 @@ function record(row: Row): DistributionRecord {
 /* --------------------------------------------------------------------- views */
 
 export type PersonRef = { id: number; name: string };
-export type DistributionSlotView = { label: string; mode: SlotMode; custom: string; inherited: string; max: number; required: boolean; multiline: boolean };
+export type DistributionSlotView = { label: string; mode: SlotMode; custom: string | null; inherited: string; max: number; required: boolean; multiline: boolean };
 export type DistributionCan = { edit: boolean; annotate: boolean; assign: boolean; claim: boolean; approve: boolean; skip: boolean; reopen: boolean; restore: boolean; post: boolean };
 
 export type DistributionItemView = {
@@ -192,7 +193,7 @@ function itemView(view: ViewContext, row: Row): DistributionItemView | null {
   const problems = rec.state === "posted" || rec.state === "skipped" ? [] : distributionProblems(rec, effective, story, effective.mediaId === null ? [] : view.mediaIssues.get(effective.mediaId) ?? []);
   const person = (id: number | null) => (id === null ? null : { id, name: view.people.get(id) ?? "Former account" });
   const slot = (definition: typeof descriptor.text, mode: SlotMode, custom: string | null): DistributionSlotView | null => definition
-    ? { label: definition.label, mode, custom: custom ?? "", inherited: definition.inherit(story), max: definition.max, required: definition.required, multiline: definition.multiline }
+    ? { label: definition.label, mode, custom, inherited: definition.inherit(story), max: definition.max, required: definition.required, multiline: definition.multiline }
     : null;
   const { timeZone, now } = view.ctx;
   return {
@@ -285,14 +286,13 @@ export async function storyDistributionView(ctx: ScreenContext, storyId: number)
   const existing = new Set(rows.map((row) => row.destination));
   const expected = policyFor(settings, { preset: plan?.preset ?? null, section: facts.section });
   const suggestions = expected.filter((entry) => !existing.has(entry.kind) && (!facts.everPublished || entry.level === "optional" || !rows.length)).map((entry) => ({ ...entry, label: settings.destinations[entry.kind].label }));
-  const suggested = new Set(suggestions.map((entry) => entry.kind));
   const editor = atLeast(ctx.user, "editor");
   return {
     story: { id: storyId, headline: facts.headline, published: facts.published, everPublished: facts.everPublished, url: facts.url },
     copy: { headline: facts.headline, excerpt: facts.deck, canonicalUrl: facts.url },
     items,
     suggestions,
-    addable: DESTINATION_KINDS.filter((kind) => settings.destinations[kind].enabled && !existing.has(kind) && !suggested.has(kind)).map((kind) => ({ kind, label: settings.destinations[kind].label })),
+    addable: DESTINATION_KINDS.filter((kind) => settings.destinations[kind].enabled && !existing.has(kind)).map((kind) => ({ kind, label: settings.destinations[kind].label })),
     canAdd: facts.published && (editor || scopeManages(scope, storyId))
   };
 }
@@ -340,7 +340,29 @@ function localInstant(value: unknown, timeZone: string): string | null {
   }
 }
 
-export async function updateDistribution(ctx: ScreenContext, id: number, patch: DistributionPatch): Promise<DistributionItemView> {
+// The permissions, transition, snapshot and side effects all depend on the
+// current row. Serialize writers so two requests cannot both record a send.
+async function editItem<T>(req: PayloadRequest, id: number, run: () => Promise<T>): Promise<T> {
+  const owns = await initTransaction(req);
+  try {
+    const transactionId = await req.transactionID;
+    const db = (req.payload.db as unknown as PostgresAdapter).sessions[String(transactionId)]?.db;
+    if (!db) throw new Error("Distribution changes require a database transaction.");
+    await db.execute(sql`select id from distribution_items where id = ${id} for update`);
+    const result = await run();
+    if (owns) await commitTransaction(req);
+    return result;
+  } catch (error) {
+    if (owns) await killTransaction(req);
+    throw error;
+  }
+}
+
+export function updateDistribution(ctx: ScreenContext, id: number, patch: DistributionPatch): Promise<DistributionItemView> {
+  return editItem(ctx.req, id, () => applyDistributionPatch(ctx, id, patch));
+}
+
+async function applyDistributionPatch(ctx: ScreenContext, id: number, patch: DistributionPatch): Promise<DistributionItemView> {
   const { req, user } = ctx;
   const { payload } = req;
   const row = await readRow(ctx, id);
@@ -434,7 +456,11 @@ export async function updateDistribution(ctx: ScreenContext, id: number, patch: 
   }
   if ("scheduledFor" in patch) {
     if (!can.edit) forbid();
-    data.scheduledFor = next.scheduledFor = localInstant(patch.scheduledFor, ctx.timeZone);
+    if (!descriptor.supportsScheduling || (target ?? before.state) !== "scheduled") throw new APIError(`${label} has no schedule to update.`, 409);
+    if (needsApproval(setting, next, { editor })) throw new APIError("An editor needs to approve this first.", 409);
+    const scheduledFor = localInstant(patch.scheduledFor, ctx.timeZone);
+    if (!scheduledFor) throw new APIError("Choose when it is scheduled to go out.", 400);
+    data.scheduledFor = next.scheduledFor = scheduledFor;
   }
   if (target !== undefined && target !== before.state) {
     const problem = transitionProblem(before.state, target, { editor });
@@ -496,7 +522,11 @@ export async function updateDistribution(ctx: ScreenContext, id: number, patch: 
  * becomes Failed, its owner and the editors are notified, and the Story
  * records it. Manual work never fails just because nobody has posted yet.
  */
-export async function markDistributionFailed(req: PayloadRequest, id: number, reason: string): Promise<boolean> {
+export function markDistributionFailed(req: PayloadRequest, id: number, reason: string): Promise<boolean> {
+  return editItem(req, id, () => recordDeliveryFailure(req, id, reason));
+}
+
+async function recordDeliveryFailure(req: PayloadRequest, id: number, reason: string): Promise<boolean> {
   const { payload } = req;
   const row = (await payload.find({ collection: COLLECTION, where: { id: { equals: id } }, limit: 1, ...system(req) })).docs[0] as Row | undefined;
   if (!row || !isDestinationKind(row.destination) || !PENDING.includes(record(row).state) || record(row).state === "failed") return false;
@@ -571,20 +601,26 @@ export async function distributionDesk(ctx: ScreenContext, filters: DeskFilters)
   if (search || section !== null) {
     // Lightweight Story ids (never bodies) to narrow the items.
     const conditions: Where[] = [];
-    if (search) conditions.push({ headline: { like: search } });
+    if (search) conditions.push({ headline: { contains: search } });
     if (section !== null) conditions.push({ section: { equals: section } });
-    const { docs } = await payload.find({ collection: "stories", where: { and: conditions }, limit: 500, select: {}, ...system(req) });
+    const { docs } = await payload.find({ collection: "stories", where: { and: conditions }, pagination: false, select: {}, ...system(req) });
     where.push({ story: { in: docs.length ? docs.map((story) => story.id) : [0] } });
   }
+  const when = (["today", "week", "past-week"] as const).find((value) => value === filters.when) ?? "";
+  const today = localDay(ctx.now, ctx.timeZone);
+  const postedInWindow: Where[] = when ? [{
+    postedAt: {
+      greater_than_equal: localToInstant(`${addDays(today, when === "past-week" ? -6 : 0)}T00:00`, ctx.timeZone),
+      less_than: localToInstant(`${addDays(today, when === "week" ? 7 : 1)}T00:00`, ctx.timeZone)
+    }
+  }] : [];
   const [pending, posted, settings] = await Promise.all([
     payload.find({ collection: COLLECTION, where: { and: [...where, { state: { in: [...PENDING] } }] }, pagination: false, ...asUser(ctx) }),
-    payload.find({ collection: COLLECTION, where: { and: [...where, { state: { equals: "posted" } }] }, sort: "-postedAt", limit: POSTED_LIMIT, ...asUser(ctx) }),
+    payload.find({ collection: COLLECTION, where: { and: [...where, ...postedInWindow, { state: { equals: "posted" } }] }, sort: ["-postedAt", "-id"], limit: POSTED_LIMIT, ...asUser(ctx) }),
     readDistributionSettings(req)
   ]);
   const rows = [...pending.docs, ...posted.docs] as Row[];
   const context = await viewContext(ctx, rows, { settings, scope: null });
-  const when = (["today", "week", "past-week"] as const).find((value) => value === filters.when) ?? "";
-  const today = localDay(ctx.now, ctx.timeZone);
   const inWindow = (item: DistributionItemView) => {
     if (!when) return true;
     const time = rowTime(item);
@@ -595,7 +631,7 @@ export async function distributionDesk(ctx: ScreenContext, filters: DeskFilters)
   };
   const items = rows.map((row) => itemView(context, row)).filter((item): item is DistributionItemView => item !== null && inWindow(item));
   const counts = Object.fromEntries(DESK_VIEWS.map((key) => [key, items.filter((item) => inView(item, key)).length])) as Record<DeskView, number>;
-  if (!when && !search && section === null && where.length === 0) counts.posted = await payload.count({ collection: COLLECTION, where: { state: { equals: "posted" } }, ...asUser(ctx) }).then((found) => found.totalDocs);
+  if (posted.totalDocs > POSTED_LIMIT) counts.posted += posted.totalDocs - POSTED_LIMIT;
   const order: Record<DeskView, (a: DistributionItemView, b: DistributionItemView) => number> = {
     attention: (a, b) => Number(b.state === "failed") - Number(a.state === "failed") || (a.plannedFor ?? "9").localeCompare(b.plannedFor ?? "9") || a.id - b.id,
     drafts: (a, b) => (a.plannedFor ?? "9").localeCompare(b.plannedFor ?? "9") || b.id - a.id,

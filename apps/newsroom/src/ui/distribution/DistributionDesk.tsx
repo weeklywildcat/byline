@@ -60,11 +60,10 @@ function useDeskFilters() {
     return () => window.removeEventListener("popstate", pop);
   }, []);
   const update = useCallback((patch: Partial<Filters>, replace = false) => {
-    setFilters((current) => {
-      const next = { ...current, ...patch };
-      window.history[replace ? "replaceState" : "pushState"](null, "", `${window.location.pathname}${search(next)}`);
-      return next;
-    });
+    const next = { ...read(), ...patch };
+    const query = search(next);
+    if (window.location.search !== query) window.history[replace ? "replaceState" : "pushState"](null, "", `${window.location.pathname}${query}`);
+    setFilters(next);
   }, []);
   return [filters, update] as const;
 }
@@ -94,15 +93,15 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
 
   if (desk.isError && !data) return <div className="p-6"><InlineAlert title="Distribution isn't available" onAction={() => void desk.refetch()}>{(desk.error as Error).message}</InlineAlert></div>;
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 md:p-6">
+    <div className="mx-auto grid w-full min-w-0 max-w-6xl gap-4 p-4 md:p-6">
       <header className="grid gap-1">
         <h1 className="text-xl font-semibold">Distribution</h1>
         <p className="text-sm text-muted-foreground">What still needs to go out, who owns it, and what actually did.</p>
       </header>
 
       <Tabs value={filters.view} onValueChange={(value) => update({ view: value as DeskView })}>
-        <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          {VIEWS.map((entry) => <TabsTrigger key={entry.id} value={entry.id}>{entry.label}{data ? <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{data.counts[entry.id]}</span> : null}</TabsTrigger>)}
+        <TabsList className="max-w-full flex-wrap justify-start gap-y-1 group-data-horizontal/tabs:h-auto">
+          {VIEWS.map((entry) => <TabsTrigger key={entry.id} value={entry.id} className="h-auto min-h-6">{entry.label}{data ? <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{data.counts[entry.id]}</span> : null}</TabsTrigger>)}
         </TabsList>
       </Tabs>
 
@@ -128,8 +127,8 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
             <TableHeader>
               <TableRow>
                 <TableHead>Story</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>State</TableHead>
+                <TableHead className="hidden sm:table-cell">Destination</TableHead>
+                <TableHead className="hidden sm:table-cell">State</TableHead>
                 <TableHead className="hidden md:table-cell">Owner</TableHead>
                 <TableHead className="hidden lg:table-cell">When</TableHead>
                 <TableHead className="text-right">Next</TableHead>
@@ -138,12 +137,18 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
             <TableBody>
               {data.rows.map((row) => (
                 <TableRow key={row.id} className="cursor-pointer" onClick={() => setOpen(row.id)}>
-                  <TableCell className="max-w-72 min-w-40 whitespace-normal">
+                  <TableCell className="max-w-72 min-w-0 whitespace-normal sm:min-w-32">
                     <button type="button" className="text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline" onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.story}</button>
                     <span className="block text-xs text-muted-foreground">{[row.section, row.published ? null : "Unpublished"].filter(Boolean).join(" · ")}</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:hidden">
+                      <span>{row.label}</span>
+                      <DistributionStateBadge state={row.state} label={row.stateLabel} />
+                      {row.attention && row.attention !== row.stateLabel ? <span className="text-muted-foreground">{row.attention}</span> : null}
+                      {row.owner ? <span className="text-muted-foreground">{row.owner.name}</span> : null}
+                    </div>
                   </TableCell>
-                  <TableCell>{row.label}</TableCell>
-                  <TableCell className="whitespace-normal"><div className="flex flex-wrap items-center gap-1.5"><DistributionStateBadge state={row.state} label={row.stateLabel} />{row.attention && row.attention !== row.stateLabel ? <span className="text-xs text-muted-foreground">{row.attention}</span> : null}</div></TableCell>
+                  <TableCell className="hidden whitespace-normal sm:table-cell">{row.label}</TableCell>
+                  <TableCell className="hidden whitespace-normal sm:table-cell"><div className="flex flex-wrap items-center gap-1.5"><DistributionStateBadge state={row.state} label={row.stateLabel} />{row.attention && row.attention !== row.stateLabel ? <span className="text-xs text-muted-foreground">{row.attention}</span> : null}</div></TableCell>
                   <TableCell className="hidden md:table-cell">{row.owner?.name ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
                   <TableCell className="hidden lg:table-cell">{row.time ? <span><span className="text-xs text-muted-foreground">{row.time.label} </span>{formatDay(row.time.at, timeZone)}</span> : <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="text-right"><Button type="button" variant="ghost" size="sm" aria-label={`${row.nextAction}: ${row.story}, ${row.label}`} onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.nextAction}</Button></TableCell>

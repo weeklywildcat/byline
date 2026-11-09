@@ -71,6 +71,7 @@ export function distributionSettingsFrom(raw: unknown): DistributionSettings {
   if (doc.customized !== true) return defaultDistributionSettings();
   const destinations = Object.fromEntries(DESTINATION_KINDS.map((kind) => [kind, destinationDefaults(kind, false, false)])) as Record<DestinationKind, DestinationSetting>;
   for (const row of Array.isArray(doc.destinations) ? doc.destinations : []) {
+    if (!row || typeof row !== "object") continue;
     const value = row as Record<string, unknown>;
     if (!isDestinationKind(value.kind)) continue;
     const label = typeof value.label === "string" && value.label.trim() ? value.label.trim().slice(0, 60) : DESTINATIONS[value.kind].label;
@@ -78,6 +79,7 @@ export function distributionSettingsFrom(raw: unknown): DistributionSettings {
   }
   const rules: PolicyRule[] = [];
   for (const row of Array.isArray(doc.rules) ? doc.rules : []) {
+    if (!row || typeof row !== "object") continue;
     const value = row as Record<string, unknown>;
     if (!isDestinationKind(value.destination) || !(DISTRIBUTION_LEVELS as readonly string[]).includes(String(value.level))) continue;
     rules.push({ destination: value.destination, level: value.level as DistributionLevel, presets: (Array.isArray(value.presets) ? value.presets : []).filter((preset): preset is string => typeof preset === "string"), sections: ids(value.sections) });
@@ -198,7 +200,7 @@ export type Problem = { message: string; blocks: "ready" | "post" };
  * server's normal Media checks on the effective image (missing, not an image,
  * metadata gaps); this never invents a second rights or alt system.
  */
-export function distributionProblems(record: Pick<DistributionRecord, "kind">, effective: EffectiveContent, story: Pick<StoryState, "published" | "everPublished">, mediaIssues: readonly string[] = []): Problem[] {
+export function distributionProblems(record: Pick<DistributionRecord, "kind" | "mediaMode">, effective: EffectiveContent, story: Pick<StoryState, "published" | "everPublished">, mediaIssues: readonly string[] = []): Problem[] {
   const descriptor = DESTINATIONS[record.kind];
   const problems: Problem[] = [];
   for (const [slot, value] of [[descriptor.headline, effective.headline], [descriptor.text, effective.text]] as const) {
@@ -207,7 +209,9 @@ export function distributionProblems(record: Pick<DistributionRecord, "kind">, e
     if (slot.required && !length) problems.push({ message: `Add a ${slot.noun}.`, blocks: "ready" });
     if (length > slot.max) problems.push({ message: `The ${slot.noun} is ${length.toLocaleString("en-US")} characters; ${descriptor.label} allows ${slot.max.toLocaleString("en-US")}.`, blocks: "ready" });
   }
-  if (descriptor.media === "required" && effective.mediaId === null) problems.push({ message: "Choose an image.", blocks: "ready" });
+  if (effective.mediaId === null && (descriptor.media === "required" || (descriptor.media === "optional" && record.mediaMode === "custom"))) {
+    problems.push({ message: "Choose an image.", blocks: "ready" });
+  }
   if (effective.mediaId !== null) for (const issue of mediaIssues) problems.push({ message: issue, blocks: "ready" });
   if (descriptor.requiresPublishedStory && !story.published) {
     problems.push({ message: story.everPublished ? "The Story is unpublished. Nothing new goes out until it is published again." : "Publish the Story before it goes out.", blocks: "post" });
@@ -278,7 +282,7 @@ export function attentionReason(record: Pick<DistributionRecord, "state" | "expe
     }
     case "planned":
       if (due(record.plannedFor)) return "Overdue";
-      return record.expectation === "prepare" ? "Not started" : null;
+      return record.expectation === "prepare" && !record.plannedFor ? "Not started" : null;
     default:
       return null;
   }

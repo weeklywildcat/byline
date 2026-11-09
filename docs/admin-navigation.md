@@ -82,10 +82,14 @@ and offers its context in a sheet:
 ## Payload migration: Publish group and Field Mode
 
 Editors' primary navigation has a **Publish** group for the desks that
-coordinate many Stories: **Front Page** (`/admin/front-page`, see
-[front page](front-page.md)) and **Content Health** (moved there from the
-account menu). Ordinary Story-level work (Reporting, the Story's Front page
-status and Feature action) stays on the Story itself. There is no Studio.
+coordinate many Stories.
+
+- **Front Page** (`/admin/front-page`) manages the homepage lineup. [Front Page](front-page.md)
+- **Distribution** (`/admin/distribution`) coordinates channel work across Stories. [Distribution](distribution.md)
+- **Content Health** surfaces publication readiness issues.
+
+Reporters work from the Story itself. **Reporting** holds reporting materials, and
+**History** holds the Story's homepage placement and Distribution destinations.
 
 **Field Mode** (`/admin/field`, see [Field Mode](field-mode.md)) is a separate,
 reporter-oriented entry in the account menu and ⌘K, with its own small shell.

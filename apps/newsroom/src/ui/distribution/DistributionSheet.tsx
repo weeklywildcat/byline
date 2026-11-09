@@ -23,6 +23,7 @@ import { ApiError, getJson, patchJson } from "../story/api";
 import { formatDay } from "../story/parts";
 
 type Item = DistributionItemView & { owners: PersonRef[] };
+type CopyPatch = Pick<DistributionPatch, "headline" | "text">;
 
 export const distributionItemKey = (id: number) => ["byline", "distribution-item", id] as const;
 
@@ -45,26 +46,71 @@ export function DistributionSheet({ api, itemId, timeZone, userId, onClose, show
   const queries = useQueryClient();
   const item = useQuery({ queryKey: distributionItemKey(itemId ?? 0), queryFn: () => getJson<Item>(api, `/byline/distribution/${itemId}`), enabled: itemId !== null });
   const [linkError, setLinkError] = useState("");
+  const [copyError, setCopyError] = useState(false);
+  const [copyDraft, setCopyDraft] = useState<CopyPatch>({});
+  const pendingCopy = useRef<CopyPatch>({});
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savingCopy = useRef<Promise<boolean> | null>(null);
   const change = useMutation({
-    mutationFn: (patch: DistributionPatch) => patchJson<Item>(api, `/byline/distribution/${itemId}`, patch),
+    mutationFn: ({ id, patch }: { id: number; patch: DistributionPatch }) => patchJson<Item>(api, `/byline/distribution/${id}`, patch),
+    networkMode: "always",
+    scope: { id: `distribution-${itemId}` },
     onSuccess: (next) => {
       queries.setQueryData(distributionItemKey(next.id), next);
       void queries.invalidateQueries({ queryKey: ["byline", "story-distribution"] });
       void queries.invalidateQueries({ queryKey: ["byline", "distribution-desk"] });
     }
   });
-  const run = (patch: DistributionPatch, done?: (next: Item) => void) => change.mutate(patch, {
-    onSuccess: (next) => done?.(next),
-    onError: (error) => {
+  const flushCopy = (): Promise<boolean> => {
+    clearTimeout(timer.current);
+    if (savingCopy.current) return savingCopy.current;
+    if (itemId === null || !Object.keys(pendingCopy.current).length) return Promise.resolve(true);
+    savingCopy.current = (async () => {
+      while (Object.keys(pendingCopy.current).length) {
+        const patch = pendingCopy.current;
+        pendingCopy.current = {};
+        try {
+          await change.mutateAsync({ id: itemId, patch });
+          setCopyDraft(pendingCopy.current);
+          setCopyError(false);
+        } catch {
+          pendingCopy.current = { ...patch, ...pendingCopy.current };
+          setCopyError(true);
+          return false;
+        }
+      }
+      return true;
+    })().finally(() => { savingCopy.current = null; });
+    return savingCopy.current;
+  };
+  const queueCopy = (name: "headline" | "text", value: string) => {
+    pendingCopy.current = { ...pendingCopy.current, [name]: value };
+    setCopyDraft((current) => ({ ...current, [name]: value }));
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => void flushCopy(), 700);
+  };
+  const run = async (patch: DistributionPatch, done?: (next: Item) => void) => {
+    if (itemId === null || !(await flushCopy())) return;
+    try {
+      const next = await change.mutateAsync({ id: itemId, patch });
+      done?.(next);
+    } catch (error) {
       if ("permalink" in patch && error instanceof ApiError && error.status < 500) setLinkError(error.message);
       else toast.error((error as Error).message);
     }
-  });
+  };
   useEffect(() => setLinkError(""), [itemId]);
+  useEffect(() => {
+    const guard = (event: BeforeUnloadEvent) => {
+      if (savingCopy.current || Object.keys(pendingCopy.current).length) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => { clearTimeout(timer.current); window.removeEventListener("beforeunload", guard); };
+  }, []);
   const data = item.data;
 
   return (
-    <Sheet open={itemId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Sheet open={itemId !== null} onOpenChange={(open) => { if (!open) void flushCopy().then((saved) => { if (saved) onClose(); }); }}>
       <SheetContent side="right" className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-lg">
         <SheetHeader className="border-b pr-12">
           <SheetTitle className="flex flex-wrap items-center gap-2">{data ? <>{data.label}<DistributionStateBadge state={data.state} label={data.stateLabel} /></> : "Distribution"}</SheetTitle>
@@ -72,13 +118,22 @@ export function DistributionSheet({ api, itemId, timeZone, userId, onClose, show
             {data ? <>{showStory && admin ? <a className="underline-offset-2 hover:underline" href={`${admin}/collections/stories/${data.storyId}?tab=history`}>{data.story.headline}</a> : data.story.headline}{data.story.published ? null : <span className="text-destructive"> · Story unpublished</span>}</> : item.isError ? (item.error as Error).message : "Loading…"}
           </SheetDescription>
         </SheetHeader>
-        {data ? <SheetBody key={data.id} item={data} timeZone={timeZone} userId={userId} run={run} busy={change.isPending} linkError={linkError} setLinkError={setLinkError} /> : null}
+        {copyError ? <div className="flex flex-wrap items-center gap-2 border-b p-3" role="alert">
+          <span className="text-sm text-destructive">Byline could not save your copy. Your edits are still here.</span>
+          <Button type="button" size="sm" variant="outline" disabled={change.isPending} onClick={() => void flushCopy()}>Retry save</Button>
+        </div> : null}
+        {data ? <SheetBody key={data.id} item={data} timeZone={timeZone} userId={userId} run={run} busy={change.isPending} linkError={linkError} setLinkError={setLinkError}
+          copyDraft={copyDraft} queueCopy={queueCopy} flushCopy={flushCopy} /> : null}
       </SheetContent>
     </Sheet>
   );
 }
 
-function SheetBody({ item, timeZone, userId, run, busy, linkError, setLinkError }: { item: Item; timeZone: string; userId: number; run: (patch: DistributionPatch, done?: (next: Item) => void) => void; busy: boolean; linkError: string; setLinkError: (message: string) => void }) {
+function SheetBody({ item, timeZone, userId, run, busy, linkError, setLinkError, copyDraft, queueCopy, flushCopy }: {
+  item: Item; timeZone: string; userId: number; run: (patch: DistributionPatch, done?: (next: Item) => void) => void;
+  busy: boolean; linkError: string; setLinkError: (message: string) => void;
+  copyDraft: CopyPatch; queueCopy: (name: "headline" | "text", value: string) => void; flushCopy: () => Promise<boolean>;
+}) {
   const { can, destination } = item;
   const pending = item.state !== "posted" && item.state !== "skipped";
   const readyBlockers = item.problems.filter((problem) => problem.blocks === "ready");
@@ -103,7 +158,7 @@ function SheetBody({ item, timeZone, userId, run, busy, linkError, setLinkError 
         <section className="grid gap-3" aria-label="Post">
           <ButtonGroup>
             <Button type="button" size="sm" onClick={() => copy(item.effective.copy, item.text ? item.text.label : "Text")} disabled={!item.effective.copy}><Copy data-icon="inline-start" />Copy {textNoun}</Button>
-            {destination.openUrl ? <Button type="button" size="sm" variant="outline" render={<a href={destination.openUrl} target="_blank" rel="noopener noreferrer" />}>Open {item.label}<ExternalLink data-icon="inline-end" /></Button> : null}
+            {destination.openUrl ? <Button nativeButton={false} size="sm" variant="outline" render={<a href={destination.openUrl} target="_blank" rel="noopener noreferrer" />}>Open {item.label}<ExternalLink data-icon="inline-end" /></Button> : null}
           </ButtonGroup>
           {destination.permalink !== "none" ? <PermalinkField item={item} run={run} busy={busy} error={linkError} setError={setLinkError} /> : null}
         </section>
@@ -114,8 +169,8 @@ function SheetBody({ item, timeZone, userId, run, busy, linkError, setLinkError 
       {/* Content: inherited until deliberately customized, slot by slot */}
       {pending && (item.headline || item.text || item.media) ? (
         <FieldGroup className="gap-4">
-          {item.headline ? <SlotField slot={item.headline} name="headline" editable={can.edit} run={run} /> : null}
-          {item.text ? <SlotField slot={item.text} name="text" editable={can.edit} run={run} /> : null}
+          {item.headline ? <SlotField slot={item.headline} name="headline" editable={can.edit} run={run} draft={copyDraft.headline} queueCopy={queueCopy} flushCopy={flushCopy} /> : null}
+          {item.text ? <SlotField slot={item.text} name="text" editable={can.edit} run={run} draft={copyDraft.text} queueCopy={queueCopy} flushCopy={flushCopy} /> : null}
           {item.media ? <MediaField item={item} run={run} /> : null}
         </FieldGroup>
       ) : null}
@@ -137,7 +192,7 @@ function StateActions({ item, timeZone, run, busy, readyBlocked }: { item: Item;
   const [scheduleAt, setScheduleAt] = useState(item.scheduledForLocal);
   const [scheduling, setScheduling] = useState(false);
   const buttons: React.ReactNode[] = [];
-  if (can.edit && (state === "planned" || state === "draft" || state === "failed")) buttons.push(<Button key="ready" type="button" size="sm" disabled={busy || readyBlocked} onClick={() => run({ state: "ready" }, () => toast.success(item.requiresApproval && !can.approve && !can.skip ? "Ready. The editors were asked to approve it." : "Marked ready."))}>Mark ready</Button>);
+  if (can.edit && (state === "planned" || state === "draft" || (state === "failed" && can.skip))) buttons.push(<Button key="ready" type="button" size="sm" disabled={busy || readyBlocked} onClick={() => run({ state: "ready" }, () => toast.success(item.requiresApproval && !can.approve && !can.skip ? "Ready. The editors were asked to approve it." : "Marked ready."))}>{item.requiresApproval && can.skip ? "Mark ready and approve" : "Mark ready"}</Button>);
   if (can.approve) buttons.push(<Button key="approve" type="button" size="sm" disabled={busy} onClick={() => run({ approve: true }, () => toast.success("Approved."))}>Approve</Button>);
   // Without a required final address, recording that it went out is the action (Newsletter "Mark sent").
   if (destination.permalink !== "required" && can.post && (state === "ready" || state === "scheduled" || state === "draft" || state === "planned")) buttons.push(<Button key="post" type="button" size="sm" variant={state === "ready" ? "default" : "outline"} disabled={busy} onClick={() => run({ state: "posted" }, () => toast.success(`Marked ${destination.postedLabel.toLowerCase()}.`))}>Mark {destination.postedLabel.toLowerCase()}</Button>);
@@ -158,7 +213,7 @@ function StateActions({ item, timeZone, run, busy, readyBlocked }: { item: Item;
             <Input id={`schedule-${item.id}`} type="datetime-local" className="w-auto" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} onKeyDown={onEnter(() => undefined)} />
             <Button type="button" size="sm" disabled={busy || !scheduleAt} onClick={() => run({ scheduledFor: scheduleAt, state: "scheduled" }, () => { setScheduling(false); toast.success("Recorded as scheduled."); })}>Save</Button>
           </div>
-          <FieldDescription>Byline records the time; post it on {item.label} itself.</FieldDescription>
+          <FieldDescription>Byline records the time. Schedule it on {item.label} first.</FieldDescription>
         </Field>
       ) : null}
     </>
@@ -194,37 +249,25 @@ function PostedSummary({ item }: { item: Item }) {
   return (
     <section className="grid gap-2" aria-label={item.destination.postedLabel}>
       <p className="text-sm">{item.destination.postedLabel}{item.postedBy ? ` by ${item.postedBy.name}` : ""}.</p>
-      {item.permalink ? <Button type="button" size="sm" className="w-fit" render={<a href={item.permalink} target="_blank" rel="noopener noreferrer" />}>Open {item.label} post<ExternalLink data-icon="inline-end" /></Button> : null}
+      {item.permalink ? <Button nativeButton={false} size="sm" className="w-fit" render={<a href={item.permalink} target="_blank" rel="noopener noreferrer" />}>Open {item.label} post<ExternalLink data-icon="inline-end" /></Button> : null}
     </section>
   );
 }
 
-function SlotField({ slot, name, editable, run }: { slot: DistributionSlotView; name: "headline" | "text"; editable: boolean; run: (patch: DistributionPatch) => void }) {
+function SlotField({ slot, name, editable, run, draft, queueCopy, flushCopy }: {
+  slot: DistributionSlotView; name: "headline" | "text"; editable: boolean; run: (patch: DistributionPatch) => void;
+  draft?: string; queueCopy: (name: "headline" | "text", value: string) => void; flushCopy: () => Promise<boolean>;
+}) {
   const id = useId();
-  const input = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
-  const [draft, setDraft] = useState(slot.custom);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modeKey = name === "headline" ? "headlineMode" : "textMode";
-  // Follow the server unless the person is typing here.
-  useEffect(() => { if (document.activeElement !== input.current) setDraft(slot.custom); }, [slot.custom]);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  const flush = (value: string) => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (value !== slot.custom) run({ [name]: value });
-  };
-  const schedule = (value: string) => {
-    setDraft(value);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => flush(value), 700);
-  };
   const choose = (mode: "story" | "custom") => {
     if (mode === slot.mode) return;
-    // Custom starts from what would go out now; Story keeps the custom text for later.
-    if (mode === "custom") { const start = slot.custom || slot.inherited; setDraft(start); run({ [modeKey]: "custom", [name]: start }); }
+    // Custom starts from the Story. Returning to Story retains the custom copy.
+    if (mode === "custom") run({ [modeKey]: "custom", [name]: slot.custom ?? slot.inherited });
     else run({ [modeKey]: "story" });
   };
-  const value = slot.mode === "custom" ? draft : slot.inherited;
+  const value = slot.mode === "custom" ? draft ?? slot.custom ?? "" : slot.inherited;
+  const flush = () => void flushCopy();
   const length = value.trim().length;
   return (
     <Field>
@@ -238,9 +281,9 @@ function SlotField({ slot, name, editable, run }: { slot: DistributionSlotView; 
       {slot.mode === "story" ? (
         <p id={id} className="rounded-md bg-muted/60 px-3 py-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]" aria-live="polite">{slot.inherited || <span className="text-muted-foreground">The Story has no {slot.label.toLowerCase()} yet.</span>}</p>
       ) : slot.multiline ? (
-        <Textarea id={id} ref={input} rows={5} className="min-h-28!" value={draft} disabled={!editable} onChange={(event) => schedule(event.target.value)} onBlur={(event) => flush(event.target.value)} />
+        <Textarea id={id} rows={5} className="min-h-28!" value={value} disabled={!editable} onChange={(event) => queueCopy(name, event.target.value)} onBlur={flush} />
       ) : (
-        <Input id={id} ref={input} value={draft} disabled={!editable} onChange={(event) => schedule(event.target.value)} onBlur={(event) => flush(event.target.value)} onKeyDown={onEnter(() => flush(draft))} />
+        <Input id={id} value={value} disabled={!editable} onChange={(event) => queueCopy(name, event.target.value)} onBlur={flush} onKeyDown={onEnter(flush)} />
       )}
       <FieldDescription className={cn("flex justify-between gap-2", length > slot.max && "text-destructive")}>
         <span>{slot.mode === "story" ? "Follows the Story until you choose Custom." : "Custom for this destination only."}</span>
