@@ -55,6 +55,16 @@ const LIMITS = { stories: 200, tasks: 100, visualWork: 50, appointments: 100, ac
 /** Board columns and filters: the lifecycle phases (docs/story-lifecycle.md), never the stored stages. */
 export const STATUSES = PHASE_STATUSES.map((status) => ({ ...status }));
 
+/**
+ * The phases as this reader may set them. Review and Ready come from the
+ * review engine; only an editor's manual override may choose them, so for
+ * everyone else they are not selectable (no Move to, no drop target).
+ */
+export function statusesFor(ctx: Pick<ScreenContext, "user">) {
+  const editor = atLeast(ctx.user, "editor");
+  return STATUSES.map((status) => (!editor && (status.id === "review" || status.id === "ready") ? { ...status, selectable: false } : status));
+}
+
 /* --------------------------------------------------------------- people */
 
 export type People = {
@@ -540,7 +550,7 @@ export async function storyWorkspace(ctx: ScreenContext, storyId: number): Promi
     format: { format: story.format === "video" ? "video" : "standard", videoUrl: story.video?.url ?? "", video: null },
     sections: row.sections ?? [],
     contributors: { storyId, contributors, available: manager ? everyone : [], canEdit: manager, canCreateGuests: manager && editor },
-    statuses: STATUSES,
+    statuses: statusesFor(ctx),
     tasks: work.tasks.map((task) => editorialTask(people, task)),
     sources: sources.docs.map((source) => storySource(people, source)),
     appointments: work.appointments.map((appointment) => storyAppointment(people, appointment, sourceLabels)),

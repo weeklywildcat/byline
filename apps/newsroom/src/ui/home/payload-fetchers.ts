@@ -1,5 +1,7 @@
 "use client";
 
+import { storyCreateBody } from "@byline/newsroom-screens/story/story-fetchers";
+
 import type { CorrectionInput, ContributorEntry, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { CorrectionPayload, ContributorPayload, EditorialRestClient, TaskPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
@@ -123,7 +125,7 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     getWorkspace,
     workspace,
     editorial,
-    createStory: (title, preset) => request<StoryWorkspace>("/stories", "POST", preset ? { title, preset } : { title }),
+    createStory: (title, preset, details) => request<StoryWorkspace>("/stories", "POST", storyCreateBody(title, preset, details)),
     getPresets: () => request<HomePresetsPayload>("/presets"),
     getHome: () => request<HomeBootstrap>("/home"),
     searchStories: (query) => request(`/home/search?query=${encodeURIComponent(query)}`)

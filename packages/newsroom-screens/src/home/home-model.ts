@@ -1,3 +1,4 @@
+import type { ContributorEntry } from "../editorial/editorial-model";
 import {
   isPlanningDateOverdue,
   parsePlanningDate,
@@ -69,6 +70,12 @@ export type HomePresetsPayload = {
   presets: Record<string, HomePreset>;
   types: string[];
   revision: number;
+  /**
+   * What New story may offer this reader besides a title and template. Hosts
+   * that omit it (WordPress) offer title and template only; `canAssign` gates
+   * writers and deadline, which only editors set.
+   */
+  create?: { sections: Array<{ id: number; name: string }>; writers: ContributorEntry[]; canAssign: boolean };
 };
 
 export type HomePresetMutation = {

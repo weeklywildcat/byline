@@ -14,6 +14,7 @@ import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { dateLabel, dayDistance, exactDate, mediaStatusLabels, mediaTypeLabels, siteDay } from "../home/newsroom-model";
 import { isPlannedDayOnly, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 import { openArticleNotesLabel, openNotesSignal } from "./notes-model";
+import { leadingSignals, type AttentionKind, type AttentionSignal } from "./attention";
 
 /** The headline, as a button that opens Story Peek. Never a link into the editor: inspect first. */
 export function StoryTitleButton({ story, onOpen, className, ...props }: { story: Pick<PlanningStory, "id" | "title">; onOpen: (storyId: number) => void } & Omit<ComponentProps<"button">, "onClick" | "children">) {
@@ -134,4 +135,42 @@ export function ProductionSummary({ story, className, empty = "—", maxSignals 
       <PopoverContent align="start" className="w-64"><p className="text-xs font-semibold text-muted-foreground">More work</p><span className="flex flex-wrap items-center gap-1.5">{more.map((signal) => <WorkStatusBadge key={signal.key} kind={signal.kind} intensity={signal.intensity}>{signal.label}</WorkStatusBadge>)}</span></PopoverContent>
     </Popover> : null}<StoryNotesIndicator story={story} /></span>
     : empty === null ? null : <span className={cn("text-xs text-muted-foreground", className)}>{empty}</span>;
+}
+
+/** Attention kinds that justify a second line on a compact card. */
+const URGENT: ReadonlySet<AttentionKind> = new Set(["routing-failed", "changes-requested", "review-assigned", "deadline-overdue"]);
+
+const ATTENTION_BADGE: Record<AttentionKind, { kind: WorkKind; intensity: WorkIntensity }> = {
+  "routing-failed": { kind: "editorial", intensity: "action" },
+  "changes-requested": { kind: "editorial", intensity: "action" },
+  "review-assigned": { kind: "editorial", intensity: "active" },
+  "deadline-overdue": { kind: "neutral", intensity: "action" },
+  "appointment-soon": { kind: "reporting", intensity: "active" },
+  "media-due": { kind: "production", intensity: "action" },
+  "checklist-due": { kind: "task", intensity: "active" },
+  "waiting-on-source": { kind: "reporting", intensity: "active" },
+  "media-needed": { kind: "production", intensity: "active" },
+  "deadline-soon": { kind: "neutral", intensity: "active" },
+  "ready-to-publish": { kind: "publication", intensity: "active" }
+};
+
+/**
+ * The one signal a compact card shows, from Story Attention (story/attention.ts):
+ * the reader's own first, and a second only when both are urgent. The card's
+ * meta row already shows the deadline, so "Due Friday" is not repeated.
+ * Hosts without attention (WordPress) keep their work signals.
+ */
+export function cardSignals(story: Pick<PlanningStory, "attention">): AttentionSignal[] {
+  if (!story.attention) return [];
+  const signals = leadingSignals({ ...story.attention, signals: story.attention.signals.filter((signal) => signal.kind !== "deadline-soon" && signal.kind !== "deadline-overdue") }, 2);
+  return signals.length === 2 && !(URGENT.has(signals[0].kind) && URGENT.has(signals[1].kind)) ? signals.slice(0, 1) : signals;
+}
+
+export function StoryAttentionSignals({ story, limit = 2, className }: { story: PlanningStory; /** Dense rows show one. */ limit?: 1 | 2; className?: string }) {
+  if (!story.attention) return <StorySignals story={story} className={className} />;
+  const signals = cardSignals(story).slice(0, limit);
+  if (!signals.length) return null;
+  return <ul aria-label="Needs" className={cn("flex min-w-0 flex-wrap items-center gap-1.5 text-xs", className)} data-story-attention="">
+    {signals.map((signal) => <li key={signal.kind} className="min-w-0 max-w-full"><WorkStatusBadge kind={ATTENTION_BADGE[signal.kind].kind} intensity={ATTENTION_BADGE[signal.kind].intensity} className="max-w-full truncate" data-attention={signal.kind} title={signal.detail ? `${signal.label} · ${signal.detail}` : signal.label}>{signal.label}</WorkStatusBadge></li>)}
+  </ul>;
 }

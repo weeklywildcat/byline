@@ -100,8 +100,16 @@ const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as
 
 /* ------------------------------------------------------------- presets */
 
-function presetsPayload(): HomePresetsPayload {
+/** Templates, and what the New story dialog may offer this reader (docs/story-lifecycle.md#create). */
+async function presetsPayload(ctx: ScreenContext): Promise<HomePresetsPayload> {
+  const editor = atLeast(ctx.user, "editor");
+  const [sections, people] = await Promise.all([
+    ctx.req.payload.find({ collection: "sections", depth: 0, pagination: false, sort: "name", select: { name: true }, ...asUser(ctx) }),
+    editor ? loadPeople(ctx) : Promise.resolve(null)
+  ]);
+  const writers = people ? [...people.persons.keys()].map((id, order) => contributorEntry(people, id, order)).filter((entry): entry is ContributorEntry => entry !== null) : [];
   return {
+    create: { sections: sections.docs.map((section) => ({ id: section.id, name: section.name })), writers, canAssign: editor },
     presets: Object.fromEntries(
       STORY_PRESETS.map((preset) => [
         preset.id,
@@ -121,27 +129,45 @@ function presetsPayload(): HomePresetsPayload {
   };
 }
 
-/** The one Story creation flow (Home, Stories, Create, and a Collection's New story). */
-export async function createStory(ctx: ScreenContext, req: PayloadRequest, given?: { title?: string; preset?: string }) {
-  const input = given ?? (await body<{ title?: string; preset?: string }>(req));
+type CreateStoryInput = { title?: string; preset?: string; sectionId?: number | null; writerIds?: number[]; deadline?: string | null };
+
+/**
+ * The one Story creation flow (Home, Stories, Create, and a Collection's New
+ * story). Only a title is required; a Story starts as a Pitch. The optional
+ * details are a section, writers and a deadline — writers and deadline only
+ * for editors, as everywhere else — and a template.
+ */
+export async function createStory(ctx: ScreenContext, req: PayloadRequest, given?: CreateStoryInput) {
+  const input = given ?? (await body<CreateStoryInput>(req));
   const title = String(input.title ?? "").trim().slice(0, 300);
   if (!title) throw new APIError("Give the story a working headline.", 400);
   const preset = input.preset ? findPreset(input.preset) : null;
   if (input.preset && !preset) throw new APIError("That template no longer exists.", 400);
   const editor = atLeast(ctx.user, "editor");
   const today = localDay(ctx.now, ctx.timeZone);
+  const writerIds = Array.isArray(input.writerIds) ? [...new Set(input.writerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))] : null;
+  const deadline = typeof input.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.deadline.slice(0, 10)) ? input.deadline.slice(0, 10) : null;
+  if (!editor && (writerIds || deadline)) throw new APIError("Only editors assign writers and deadlines.", 403);
 
   let section: number | null = null;
-  if (preset) {
+  if (input.sectionId) {
+    const found = await req.payload.find({ collection: "sections", where: { id: { equals: Number(input.sectionId) } }, depth: 0, limit: 1, ...asUser(ctx) });
+    if (!found.docs[0]) throw new APIError("That section no longer exists.", 400);
+    section = found.docs[0].id;
+  } else if (preset) {
     const found = await req.payload.find({ collection: "sections", where: { slug: { equals: preset.section } }, depth: 0, limit: 1, ...asUser(ctx) });
     section = found.docs[0]?.id ?? null;
+  }
+  if (writerIds?.length) {
+    const found = await req.payload.find({ collection: "people", where: { id: { in: writerIds } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) });
+    if (found.docs.length !== writerIds.length) throw new APIError("One of those writers no longer exists.", 400);
   }
   const story = await req.payload.create({
     collection: "stories",
     draft: true,
     data: {
       headline: title,
-      contributors: ctx.user.linkedPerson !== null ? [Number(ctx.user.linkedPerson)] : [],
+      contributors: writerIds ?? (ctx.user.linkedPerson !== null ? [Number(ctx.user.linkedPerson)] : []),
       ...(section ? { section } : {}),
       ...(preset?.format ? { format: preset.format } : {})
     },
@@ -149,7 +175,8 @@ export async function createStory(ctx: ScreenContext, req: PayloadRequest, given
     context: {
       bylinePlan: {
         ...(preset ? { workflow: preset.workflow.status, preset: preset.id } : {}),
-        ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {})
+        ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {}),
+        ...(deadline ? { deadline } : {})
       }
     },
     ...asUser(ctx)
@@ -466,7 +493,7 @@ async function moveToFolder(ctx: ScreenContext, req: PayloadRequest) {
  */
 async function createCollectionStory(ctx: ScreenContext, req: PayloadRequest) {
   const id = idParam(req);
-  const input = await body<{ title?: string; preset?: string }>(req);
+  const input = await body<CreateStoryInput>(req);
   const created = await createStory(ctx, req, input);
   try {
     await addStory(ctx, id, created.story.id);
@@ -569,7 +596,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
-  { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
+  { path: "/byline/presets", method: "get", handler: handle(presetsPayload) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
   // The sidebar's open-work counts (Stories, Media, Collections and the promoted Stories views).

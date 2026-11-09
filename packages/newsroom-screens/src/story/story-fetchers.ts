@@ -15,9 +15,23 @@ export type StoryFetchers = {
   workspace?: WorkspaceClient;
   editorial?: EditorialRestClient;
   /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
-  createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
+  createStory?: (title: string, preset?: string, details?: StoryCreateDetails) => Promise<StoryWorkspace>;
   getPresets?: () => Promise<HomePresetsPayload>;
 };
+
+/** New story's optional details (HomePresetsPayload.create says which a host offers). */
+export type StoryCreateDetails = { sectionId?: number | null; writerIds?: number[]; deadline?: string | null };
+
+/** The one request body for creating a story, shared by every host. */
+export function storyCreateBody(title: string, preset?: string, details: StoryCreateDetails = {}): Record<string, unknown> {
+  return {
+    title,
+    ...(preset ? { preset } : {}),
+    ...(details.sectionId ? { sectionId: details.sectionId } : {}),
+    ...(details.writerIds?.length ? { writerIds: details.writerIds } : {}),
+    ...(details.deadline ? { deadline: details.deadline } : {})
+  };
+}
 
 export type StoryCapabilities = { editPosts?: boolean; manage?: boolean };
 
@@ -32,7 +46,7 @@ export function createStoryFetchers(request: StoryRequest, capabilities: StoryCa
     if (host.collections) fetchers.collections = host.collections;
     fetchers.workspace = createWorkspaceClient(request, { collections: host.collections });
     fetchers.getWorkspace = fetchers.workspace.getWorkspace;
-    fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
+    fetchers.createStory = (title, preset, details) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: storyCreateBody(title, preset, details) });
     fetchers.editorial = createEditorialRestClient(request);
   }
   if (capabilities.editPosts !== false || capabilities.manage) {

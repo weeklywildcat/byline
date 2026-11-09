@@ -212,14 +212,14 @@ function workspace(notes: ArticleNotesSummary | null | undefined): StoryWorkspac
 }
 const peek = (data: StoryWorkspace) => renderToStaticMarkup(<StoryPeekContent {...({
   data, timezone, now, workspaceUrl: (id: number) => `/wp-admin/admin.php?page=byline-planning&story=${id}`,
-  onNewTask: vi.fn(), onComplete: vi.fn(), onUpdateTask: vi.fn(), onEditTask: vi.fn(), onPlan: vi.fn(), onWriters: vi.fn(), onSaveLink: vi.fn(), onRemoveLink: vi.fn(),
-  planning: false, writing: false, linking: false, error: "", linkError: "", linkFormOpen: false, onLinkForm: vi.fn()
+  onPlan: vi.fn(), onWriters: vi.fn(), planning: false, writing: false, error: ""
 } satisfies StoryPeekContentProps)} />);
 
 describe("Article Notes in Story Peek", () => {
   it("shows one quiet row whose whole target opens the editor", () => {
     const html = peek(workspace(summary({ openCount: 3 })));
-    expect(html).toContain("Article notes");
+    // A line under Next, not a section of its own.
+    expect(html).toContain(">Next<");
     expect(html).toContain("3 open notes");
     expect(html).toContain("Review in editor");
     const link = html.match(/<a[^>]*data-peek-notes[^>]*>/)![0];
@@ -235,7 +235,7 @@ describe("Article Notes in Story Peek", () => {
   it("shows nothing when there are no open Notes, Notes are unavailable, or the viewer may not see them", () => {
     for (const hidden of [summary({ openCount: 0 }), summary({ available: false }), summary({ canView: false }), null, undefined]) {
       const html = peek(workspace(hidden));
-      expect(html).not.toContain("Article notes");
+      expect(html).not.toContain("open note");
       expect(html).not.toContain("data-peek-notes");
     }
   });

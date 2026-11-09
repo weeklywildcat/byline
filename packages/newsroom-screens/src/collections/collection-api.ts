@@ -1,3 +1,4 @@
+import type { StoryCreateDetails } from "../story/story-fetchers";
 import type { PlanningStory } from "../planning/planning-model";
 import type { StoryWorkspace } from "../workspace/workspace-types";
 import type {
@@ -32,6 +33,7 @@ export type CollectionApi = {
     id: number,
     title: string,
     preset?: string,
+    details?: StoryCreateDetails,
   ) => Promise<StoryWorkspace>;
   addStory: (id: number, storyId: number) => Promise<unknown>;
   /** Membership only; the story itself is untouched. */

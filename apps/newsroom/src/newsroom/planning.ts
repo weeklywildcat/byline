@@ -6,7 +6,7 @@ import { localDay } from "../domain/dates";
 import { phaseFromId } from "@byline/newsroom-screens/story/lifecycle";
 import { effectiveWorkflow } from "../domain/workflow";
 import type { StoryPlan } from "../payload-types";
-import { loadPeople, localToday, planningStory, STATUSES, storiesWithExtras, userPerson, type ScreenContext } from "./screen-models";
+import { loadPeople, localToday, planningStory, statusesFor, storiesWithExtras, userPerson, type ScreenContext } from "./screen-models";
 
 /**
  * The Stories collection (`GET /api/byline/planning`): the shared
@@ -83,7 +83,7 @@ export async function planningResponse(ctx: ScreenContext, filters: PlanningFilt
   return {
     stories: matching,
     timezone: ctx.timeZone,
-    workflowStatuses: STATUSES.map((status) => ({ ...status, group: status.group as PlanningResponse["workflowStatuses"][number]["group"] })),
+    workflowStatuses: statusesFor(ctx).map((status) => ({ ...status, group: status.group as PlanningResponse["workflowStatuses"][number]["group"] })),
     capabilities: { canMoveStories: true, canAssign: editor, canManageSavedViews: true, canManageMedia: false, canManageFeedback: false },
     currentUser: userPerson(people, ctx.user.id),
     total: matching.length,
