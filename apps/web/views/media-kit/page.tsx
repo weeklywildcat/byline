@@ -3,10 +3,9 @@ import { AuthorDirectory } from "@/components/AuthorDirectory";
 import { SectionHeader } from "@/components/SectionHeader";
 import { filterGeneralEditorialPosts, filterVisibleContentPosts } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
-import { getPresentationMediaUrl } from "@/lib/media";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
-import { getAllPosts, getFeaturedMedia, getPostHref, type WordPressMedia, type WordPressPost } from "@/lib/wordpress";
+import { getAllPosts, getFeaturedMedia, getPostHref, type ArchiveMedia, type ArchivePost } from "@/lib/public-content";
 
 type BrandAsset = {
   title: string;
@@ -161,7 +160,7 @@ export const metadata: Metadata = {
   })
 };
 
-function getImageCredit(image: WordPressMedia) {
+function getImageCredit(image: ArchiveMedia) {
   return stripHtml(
     (image.bylineImage ?? image.weeklyWildcatImage)?.creditText ||
       image.media_details?.image_meta?.credit ||
@@ -170,11 +169,11 @@ function getImageCredit(image: WordPressMedia) {
   );
 }
 
-function getImageAlt(image: WordPressMedia) {
+function getImageAlt(image: ArchiveMedia) {
   return image.alt_text || stripHtml(image.title?.rendered ?? "") || `${publication.identity.shortName} editorial image`;
 }
 
-function getMediaKitImages(posts: WordPressPost[]) {
+function getMediaKitImages(posts: ArchivePost[]) {
   const seenImages = new Set<number>();
 
   return posts
@@ -182,7 +181,7 @@ function getMediaKitImages(posts: WordPressPost[]) {
       post,
       image: getFeaturedMedia(post)
     }))
-    .filter((item): item is { post: WordPressPost; image: WordPressMedia } => {
+    .filter((item): item is { post: ArchivePost; image: ArchiveMedia } => {
       if (!item.image?.source_url || seenImages.has(item.image.id)) {
         return false;
       }
@@ -333,7 +332,7 @@ export default async function MediaKitPage() {
                 <article className="media-kit-image-card" key={`${post.id}-${image.id}`}>
                   <a className="media-kit-image-frame" href={storyHref}>
                     <img
-                      src={getPresentationMediaUrl(image.source_url)}
+                      src={image.source_url}
                       alt={getImageAlt(image)}
                       width={image.media_details?.width}
                       height={image.media_details?.height}

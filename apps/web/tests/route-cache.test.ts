@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { buildSnapshot } from "@byline/content";
 import { routeCacheDependency } from "@/lib/route-cache";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
-import { getPostContributors, isGuestContributor, type WordPressPost } from "@/lib/wordpress";
+import { getPostContributors, isGuestContributor, type ArchivePost } from "@/lib/public-content";
 import type { WebBuildSnapshot } from "@/lib/build-snapshot";
 import fixture from "./fixtures/weekly-wildcat-content.json";
 const personKey = (p: { id: number | string; type?: string }) => `${p.type === "guest" ? "guest" : "user"}:${p.id}`;
-async function snapshot(posts = structuredClone(fixture.posts) as WordPressPost[], contributors = structuredClone(fixture.authors), coverages: any[] = []): Promise<WebBuildSnapshot> {
+async function snapshot(posts = structuredClone(fixture.posts) as ArchivePost[], contributors = structuredClone(fixture.authors), coverages: any[] = []): Promise<WebBuildSnapshot> {
   return buildSnapshot({
     loaders: { posts: async () => posts, contributors: async () => contributors, categories: async () => structuredClone(fixture.categories) as any, tags: async () => [], corrections: async () => [], pages: async () => structuredClone(fixture.pages), sports: async () => ({ games: [], teams: [], rosters: [], teamMedia: [], coverages }), games: (sports) => sports.games },
     accessors: { postId: (p) => p.id, postSlug: (p) => p.slug, postCategoryIds: (p) => p.categories, postTagIds: (p) => p.tags, postContributorIds: (p) => getPostContributors(p).map(personKey), contributorId: personKey, categoryId: (c: any) => c.id, tagId: (t: any) => t.id, pageSlug: (p) => p.slug, correctionPostId: () => null, gameId: () => 0, gameSport: () => "", gameSeason: () => "", gameTeamKeys: () => [], gameDate: () => "" },
@@ -71,15 +71,11 @@ describe("incremental keys follow actual render dependencies", () => {
     (publication as any)[field] = { changed: true };
     for (const [kind, id] of [["article", s.posts[0].id], ["author", "user:1"], ["category", 2], ["page", s.pages[0].slug], ["coverage", "election"]] as const) expect(key(s, kind, id)).not.toBe(key(s, kind, id, publication));
   });
-  it("invalidates canonical/form URLs when an effective public environment override changes", async () => {
+  it("invalidates canonical URLs when an effective public environment override changes", async () => {
     const s = await snapshot();
     const before = key(s, "article", s.posts[0].id);
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://changed.example.test");
     expect(key(s, "article", s.posts[0].id)).not.toBe(before);
-    vi.unstubAllEnvs();
-    const category = key(s, "category", 2);
-    vi.stubEnv("NEXT_PUBLIC_WP_API_URL", "https://cms.changed.example.test/wp-json/wp/v2");
-    expect(key(s, "category", 2)).not.toBe(category);
     vi.unstubAllEnvs();
   });
   it("refuses a deleted or unpublished article key", async () => {

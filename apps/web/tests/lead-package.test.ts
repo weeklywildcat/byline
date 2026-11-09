@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { WEEKLY_WILDCAT_LEAD_DEFAULTS } from "@byline/design";
 import { resolveLeadPackage, toCalendarEntries, toStoryView } from "@/lib/homepage-packages";
 import { resolveWeeklyWildcatHomepage } from "@/lib/homepage-selection";
-import type { WordPressCategory, WordPressPost } from "@/lib/wordpress";
+import type { ArchiveCategory, ArchivePost } from "@/lib/public-content";
 
-function category(id: number, slug: string): WordPressCategory {
+function category(id: number, slug: string): ArchiveCategory {
   return { id, count: 1, description: "", link: "", name: slug, slug, taxonomy: "category", parent: 0 };
 }
 
-function post(id: number, categorySlug: string, options: { sticky?: boolean; image?: boolean } = {}): WordPressPost {
+function post(id: number, categorySlug: string, options: { sticky?: boolean; image?: boolean } = {}): ArchivePost {
   return {
     id,
     date: `2026-08-${String(id).padStart(2, "0")}T12:00:00`,
@@ -48,12 +48,12 @@ function post(id: number, categorySlug: string, options: { sticky?: boolean; ima
         : [],
       "wp:term": [[category(id, categorySlug)]]
     }
-  } as WordPressPost;
+  } as ArchivePost;
 }
 
 const ALL_MODULES = { polls: true, events: true, sports: true };
 
-function resolve(posts: WordPressPost[], props: unknown = {}, features = ALL_MODULES) {
+function resolve(posts: ArchivePost[], props: unknown = {}, features = ALL_MODULES) {
   return resolveLeadPackage({
     packageId: "home-lead",
     props,

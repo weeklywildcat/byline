@@ -10,7 +10,7 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
 | --- | --- |
 | Page metadata, JSON-LD, social images | `apps/web/lib/seo.ts` |
 | `<meta>` serialization | `apps/web/lib/metadata.ts`, `src/layouts/BaseLayout.astro` |
-| WordPress date → ISO timestamps | `apps/web/lib/dates.ts` |
+| Publication date → ISO timestamps | `apps/web/lib/dates.ts` |
 | Image alt fallbacks | `apps/web/lib/image-alt.ts` |
 | `sitemap.xml` | `apps/web/lib/sitemap.ts`, `views/sitemap.ts` |
 | `news-sitemap.xml` | `apps/web/lib/news-sitemap.ts` |
@@ -20,11 +20,9 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
 
 ## Rules the build enforces
 
-- Every social image URL (`og:image`, `twitter:image`) is absolute. Mirrored media
-  lives at `/_wordpress-media/...` and is resolved against the public origin.
-- Dates in JSON-LD, Open Graph, the sitemaps and the feed come from WordPress's
-  GMT fields (`date_gmt`, `modified_gmt`) as ISO 8601 UTC. A post with only local
-  dates is read in the publication timezone. Readers still see dates in
+- Every social image URL (`og:image`, `twitter:image`) is absolute. Prepared media
+  lives at `/_byline/media/...` and is resolved against the public origin.
+- Dates in JSON-LD, Open Graph, the sitemaps and the feed come from the published and modified instants in Snapshot v2. Readers still see dates in
   `America/New_York`.
 - Article pages do not render the masthead's build date (`<time>`); the homepage and
   other pages keep it.
@@ -53,8 +51,8 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
   the masthead is the page's single `h1`.
 - Image alt text is the editor's alt text, or an attachment title only if it reads like
   a description. Filename-like titles never become alt text.
-- Section descriptions come from `publication.sections[].description`; a WordPress
-  category description overrides them only when it is a real sentence.
+- Section descriptions come from `publication.sections[].description`; a
+  section description overrides them only when it is a real sentence.
 - The sitemap lists only canonical, indexable pages. Redirect sources, search, the 404
   page, internal CMS pages and `noindex` pages are never listed. Authors without
   published stories and sections without stories are not listed.
@@ -62,19 +60,13 @@ below is generated at build time and checked by `apps/web/scripts/verify-seo.mjs
 
 ## Video stories
 
-A video story is an ordinary post whose **Format** is Video (`byline_story_format`
-= `video`) and which has one primary YouTube video (`byline_primary_video_url`).
+A video story is an Story whose **Format** is Video and which has one primary YouTube video.
 There is no video post type or category. Writers set Format and paste a YouTube
 link, in the Story Workspace's Details or the editor's Format panel; nothing else.
 A YouTube embed in an ordinary article's body never makes it a video story.
 
-- WordPress (`includes/content/story-video.php`) parses the link to its video ID
-  and, when the link changes, looks the video up once: the YouTube Data API when
-  `BYLINE_YOUTUBE_API_KEY` (constant or environment) is set, otherwise YouTube's
-  keyless oEmbed (title and thumbnail only). The result is cached in the protected
-  `_byline_primary_video` meta, so builds never call YouTube. A failed lookup never
-  blocks saving. Readiness blocks publishing a video story without a valid video.
-- The `byline` REST field and the build snapshot carry `format` and `video`.
+- The newsroom normalizes the YouTube URL and stores its video facts. Readiness blocks publication without a valid video.
+- Snapshot v2 carries the story format and video metadata.
   `packages/core/src/story-video.ts` is the one parser/validator both sides use.
 - The story's own URL is the watch page. `ArticleView` renders a real YouTube
   `<iframe>` (`https://www.youtube.com/embed/<id>`) in place of the lead photo,
@@ -117,10 +109,7 @@ The newsletter block links to Google's no-JavaScript preferred-source deeplink
 
 `NewsArticle.image` lists the original and one image in each of Google's 16:9, 4:3
 and 1:1 ratios. An editor's crop for that ratio (Wide, Standard, Square) wins.
-Otherwise it is the largest WordPress size that already has the ratio; WordPress sizes
-keep the photo's own proportions. Crops are generated only for photos an editor
-art-directs (see `docs/newsroom-blocks.md`, *Photo crops*), never for every upload,
-because every file is mirrored into the static export.
+The public snapshot names the exact prepared files; see [publication media](publication-media.md).
 
 Open Graph and X cards use the editor's 1200×630 social crop when the featured image
 has art direction, and the original photo otherwise.

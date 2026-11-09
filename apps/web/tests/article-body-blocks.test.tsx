@@ -173,14 +173,12 @@ describe("Related Coverage, Poll and Repository Interactive", () => {
     expect(renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.relatedCoverage, FIXTURE_BLOCKS.poll), references: undefined }} />)).toBe('<div class="article-body"></div>');
   });
 
-  it("renders an open poll statically, with the payload the site's poll widget hydrates from", () => {
+  it("renders an open poll statically, with choices and no voting form", () => {
     const html = render(FIXTURE_BLOCKS.poll);
     expect(html).toContain('data-byline-poll-id="lunch-line"');
     expect(html).toContain("How long do you usually wait for lunch?");
-    expect(html).toContain('<script type="application/json" class="byline-poll-data">');
-    expect(html).toContain('"votingOpen":true');
-    // An open poll never prints counts.
-    expect(html).toContain('"votes":0');
+    expect(html).toContain("Online voting is unavailable.");
+    expect(html).not.toContain("<form");
     expect(html).not.toContain("byline-poll-results");
   });
 
@@ -188,11 +186,8 @@ describe("Related Coverage, Poll and Repository Interactive", () => {
     const poll = FIXTURE_REFERENCES.polls!["601"]!;
     const released = renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.poll), references: { polls: { "601": { ...poll, votingOpen: false, results: { totalVotes: 10, votes: { "under-5": 6, "5-10": 3, "over-10": 1 } } } } } }} />);
     expect(released).toContain("Under 5 minutes: 60%");
-    expect(released).toContain('"resultsAvailable":true');
     const withheld = renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.poll), references: { polls: { "601": { ...poll, votingOpen: false } } } }} />);
     expect(withheld).toContain("Voting is closed.");
-    expect(withheld).toContain('"resultsAvailable":false');
-    expect(withheld).toContain('"totalVotes":0');
   });
 
   it("draws a repository interactive's title and text alternative, and its fallback only from the host registry", () => {

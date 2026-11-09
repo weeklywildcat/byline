@@ -1,6 +1,6 @@
 import { getGameCenterHref, type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { getPublicationConfig } from "@/lib/publication";
-import { getPostCategories, getPostPrimaryGameId, type WordPressPost } from "@/lib/wordpress";
+import { getPostCategories, getPostPrimaryGameId, type ArchivePost } from "@/lib/public-content";
 import { getGameSeason, normalizeSportsSeason } from "@/lib/sports-season";
 
 export { getGameSeason, getSeasonFromDate, normalizeSportsSeason } from "@/lib/sports-season";
@@ -426,7 +426,7 @@ export function getGameHref(game: SportsGame) {
   return getGameCenterHref(game);
 }
 
-export function getSportsCoverage(posts: WordPressPost[]) {
+export function getSportsCoverage(posts: ArchivePost[]) {
   return posts.filter((post) => getPostCategories(post).some((category) => category.slug === "sports"));
 }
 
@@ -437,7 +437,7 @@ export function getRelatedSportsCoverage({
   year,
   limit = 6
 }: {
-  posts: WordPressPost[];
+  posts: ArchivePost[];
   team: TeamSummary;
   games?: SportsGame[];
   year?: string;

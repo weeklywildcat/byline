@@ -182,15 +182,6 @@ export function BodyParagraphs({ body }: { body: readonly ParagraphNode[] }): Re
 export function PollBlockView({ blockId, poll }: { blockId: string; poll: PublicPollReference }): ReactNode {
   const id = `${blockId}-heading`;
   const total = poll.results?.totalVotes ?? 0;
-  // The payload the site's poll widget reads. Counts exist only when the poll is closed and releasable.
-  const payload = {
-    id: poll.id,
-    question: poll.question,
-    options: poll.options.map((option) => ({ id: option.id, label: option.label, votes: poll.results?.votes[option.id] ?? 0 })),
-    totalVotes: total,
-    resultsAvailable: Boolean(poll.results),
-    votingOpen: poll.votingOpen
-  };
   return (
     <section className="byline-poll-block" id={`poll-${blockId}`} data-byline-poll-id={poll.id} aria-labelledby={id}>
       <h2 id={id}>Reader poll</h2>
@@ -200,7 +191,7 @@ export function PollBlockView({ blockId, poll }: { blockId: string; poll: Public
           <ul className="byline-poll-options">
             {poll.options.map((option) => <li key={option.id} className="byline-poll-option">{option.label}</li>)}
           </ul>
-          <p className="byline-poll-note">Voting opens when the page finishes loading.</p>
+          <p className="byline-poll-note">Online voting is unavailable.</p>
         </>
       ) : poll.results ? (
         <ol className="byline-poll-results">
@@ -218,7 +209,6 @@ export function PollBlockView({ blockId, poll }: { blockId: string; poll: Public
       ) : (
         <p className="byline-poll-note">Voting is closed.</p>
       )}
-      <script type="application/json" className="byline-poll-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(payload).replace(/</g, "\\u003c") }} />
     </section>
   );
 }

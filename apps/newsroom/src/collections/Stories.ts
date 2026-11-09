@@ -252,7 +252,7 @@ export const Stories: CollectionConfig = {
           type: "select",
           required: true,
           defaultValue: "byline-v1",
-          options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Imported WordPress body" })),
+          options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Archived HTML body" })),
           admin: { readOnly: true, position: "sidebar" }
         },
         // The byline-v1 body: prose plus the Byline story blocks (@byline/editor). Never Payload's generic block forms.
@@ -265,9 +265,9 @@ export const Stories: CollectionConfig = {
           name: "legacyHtml",
           label: "Imported body (HTML)",
           type: "code",
-          admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Imported from WordPress. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
+          admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Archived HTML. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
         },
-        { name: "legacySource", label: "Original Gutenberg source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
+        { name: "legacySource", label: "Original imported source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
         {
           type: "collapsible",
           label: "Presentation",

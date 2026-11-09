@@ -62,7 +62,7 @@ export const CALENDAR_GEOMETRY = { sidebar: 350, sidePadding: 48, weekAxis: 82, 
  * least three comfortable thumbnails still fit beside it:
  * 320 + 48 + 3 x 168 + 2 x 12 = 896px, plus a scrollbar and a margin so the
  * third column never collapses during a sidebar transition. Measured in the
- * browser (docs/payload-migration.md, Media): see MEDIA_WORKSPACE_MIN_WIDTH.
+ * browser (docs/media-workspace.md): see MEDIA_WORKSPACE_MIN_WIDTH.
  * Below it the ordinary 256px sidebar stays and the navigator opens in a
  * sheet.
  */

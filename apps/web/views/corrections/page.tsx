@@ -9,7 +9,7 @@ import {
   getAllPublicCorrections,
   getCorrectionTypeLabel,
   getPostHref
-} from "@/lib/wordpress";
+} from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 export default async function CorrectionsPage() {
   const [posts, remoteCorrections] = await Promise.all([
-    requireBuildData("/wp-json/wp/v2/posts", getAllPosts),
-    optionalBuildData("/wp-json/byline/v1/corrections", getAllPublicCorrections, [])
+    requireBuildData("public snapshot: posts", getAllPosts),
+    optionalBuildData("public snapshot: corrections", getAllPublicCorrections, [])
   ]);
   const entries = getPublicCorrectionLog(posts, remoteCorrections);
   const breadcrumbSchema = getBreadcrumbSchema([

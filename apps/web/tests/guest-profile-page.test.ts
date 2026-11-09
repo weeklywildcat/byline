@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   contributorHasProfilePage,
   normalizeGuestContributor
-} from "@/lib/wordpress";
+} from "@/lib/public-content";
 
 const base = { type: "guest", id: 9, name: "Alex Smith", slug: "alex-smith", role: "Photographer" };
 

@@ -4,7 +4,7 @@ import { filterGeneralEditorialPosts, getPrimaryVisibleCategory } from "@/lib/co
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
 import { escapeXml } from "@/lib/news-sitemap";
-import { getContributorName, getPostContributors, getPostHref, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
+import { getContributorName, getPostContributors, getPostHref, getPostRouteParts, type ArchivePost } from "@/lib/public-content";
 
 export const FEED_ITEM_LIMIT = 30;
 const FEED_SUMMARY_LENGTH = 320;
@@ -18,7 +18,7 @@ type FeedOptions = {
   timeZone: string;
 };
 
-function summarize(post: WordPressPost) {
+function summarize(post: ArchivePost) {
   const native = nativeStory(post.id);
   const text = stripHtml(post.excerpt.rendered) || (native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered));
 
@@ -32,7 +32,7 @@ function summarize(post: WordPressPost) {
  * RSS 2.0 for the newest public stories. `posts` must already be limited to
  * publicly visible stories, newest first.
  */
-export function buildRssFeed(posts: WordPressPost[], { siteUrl, title, description, language, timeZone }: FeedOptions) {
+export function buildRssFeed(posts: ArchivePost[], { siteUrl, title, description, language, timeZone }: FeedOptions) {
   const items = filterGeneralEditorialPosts(posts)
     .flatMap((post) => {
       const native = nativeStory(post.id);

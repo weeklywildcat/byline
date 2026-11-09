@@ -1,6 +1,6 @@
 "use client";
 
-import { publicStoryPath, wordpressLocalDateTime } from "@byline/content";
+import { publicStoryPath, publicationLocalDateTime } from "@byline/content";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/dialog";
 import { Input } from "@byline/newsroom-ui/ui/input";
@@ -46,7 +46,7 @@ export function StoryURL({ context, compact = false }: { context: StoryScreenCon
   const url = config.path ? config.publicSite + config.path : "";
   const pending = proposedPath();
   const partial = currentSection && slug.value ? `…/${currentSection.slug}/${slug.value}/` : "";
-  const originalTime = date.value ? wordpressLocalDateTime(date.value, config.timezone) : "";
+  const originalTime = date.value ? publicationLocalDateTime(date.value, config.timezone) : "";
   function save(event: FormEvent) {
     event.preventDefault();
     const normalized = slugify(nextSlug);
@@ -57,7 +57,7 @@ export function StoryURL({ context, compact = false }: { context: StoryScreenCon
         try {
           const timezone = config!.timezone;
           const instant = localToInstant(wallTime, timezone);
-          if (!wordpressLocalDateTime(instant, timezone).startsWith(wallTime)) throw new Error();
+          if (!publicationLocalDateTime(instant, timezone).startsWith(wallTime)) throw new Error();
           date.setValue(instant);
         } catch {
           return setError("Enter a date and time that exists in the publication timezone.");

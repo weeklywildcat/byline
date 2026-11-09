@@ -1,11 +1,11 @@
-import type { WordPressPage } from "@/lib/wordpress";
+import type { ArchivePage } from "@/lib/public-content";
 
-export function getSportsArchiveHref(pages: WordPressPage[]) {
+export function getSportsArchiveHref(pages: ArchivePage[]) {
   const index = pages.find((page) => page.bylinePage?.sportsArchive?.key === "index");
   return index && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(index.slug) ? `/${index.slug}/` : "/category/sports/";
 }
 
-export function getSportsArchiveRedirects(pages: WordPressPage[]) {
+export function getSportsArchiveRedirects(pages: ArchivePage[]) {
   const redirects = new Map<string, string>();
   for (const page of pages) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug)) continue;

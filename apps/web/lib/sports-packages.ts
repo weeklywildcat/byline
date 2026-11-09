@@ -17,7 +17,7 @@ import { toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepag
 import type { BylinePublicationConfig } from "@byline/core";
 import { getPublicationConfig } from "@/lib/publication";
 import { toAthleteSpotlightView } from "@/lib/story-view";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 
 export { toAthleteSpotlightView };
 
@@ -27,7 +27,7 @@ export { toAthleteSpotlightView };
 // through the shared ordered selection pass, and the structured sports record,
 // which arrives from the sports endpoints. Both are flattened into the
 // presentation-neutral view models the shared renderers consume, so no renderer
-// ever sees a WordPressPost or a SportsGame.
+// ever sees a ArchivePost or a SportsGame.
 
 // --- structured sports records ----------------------------------------------
 //
@@ -181,7 +181,7 @@ export function toSportsFixtureView(game: SportsGame): SportsFixtureView {
 export type SportsPackageResolutionInput = {
   packageId: string;
   props: unknown;
-  posts: WordPressPost[];
+  posts: ArchivePost[];
   // The whole-page ordered pass, produced by the canonical selection.
   selection: HomepageSelection;
   recentScores: SportsGame[];

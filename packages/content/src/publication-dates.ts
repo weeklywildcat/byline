@@ -53,19 +53,19 @@ export function publicationLocalDate(value: Date | string, timeZone: string): st
 }
 
 /** WordPress `date` / `modified`: the publication's wall time, no offset (`YYYY-MM-DDTHH:MM:SS`). */
-export function wordpressLocalDateTime(value: Date | string, timeZone: string): string {
+export function publicationLocalDateTime(value: Date | string, timeZone: string): string {
   const { year, month, day, hour, minute, second } = publicationDateParts(value, timeZone);
   return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
 
 /** WordPress `date_gmt` / `modified_gmt`: UTC, no offset (`YYYY-MM-DDTHH:MM:SS`). */
-export function wordpressGmtDateTime(value: Date | string): string {
+export function publicationUtcDateTime(value: Date | string): string {
   return requireInstant(value).toISOString().slice(0, 19);
 }
 
 /** The publication's wall time to the minute (`YYYY-MM-DDTHH:MM`), the school-event contract. */
 export function publicationLocalMinute(value: Date | string, timeZone: string): string {
-  return wordpressLocalDateTime(value, timeZone).slice(0, 16);
+  return publicationLocalDateTime(value, timeZone).slice(0, 16);
 }
 
 /**

@@ -3,15 +3,15 @@
 How a story is laid out on the public site. There are three, chosen in this order:
 
 ```
-WordPress post
+Byline Story
       ↓
 ArticlePresentation                   (apps/web/lib/article-presentation.ts)
       ↓
 1. repo entry registered for the post ID?     → custom TSX            (developers)
-      │   a presentation arranges the WordPress body;
+      │   a presentation arranges the newsroom body;
       │   a flagship visual story replaces it with its own narrative
       ↓ no
-2. author chose Immersive in WordPress?       → ImmersiveArticleView  (authors)
+2. author chose Immersive in the newsroom?       → ImmersiveArticleView  (authors)
       ↓ no
 3.                                            → ArticleView           (default)
 ```
@@ -24,19 +24,19 @@ Where each kind of work belongs:
 
 | The story needs | Use |
 | --- | --- |
-| Ordinary reporting, photos, quotes, embeds | WordPress |
+| Ordinary reporting, photos, quotes, embeds | the newsroom |
 | A Datawrapper or Flourish chart, Google or OpenStreetMap map | Chart / Map block |
-| A small self-contained interactive (calculator, quiz, custom chart) | Interactive block ([newsroom-blocks.md](newsroom-blocks.md#interactive)) |
-| The standard fullscreen photo opening | WordPress **Story presentation → Immersive** |
-| A bespoke layout around the WordPress text | A presentation (below) |
+| A small self-contained interactive (calculator, quiz, custom chart) | Repository Interactive ([article editor](article-editor.md)) |
+| The standard fullscreen photo opening | the newsroom **Story presentation → Immersive** |
+| A bespoke layout around the newsroom text | A presentation (below) |
 | Scrollytelling, an immersive narrative, a major visual feature | A [flagship visual story](#flagship-visual-stories) |
 
-There is no WordPress scrollytelling tool: scroll-driven storytelling is always a
+There is no the newsroom scrollytelling tool: scroll-driven storytelling is always a
 flagship visual story's own code.
 
 ## The author option: Immersive
 
-In the WordPress post editor's **Story presentation** panel (Document sidebar):
+In the Byline Story editor's **Story presentation** panel (Document sidebar):
 
 - **Standard** (default) is the normal article.
 - **Immersive** opens the story on its featured image, full screen under the site
@@ -50,32 +50,22 @@ standard story (the panel says so). Everything else (byline, caption and credit,
 body, corrections, poll, newsletter, related stories, the ending) is the normal
 article's, just rearranged.
 
-Under the hood these are two post meta values, `byline_story_presentation`
-(`standard` | `immersive`) and `byline_story_immersive_alignment`
-(`bottom-left` | `center`), registered in
-`wordpress-plugin/includes/content/story-presentation.php` and sanitized to those
-values. They are published as `presentation` and `immersiveAlignment` in the
-existing post `byline` settings (and its `weeklyWildcat` alias), included in the
-build snapshot, and carried as `storyPresentation` and `immersiveAlignment` on
-`ArticlePresentation`. Stories from before the setting existed, and any missing or
-unrecognized value, are Standard / Bottom left. Changing the choice changes the
-post and so triggers the normal rebuild. `ImmersiveArticleView` lives in
-`packages/ui` with its styles in `packages/ui/immersive-article.css`.
+Payload stores `presentation` and `immersiveAlignment` on the Story and projects them into Snapshot v2. Live Preview and the public renderer use the same presentation resolver.
 
 ## The developer override
 
-A repository-defined presentation override for selected WordPress posts. It is an
+A repository-defined presentation override for selected Byline Stories. It is an
 escape hatch for the occasional story that deserves a one-off layout, not the
 normal publishing path.
 
-### What stays in WordPress
+### What stays in the newsroom
 
 Everything editorial: headline, excerpt/deck, contributors and bylines, featured
-image with its caption and credit, the Gutenberg body (galleries, Visual
+image with its caption and credit, the article body (galleries, Visual
 Chapters, charts, quotes), corrections, topics, publish and update
 dates. Authors write, publish and correct exactly as they do now. There is no
 checkbox, template, shortcode, block, tag or setting for this feature, and
-WordPress does not know it exists.
+the newsroom does not know it exists.
 
 ### What stays in the repository
 
@@ -85,9 +75,9 @@ URL stay with the article route and are never part of a presentation.
 
 ## How a story is identified
 
-By its **WordPress post ID**, never its slug or headline (those change; the ID
+By its **Byline Story ID**, never its slug or headline (those change; the ID
 does not). It is the number in the editor URL (`post.php?post=384&action=edit`) or
-`id` in `/wp-json/wp/v2/posts?slug=...`. `ArticlePresentation.id` carries it.
+Use the ID shown in the newsroom Story URL. `ArticlePresentation.id` carries it.
 
 The registry, `packages/story-presentations/src/registry.ts`, is an explicit map:
 
@@ -113,7 +103,7 @@ them.
 A presentation receives `{ presentation, slots }` (`StoryPresentationProps`): the
 normalized article model and the interactive slots (`shareActions`,
 `primaryGame`, `poll`, `feedback`, `newsletter`). It never receives a raw
-WordPress post.
+Byline Story.
 
 ## Creating one
 
@@ -140,7 +130,7 @@ add `styles.css`, and add the import and the `id: Component` entry to the regist
 | `ArticleMeta` | Avatars, byline, published/updated times, reading time and the share actions slot. |
 | `ArticleFeaturedImage` | The lead image as a captioned figure. |
 | `ArticleImageCaption` | Only the caption and "Photo: credit", for layouts that paint the image another way. |
-| `ArticleBody` | The WordPress body (with the legacy primary-game card ahead of it) or the empty state. |
+| `ArticleBody` | The the newsroom body (with the legacy primary-game card ahead of it) or the empty state. |
 | `ArticleStoryFooter` | How we reported this, corrections, the series guide, poll, topics, update notice, feedback and newsletter, in the standard order. |
 | `ArticleReportingNote`, `ArticleCorrections`, `ArticleSeriesGuide`, `ArticleTopics`, `ArticleUpdateNotice` | The individual pieces of the footer. |
 | `ArticleStandardEnding` | About the writers, related stories, more by the author and the newsroom tip. Or compose `ArticleAuthors`, `ArticleRelatedStories`, `ArticleMoreByAuthor`, `ArticleTipCallout`. |
@@ -161,21 +151,21 @@ Namespace every selector under `.story-<name>`; add no one-off selectors to
 
 The headline, category and excerpt are not inside `.byline-article-view`, so style
 them yourself. The body, byline and ending are, and inherit the normal article
-styles. Wide and full-bleed blocks in the WordPress body work because the body
+styles. Wide and full-bleed blocks in the newsroom body work because the body
 sits in an `ArticleShell`.
 
 ## Rules (for overrides)
 
 - **Never hard-code article reporting.** No headline, deck, byline, caption or
   paragraph in a presentation. Render `presentation` through the primitives; if
-  WordPress is edited, the page must change with it. (The framework test fails on
+  the newsroom is edited, the page must change with it. (The framework test fails on
   JSX text in the example.) The one exception is a
   [flagship visual story](#flagship-visual-stories), whose narrative is
   deliberately in the repository; its headline, deck, byline and captions of the
-  lead image still come from WordPress.
+  lead image still come from the newsroom.
 - **Do not duplicate the article body.** Render it once with `ArticleBody`.
 - **Preserve the standard article systems:** corrections, the update notice,
-  topics, authors, share actions, the poll, reader feedback, the newsletter,
+  topics, authors, share actions, the poll, the newsletter,
   related stories and the newsroom tip. Omit one only deliberately.
 - **Keep exactly one `<h1>`** (`ArticleHeadline`), in reading order, with real
   alt text, a captioned and credited lead image, keyboard-reachable controls, no
@@ -185,20 +175,17 @@ sits in an `ArticleShell`.
   once. Do not paint it as a CSS background or add a second copy of it; that
   would change what search engines index as the story's image.
 - **Do not fork SEO or routing** into a presentation.
-- **It is an escape hatch.** Prefer improving the shared article. There is no
-  WordPress preview of a custom presentation: view it through the public route
-  (a local `npm run dev` or build). The editor canvas keeps showing the content,
-  not the custom layout.
+- **It is an escape hatch.** Prefer improving the shared article. Use the newsroom Live Preview or a public build to see the custom presentation.
 
 ## Example request for a coding agent
 
-> Create a bespoke presentation for WordPress post 384. Do not hard-code editorial
+> Create a bespoke presentation for Byline Story 384. Do not hard-code editorial
 > content. Use the existing ArticlePresentation data. Make the featured image fill
 > the first viewport beneath the site header. Place the category, headline and
 > excerpt over the photograph. Keep the photograph pinned while an off-white
 > article surface rises over it as the reader scrolls. Put the byline,
 > publication information, share actions and image caption at the top of the
-> article surface. Render the WordPress article body normally after that and use
+> article surface. Render the newsroom article body normally after that and use
 > the standard Byline article ending.
 
 Run `npm run story-presentation -- create 384 <name>`; the generated component is
@@ -211,7 +198,7 @@ work as one piece (closer to an NYT visual feature than an article with
 pictures), a registry entry can opt into owning the body as well:
 
 ```sh
-npm run story-presentation -- create <wordpress-post-id> <kebab-case-name> --visual
+npm run story-presentation -- create <story-id> <kebab-case-name> --visual
 ```
 
 The scaffold writes `stories/<name>/index.tsx`, `styles.css` and `client.ts` and
@@ -221,7 +208,7 @@ registry is still a presentation.
 
 ### Who owns what
 
-| WordPress (the publishing record) | The story folder |
+| the newsroom (the publishing record) | The story folder |
 | --- | --- |
 | Headline, deck, contributors, dates, category and series | The narrative: text, figures, graphics, data |
 | Featured image, caption and credit; Open Graph and search image | Layout, styles and the scroll behavior (`client.ts`) |
@@ -230,16 +217,16 @@ registry is still a presentation.
 | The text edition in the body (feeds, site search) | |
 
 `StoryArticle` gives the component the normal `presentation` and slots, with
-`contentHtml` emptied: the WordPress body is never printed on a visual story's
+`contentHtml` emptied: the newsroom body is never printed on a visual story's
 page, so it cannot appear twice. Render the header and the standard footer and
 ending with the shared primitives, exactly as a presentation does.
 
-**The WordPress body** is the story's text edition. It still feeds RSS, site
+**The the newsroom body** is the story's text edition. It still feeds RSS, site
 search and the reading time Byline would compute, and it is what the story falls
 back to if the registry line is removed. Put a summary or text version there.
 Because the page's words are the narrative, the route omits `articleBody` from
 the NewsArticle structured data for a visual story; everything else (headline,
-description, dates, authors, image) is unchanged. A visual story whose WordPress
+description, dates, authors, image) is unchanged. A visual story whose the newsroom
 body is short can pass `readingTime: "12 min read"` to `defineVisualStory`.
 
 ### Writing the narrative
@@ -255,7 +242,7 @@ body is short can pass `readingTime: "12 min read"` to `defineVisualStory`.
   `prefers-reduced-motion`: no animation, and nothing that only works in motion.
   The scaffold's sticky graphic and reading-line steps are a starting point, not
   a model: design the scroll experience the story needs.
-- **Accessibility.** One `<h1>` (the WordPress headline), semantic sections and
+- **Accessibility.** One `<h1>` (the newsroom headline), semantic sections and
   headings below it, real `alt` text and captions with credits, text equivalents
   for graphics (`role="img"` with a title, or a table), keyboard-reachable
   controls with visible focus, no traps.
@@ -263,7 +250,7 @@ body is short can pass `readingTime: "12 min read"` to `defineVisualStory`.
   that story only; give photographs `width`, `height` and real alt text, and
   credit them in a caption.
 - **Corrections to the narrative** are code changes and a deploy. Record them in
-  WordPress as usual (the correction notice prints on the story), then fix the
+  the newsroom as usual (the correction notice prints on the story), then fix the
   text in the folder.
 
 The fixture `stories/visual-fixture/` (post 10) is exactly what `--visual`
@@ -272,28 +259,24 @@ generates, and a test keeps it that way.
 ## Tests and the fixtures
 
 The fixture build (`BYLINE_CONTENT_MODE=weekly-wildcat-fixture`) marks fixture posts
-8 (bottom left), 7 (centered) and 6 as Immersive in WordPress. Post 6 also has the
+8 (bottom left), 7 (centered) and 6 as Immersive in the newsroom. Post 6 also has the
 fixture-only override `stories/override-fixture/`, and post 10 the fixture-only
 visual story `stories/visual-fixture/`, both registered in
 `fixtureStoryPresentations`, so production can never match them. Coverage:
 
 - `apps/web/tests/story-presentations.test.tsx`: registry resolution; the standard
   article unchanged; the settings normalized and carried into the model; both
-  headline positions with the live WordPress content, one `<h1>`, caption and
+  headline positions with the live the newsroom content, one `<h1>`, caption and
   credit, corrections, authors, slots and structured data; and the override
   winning over Immersive.
 - `apps/web/tests/browser/hero-reveal.spec.ts`: the reveal geometry at desktop and
   phone width for both alignments, headline placement, reduced motion, the scroll
   cue, no horizontal overflow, the override winning, and the Diversity & Inclusion
   page using the same reveal.
-- `wordpress-plugin/tests/story-presentation-regression.php` (meta, defaults,
-  sanitizing, REST schema), `tests-js/story-presentation-settings.test.ts` (the
-  editor controls' model), and the build-snapshot integration test (the choice
-  reaches the snapshot).
 - `apps/web/tests/story-presentations.test.tsx` also covers visual stories: the
-  opt-in, the WordPress body never printed, the publishing record and standard
+  opt-in, the newsroom body never printed, the publishing record and standard
   systems kept, structured data without `articleBody`, and the fallback to the
-  WordPress body when the registry line is removed.
+  the newsroom body when the registry line is removed.
 - `apps/web/tests/browser/visual-story.spec.ts`: the narrative complete without
   JavaScript, the reading-line enhancement in both directions, the sticky graphic,
   reduced motion, phone width, and the story's code and CSS loading on its page
@@ -311,8 +294,8 @@ When you add a real override, add a test for anything specific to it.
   pages to be re-rendered (not restored) after such a change.
 - The Story presentation panel is in the block editor only. The classic editor
   keeps whatever was saved. "Preview as Byline" still renders the standard article,
-  with the WordPress body, for both presentations and visual stories.
+  with the newsroom body, for both presentations and visual stories.
 - A presentation is static HTML; anything interactive needs its own island, as the
   existing slots do. A visual story can add its own `client.ts`.
-- A visual story's narrative is not in WordPress: writers cannot edit it there,
-  and site search indexes the WordPress text edition, not the narrative.
+- A visual story's narrative is not in the newsroom: writers cannot edit it there,
+  and site search indexes the newsroom text edition, not the narrative.

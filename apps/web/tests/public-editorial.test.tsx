@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ArticleCorrectionNotices } from "@/components/ArticleCorrectionNotices";
-import { ReaderFeedbackForm } from "@/components/ReaderFeedbackForm";
 import { getPublicCorrectionLog } from "@/lib/content";
 import { getNewsArticleSchema } from "@/lib/seo";
 import {
@@ -9,8 +8,8 @@ import {
   getPublicCorrectionsForPost,
   normalizePublicCorrection,
   normalizePublicCoverage,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchivePost
+} from "@/lib/public-content";
 import {
   publicEditorialCoverage,
   publicEditorialPosts,
@@ -88,23 +87,8 @@ describe("public editorial surfaces", () => {
     expect(entries.every((entry) => entry.post.status === "publish")).toBe(true);
   });
 
-  it("keeps the feedback form usable when its persistence endpoint is optional", () => {
-    const markup = renderToStaticMarkup(
-      <ReaderFeedbackForm
-        postId={101}
-        articleTitle="Public records guide"
-        articleUrl="https://news.example.test/2026/08/20/news/public-records-guide/"
-        endpointCandidates={[]}
-      />
-    );
-
-    expect(markup).toContain("Spot an error or have a note?");
-    expect(markup).toContain("Send feedback");
-    expect(markup).toContain('name="website"');
-  });
-
   it("keeps the fixture shape assignable to the public post contract", () => {
-    const post: WordPressPost = publicEditorialPosts[0];
+    const post: ArchivePost = publicEditorialPosts[0];
 
     expect(post.status).toBe("publish");
   });

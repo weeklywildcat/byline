@@ -6,11 +6,11 @@ import { describe, expect, it } from "vitest";
 import { MAX_STATIC_REDIRECTS, buildRedirectsFile, parseRedirectsFile } from "@/scripts/redirects.mts";
 import { getSportsArchiveRedirects } from "@/lib/sports-archive";
 import fixture from "./fixtures/weekly-wildcat-content.json";
-import type { WordPressPage } from "@/lib/wordpress";
+import type { ArchivePage } from "@/lib/public-content";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative: string) => readFileSync(path.join(webRoot, relative), "utf8");
-const redirects = getSportsArchiveRedirects(fixture.pages as WordPressPage[]).map(({ path: from, target }) => ({ from, to: target }));
+const redirects = getSportsArchiveRedirects(fixture.pages as ArchivePage[]).map(({ path: from, target }) => ({ from, to: target }));
 
 describe("_redirects generation", () => {
   const file = buildRedirectsFile(redirects);

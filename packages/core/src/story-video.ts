@@ -4,7 +4,7 @@
  * YouTube embed somewhere in an ordinary article's body does not make it one.
  *
  * WordPress stores the format and the pasted URL and fills in what YouTube
- * knows about the video (see wordpress-plugin/includes/content/story-video.php).
+ * knows about the video.
  * This module is the one place both the editor and the public site parse a
  * YouTube URL and validate the published projection.
  */

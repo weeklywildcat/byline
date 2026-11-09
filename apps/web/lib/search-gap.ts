@@ -1,5 +1,4 @@
 import { normalizeSearch } from "@/lib/search";
-import { getBylineRestUrl } from "@/lib/byline-rest";
 
 const MAX_SEARCH_GAP_QUERY_LENGTH = 120;
 const sensitiveQueryPattern = /(?:^|\s)[^\s@]+@[^\s@]+\.[^\s@]+(?:$|\s)/;
@@ -52,7 +51,7 @@ function resolveSearchGapEndpoint(endpoint: string) {
 /**
  * Best-effort reporting for an aggregate zero-result search.
  *
- * The CMS endpoint is the default; a deployment may override it with
+ * A deployment may opt in with
  * NEXT_PUBLIC_SEARCH_GAP_ENDPOINT. Search remains fully functional when the
  * endpoint is unavailable or rejects the request.
  */
@@ -63,7 +62,7 @@ export function reportZeroResultSearch(
     now?: Date;
   } = {}
 ) {
-  const endpoint = resolveSearchGapEndpoint(options.endpoint ?? process.env.NEXT_PUBLIC_SEARCH_GAP_ENDPOINT ?? getBylineRestUrl("search-gaps"));
+  const endpoint = resolveSearchGapEndpoint(options.endpoint ?? process.env.NEXT_PUBLIC_SEARCH_GAP_ENDPOINT ?? "");
   const event = createSearchGapEvent(value, options.now);
 
   if (!endpoint || !event) {

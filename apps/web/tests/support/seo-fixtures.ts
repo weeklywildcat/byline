@@ -1,12 +1,12 @@
-import type { WordPressAuthor, WordPressCategory, WordPressMedia, WordPressPost } from "@/lib/wordpress";
+import type { ArchiveAuthor, ArchiveCategory, ArchiveMedia, ArchivePost } from "@/lib/public-content";
 
-export const author = (id: number, name: string, slug: string): WordPressAuthor => ({ id, name, slug, description: "", avatar_urls: {} });
+export const author = (id: number, name: string, slug: string): ArchiveAuthor => ({ id, name, slug, description: "", avatar_urls: {} });
 
-export const category = (id: number, name: string, slug: string): WordPressCategory => ({
+export const category = (id: number, name: string, slug: string): ArchiveCategory => ({
   id, count: 1, description: "", link: "", name, slug, taxonomy: "category", parent: 0
 });
 
-export function media(overrides: Partial<WordPressMedia> = {}): WordPressMedia {
+export function media(overrides: Partial<ArchiveMedia> = {}): ArchiveMedia {
   return {
     id: 90,
     date: "2026-10-01T10:00:00",
@@ -20,12 +20,12 @@ export function media(overrides: Partial<WordPressMedia> = {}): WordPressMedia {
     media_type: "image",
     mime_type: "image/jpeg",
     media_details: { width: 2048, height: 1365 },
-    source_url: "/_wordpress-media/2026/10/photo.jpg",
+    source_url: "/_byline/media/2026/10/photo.jpg",
     ...overrides
   };
 }
 
-export function post(overrides: Partial<WordPressPost> = {}): WordPressPost {
+export function post(overrides: Partial<ArchivePost> = {}): ArchivePost {
   return {
     id: 1,
     date: "2026-10-14T18:15:00",

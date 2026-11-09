@@ -11,8 +11,8 @@ import {
   getCoverageHref,
   getPostHref,
   getPublicCoverageBySlug,
-  type WordPressCoverage
-} from "@/lib/wordpress";
+  type ArchiveCoverage
+} from "@/lib/public-content";
 
 type CoveragePageProps = {
   params: Promise<{ slug: string }>;
@@ -24,7 +24,7 @@ export async function getMetadata({ params }: CoveragePageProps): Promise<Metada
   const { slug } = await params;
 
   const coverage = await optionalBuildData(
-    `/wp-json/byline/v1/coverage/${slug}`,
+    `public snapshot: coverage/${slug}`,
     () => getPublicCoverageBySlug(slug),
     null
   );
@@ -88,7 +88,7 @@ function CoveragePart({ story, series, lead = false }: { story: CoverageStoryVie
   );
 }
 
-function getCoverageSchema(coverage: WordPressCoverage) {
+function getCoverageSchema(coverage: ArchiveCoverage) {
   const path = getCoverageHref(coverage);
   const pageUrl = absoluteUrl(path);
   const imageId = coverage.artwork?.url ? `${pageUrl}#primaryimage` : undefined;
@@ -129,7 +129,7 @@ export default async function CoveragePage({ params }: CoveragePageProps) {
   const { slug } = await params;
 
   const coverage = await optionalBuildData(
-    `/wp-json/byline/v1/coverage/${slug}`,
+    `public snapshot: coverage/${slug}`,
     () => getPublicCoverageBySlug(slug),
     null
   );

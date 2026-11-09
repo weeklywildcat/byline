@@ -8,24 +8,10 @@
 # Every label named here must exist in the repository, because the labeler adds
 # labels but never creates them.
 
-plugin:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "wordpress-plugin/**"
-          - "weekly-wildcat-headless.php"
-          - "readme.txt"
-          - "scripts/package-plugin.sh"
-          - "scripts/test-plugin-php.sh"
-
 frontend:
   - changed-files:
       - any-glob-to-any-file:
           - "apps/web/**"
-
-discord:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "apps/discord-bot/**"
 
 packages:
   - changed-files:

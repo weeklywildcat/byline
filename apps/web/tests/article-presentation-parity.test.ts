@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { getMediaCredit, getPostContributors, type WordPressAuthor, type WordPressPost } from "@/lib/wordpress";
+import { getMediaCredit, getPostContributors, type ArchiveAuthor, type ArchivePost } from "@/lib/public-content";
 import paritySnapshot from "../../../tests/fixtures/article-presentation-parity.json";
 
 const category = (id: number, name: string, slug: string) => ({
@@ -25,7 +25,7 @@ const tag = (id: number, name: string, slug: string) => ({
   taxonomy: "post_tag" as const
 });
 
-const author: WordPressAuthor = {
+const author: ArchiveAuthor = {
   id: 7,
   name: "Alex Rivera",
   slug: "alex-rivera",
@@ -44,7 +44,7 @@ function post(
   title: string,
   categoryValue: ReturnType<typeof category>,
   contributors: unknown[]
-): WordPressPost {
+): ArchivePost {
   return {
     id,
     date,
@@ -90,7 +90,7 @@ const guest = {
   socials: { website: "https://example.test/jordan" }
 };
 
-const parityPosts: WordPressPost[] = [
+const parityPosts: ArchivePost[] = [
   {
     ...post(100, "2026-08-20T09:00:00", "Parity <em>Story</em>", news, [{ type: "user", id: 7 }, guest]),
     modified: "2026-08-22T09:00:00",
@@ -160,7 +160,7 @@ describe("public article presentation parity fixture", () => {
       post: postValue,
       allPosts: parityPosts,
       contributors,
-      author: contributors.find((value): value is WordPressAuthor => !("type" in value)) ?? null
+      author: contributors.find((value): value is ArchiveAuthor => !("type" in value)) ?? null
     });
 
     expect(presentation.id).toBe(expected.id);

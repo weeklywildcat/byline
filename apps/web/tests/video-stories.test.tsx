@@ -7,7 +7,7 @@ import { buildSitemapEntries } from "@/lib/sitemap";
 import { toStoryView } from "@/lib/story-view";
 import { buildVideoSitemapXml } from "@/lib/video-sitemap";
 import { absoluteUrl, serializeJsonLd } from "@/lib/seo";
-import { getPostContributors, getPostHref, getPostPrimaryVideo, type WordPressPost } from "@/lib/wordpress";
+import { getPostContributors, getPostHref, getPostPrimaryVideo, type ArchivePost } from "@/lib/public-content";
 import { StoryTeaser } from "@/components/StoryTeaser";
 import { StoryArticle } from "@/lib/story-presentation-host";
 import { auditVideoSitemap, pageVideoObject, type SitemapPage } from "@/scripts/seo-audit.mts";
@@ -18,7 +18,7 @@ const EMBED = `https://www.youtube.com/embed/${ID}`;
 const BODY_EMBED = `<figure class="wp-block-embed is-type-video is-provider-youtube"><div class="wp-block-embed__wrapper"><iframe title="Highlights" src="https://www.youtube.com/embed/aaaaaaaaaaa?feature=oembed"></iframe></div></figure>`;
 
 /** A published video story as the `byline` REST field (and build snapshot) delivers it. */
-function videoStory(overrides: Partial<WordPressPost> = {}, video: Record<string, unknown> = {}): WordPressPost {
+function videoStory(overrides: Partial<ArchivePost> = {}, video: Record<string, unknown> = {}): ArchivePost {
   return post({
     id: 21,
     slug: "homecoming-in-90-seconds",
@@ -55,12 +55,12 @@ const article = post({ id: 22, slug: "board-meeting", featured_media: 90, conten
   "wp:term": [[category(2, "News", "news")], []]
 } });
 
-function presentation(target: WordPressPost, all: WordPressPost[] = [target, article]) {
+function presentation(target: ArchivePost, all: ArchivePost[] = [target, article]) {
   return buildArticlePresentation({ post: target, allPosts: all, contributors: getPostContributors(target), author: null });
 }
 
 /** The article markup the route renders, with the JSON-LD the route puts beside it. */
-function renderArticle(target: WordPressPost) {
+function renderArticle(target: ArchivePost) {
   return `<script type="application/ld+json">${serializeJsonLd(getArticleJsonLd(target))}</script>${renderToStaticMarkup(<StoryArticle presentation={presentation(target)} />)}`;
 }
 

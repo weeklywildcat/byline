@@ -1,5 +1,5 @@
 import { decodeHtml } from "@/lib/format";
-import { getFeaturedMedia, type WordPressPost } from "@/lib/wordpress";
+import { getFeaturedMedia, type ArchivePost } from "@/lib/public-content";
 
 /** Google reads at most 1,000 images per <url> entry. */
 export const MAX_SITEMAP_IMAGES_PER_URL = 1000;
@@ -69,7 +69,7 @@ function publicImageUrl(value: string | undefined, siteUrl: string) {
  * exactly the set of files the static deploy serves to crawlers. Anything still
  * pointing at the CMS (a failed mirror) or another host is left out.
  */
-export function getPostSitemapImages(post: WordPressPost, siteUrl: string): string[] {
+export function getPostSitemapImages(post: ArchivePost, siteUrl: string): string[] {
   const images = new Set<string>();
   const add = (value: string | undefined) => {
     const url = publicImageUrl(value, siteUrl);

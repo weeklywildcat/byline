@@ -75,7 +75,7 @@ export const FAQ = [
   {
     question: "Can I use my school Chromebook?",
     answer:
-      "No. District restrictions do not let you add your @weeklywildcat.com Google Workspace account to a school Chromebook, so you will not be able to reach our WordPress, shared drive or any documents, and you cannot do newspaper work on one. We also typically ask that Chromebooks not be used for interviews, since recordings and notes have been lost on them, and we would suggest not relying on one to research your stories. An iPad, MacBook or other personal laptop works much better. If you do not have one, we will work with you."
+      "No. District restrictions do not let you add your @weeklywildcat.com Google Workspace account to a school Chromebook, so you will not be able to reach the Byline newsroom, shared drive or any documents, and you cannot do newspaper work on one. We also typically ask that Chromebooks not be used for interviews, since recordings and notes have been lost on them, and we would suggest not relying on one to research your stories. An iPad, MacBook or other personal laptop works much better. If you do not have one, we will work with you."
   },
   {
     question: "Do I need my own camera?",
@@ -84,7 +84,7 @@ export const FAQ = [
   {
     question: "What accounts will I get?",
     answer:
-      "You will get a @weeklywildcat.com Google Workspace account. It lets you log in to our WordPress, where stories are written and edited."
+      "You will get a @weeklywildcat.com Google Workspace account. It lets you log in to the Byline newsroom, where stories are written and edited."
   },
   {
     question: "Can I stay on the staff and become an editor?",

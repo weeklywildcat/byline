@@ -305,8 +305,7 @@ export function PersonEditor({
         </div>
       </header>
       <p className="text-sm text-muted-foreground">
-        Profiles saved here are part of the Payload migration. The public site
-        still uses WordPress.
+        Public profile changes appear on the website after the next publication build.
       </p>
       {error ? (
         <div className="space-y-2">

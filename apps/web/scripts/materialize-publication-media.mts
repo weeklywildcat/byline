@@ -7,7 +7,7 @@
  *
  * `<file.json>` is either an array of publication blob descriptors or
  * `{ "manifests": [...] }` (prepared-media manifests, as the Phase 7 Payload
- * snapshot will carry them). Not wired into the WordPress `postbuild`.
+ * snapshot carries them). The build wrapper invokes the materializer automatically.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";

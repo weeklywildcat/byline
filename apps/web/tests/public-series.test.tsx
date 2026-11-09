@@ -6,15 +6,15 @@ import { buildArticlePresentation, buildArticleSeries } from "@/lib/article-pres
 import { buildCoveragePresentation } from "@/lib/coverage-presentation";
 import { routeCacheDependency } from "@/lib/route-cache";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@/lib/publication";
-import { getPostContributors, getPostReportingNote, normalizePublicCoverage, type WordPressCoverage, type WordPressPost } from "@/lib/wordpress";
+import { getPostContributors, getPostReportingNote, normalizePublicCoverage, type ArchiveCoverage, type ArchivePost } from "@/lib/public-content";
 import type { WebBuildSnapshot } from "@/lib/build-snapshot";
 import fixture from "./fixtures/weekly-wildcat-content.json";
 
-const posts = structuredClone(fixture.posts) as WordPressPost[];
+const posts = structuredClone(fixture.posts) as ArchivePost[];
 const [first, second, third, fourth, fifth] = posts;
 
 /** The public coverage projection WordPress sends (and the build snapshot stores). */
-function coverage(values: { id?: number; slug?: string; title?: string; format?: string; status?: string; stories: WordPressPost[]; overview?: string; description?: string }): WordPressCoverage {
+function coverage(values: { id?: number; slug?: string; title?: string; format?: string; status?: string; stories: ArchivePost[]; overview?: string; description?: string }): ArchiveCoverage {
   const normalized = normalizePublicCoverage({
     id: values.id ?? 41,
     slug: values.slug ?? "lunch-squeeze",
@@ -30,11 +30,11 @@ function coverage(values: { id?: number; slug?: string; title?: string; format?:
   return normalized;
 }
 
-function withNote(post: WordPressPost, reportingNote: unknown): WordPressPost {
+function withNote(post: ArchivePost, reportingNote: unknown): ArchivePost {
   return { ...post, byline: { ...(post.byline ?? {}), reportingNote } };
 }
 
-function presentationFor(post: WordPressPost, coverages: WordPressCoverage[], allPosts = posts) {
+function presentationFor(post: ArchivePost, coverages: ArchiveCoverage[], allPosts = posts) {
   return buildArticlePresentation({ post, allPosts, contributors: getPostContributors(post), author: null, coverages });
 }
 
@@ -75,7 +75,7 @@ describe("a story in a series", () => {
 
   it("numbers only stories readers can open", () => {
     // The public site never shows the "Hello world" placeholder, even when it is published.
-    const hidden = { ...second, slug: "hello-world" } as WordPressPost;
+    const hidden = { ...second, slug: "hello-world" } as ArchivePost;
     const view = buildArticleSeries(third, [series], posts.map((post) => post.id === second.id ? hidden : post))!;
     expect(view.parts.map((part) => [part.id, part.number])).toEqual([[first.id, 1], [third.id, 2]]);
     expect(view.position).toBe(2);
@@ -149,7 +149,7 @@ describe("coverage page", () => {
 });
 
 describe("incremental rendering", () => {
-  async function snapshot(coverages: WordPressCoverage[], snapshotPosts = posts): Promise<WebBuildSnapshot> {
+  async function snapshot(coverages: ArchiveCoverage[], snapshotPosts = posts): Promise<WebBuildSnapshot> {
     const personKey = (p: { id: number | string; type?: string }) => `${p.type === "guest" ? "guest" : "user"}:${p.id}`;
     return buildSnapshot({
       loaders: { posts: async () => structuredClone(snapshotPosts), contributors: async () => structuredClone(fixture.authors), categories: async () => structuredClone(fixture.categories) as any, tags: async () => [], corrections: async () => [], pages: async () => structuredClone(fixture.pages), sports: async () => ({ games: [], teams: [], rosters: [], teamMedia: [], coverages }), games: (sports) => sports.games },

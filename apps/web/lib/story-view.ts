@@ -14,17 +14,17 @@ import {
   getPostAuthor,
   getPostHref,
   getPostLiveCoverage,
-  type WordPressMedia,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchiveMedia,
+  type ArchivePost
+} from "@/lib/public-content";
 
 // Turns build-time WordPress records into the presentation-neutral view models
 // the shared renderers consume. Everything WordPress-shaped stops here; the
-// canonical resolver in @byline/ui/homepage never sees a WordPressPost.
+// canonical resolver in @byline/ui/homepage never sees a ArchivePost.
 
 // The photo for a card, with its srcset, the editor's focal point and any
 // per-shape crops. The card renderer picks the shape and `sizes` per variant.
-function toStoryImageView(image: WordPressMedia | null, credit: string): StoryImageView | null {
+function toStoryImageView(image: ArchiveMedia | null, credit: string): StoryImageView | null {
   const photo = getResponsiveImageProps(image, { imageSearchVisibility: "presentation" });
   if (!image || !photo) return null;
   const crops: Partial<Record<ImageCropShape, StoryImageCrop>> = {};
@@ -44,12 +44,12 @@ function toStoryImageView(image: WordPressMedia | null, credit: string): StoryIm
   };
 }
 
-function getCleanDeck(post: WordPressPost) {
+function getCleanDeck(post: ArchivePost) {
   const native = nativeStory(post.id);
   return cleanDeckText((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered));
 }
 
-function getReadingTime(post: WordPressPost) {
+function getReadingTime(post: ArchivePost) {
   const native = nativeStory(post.id);
   const words = ((native ? articleBodyPlainText(native.body) : stripHtml(post.content.rendered)) || stripHtml(post.excerpt.rendered)).split(/\s+/).filter(Boolean).length;
 
@@ -61,7 +61,7 @@ export type StoryViewOptions = {
   includeReadingTime?: boolean;
 };
 
-export function toStoryView(post: WordPressPost, options: StoryViewOptions = {}): StoryView {
+export function toStoryView(post: ArchivePost, options: StoryViewOptions = {}): StoryView {
   const author = getPostAuthor(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);
@@ -90,13 +90,13 @@ export function toStoryView(post: WordPressPost, options: StoryViewOptions = {})
 //
 // Moved verbatim from apps/web/components/SportsAthleteFeature.tsx.
 
-function getAthleteName(post: WordPressPost) {
+function getAthleteName(post: ArchivePost) {
   return stripHtml(post.title.rendered)
     .replace(/^athlete\s+of\s+the\s+(?:week|month)\s*:?\s*/i, "")
     .trim();
 }
 
-function getAthleteBlurb(post: WordPressPost) {
+function getAthleteBlurb(post: ArchivePost) {
   // Shares the linear excerpt-marker strip rather than repeating the regex it
   // replaced: the same publication text reaches both, and the same
   // backtracking hazard would come with it.
@@ -111,7 +111,7 @@ function getAthleteBlurb(post: WordPressPost) {
   return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
 }
 
-export function toAthleteSpotlightView(post: WordPressPost): AthleteSpotlightView {
+export function toAthleteSpotlightView(post: ArchivePost): AthleteSpotlightView {
   const image = getFeaturedMedia(post);
   const credit = getMediaCredit(image);
   const blurb = getAthleteBlurb(post);

@@ -13,7 +13,7 @@ import type { BylinePublicationConfig } from "@byline/core";
 import type { SchoolEvent, SportsGame } from "@/lib/headless";
 import { toHomepageCoverageInputs, toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import { toSportsFixtureView, toSportsResultView } from "@/lib/sports-packages";
-import type { WordPressCoverage, WordPressPost } from "@/lib/wordpress";
+import type { ArchiveCoverage, ArchivePost } from "@/lib/public-content";
 
 const BASELINE_RECENT_GAMES = 3;
 const BASELINE_UPCOMING_GAMES = 8;
@@ -64,8 +64,8 @@ export function getHomepageDataRequirements(document: BylineDesignDocumentV2): H
 
 export type HomepageResolutionInput = {
   document: BylineDesignDocumentV2;
-  posts: WordPressPost[];
-  coverages?: WordPressCoverage[];
+  posts: ArchivePost[];
+  coverages?: ArchiveCoverage[];
   publication: BylinePublicationConfig;
   /** The active Front Page placements from the snapshot (slot id → Story id); absent means automatic. */
   placements?: Readonly<Record<string, number>>;

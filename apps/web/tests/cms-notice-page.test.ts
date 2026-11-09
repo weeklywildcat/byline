@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { excludeCmsNoticePages, isCmsNoticePage } from "@/lib/wordpress";
+import { excludeCmsNoticePages, isCmsNoticePage } from "@/lib/public-content";
 
 describe("CMS Notice page", () => {
   it("recognizes the editor landing page by its title", () => {

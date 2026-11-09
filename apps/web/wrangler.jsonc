@@ -1,44 +1,10 @@
 {
   "name": "byline",
-  "main": "src/worker.js",
   "compatibility_date": "2026-06-30",
-  "keep_vars": true,
-
-  // Required by `wrangler preview` (branch previews in Workers Builds). Previews
-  // do not inherit production vars or bindings; this Worker has none that a
-  // preview needs, and the assets directory below is shared.
   "previews": {},
-
   "assets": {
     "directory": "./out",
-    "binding": "ASSETS",
-    "run_worker_first": ["/api/*"],
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash"
-  },
-
-  // Polls have no database binding. WordPress is the poll datastore and the
-  // Worker proxies /api/polls/* and read-only /api/live/<storyId> routes.
-  // Live updates use WordPress too; article rendering stays entirely static.
-  //
-  // The CMS origin is read from the static export's _byline/publication.json
-  // (urls.cms), so no configuration is required. Set the optional BYLINE_CMS_URL
-  // var or secret to override it per deployment:
-  //   npx wrangler secret put BYLINE_CMS_URL
-
-  "observability": {
-    "enabled": false,
-    "head_sampling_rate": 1,
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "persist": true,
-      "invocation_logs": true
-    },
-    "traces": {
-      "enabled": false,
-      "persist": true,
-      "head_sampling_rate": 1
-    }
   }
 }

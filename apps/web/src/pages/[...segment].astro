@@ -7,7 +7,6 @@ import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import Page, { getMetadata, PublicProsePage } from "@/views/[segment]/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
-import { NewsroomPollHydrator } from "@/components/NewsroomPollHydrator";
 export async function getStaticPaths() {
   const snapshot = await getBuildSnapshot();
   const native = getNativeSnapshot();
@@ -25,5 +24,5 @@ const metadata = page ? buildPageMetadata({ title: page.title, description, path
 <BaseLayout metadata={metadata}>
   {page
     ? <PublicProsePage title={page.title} description={description} href={page.href} bodyHtml={page.bodyHtml} />
-    : <><Page params={Promise.resolve(params)} /><NewsroomPollHydrator client:load /></>}
+    : <Page params={Promise.resolve(params)} />}
 </BaseLayout>

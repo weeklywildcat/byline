@@ -1,10 +1,6 @@
 # apps/newsroom
 
-The private Byline newsroom: Payload 3 + Next.js + PostgreSQL. It replaces
-WordPress as the control plane through a phased strangler migration; read
-[`docs/payload-migration.md`](../../docs/payload-migration.md) before changing
-anything here. The public newspaper is still `apps/web` (Astro), built from a
-snapshot; nothing in this app serves public reading.
+The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public site is a separate Astro export built from a snapshot. See [architecture](../../docs/architecture.md).
 
 ## Rules
 
@@ -15,8 +11,7 @@ snapshot; nothing in this app serves public reading.
   endpoint checks the user (`src/access`). A custom admin view is not protected by
   being inside the admin; call `requestUser(req)` and read through the Local API
   with `overrideAccess: false`.
-- **Story context** (`src/access/story-context.ts`) is the port of
-  `byline_story_context()`: managers (editors, creator, assigned editor,
+- **Story context** (`src/access/story-context.ts`) is the shared check for managers (editors, creator, assigned editor,
   contributors via linked person), participants (assigned work only) and
   everyone else. Extend it; do not add parallel checks.
 - **Workflow and planning live on `story-plans`, not on `stories`.** Payload draft
@@ -31,7 +26,7 @@ snapshot; nothing in this app serves public reading.
   run `advanceIdSequences` after importing. Sequences never move backwards.
 - **Votes** live in `byline_poll_votes` (`src/db/poll-votes.ts`), never a collection.
 - **Nothing private enters a public projection.** Public snapshot/live/poll
-  projections (later phases) use explicit allowlists.
+  projections use explicit allowlists.
 - **Byline UI, Payload underneath.** Payload owns infrastructure and the
   form/document lifecycle. `@byline/newsroom-ui` owns the staff-facing
   component system. The canonical app shell is shadcn/Base Nova. Raw Payload
@@ -42,11 +37,10 @@ snapshot; nothing in this app serves public reading.
   form state stays Payload's. Do not replace the template, the Edit view or
   the document root: the Story screen is the custom Field of a presentational
   collapsible.
-- **One shell** (`src/ui/shell`, docs/payload-migration.md §7.2): the provider
+- **One shell** (`src/ui/shell`): the provider
   (`BylineShellProvider`: query cache, shadcn `SidebarProvider`, Create,
   Search), the sidebar (`BylineNav`/`BylineSidebar`), the sticky header
-  (`BylineAppHeader`). Do not add a second global sidebar; the other shadcn
-  sidebar blocks map to specific future surfaces in §7.2.
+  (`BylineAppHeader`). Do not add a second global sidebar; reuse these primitives for additional contexts.
 - **One SidebarProvider, contextual composition.** `BylineSidebar` keeps one
   outer `Sidebar collapsible="icon"` and chooses its contents from the route
   and viewport (`ui/shell/layout.tsx`). Normal screens get the global app
@@ -77,8 +71,7 @@ snapshot; nothing in this app serves public reading.
 - **Collection saves** are explicit, including brief/interview/public settings.
   Route all moves through the existing dirty guard and shell leave guard. Do not
   treat these like Story autosave. The public projection in
-  `newsroom/public-coverage.ts` is allowlisted and published-only; full snapshot
-  delivery/materialization and WordPress cutover remain later work.
+  `newsroom/public-coverage.ts` is allowlisted and published-only; Snapshot v2 delivers it to the public site.
 - **People** (`/admin/people`, [docs/people-workspace.md](../../docs/people-workspace.md))
   is editor+ public identity management, always in the normal global sidebar.
   `?person=<id>` selects the full editor; URL views/search and Back/Forward use
@@ -115,7 +108,7 @@ snapshot; nothing in this app serves public reading.
   overwritten, never eagerly deleted); the build reads them only through
   `/api/byline/build/media/:sha256` with `BYLINE_BUILD_TOKEN`. Recipe numbers
   live in `recipe.ts`; changing one bumps `PUBLICATION_MEDIA_RECIPE_VERSION`.
-- **Live Preview** (`src/preview`, docs/payload-migration.md §5): Payload owns
+- **Live Preview** (`src/preview`): Payload owns
   the pane, iframe, toolbar, devices, zoom, pop-out, transport and open state;
   Byline owns the `/preview/story` page and the Preview button
   (`useLivePreviewContext`). Configured once on `stories` with a static URL, never a
@@ -140,9 +133,7 @@ snapshot; nothing in this app serves public reading.
 - **Search** is the shared `HomeCommands` palette in `src/ui/shell/search.tsx`
   (⌘K everywhere). Screens that show a story in place register
   `setStoryOpener`.
-- **shadcn components** are added to `packages/newsroom-ui` only (the CLI
-  aliases in `wordpress-plugin/components.json` point there), never copied
-  into `apps/newsroom`.
+- **shadcn components** are added to `packages/newsroom-ui` only; never copy them into `apps/newsroom`.
 - **Nova inside Payload:** Byline stylesheets live in `src/ui/*.css` (the only
   files `postcss/byline-ui.cjs` compiles and scopes). The Story screen sits
   inside Payload's `<form>`: give every button `type="button"`, stop Enter in

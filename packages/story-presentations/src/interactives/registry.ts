@@ -8,7 +8,7 @@ import type { RepositoryInteractive, RepositoryInteractiveRegistry } from "./typ
  *
  *   "lunch-line-calculator": LunchLineCalculator
  *
- * See docs/newsroom-blocks.md ("Repository Interactive").
+ * See docs/article-editor.md ("Repository Interactive").
  */
 export const repositoryInteractives: RepositoryInteractiveRegistry = {};
 

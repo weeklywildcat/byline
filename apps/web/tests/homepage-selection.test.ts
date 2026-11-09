@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { resolveWeeklyWildcatHomepage, takeUnused } from "@/lib/homepage-selection";
-import type { WordPressCategory, WordPressPost, WordPressTag } from "@/lib/wordpress";
+import type { ArchiveCategory, ArchivePost, ArchiveTag } from "@/lib/public-content";
 
-function category(id: number, slug: string): WordPressCategory {
+function category(id: number, slug: string): ArchiveCategory {
   return {
     id,
     count: 1,
@@ -15,7 +15,7 @@ function category(id: number, slug: string): WordPressCategory {
   };
 }
 
-function tag(id: number, slug: string): WordPressTag {
+function tag(id: number, slug: string): ArchiveTag {
   return {
     id,
     count: 1,
@@ -31,8 +31,8 @@ function post(
   id: number,
   categorySlug: string,
   options: { sticky?: boolean; tagSlug?: string; image?: boolean } = {}
-): WordPressPost {
-  const terms: Array<WordPressCategory | WordPressTag> = [category(id, categorySlug)];
+): ArchivePost {
+  const terms: Array<ArchiveCategory | ArchiveTag> = [category(id, categorySlug)];
 
   if (options.tagSlug) {
     terms.push(tag(id + 1000, options.tagSlug));
@@ -118,7 +118,7 @@ describe("Weekly Wildcat homepage compatibility resolver", () => {
       ...resolved.morePosts,
       ...resolved.rightNowPosts,
       ...resolved.briefPosts
-    ].filter((value): value is WordPressPost => Boolean(value));
+    ].filter((value): value is ArchivePost => Boolean(value));
     const selectedIds = selected.map(({ id }) => id);
 
     expect(resolved.athleteSpotlightPost?.id).toBe(1);

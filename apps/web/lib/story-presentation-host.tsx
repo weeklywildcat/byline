@@ -30,7 +30,8 @@ export const publicStoryHost: StoryPresentationHost = {
 
 /** The fixture build (`BYLINE_CONTENT_MODE=weekly-wildcat-fixture`) also renders the fixture presentations. */
 export function publicStoryRegistry() {
-  return storyPresentationRegistry({ fixtures: process.env.BYLINE_CONTENT_MODE === "weekly-wildcat-fixture" });
+  const mode = process.env.BYLINE_CONTENT_MODE;
+  return storyPresentationRegistry({ fixtures: mode === "weekly-wildcat-fixture" || mode === "weekly-wildcat-browser-fixture" });
 }
 
 /** The repository presentation registered for a story on the public site, or `null`. */

@@ -17,9 +17,11 @@ function positiveInteger(value, fallback = 0) {
 }
 
 let snapshotBacked = false;
+let contentSource;
 try {
-  const { dataMode } = JSON.parse(await readFile(path.join(projectRoot, ".byline-build/frontend-phases.json"), "utf8"));
+  const { dataMode, snapshotSource } = JSON.parse(await readFile(path.join(projectRoot, ".byline-build/frontend-phases.json"), "utf8"));
   snapshotBacked = dataMode === "prepared-snapshot" || dataMode === "direct-source-recovery";
+  contentSource = snapshotSource === "payload" ? "payload" : "fixture";
 } catch {}
 if (snapshotBacked && process.env.BYLINE_PUBLICATION_REVISION !== undefined && positiveInteger(process.env.BYLINE_PUBLICATION_REVISION) !== builtPublication.revision) {
   throw new Error("BYLINE_PUBLICATION_REVISION cannot override the verified snapshot revision.");
@@ -29,6 +31,7 @@ const manifest = {
   frontendVersion: String(packageJson.version || "0.0.0"),
   publicationSchemaVersion: 1,
   generatedAt: new Date().toISOString(),
+  contentSource,
   publicationRevision: positiveInteger(process.env.BYLINE_PUBLICATION_REVISION ?? builtPublication.revision),
   theme: "weekly-wildcat"
 };

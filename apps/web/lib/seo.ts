@@ -19,10 +19,10 @@ import {
   getPostContributors,
   getPostHref,
   getSiteUrl,
-  type WordPressContributor,
-  type WordPressMedia,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchiveContributor,
+  type ArchiveMedia,
+  type ArchivePost
+} from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 
@@ -69,7 +69,7 @@ type BasicSeoImage = {
   alt?: string;
 };
 
-type SeoImage = WordPressMedia | BasicSeoImage;
+type SeoImage = ArchiveMedia | BasicSeoImage;
 
 /** Resolve a site path (or protocol-relative URL) against the public origin; absolute URLs pass through untouched. */
 export function absoluteUrl(path: string) {
@@ -124,7 +124,7 @@ export function getSeoDescription(value: string, fallback = SITE_DESCRIPTION) {
   return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : trimmed.length).trim()}...`;
 }
 
-function isWordPressMedia(image: SeoImage): image is WordPressMedia {
+function isWordPressMedia(image: SeoImage): image is ArchiveMedia {
   return "source_url" in image;
 }
 
@@ -163,7 +163,7 @@ function getMediaAlt(image: SeoImage | null | undefined) {
 
 /**
  * Social crawlers fetch these URLs from outside the site, so they must be
- * absolute. Mirrored WordPress media is stored as /_wordpress-media/... and is
+ * absolute. Mirrored WordPress media is stored as /_byline/media/... and is
  * resolved against the public origin here; URLs that are already absolute
  * (including the CMS fallback when mirroring failed) are left alone.
  */
@@ -251,13 +251,13 @@ export function getWebsiteId() {
   return `${getSiteUrl()}/#website`;
 }
 
-export function getContributorPersonId(contributor: WordPressContributor) {
+export function getContributorPersonId(contributor: ArchiveContributor) {
   return contributorHasProfilePage(contributor)
     ? `${absoluteUrl(getContributorHref(contributor))}#person`
     : undefined;
 }
 
-export function getNewsArticleId(post: WordPressPost) {
+export function getNewsArticleId(post: ArchivePost) {
   return `${absoluteUrl(getPostHref(post))}#article`;
 }
 
@@ -382,7 +382,7 @@ type ImageCandidate = { url: string; width: number; height: number };
  * sizes keep the photo's own proportions, so without editor crops a 16:9 photo
  * yields 16:9 variants only. No crops are generated here.
  */
-export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate[] {
+export function getArticleImageCandidates(image: ArchiveMedia): ImageCandidate[] {
   const original: ImageCandidate | null = image.source_url && image.media_details?.width && image.media_details?.height
     ? { url: image.source_url, width: image.media_details.width, height: image.media_details.height }
     : null;
@@ -415,7 +415,7 @@ export function getArticleImageCandidates(image: WordPressMedia): ImageCandidate
   return candidates.length > 0 ? candidates : [{ url: image.source_url, width: 0, height: 0 }];
 }
 
-function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string) {
+function getArticleImageSchema(image: ArchiveMedia | null, articleUrl: string) {
   // The generic social card is appropriate for link previews, but it is not a
   // photograph of an imageless story. Advertising it as NewsArticle.image makes
   // search engines associate the same brand artwork with unrelated articles.
@@ -463,11 +463,11 @@ function getArticleImageSchema(image: WordPressMedia | null, articleUrl: string)
 }
 
 /** Timezone-aware ISO timestamps for a post, for JSON-LD and Open Graph. */
-export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" | "modified" | "modified_gmt"> & Partial<Pick<WordPressPost, "live" | "byline" | "weeklyWildcat">>) {
+export function getPostTimestamps(post: Pick<ArchivePost, "date" | "date_gmt" | "modified" | "modified_gmt"> & Partial<Pick<ArchivePost, "live" | "byline" | "weeklyWildcat">>) {
   const published = getWordPressIsoTimestamp({ gmt: post.date_gmt, local: post.date }, publication.timezone);
   const modified = getWordPressIsoTimestamp({ gmt: post.modified_gmt, local: post.modified }, publication.timezone);
   // Live updates are separate records, so the post's own modified time lags them.
-  const live = getPostLiveCoverage(post as WordPressPost);
+  const live = getPostLiveCoverage(post as ArchivePost);
   const latest = [modified ?? published, live?.startedAt, live?.endedAt, ...(live?.updates.map((update) => update.modified) ?? [])]
     .filter((value): value is string => Boolean(value)).sort((a, b) => Date.parse(a) - Date.parse(b)).at(-1);
 
@@ -478,7 +478,7 @@ export function getPostTimestamps(post: Pick<WordPressPost, "date" | "date_gmt" 
  * Google's LiveBlogPosting fields for a story that has been live: coverage
  * times and the newest updates, each linking to its anchor on the page.
  */
-function getLiveBlogFields(post: WordPressPost, articleUrl: string) {
+function getLiveBlogFields(post: ArchivePost, articleUrl: string) {
   const live = getPostLiveCoverage(post);
   if (!live) return null;
   return {
@@ -499,13 +499,13 @@ function getLiveBlogFields(post: WordPressPost, articleUrl: string) {
 const LIVE_BLOG_UPDATE_LIMIT = 50;
 
 /** Canonical profile URLs for the contributors who have a public profile page. One-off guests have none. */
-export function getArticleAuthorProfileUrls(post: WordPressPost) {
+export function getArticleAuthorProfileUrls(post: ArchivePost) {
   return getPostContributors(post)
     .filter(contributorHasProfilePage)
     .map((contributor) => absoluteUrl(getContributorHref(contributor)));
 }
 
-export function getProfilePageSchema(contributor: WordPressContributor, posts: WordPressPost[]) {
+export function getProfilePageSchema(contributor: ArchiveContributor, posts: ArchivePost[]) {
   const profileUrl = absoluteUrl(getContributorHref(contributor));
   const personId = getContributorPersonId(contributor) ?? `${profileUrl}#person`;
   const photo = getContributorPhoto(contributor);
@@ -561,7 +561,7 @@ export function getProfilePageSchema(contributor: WordPressContributor, posts: W
  * repository narrative rather than the WordPress body: the schema then does not
  * claim a body the page does not show.
  */
-export function getNewsArticleSchema(post: WordPressPost, { articleBody: includeBody = true }: { articleBody?: boolean } = {}) {
+export function getNewsArticleSchema(post: ArchivePost, { articleBody: includeBody = true }: { articleBody?: boolean } = {}) {
   const contributors = getPostContributors(post);
   const category = getPrimaryVisibleCategory(post);
   const image = getFeaturedMedia(post);

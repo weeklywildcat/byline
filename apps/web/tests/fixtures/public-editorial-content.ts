@@ -1,4 +1,4 @@
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 
 const primaryAuthor = {
   id: 7,
@@ -21,7 +21,7 @@ const primaryAuthor = {
   }
 };
 
-export const publicEditorialPosts: WordPressPost[] = [
+export const publicEditorialPosts: ArchivePost[] = [
   {
     id: 101,
     date: "2026-08-20T09:00:00",

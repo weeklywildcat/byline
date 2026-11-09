@@ -7,18 +7,18 @@ import {
   getContributorName,
   getCategoryHref,
   isGuestContributor,
-  type WordPressAuthor,
-  type WordPressCategory,
-  type WordPressContributor
-} from "@/lib/wordpress";
+  type ArchiveAuthor,
+  type ArchiveCategory,
+  type ArchiveContributor
+} from "@/lib/public-content";
 import { getPublicationConfig } from "@/lib/publication";
 
 const publication = getPublicationConfig();
 
 type ArticleBylineProps = {
-  author?: WordPressAuthor | null;
-  contributors?: WordPressContributor[];
-  category: WordPressCategory | null;
+  author?: ArchiveAuthor | null;
+  contributors?: ArchiveContributor[];
+  category: ArchiveCategory | null;
   date: string;
   /** A video story leads the line with a small "Video" label. */
   video?: boolean;

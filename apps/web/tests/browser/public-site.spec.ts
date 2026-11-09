@@ -3,6 +3,11 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 const ARTICLE_PATH = "/2026/08/20/news/weekly-wildcat-fixture-story/";
 const PUBLIC_ORIGIN = process.env.BYLINE_BROWSER_ORIGIN || `http://127.0.0.1:${process.env.BYLINE_BROWSER_PORT || "4173"}`;
 
+test.beforeEach(async ({ context }) => {
+  // These checks exercise our site, independent of third-party analytics.
+  await context.route(/https:\/\/[^/]+\.clarity\.ms\//, (route) => route.fulfill({ body: "", contentType: "application/javascript" }));
+});
+
 function collectBrowserErrors(page: Page) {
   const errors: string[] = [];
 
@@ -19,11 +24,9 @@ function collectBrowserErrors(page: Page) {
     const isBlockedThirdPartyRequest = message.text().includes("ERR_BLOCKED_BY_RESPONSE.NotSameOrigin");
     const isExpectedFixtureNetworkNoise =
       sourceUrl.includes("clarity.ms/tag/") ||
-      sourceUrl.endsWith("/api/polls/active") ||
       isBlockedThirdPartyRequest;
 
-    // The static fixture server intentionally does not emulate the Cloudflare
-    // poll proxy, and the fixture's third-party analytics script is not part
+    // The fixture's third-party analytics script is not part
     // of this browser contract. Keep those known network failures out of the
     // uncaught-error signal while still failing on application errors and
     // unexpected missing local resources.
@@ -132,7 +135,7 @@ test.describe("public Astro site", () => {
     });
     await expect(page.locator(".article-share-actions button")).toHaveCount(2);
     await expect(page.locator(".article-newsletter-signup")).toBeVisible();
-    await expect(page.locator(".reader-feedback")).toBeVisible();
+    await expect(page.locator(".reader-feedback")).toHaveCount(0);
     await expectNoBrowserErrors(errors);
 
     const noJs = await openWithoutJavaScript(browser, ARTICLE_PATH);

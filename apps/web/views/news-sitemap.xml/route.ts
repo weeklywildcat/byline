@@ -2,7 +2,7 @@ import { filterVisibleContentPosts } from "@/lib/content";
 import { buildNewsSitemapXml } from "@/lib/news-sitemap";
 import { getPublicationConfig } from "@/lib/publication";
 import { SITE_NAME } from "@/lib/seo";
-import { getAllPosts, getSiteUrl } from "@/lib/wordpress";
+import { getAllPosts, getSiteUrl } from "@/lib/public-content";
 
 export async function GET() {
   const xml = buildNewsSitemapXml(filterVisibleContentPosts(await getAllPosts()), {

@@ -3,7 +3,7 @@
 `/about/` is rendered by code, not from the CMS page with the slug `about`. The route is
 `apps/web/src/pages/about.astro`; the CMS page of the same slug is skipped in
 `apps/web/lib/code-routes.ts` (`CODE_ROUTED_PAGE_SLUGS`, used by `[segment].astro` and the route manifest) so only one page is generated. Add a slug there whenever a CMS page gets a dedicated route.
-Editing "About Us" in WordPress no longer changes the public page.
+The About route is maintained in the public app.
 
 | File | What it holds |
 | --- | --- |
@@ -38,7 +38,7 @@ Leadership is not duplicated here. Only people whose directory role contains "Ed
 | Roles, "you do not need to be an expert" | `/join/` and `/diversity-inclusion/` |
 | Editors assign, review drafts, check details; students lead | `/leadership/` |
 | Fair, accurate, chance to respond, opinion labeled, corrections | The previous About text; `/diversity-inclusion/`; `/leadership/` |
-| Public corrections log, notes on stories, feedback form, anonymous concerns | `/corrections/`, `ArticleCorrectionNotices`, `ReaderFeedbackForm`, `/diversity-inclusion/` |
+| Public corrections log, notes on stories, feedback form, anonymous concerns | `/corrections/`, article corrections, `/diversity-inclusion/` |
 | Photograph credits, CC BY 4.0 | `/image-license/` |
 | Advertising supports reporting, photography, design tools, web costs | `/advertise/` |
 | $0 budget, no school funding, sponsors and donations welcome | The newsroom. There is no donation page yet: `DONATE_URL` in `SiteHeader.tsx` points to `/contact/` as a placeholder |
