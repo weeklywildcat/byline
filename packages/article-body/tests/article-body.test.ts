@@ -17,10 +17,10 @@ import {
   type ArticleBlock,
   type MediaLookup
 } from "../src";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "../src/fixtures";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_TRACKER_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
-const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
+const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceDir = join(import.meta.dirname, "../src");
 
 describe("the contract stays provider-neutral", () => {
@@ -144,7 +144,7 @@ describe("publishing keeps only complete blocks", () => {
 
   it("never publishes empty fact rows, and defaults the heading", () => {
     const result = finalizeBlock({ ...FIXTURE_BLOCKS.keyFacts, heading: " ", facts: [{ id: "a", text: " " }, { id: "b", text: "One fact." }] }, lookup);
-    expect(result.block).toEqual({ type: "keyFacts", id: "blk-facts", heading: "Key facts", facts: [{ id: "b", text: "One fact." }] });
+    expect(result.block).toEqual({ type: "keyFacts", id: "blk-facts", heading: "Key facts", facts: [{ id: "b", text: "One fact." }], presentation: "standard" });
     expect(finalizeBlock({ ...FIXTURE_BLOCKS.keyFacts, facts: [] }, lookup).block).toBeNull();
   });
 

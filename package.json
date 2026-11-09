@@ -36,7 +36,7 @@
     "build:discord": "npm run build --workspace @byline/discord-bot",
     "package:plugin": "bash scripts/package-plugin.sh",
     "story-presentation": "node scripts/story-presentation.mjs",
-    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-updater-transition.mjs && node scripts/verify-shared-style-contracts.mjs && node scripts/verify-editor-canvas-contract.mjs && node --test scripts/prepare-release.test.mjs scripts/story-presentation.test.mjs && npm run verify:mcp-catalog",
+    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-updater-transition.mjs && node scripts/verify-shared-style-contracts.mjs && node scripts/verify-editor-canvas-contract.mjs && node --test scripts/prepare-release.test.mjs scripts/story-presentation.test.mjs scripts/repository-tracker.test.mjs && npm run verify:mcp-catalog",
     "test:frontend:snapshot-build": "npm run test:snapshot-build --workspace @byline/web",
     "typecheck:mcp": "npm run typecheck --workspace @byline/mcp-contracts",
     "test:mcp": "npm run test --workspace @byline/mcp-contracts",
@@ -47,7 +47,8 @@
     "dev:newsroom": "npm run dev --workspace @byline/newsroom",
     "typecheck:newsroom": "npm run typecheck --workspace @byline/newsroom",
     "test:newsroom": "npm run test --workspace @byline/newsroom",
-    "test:newsroom:integration": "npm run test:integration --workspace @byline/newsroom"
+    "test:newsroom:integration": "npm run test:integration --workspace @byline/newsroom",
+    "tracker": "node scripts/repository-tracker.mjs"
   },
   "devDependencies": {
     "@types/react": "19.2.18",

@@ -1,4 +1,4 @@
-import { ARTICLE_BLOCK_LIMITS as LIMITS, ARTICLE_BLOCKS, DEFAULT_HEADINGS, isStubEvent, visualizationHeights, visualizationUrl, type ArticleBlockType } from "@byline/article-body";
+import { ARTICLE_BLOCK_LIMITS as LIMITS, ARTICLE_BLOCKS, boundedParagraphs, DEFAULT_HEADINGS, hasInlineText, isStubEvent, parseSocialPostUrl, safeWebUrl, visualizationHeights, visualizationUrl, type ArticleBlockType } from "@byline/article-body";
 import { parseYouTubeVideoId } from "@byline/core";
 import type { Block, Field, Validate } from "payload";
 import { blockIconDataUri } from "./icons";
@@ -25,6 +25,19 @@ const pdfOnly = { mimeType: { equals: "application/pdf" } } as const;
 const audioOnly = { mimeType: { contains: "audio/" } } as const;
 const publishedStories = { _status: { equals: "published" } } as const;
 const publicPolls = { status: { in: ["open", "closed"] } } as const;
+const publishedEvents = { _status: { equals: "published" } } as const;
+/** An optional public web address: empty, or http(s). */
+const optionalWebUrl: Validate = (value) => (value === null || value === undefined || value === "" || safeWebUrl(value) ? true : "Use a web address that starts with https://.");
+const someParagraph: Validate = (value) => (boundedParagraphs(value, LIMITS.contextBody).some((paragraph) => hasInlineText(paragraph.children)) ? true : "Write the context.");
+const chapterFields = (): Field => ({
+  name: "chapters",
+  type: "array",
+  maxRows: LIMITS.chaptersMax,
+  fields: [
+    { name: "time", type: "number", min: 0, max: LIMITS.chapterTimeMax },
+    { name: "label", type: "text", maxLength: LIMITS.chapterLabel }
+  ]
+});
 
 const PLACEMENT_OPTIONS = [{ value: "column", label: "Column" }, { value: "wide", label: "Wide" }, { value: "full", label: "Full" }];
 const MEDIA_PLACEMENT_OPTIONS = [{ value: "wide", label: "Wide" }, { value: "full", label: "Full" }];
@@ -61,7 +74,11 @@ const PASCAL: Record<ArticleBlockType, string> = {
   beforeAfter: "BeforeAfter",
   relatedCoverage: "RelatedCoverage",
   poll: "Poll",
-  repositoryInteractive: "RepositoryInteractive"
+  repositoryInteractive: "RepositoryInteractive",
+  repositoryTracker: "RepositoryTracker",
+  event: "Event",
+  socialPost: "SocialPost",
+  finalScore: "FinalScore"
 };
 
 function storyBlock(type: ArticleBlockType, fields: Field[]): Block {
@@ -98,11 +115,14 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
         { name: "altOverride", type: "text", maxLength: LIMITS.altText }
       ]
     },
-    { name: "fit", type: "select", required: true, defaultValue: "natural", options: [{ value: "natural", label: "Whole photographs" }, { value: "crop", label: "Even grid" }] }
+    { name: "fit", type: "select", required: true, defaultValue: "natural", options: [{ value: "natural", label: "Whole photographs" }, { value: "crop", label: "Even grid" }] },
+    { name: "layout", type: "select", required: true, defaultValue: "grid", options: [{ value: "grid", label: "Grid" }, { value: "essay", label: "Photo Essay" }, { value: "featured", label: "Featured" }] }
   ]),
   reportedQuote: storyBlock("reportedQuote", [
     { name: "text", type: "textarea", required: true, maxLength: LIMITS.quote },
-    { name: "attribution", type: "text", required: true, maxLength: LIMITS.attribution }
+    { name: "attribution", type: "text", required: true, maxLength: LIMITS.attribution },
+    { name: "sourceUrl", type: "text", maxLength: LIMITS.webUrl, validate: optionalWebUrl },
+    { name: "sourceLabel", type: "text", maxLength: LIMITS.quoteSourceLabel }
   ]),
   pullQuote: storyBlock("pullQuote", [
     { name: "text", type: "textarea", required: true, maxLength: LIMITS.quote },
@@ -110,11 +130,13 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
   ]),
   keyFacts: storyBlock("keyFacts", [
     { name: "heading", type: "text", defaultValue: DEFAULT_HEADINGS.keyFacts, maxLength: LIMITS.heading },
-    { name: "facts", type: "array", maxRows: LIMITS.factsMax, validate: someFact, fields: [{ name: "text", type: "textarea", maxLength: LIMITS.fact }] }
+    { name: "facts", type: "array", maxRows: LIMITS.factsMax, validate: someFact, fields: [{ name: "text", type: "textarea", maxLength: LIMITS.fact }] },
+    { name: "presentation", type: "select", required: true, defaultValue: "standard", options: [{ value: "standard", label: "Standard" }, { value: "compact", label: "Compact" }] }
   ]),
   context: storyBlock("context", [
     { name: "heading", type: "text", defaultValue: DEFAULT_HEADINGS.context, maxLength: LIMITS.heading },
-    { name: "body", type: "textarea", required: true, maxLength: LIMITS.contextBody }
+    // Bounded paragraphs (text, bold, italic, web links) as JSON; older stories hold plain text, read the same way.
+    { name: "body", type: "json", validate: someParagraph }
   ]),
   document: storyBlock("document", [
     { name: "media", type: "upload", relationTo: "media", required: true, filterOptions: pdfOnly },
@@ -127,7 +149,8 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
       maxRows: LIMITS.documentPagesMax,
       fields: [
         { name: "page", type: "number", required: true, min: 1 },
-        { name: "label", type: "text", maxLength: LIMITS.documentPageLabel }
+        { name: "label", type: "text", maxLength: LIMITS.documentPageLabel },
+        { name: "excerpt", type: "textarea", maxLength: LIMITS.documentPageExcerpt }
       ]
     }
   ]),
@@ -141,7 +164,15 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
         { name: "label", type: "text", maxLength: LIMITS.timelineLabel },
         { name: "title", type: "text", maxLength: LIMITS.timelineTitle },
         { name: "body", type: "textarea", maxLength: LIMITS.timelineBody },
-        { name: "current", type: "checkbox", defaultValue: false }
+        { name: "current", type: "checkbox", defaultValue: false },
+        // Optional evidence: one photograph, one web link, one PDF (and page).
+        { name: "media", type: "upload", relationTo: "media", filterOptions: imageOnly },
+        { name: "altOverride", type: "text", maxLength: LIMITS.altText },
+        { name: "caption", type: "textarea", maxLength: LIMITS.caption },
+        { name: "linkUrl", type: "text", maxLength: LIMITS.webUrl, validate: optionalWebUrl },
+        { name: "linkLabel", type: "text", maxLength: LIMITS.timelineLinkLabel },
+        { name: "document", type: "upload", relationTo: "media", filterOptions: pdfOnly },
+        { name: "documentPage", type: "number", min: 1 }
       ]
     }
   ]),
@@ -177,13 +208,16 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
       type: "checkbox",
       defaultValue: false,
       validate: (value: unknown) => (value === true ? true : "Confirm the video has captions before publishing.")
-    }
+    },
+    chapterFields(),
+    { name: "transcript", type: "textarea", maxLength: LIMITS.videoTranscript }
   ]),
   audio: storyBlock("audio", [
     { name: "media", type: "upload", relationTo: "media", required: true, filterOptions: audioOnly },
     { name: "title", type: "text", required: true, maxLength: LIMITS.audioTitle },
     { name: "caption", type: "textarea", maxLength: LIMITS.caption },
-    { name: "transcript", type: "textarea", required: true, maxLength: LIMITS.audioTranscript }
+    { name: "transcript", type: "textarea", required: true, maxLength: LIMITS.audioTranscript },
+    chapterFields()
   ]),
   editorsNote: storyBlock("editorsNote", [{ name: "body", type: "textarea", required: true, maxLength: LIMITS.noteBody }]),
   marginNote: storyBlock("marginNote", [
@@ -195,13 +229,18 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "body", type: "textarea", required: true, maxLength: LIMITS.expandableBody }
   ]),
   chartMap: storyBlock("chartMap", [
-    { name: "mode", type: "select", required: true, defaultValue: "interactive", options: [{ value: "interactive", label: "Interactive chart or map" }, { value: "static", label: "Static graphic" }] },
+    { name: "mode", type: "select", required: true, defaultValue: "native", options: [{ value: "native", label: "Create chart" }, { value: "interactive", label: "Embed" }, { value: "static", label: "Graphic" }] },
     {
       name: "url",
       type: "text",
       maxLength: 2048,
-      validate: (value: unknown, { siblingData }: { siblingData?: { mode?: unknown } }) => (siblingData?.mode === "static" || (typeof value === "string" && visualizationUrl(value)) ? true : "Paste a Datawrapper, Flourish, Google Maps or OpenStreetMap address.")
+      validate: (value: unknown, { siblingData }: { siblingData?: { mode?: unknown } }) => (siblingData?.mode !== "interactive" || (typeof value === "string" && visualizationUrl(value)) ? true : "Paste a Datawrapper, Flourish, Google Maps or OpenStreetMap address.")
     },
+    { name: "chartType", type: "select", required: true, defaultValue: "bar", options: [{ value: "bar", label: "Bar" }, { value: "line", label: "Line" }, { value: "dot", label: "Dot" }] },
+    // Native chart data: the Data Table model (one label per column, one JSON array of cells per row).
+    { name: "columns", type: "array", maxRows: LIMITS.chartSeriesMax + 1, fields: [{ name: "label", type: "text", maxLength: LIMITS.chartLabel }] },
+    { name: "rows", type: "array", maxRows: LIMITS.chartRowsMax, fields: [{ name: "cells", type: "json" }] },
+    { name: "sourceUrl", type: "text", maxLength: LIMITS.webUrl, validate: optionalWebUrl },
     {
       name: "image",
       type: "upload",
@@ -288,10 +327,34 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "key", type: "text", required: true, maxLength: LIMITS.interactiveKey },
     { name: "title", type: "text", required: true, maxLength: LIMITS.interactiveTitle },
     { name: "description", type: "textarea", required: true, maxLength: LIMITS.interactiveDescription }
+  ]),
+  repositoryTracker: storyBlock("repositoryTracker", [
+    { name: "key", type: "text", required: true, maxLength: LIMITS.trackerKey },
+    { name: "title", type: "text", required: true, maxLength: LIMITS.trackerTitle },
+    { name: "description", type: "textarea", required: true, maxLength: LIMITS.trackerDescription }
+  ]),
+  // Only the relationship: the Event's title, time and place are read from the Event when the story renders.
+  event: storyBlock("event", [{ name: "event", type: "relationship", relationTo: "events", required: true, filterOptions: publishedEvents }]),
+  // Only the permalink and the reporter's context: provider and post id are derived from the permalink; no provider HTML is ever stored.
+  socialPost: storyBlock("socialPost", [
+    { name: "url", type: "text", required: true, maxLength: LIMITS.webUrl, validate: (value: unknown) => { const parsed = parseSocialPostUrl(value); return parsed.ok ? true : parsed.message; } },
+    { name: "caption", type: "textarea", maxLength: LIMITS.socialCaption }
+  ]),
+  finalScore: storyBlock("finalScore", [
+    { name: "sport", type: "text", maxLength: LIMITS.finalScoreSport },
+    { name: "teamA", type: "text", required: true, maxLength: LIMITS.finalScoreTeam },
+    { name: "teamAScore", type: "number", min: 0, max: LIMITS.finalScoreMax },
+    { name: "teamB", type: "text", required: true, maxLength: LIMITS.finalScoreTeam },
+    { name: "teamBScore", type: "number", min: 0, max: LIMITS.finalScoreMax },
+    { name: "status", type: "select", required: true, defaultValue: "final", options: [{ value: "final", label: "Final" }, { value: "overtime", label: "Final (overtime)" }, { value: "tie", label: "Tie" }, { value: "forfeit", label: "Forfeit" }] },
+    { name: "date", type: "text", maxLength: 10, validate: (value: unknown) => (value === null || value === undefined || value === "" || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) ? true : "Use a date like 2026-10-17.") },
+    { name: "location", type: "text", maxLength: LIMITS.finalScoreLocation },
+    { name: "note", type: "text", maxLength: LIMITS.finalScoreNote }
   ])
 };
 
 export const BYLINE_FOOTNOTE_COMPONENT = "@byline/editor/client#BylineFootnote";
+export const BYLINE_SOURCE_COMPONENT = "@byline/editor/client#BylineSource";
 
 /**
  * The one inline block: a footnote reference. It sits in a paragraph where the
@@ -304,4 +367,25 @@ export const BYLINE_FOOTNOTE_BLOCK: Block = {
   interfaceName: "BylineFootnoteInline",
   admin: { components: { Block: BYLINE_FOOTNOTE_COMPONENT }, disableBlockName: true },
   fields: [{ name: "text", type: "textarea", maxLength: LIMITS.footnote }]
+};
+
+/**
+ * The Source reference: an inline block at the claim it supports. A public web
+ * page (address and short title) or a PDF from Media (optionally a page). It is
+ * edited in a Popover (a Sheet on touch) on the marker itself. It has nothing to
+ * do with the private newsroom `sources` records and never names one.
+ */
+export const BYLINE_SOURCE_BLOCK: Block = {
+  slug: "source",
+  labels: { singular: "Source", plural: "Sources" },
+  interfaceName: "BylineSourceInline",
+  admin: { components: { Block: BYLINE_SOURCE_COMPONENT }, disableBlockName: true },
+  fields: [
+    { name: "kind", type: "select", defaultValue: "web", options: [{ value: "web", label: "Web page" }, { value: "document", label: "Document" }] },
+    { name: "url", type: "text", maxLength: LIMITS.webUrl, validate: optionalWebUrl },
+    { name: "media", type: "upload", relationTo: "media", filterOptions: pdfOnly },
+    { name: "page", type: "number", min: 1 },
+    { name: "label", type: "text", maxLength: LIMITS.sourceLabel },
+    { name: "note", type: "textarea", maxLength: LIMITS.sourceNote }
+  ]
 };

@@ -1,19 +1,23 @@
 "use client";
 
-import { ARTICLE_BLOCK_LIMITS as LIMITS, CONTEXT_HEADING_SUGGESTIONS, DEFAULT_HEADINGS } from "@byline/article-body";
+import { ARTICLE_BLOCK_LIMITS as LIMITS, CONTEXT_HEADING_SUGGESTIONS, DEFAULT_HEADINGS, safeWebUrl, webUrlHost } from "@byline/article-body";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { Input } from "@byline/newsroom-ui/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { PullQuoteView, ReportedQuoteView, SupportingContext } from "@byline/ui/article-body";
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useRef, type KeyboardEvent } from "react";
+import { ArrowDown, ArrowUp, ChevronDown, Link2, Plus, Trash2 } from "lucide-react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { newRowId } from "../../fields";
 import { insertItem, moveDirection, moveItem, removeItem } from "../../items";
-import { BlockShell, ToolButton, ToolTextButton } from "../chrome";
+import { BlockShell, SecondarySetting, ToolButton, ToolTextButton } from "../chrome";
 import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
 import { useAnnounce } from "../host";
-import { ParagraphFields } from "./parts";
+import { ChoiceToggle } from "./parts";
+import { RichFormatButtons, RichParagraphs, type RichFieldHandle } from "./rich-text";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
 export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
@@ -23,11 +27,39 @@ export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
   const attribution = useRef<HTMLTextAreaElement>(null);
   useFocusWhenCreated(nodeKey, text);
   const readOnly = !node.editable;
+  const urlId = useId();
+  const labelId = useId();
+  const sourceUrl = safeWebUrl(fields.sourceUrl);
+  const invalid = Boolean(fields.sourceUrl.trim()) && !sourceUrl;
   return (
-    <BlockShell type="reportedQuote" node={node} issues={issues}>
+    <BlockShell
+      type="reportedQuote"
+      node={node}
+      issues={issues}
+      actions={
+        <SecondarySetting label={fields.sourceUrl ? "Edit source" : "Add source"} title="Where it was said" description="Optional: a public page where readers can find the statement, such as minutes, a press release or a post." icon={<Link2 />}>
+          <FieldGroup className="gap-4">
+            <Field data-invalid={invalid || undefined}>
+              <FieldLabel htmlFor={urlId}>Source address</FieldLabel>
+              <InputGroup>
+                <InputGroupAddon><Link2 /></InputGroupAddon>
+                <InputGroupInput id={urlId} inputMode="url" placeholder="https://" value={fields.sourceUrl} maxLength={LIMITS.webUrl} readOnly={readOnly} aria-invalid={invalid || undefined} onChange={(event) => set({ sourceUrl: event.target.value.trim() })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
+              </InputGroup>
+              {invalid ? <FieldError>Use a web address that starts with https://.</FieldError> : null}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={labelId}>Link text</FieldLabel>
+              <Input id={labelId} placeholder={sourceUrl ? webUrlHost(sourceUrl) : "School board minutes, Oct. 21"} value={fields.sourceLabel} maxLength={LIMITS.quoteSourceLabel} readOnly={readOnly} onChange={(event) => set({ sourceLabel: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
+              <FieldDescription>Optional. Without it, readers see the site's name.</FieldDescription>
+            </Field>
+          </FieldGroup>
+        </SecondarySetting>
+      }
+    >
       <ReportedQuoteView
         text={<InlineText inputRef={text} className="byline-quote-text" label="Quote" placeholder="Type the quote exactly as it was said." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value })} />}
         attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Who said it" placeholder="Name, title" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value })} />}
+        source={sourceUrl ? <>Source: <a href={sourceUrl} onClick={(event) => event.preventDefault()} tabIndex={-1}>{fields.sourceLabel || webUrlHost(sourceUrl)}</a></> : undefined}
       />
     </BlockShell>
   );
@@ -91,8 +123,21 @@ export function KeyFactsEditor({ node, id, nodeKey }: BlockEditorProps) {
   };
 
   return (
-    <BlockShell type="keyFacts" node={node} issues={issues} actions={<ButtonGroup><ToolTextButton label="Add fact" icon={<Plus />} disabled={full} onClick={() => add(facts.length)} /></ButtonGroup>}>
-      <SupportingContext kind="keyFacts" headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading })} onEnter={() => focusFact(0, true)} />}>
+    <BlockShell
+      type="keyFacts"
+      node={node}
+      issues={issues}
+      actions={
+        <>
+          <ButtonGroup><ToolTextButton label="Add fact" icon={<Plus />} disabled={full} onClick={() => add(facts.length)} /></ButtonGroup>
+          <ChoiceToggle label="Treatment" value={fields.presentation} options={[{ value: "standard", label: "Standard" }, { value: "compact", label: "Compact" }]} onChange={(presentation) => {
+            set({ presentation });
+            announce(presentation === "compact" ? "Compact: two columns when there is room." : "Standard: one fact per row.");
+          }} />
+        </>
+      }
+    >
+      <SupportingContext kind="keyFacts" presentation={fields.presentation} headingId={`${id}-heading`} heading={<ContextHeading value={fields.heading} fallback={DEFAULT_HEADINGS.keyFacts} readOnly={readOnly} onChange={(heading) => set({ heading })} onEnter={() => focusFact(0, true)} />}>
         <ul>
           {facts.map((fact, index) => (
             <li key={fact.id} data-fact-index={index} className="byline-editable-row">
@@ -116,7 +161,9 @@ export function ContextEditor({ node, id, nodeKey }: BlockEditorProps) {
   const [fields, set] = useTypedFields("context", node);
   const issues = useReadiness("context", id, node.fields);
   const heading = useRef<HTMLTextAreaElement>(null);
-  const body = useRef<HTMLTextAreaElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const rich = useRef<RichFieldHandle>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
   useFocusWhenCreated(nodeKey, body);
   const readOnly = !node.editable;
   return (
@@ -125,6 +172,8 @@ export function ContextEditor({ node, id, nodeKey }: BlockEditorProps) {
       node={node}
       issues={issues}
       actions={
+        <>
+        <RichFormatButtons field={rich} readOnly={readOnly} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" />}>
             Heading
@@ -137,10 +186,11 @@ export function ContextEditor({ node, id, nodeKey }: BlockEditorProps) {
             <DropdownMenuItem onClick={() => heading.current?.focus()}>Write your own…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </>
       }
     >
       <SupportingContext kind="context" headingId={`${id}-heading`} heading={<ContextHeading inputRef={heading} value={fields.heading} fallback={DEFAULT_HEADINGS.context} readOnly={readOnly} onChange={(value) => set({ heading: value })} onEnter={() => body.current?.focus()} />}>
-        <ParagraphFields inputRef={body} label="Context" placeholder="The background a reader needs, in a few sentences." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value.slice(0, LIMITS.contextBody) })} />
+        <RichParagraphs inputRef={body} handleRef={rich} label="Context" placeholder="The background a reader needs, in a few sentences. Select words to make them bold, italic or a link." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value })} onLinkShortcut={() => setLinkOpen(true)} />
       </SupportingContext>
     </BlockShell>
   );

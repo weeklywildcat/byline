@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { SettingsSurface } from "./chrome";
 import { consumeCreated } from "./focus";
 import { useAnnounce } from "./host";
-import { useFootnote } from "./lexical";
+import { closedInPlace, returnToText, useFootnote } from "./lexical";
 
 /**
  * A footnote reference in running text, drawn as a superscript number. The
@@ -21,7 +21,7 @@ import { useFootnote } from "./lexical";
 export function BylineFootnote() {
   // Payload renders this server-side-registered component inside the node's own provider, which knows the node.
   const { nodeKey } = useInlineBlockComponentContext() as unknown as { nodeKey: string };
-  const { text, number, editable, write, remove } = useFootnote(nodeKey);
+  const { editor, text, number, editable, write } = useFootnote(nodeKey);
   const announce = useAnnounce();
   const [open, setOpen] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -33,10 +33,12 @@ export function BylineFootnote() {
     if (open) window.requestAnimationFrame(() => field.current?.focus());
   }, [open]);
 
-  const close = (next: boolean) => {
+  const close = (next: boolean, details?: { reason?: string }) => {
     setOpen(next);
+    if (next) return;
     // A reference with no note says nothing: closing it empty removes it (Undo brings it back).
-    if (!next && editable && !text.trim()) remove();
+    if (editable && !text.trim()) returnToText(editor, nodeKey, { remove: true });
+    else if (!closedInPlace(details)) returnToText(editor, nodeKey);
   };
 
   return (
@@ -59,8 +61,8 @@ export function BylineFootnote() {
         <Button type="button" size="sm" onClick={() => close(false)}>Done</Button>
         {editable ? (
           <Button type="button" size="sm" variant="ghost" onClick={() => {
-            remove();
             setOpen(false);
+            returnToText(editor, nodeKey, { remove: true });
             announce("Footnote removed.");
           }}>
             <Trash2 />

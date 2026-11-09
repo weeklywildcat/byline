@@ -306,31 +306,39 @@ The Gutenberg blocks in this document are the WordPress implementation and keep
 rendering existing content. New stories in the Payload newsroom store a
 semantic body instead, never Gutenberg markup. The registry is `ARTICLE_BLOCKS`
 in `@byline/article-body` and [article-editor.md](article-editor.md) is the
-reference. There are 24 tools, in four Add-menu groups, plus inline footnotes.
+reference. There are 28 tools, in four Add-menu groups, plus two inline
+references: footnotes and Source references.
 
 | Group | Tool (`type`) | Data and rules |
 | --- | --- | --- |
 | Media | Photo (`photo`) | media, caption, alt override, `placement`: column / wide / full; credit from Media |
-| | Photo Gallery (`gallery`) | 2–24 photographs, "Whole photographs" or "Even grid"; no column count |
+| | Photo Gallery (`gallery`) | 2–24 photographs; `layout` Grid / Photo Essay (one photograph per row, captions between) / Featured (the first photograph leads; any photograph can be made featured); "Whole photographs" or "Even grid"; no column count |
 | | Portrait + Text (`portraitText`) | portrait, heading, passage, caption, `side` left / right; stacks portrait-first when narrow; warns (does not block) on a very wide photograph |
-| | Video (`video`) | YouTube only, via the canonical parser; stores `videoId`, title, caption; the editor's `captionsConfirmed` flag gates publishing and never reaches the public body; privacy-enhanced lazy iframe, no autoplay or loop, watch link |
-| | Audio (`audio`) | Media audio file, title, context, **transcript required** (≤40k characters); native `<audio controls preload="metadata">`, transcript in a native `<details>` |
-| Explain | Reported Quote, Pull Quote, Key Facts, Context | as before; Context now holds Why it matters / What's next / How we know as heading choices |
+| | Video (`video`) | YouTube only, via the canonical parser; stores `videoId`, title, caption, optional transcript and ≤20 chapters (time, label); the editor's `captionsConfirmed` flag gates publishing and never reaches the public body; privacy-enhanced lazy iframe, no autoplay or loop, watch link; chapters are a list of links that seek the player when it is loaded |
+| | Audio (`audio`) | Media audio file, title, context, **transcript required** (≤40k characters), ≤20 chapters; native `<audio controls preload="metadata">`, transcript in a native `<details>`; chapter links seek the player |
+| | Social Post (`socialPost`) | a validated public Instagram, Threads, Facebook, TikTok, X or Bluesky permalink plus an optional caption; see [Social Post](#social-post-stores-a-permalink) |
+| Explain | Reported Quote (`reportedQuote`) | quote, attribution, optional public source label and web address (a link under the attribution) |
+| | Pull Quote (`pullQuote`) | as before |
+| | Key Facts (`keyFacts`) | as before, with a Standard or Compact treatment |
+| | Context (`context`) | Why it matters / What's next / How we know as heading choices; a bounded body of paragraphs with bold, italic and web links only (no headings, lists or blocks) |
 | | Editor's Note (`editorsNote`) | editors and administrators only; always labelled "Editor's note" |
 | | Margin Note (`marginNote`) | optional heading; sits in the margin on wide layouts, in order on narrow ones |
 | | Expandable (`expandable`) | required heading, body; native `<details>`, closed, no script |
-| | Document (`document`) | PDF, title, context, source, ≤12 page references |
-| Data & visual | Chart / Map (`chartMap`) | interactive (Datawrapper, Flourish, Google Maps embed, OpenStreetMap embed only) or static graphic; title and visible summary required; source, notes, credit; height preset; direct provider link always printed |
+| | Document (`document`) | PDF, title, context, source, ≤12 page references, each a page number, what is on that page and an optional excerpt; the public page links straight to that PDF page (`#page=`) |
+| Data & visual | Chart / Map (`chartMap`) | three modes: **Create chart** (native Bar / Line / Dot drawn by Byline from a small table, 2–40 rows, ≤4 series, TSV paste through the Data Table grid code; static HTML and CSS with the numbers in a `<details>` table, no chart library or script), interactive embed (Datawrapper, Flourish, Google Maps embed, OpenStreetMap embed only) or static graphic; title and visible summary required; source, notes, credit; height preset; direct provider link always printed for an embed |
 | | Data Table (`dataTable`) | 2–8 columns, ≤40 rows, ≤500 characters per cell; real `<table>` with caption, `scope` headers; Standard or Comparison treatment; TSV paste, Tab / Shift+Tab / Enter navigation |
 | | Comparison (`comparison`) | exactly two sides (label, title, passage); Swap sides |
 | | Key Numbers (`keyNumbers`) | 2–4 figures (value, label, context), optional heading and shared source |
+| | Final Score (`finalScore`) | two teams, two scores, how it ended (Final / Final in overtime / Tie / Forfeit), optional sport, date, place and note; see [Final Score](#final-score-is-article-content) |
 | | Annotated Image (`annotatedImage`) | photograph, ≤12 markers (x, y, title, note); markers are links to an always-visible ordered list |
 | | Before / After (`beforeAfter`) | two photographs, labels, `fit` cover / contain, caption; native range input; Before is always left |
 | Structure & interact | Visual Chapter (`visualChapter`) | photograph, eyebrow, heading (an H2 of the story), dek, wide / full, bottom-left / centred |
-| | Timeline (`timeline`) | 2–25 events |
-| | Related Coverage (`relatedCoverage`) | 1–3 published Stories chosen from a search; only the relationship is stored |
+| | Timeline (`timeline`) | 2–25 events, each optionally with one photograph, one web link and one PDF (with a page) as evidence |
+| | Related Coverage (`relatedCoverage`) | 1–3 published Stories; the picker's Suggested tab ranks candidates with the same related-story ranking the public site uses, and Search finds any published Story; nothing is ever added automatically, and only the relationship is stored |
+| | Event (`event`) | one published Event record; only the relationship is stored, and the block shows the record's canonical title, time, place, description and status (a canceled event says so) |
 | | Poll (`poll`) | a Poll record; only the relationship is stored |
 | | Repository Interactive (`repositoryInteractive`) | editors and administrators only; a registered key plus title and text alternative; never HTML, script, CSS or a URL |
+| | Repository Tracker (`repositoryTracker`) | editors and administrators only; a registered tracker key plus title and text alternative; see [Repository Tracker](#repository-tracker) |
 
 **Footnotes** are an inline block, not a card. Insert one from the selection
 toolbar or `/` (Footnote); a Popover (a bottom Sheet on touch) opens for the
@@ -339,9 +347,24 @@ document order, so moving or deleting a reference renumbers the rest. The
 public page prints a superscript link, and one `Footnotes` ordered list at the
 end with a backlink for each note, with no script.
 
+**Source references** are a second inline block, for public evidence: select
+the claim (or put the caret after it) and choose Source in the selection
+toolbar. The words stay; the reference goes after them and its Popover opens.
+A Source is either a **web page** (an http(s) address) or a **document** from
+Media (a PDF, with an optional page), with a short title and an optional note.
+They number in reading order apart from footnotes, so moving or deleting one
+renumbers the rest, and the public page prints a bracketed link to one
+`Sources` ordered list at the end (the two lists coexist and never share
+numbers). Source references are public evidence only. They are entirely
+separate from the newsroom's private `sources` records (the story-scoped
+reporting targets on a Story's Plan): a reference never names, links to or reads one,
+and nothing from a private source record reaches a body, a snapshot or Live
+Preview.
+
 **Deliberately not blocks:** Photo Essay (prose + Photo + Gallery), In This Story
 (derived from H2s and Visual Chapters, `articleOutline`), Correction Notice
-(canonical correction records), Game Score / Sports Schedule (legacy only),
+(canonical correction records), Game Score / Sports Schedule (legacy only; a
+result inside an article is the Final Score block),
 Stories / People / Events grids (page concepts), Scrollytelling (repository
 visual stories), generic Interactive / HTML (retired; Repository Interactive is
 the only custom-code path), Button / CTA / Divider / Columns / Spacer.
@@ -367,6 +390,49 @@ only when a story that places it is shown. The renderer takes the fallback
 through `ArticleRenderHost.renderInteractive`; it never imports the registry. A
 key that is not registered is a publication error, never a blank frame.
 
+### Social Post stores a permalink
+
+A Social Post stores the post's canonical permalink (and the provider and post
+ID the one parser, `parseSocialPostUrl`, derived from it), never provider HTML,
+an `<iframe>`, a `<blockquote>` embed or a script. Pasted embed code is not
+accepted. The parser allows only public post, video and reel addresses on each
+provider's exact hosts; profile pages, share and short links, look-alike hosts
+(`instagram.com.example`), credentials and ports are refused with a reason,
+and YouTube is sent to the Video block. The editor shows Byline's facade with
+the permalink and never loads the provider. The public page prints the same
+facade and a direct link, so it works without JavaScript and the static build
+makes no provider request. A reader's click on "Load … post" is the only thing
+that loads the provider's official embed, for that one post; a failure or
+timeout restores the facade, and the permalink is never removed.
+
+### Repository Tracker
+
+A Repository Tracker is a progress tracker (a project's phases, a count, a
+status board) that a developer builds and updates in the repository, like a
+Repository Interactive. It is repo-owned: its content, data and design live in
+`packages/story-presentations/src/trackers/<key>/` and change only with a
+deploy. An article stores only the tracker key, a title and a text alternative,
+and editors choose a key from the registry; there is no Trackers collection and
+no tracker data in Payload. Each tracker server-renders meaningful fallback HTML
+(the static page is complete without JavaScript) and may add an optional
+`client.ts` enhancement that the public page loads only when a story places that
+tracker. `repositoryTrackers` is empty until a real story needs one;
+`fixture-sidewalk-project` exists only with `BYLINE_STORY_PRESENTATION_FIXTURES=1`.
+Scaffold a new one with `npm run tracker -- create <kebab-case-key>` (add
+`--client` for an enhancement). A key that is not registered is a publication
+error, never a blank frame.
+
+### Final Score is article content
+
+Final Score is a lightweight block for one result in a story: two team names
+and two scores typed by the reporter, how the game ended, and optional sport,
+date, place and note. The winner is derived from the scores (never stored), a
+zero is a score, a forfeit may have no scores, and Swap teams changes which is
+listed first. It is not sports management: there are no team, game, season,
+roster or schedule records behind it, it does not read the retired Sports Hub
+or game records, and it never brings them back (see
+[sports-archive.md](sports-archive.md)).
+
 ### Readiness: omitted versus dropped
 
 `finalizeBlock` returns issues with `effect: "omitted"` (the whole block is left
@@ -377,11 +443,15 @@ story, photograph, fallback graphic, or a half-written number). Empty markers,
 table rows and page references are dropped without blocking. Examples: Video
 without captions confirmed, Audio without a transcript, Chart / Map without a
 title or summary, Data Table without headers or data, Before / After missing a
-side, a Poll that is a draft, an unregistered interactive.
+side, a Poll that is a draft, an unregistered interactive or tracker, an Event
+that is unpublished or missing, a Social Post address the parser refuses, a
+Final Score whose scores do not match how it ended, and a Source without a
+title or without its address or document.
 
 ### Who may write what
 
-Editor's Note and Repository Interactive are editor/administrator only. The
+Editor's Note, Repository Interactive and Repository Tracker are
+editor/administrator only. The
 inserter hides them and the blocks render read-only for staff, but the rule is
 enforced on the server (`guardPrivilegedBlocks`, `enforcePrivilegedBlocks`): for
 a non-editor, a privileged block that was added is removed, one that was changed

@@ -3,8 +3,12 @@ import { enhanceBeforeAfter } from './before-after';
 import { enhanceVisualizations } from './visualization';
 import { enhanceAnnotatedImage } from './annotated-image';
 import { enhanceInteractives } from './interactive';
+import { enhanceSocialPosts } from './social-posts';
+import { enhanceMediaChapters } from './media-chapters';
 
 export { articleEnhancementSelector } from './selector';
+export { enhanceSocialPosts, socialEmbedFrame } from './social-posts';
+export { enhanceMediaChapters } from './media-chapters';
 export type ArticleEnhancementOptions = { preview?: boolean };
 const sessions = new WeakMap<ParentNode, () => void>();
 
@@ -23,6 +27,8 @@ export function enhanceArticleStory(root: HTMLElement, options: ArticleEnhanceme
   if (!options.preview) cleanups.push(enhanceArticleGalleries(root));
   cleanups.push(enhanceVisualizations(root, signal, Boolean(options.preview)));
   cleanups.push(enhanceInteractives(root, signal));
+  cleanups.push(enhanceSocialPosts(root, signal, Boolean(options.preview)));
+  cleanups.push(enhanceMediaChapters(root, signal));
   root.querySelectorAll<HTMLElement>('.byline-annotated-image').forEach((figure) => enhanceAnnotatedImage(figure, signal));
 
   root.querySelectorAll<HTMLElement>('.byline-before-after').forEach((figure) => {

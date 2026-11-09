@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, finalizeBlock, type ArticleBlock, type ArticleMediaAsset } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_TRACKER_KEY, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
 import { ARTICLE_BLOCK_RENDERERS } from "@byline/ui/article-body";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, BLOCK_TO_ARTICLE, mediaIdOf } from "../src/fields";
 import { duplicateItem, insertItem, moveDirection, moveItem, removeItem, setOnlyCurrent } from "../src/items";
@@ -11,7 +11,7 @@ import { BYLINE_BLOCK_COMPONENT, BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
 const media = (id: string | number) => FIXTURE_MEDIA[String(id)] ?? null;
-const references = { story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
+const references = { story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceFiles = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? sourceFiles(path) : [path];
@@ -160,7 +160,9 @@ describe("stored fields", () => {
   it("start new blocks with what a writer needs to fill", () => {
     expect(BLOCK_FIELD_READERS.timeline({}).items).toHaveLength(2);
     expect(BLOCK_FIELD_READERS.keyFacts({}).facts).toEqual([{ id: "draft-0", text: "" }]);
-    expect(BLOCK_FIELD_READERS.context({})).toEqual({ heading: "Context", body: "" });
+    expect(BLOCK_FIELD_READERS.context({})).toEqual({ heading: "Context", body: [] });
+    // A Context saved before formatting existed holds plain text: it reads as paragraphs.
+    expect(BLOCK_FIELD_READERS.context({ body: "One.\n\nTwo." }).body).toHaveLength(2);
     expect(BLOCK_FIELD_READERS.photo({ placement: "giant" }).placement).toBe("column");
     // Re-reading never invents new row IDs (React keys and focus depend on them).
     expect(BLOCK_FIELD_READERS.timeline({}).items.map((item) => item.id)).toEqual(BLOCK_FIELD_READERS.timeline({}).items.map((item) => item.id));

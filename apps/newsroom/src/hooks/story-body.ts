@@ -1,11 +1,12 @@
 import { articleMediaFromPayload, collectMediaIds, collectReferenceIds, normalizePayloadArticleBody, type NormalizeIssue } from "@byline/editor/normalize";
 import { enforcePrivilegedBlocks } from "@byline/editor/permissions";
-import { blockLabel, isBlockingIssue, mediaKey, type MediaId, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
+import { blockLabel, isBlockingIssue, mediaKey, type MediaId, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
 import { repositoryInteractiveRegistry } from "@byline/story-presentations/interactives";
+import { repositoryTrackerRegistry } from "@byline/story-presentations/trackers";
 import { ValidationError, type CollectionBeforeChangeHook, type Payload, type PayloadRequest } from "payload";
 import { atLeast, requestUser } from "../access/user";
 import { loadPreviewPublication } from "../preview/publication";
-import { publicPollReference, publicStoryReference } from "../public/references";
+import { publicEventReference, publicPollReference, publicStoryReference } from "../public/references";
 
 /**
  * Server-side rules for a Story's article body, whatever the browser did.
@@ -24,6 +25,8 @@ import { publicPollReference, publicStoryReference } from "../public/references"
 
 /** Interactives the server knows. The fixture is available only where the host opts into fixtures. */
 export const repositoryInteractivesForServer = () => repositoryInteractiveRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" });
+/** Trackers the server knows, under the same fixture rule. */
+export const repositoryTrackersForServer = () => repositoryTrackerRegistry({ fixtures: process.env.BYLINE_STORY_PRESENTATION_FIXTURES === "1" && process.env.NODE_ENV !== "production" });
 
 export const guardPrivilegedBlocks: CollectionBeforeChangeHook = ({ data, originalDoc, req }) => {
   if (req.context?.bylineImport === true || req.context?.bylineSystem === true) return data;
@@ -44,14 +47,15 @@ type Doc = Record<string, unknown>;
 /** The public-safe records a body names, resolved from Payload for the normalizer. */
 export async function resolveBodyRecords(payload: Payload, body: unknown, options: { storyId?: number | string | null; req?: PayloadRequest }) {
   const mediaIds = collectMediaIds(body).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0);
-  const { stories: storyIds, polls: pollIds } = collectReferenceIds(body);
+  const { stories: storyIds, polls: pollIds, events: eventIds } = collectReferenceIds(body);
   const { timeZone } = await loadPreviewPublication(payload);
   const read = { depth: 1, pagination: false as const, overrideAccess: true as const, req: options.req };
 
-  const [mediaFound, storiesFound, pollsFound] = await Promise.all([
+  const [mediaFound, storiesFound, pollsFound, eventsFound] = await Promise.all([
     mediaIds.length ? payload.find({ collection: "media", where: { id: { in: mediaIds } }, ...read, depth: 0 }) : { docs: [] },
     storyIds.length ? payload.find({ collection: "stories", where: { and: [{ id: { in: storyIds.map(Number) } }, { _status: { equals: "published" } }] }, draft: false, ...read }) : { docs: [] },
-    pollIds.length ? payload.find({ collection: "polls", where: { id: { in: pollIds.map(Number) } }, ...read, depth: 0 }) : { docs: [] }
+    pollIds.length ? payload.find({ collection: "polls", where: { id: { in: pollIds.map(Number) } }, ...read, depth: 0 }) : { docs: [] },
+    eventIds.length ? payload.find({ collection: "events", where: { and: [{ id: { in: eventIds.map(Number) } }, { _status: { equals: "published" } }] }, draft: false, ...read, depth: 0 }) : { docs: [] }
   ]);
 
   const media = new Map<string, Doc>(mediaFound.docs.map((doc) => [mediaKey(doc.id as MediaId), doc as unknown as Doc]));
@@ -68,7 +72,13 @@ export async function resolveBodyRecords(payload: Payload, body: unknown, option
     const projected = publicPollReference(doc);
     if (projected) polls.set(mediaKey(doc.id as MediaId), projected);
   }
+  const events = new Map<string, PublicEventReference>();
+  for (const doc of eventsFound.docs) {
+    const projected = publicEventReference(doc);
+    if (projected) events.set(mediaKey(doc.id as MediaId), projected);
+  }
   const registry = repositoryInteractivesForServer();
+  const trackers = repositoryTrackersForServer();
   return {
     media: (id: MediaId) => {
       const doc = media.get(mediaKey(id));
@@ -77,7 +87,9 @@ export async function resolveBodyRecords(payload: Payload, body: unknown, option
     references: {
       story: (id: MediaId) => stories.get(mediaKey(id))?.reference ?? null,
       poll: (id: MediaId) => polls.get(mediaKey(id)) ?? null,
-      interactive: (key: string) => key in registry
+      event: (id: MediaId) => events.get(mediaKey(id)) ?? null,
+      interactive: (key: string) => key in registry,
+      tracker: (key: string) => Object.hasOwn(trackers, key)
     }
   };
 }
@@ -89,6 +101,7 @@ export function blockingBodyProblems(issues: NormalizeIssue[]): string[] {
     if (issue.kind === "unsupported-node") return [`Remove or replace unsupported content (${issue.nodeType}).`];
     if (issue.kind === "unsupported-format") return [`Remove unsupported formatting (${issue.format}).`];
     if (issue.kind === "unsafe-link") return ["Replace the unsafe link in the story body."];
+    if (issue.kind === "source" && issue.code === "source-incomplete") return [`Source: ${issue.message}`];
     if (issue.kind !== "block" || !isBlockingIssue(issue.issue)) return [];
     return [`${blockLabel(issue.issue.type)}: ${issue.issue.message}`];
   });

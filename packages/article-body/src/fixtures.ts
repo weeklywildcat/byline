@@ -32,6 +32,9 @@ export const FIXTURE_REFERENCES: ArticleReferences = {
     "501": { id: 501, headline: "Greenwood adds a second lunch period", href: "/2025/09/12/news/second-lunch-period/", section: "News", publishedAt: "2025-09-12T14:00:00.000Z", thumbnail: 104 },
     "502": { id: 502, headline: "What the student council survey found", href: "/2025/10/02/news/lunch-survey/", section: "Opinion", publishedAt: "2025-10-02T14:00:00.000Z" }
   },
+  events: {
+    "701": { id: 701, title: "School board budget vote", eventType: "Meeting", startAt: "2026-01-14T23:00:00.000Z", endAt: "2026-01-15T01:00:00.000Z", allDay: false, location: "Greenwood High library", description: "The board votes on the Nutrition Services request, including the third serving window.", externalUrl: "https://example.org/board/2026-01-14", eventStatus: "scheduled" }
+  },
   polls: {
     "601": { id: "lunch-line", question: "How long do you usually wait for lunch?", options: [{ id: "under-5", label: "Under 5 minutes" }, { id: "5-10", label: "5 to 10 minutes" }, { id: "over-10", label: "More than 10 minutes" }], votingOpen: true }
   }
@@ -39,6 +42,8 @@ export const FIXTURE_REFERENCES: ArticleReferences = {
 
 /** The one repository interactive the fixture registry knows. */
 export const FIXTURE_INTERACTIVE_KEY = "fixture-lunch-line";
+/** The one repository tracker the fixture registry knows. */
+export const FIXTURE_TRACKER_KEY = "fixture-sidewalk-project";
 
 export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { type: K }> } = {
   photo: {
@@ -52,6 +57,7 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     type: "gallery",
     id: "blk-gallery",
     fit: "natural",
+    layout: "grid",
     items: [
       { id: "g1", media: 103, caption: "Junior Amara Okafor eats on the courtyard steps after giving up on the line." },
       { id: "g2", media: 104, caption: "Cafeteria manager Denise Royal checks orders at the new express station, which opened Oct. 6." }
@@ -61,7 +67,9 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     type: "reportedQuote",
     id: "blk-reported",
     text: "We are feeding 1,400 students in two lunch periods with a kitchen built for 900. Every minute we save at the register is a minute a kid gets to sit down.",
-    attribution: "Denise Royal, Greenwood cafeteria manager"
+    attribution: "Denise Royal, Greenwood cafeteria manager",
+    sourceUrl: "https://example.org/board/2025-10-21-minutes",
+    sourceLabel: "School board minutes, Oct. 21"
   },
   pullQuote: {
     type: "pullQuote",
@@ -78,14 +86,24 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
       { id: "f2", text: "The kitchen and serving line were built in 1998 for a school of 900." },
       { id: "f3", text: "An express station for pre-ordered meals opened Oct. 6 and served 212 students in its first week." },
       { id: "f4", text: "The district's proposed 2026 budget adds $48,000 for a third serving window." }
-    ]
+    ],
+    presentation: "standard"
   },
   context: {
     type: "context",
     id: "blk-context",
     heading: "Why it matters",
     body: [
-      paragraph("Research on school meals has found that students with less than 20 minutes to eat throw away more food and eat fewer fruits and vegetables. At Greenwood, students in the back half of the second-lunch line routinely have about 12."),
+      {
+        type: "paragraph",
+        children: [
+          { type: "text", text: "Research on school meals has found that students with " },
+          { type: "text", text: "less than 20 minutes", bold: true },
+          { type: "text", text: " to eat throw away more food and eat fewer fruits and vegetables, according to a " },
+          { type: "link", href: "https://example.org/school-meal-time-study", children: [{ type: "text", text: "Harvard study", italic: true }] },
+          { type: "text", text: ". At Greenwood, students in the back half of the second-lunch line routinely have about 12." }
+        ]
+      },
       paragraph("Lunch is also the only meal of the day for some students: 38% of Greenwood students qualify for free or reduced-price meals, according to state data.")
     ]
   },
@@ -97,7 +115,7 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     context: "The request asks for a third serving window and two part-time cashiers, and lists Greenwood's average wait times by period.",
     source: "Greenwood School District, released Oct. 21",
     pages: [
-      { id: "p1", page: 4, label: "Wait times by school and lunch period" },
+      { id: "p1", page: 4, label: "Wait times by school and lunch period", excerpt: "Greenwood's second lunch has the longest average wait in the district, 14 minutes." },
       { id: "p2", page: 9, label: "Cost of a third serving window" }
     ]
   },
@@ -106,9 +124,9 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     id: "blk-timeline",
     items: [
       { id: "t1", label: "Aug. 2025", title: "Enrollment passes 1,400", body: "Greenwood opens the school year with its largest enrollment since the building opened.", current: false },
-      { id: "t2", label: "Sept. 2025", title: "Student council surveys the lunch line", body: "More than 600 students answer; 71% say they regularly have less than 15 minutes to eat.", current: false },
-      { id: "t3", label: "Oct. 6, 2025", title: "Express station opens", body: "Students can pre-order a wrap or salad on the school app and pick it up at a separate window.", current: false },
-      { id: "t4", label: "Jan. 2026", title: "School board votes on the budget", body: "The board is scheduled to vote on the Nutrition Services request at its Jan. 14 meeting.", current: true }
+      { id: "t2", label: "Sept. 2025", title: "Student council surveys the lunch line", body: "More than 600 students answer; 71% say they regularly have less than 15 minutes to eat.", current: false, link: { url: "https://example.org/greenwood-lunch-survey", label: "Survey results" } },
+      { id: "t3", label: "Oct. 6, 2025", title: "Express station opens", body: "Students can pre-order a wrap or salad on the school app and pick it up at a separate window.", current: false, image: { media: 104, caption: "The express station window on its first day." } },
+      { id: "t4", label: "Jan. 2026", title: "School board votes on the budget", body: "The board is scheduled to vote on the Nutrition Services request at its Jan. 14 meeting.", current: true, document: { media: 201, page: 9 } }
     ]
   },
   portraitText: {
@@ -123,14 +141,23 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     caption: "Okafor on the courtyard steps.",
     side: "left"
   },
-  video: { type: "video", id: "blk-video", videoId: "dQw4w9WgXcQ", title: "Inside the second-lunch line", caption: "Filmed Oct. 14 at Greenwood High." },
+  video: {
+    type: "video",
+    id: "blk-video",
+    videoId: "dQw4w9WgXcQ",
+    title: "Inside the second-lunch line",
+    caption: "Filmed Oct. 14 at Greenwood High.",
+    chapters: [{ id: "vc1", time: 0, label: "The bell" }, { id: "vc2", time: 84, label: "The express window" }],
+    transcript: "Narrator: The bell for second lunch rings at 11:38.\n\nOkafor: You can tell who has a class on the far side of the building."
+  },
   audio: {
     type: "audio",
     id: "blk-audio",
     media: 202,
     title: "Denise Royal on the express station",
     caption: "Recorded Oct. 20 in the cafeteria kitchen.",
-    transcript: "Reporter: How long did the express station take to set up?\n\nRoyal: About two weeks. The hard part was finding space for a second window without losing a register."
+    transcript: "Reporter: How long did the express station take to set up?\n\nRoyal: About two weeks. The hard part was finding space for a second window without losing a register.",
+    chapters: [{ id: "ac1", time: 0, label: "Setting up the station" }, { id: "ac2", time: 42, label: "Finding a second window" }]
   },
   editorsNote: { type: "editorsNote", id: "blk-editors-note", body: [paragraph("This story was updated Oct. 22 to correct the date the express station opened.")] },
   marginNote: { type: "marginNote", id: "blk-margin", heading: "About the survey", body: [paragraph("The student council survey was open Sept. 8 to Sept. 19 and was not a random sample.")] },
@@ -217,7 +244,36 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
   },
   relatedCoverage: { type: "relatedCoverage", id: "blk-related", heading: "Related coverage", stories: [{ id: "s1", story: 501 }, { id: "s2", story: 502 }] },
   poll: { type: "poll", id: "blk-poll", poll: 601 },
-  repositoryInteractive: { type: "repositoryInteractive", id: "blk-interactive", key: FIXTURE_INTERACTIVE_KEY, title: "Build your own lunch schedule", description: "A calculator that shows how a change in period length changes the longest wait." }
+  repositoryInteractive: { type: "repositoryInteractive", id: "blk-interactive", key: FIXTURE_INTERACTIVE_KEY, title: "Build your own lunch schedule", description: "A calculator that shows how a change in period length changes the longest wait." },
+  repositoryTracker: { type: "repositoryTracker", id: "blk-tracker", key: FIXTURE_TRACKER_KEY, title: "Where the sidewalk project stands", description: "The Main Street sidewalk project has finished two of its five phases; the crossing at Greenwood High is next." },
+  event: { type: "event", id: "blk-event", event: 701 },
+  socialPost: { type: "socialPost", id: "blk-social", url: "https://www.instagram.com/p/C0ffEeLunch1/", provider: "instagram", postId: "C0ffEeLunch1", caption: "The student council posted its survey results on Instagram the morning they were released." },
+  finalScore: { type: "finalScore", id: "blk-score", sport: "Football", teamA: "Greenwood", teamAScore: 42, teamB: "Abbeville", teamBScore: 14, status: "final", date: "2025-10-17", location: "Wildcat Stadium", note: "Region championship" }
+};
+
+/** Chart / Map in native mode: drawn by Byline from the reporter's table. */
+export const FIXTURE_NATIVE_CHART: Extract<ArticleBlock, { type: "chartMap" }> = {
+  type: "chartMap",
+  id: "blk-native-chart",
+  mode: "native",
+  image: null,
+  title: "Second lunch waits nearly twice as long",
+  dek: "Average minutes from joining the line to reaching the register, by day, October 2025.",
+  summary: "On every day reporters timed, second-lunch students waited longer than first-lunch students; the gap was widest on Friday, 16 minutes to 8.",
+  source: "Weekly Wildcat timing study",
+  notes: "40 students timed over five days.",
+  height: "standard",
+  chartType: "bar",
+  data: {
+    columns: [{ id: "nc0", label: "Day" }, { id: "nc1", label: "First lunch" }, { id: "nc2", label: "Second lunch" }],
+    rows: [
+      { id: "nr1", cells: ["Monday", "7", "13"] },
+      { id: "nr2", cells: ["Tuesday", "8", "14"] },
+      { id: "nr3", cells: ["Wednesday", "8", "12"] },
+      { id: "nr4", cells: ["Thursday", "9", "15"] },
+      { id: "nr5", cells: ["Friday", "8", "16"] }
+    ]
+  }
 };
 
 /** The whole fixture story, prose and every block, in reading order. */
@@ -242,6 +298,7 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
         { type: "text", text: " complaint at Greenwood this fall, and it surfaced in a " },
         { type: "link", href: "https://example.org/greenwood-lunch-survey", children: [{ type: "text", text: "student council survey" }] },
         { type: "text", text: " that drew more than 600 responses." },
+        { type: "source", id: "src-survey", kind: "web", url: "https://example.org/greenwood-lunch-survey", label: "Student council lunch survey results", note: "Published Sept. 22 by the Greenwood student council." },
         { type: "footnote", id: "fn-survey", text: "The survey was open Sept. 8 to Sept. 19 and was not a random sample." }
       ]
     },
@@ -271,7 +328,9 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
     FIXTURE_BLOCKS.context,
     FIXTURE_BLOCKS.video,
     FIXTURE_BLOCKS.chartMap,
+    FIXTURE_NATIVE_CHART,
     FIXTURE_BLOCKS.dataTable,
+    FIXTURE_BLOCKS.socialPost,
     FIXTURE_BLOCKS.annotatedImage,
     FIXTURE_BLOCKS.beforeAfter,
     FIXTURE_BLOCKS.visualChapter,
@@ -280,6 +339,7 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
       type: "paragraph",
       children: [
         { type: "text", text: "The district's 2026 budget request, released Oct. 21, asks for money to add a third serving window at Greenwood." },
+        { type: "source", id: "src-budget", kind: "document", media: 201, page: 9, label: "Nutrition Services budget request, 2026" },
         { type: "footnote", id: "fn-budget", text: "Nutrition Services budget request, 2026, page 9." }
       ]
     },
@@ -288,8 +348,12 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
     FIXTURE_BLOCKS.document,
     FIXTURE_BLOCKS.timeline,
     FIXTURE_BLOCKS.relatedCoverage,
+    FIXTURE_BLOCKS.event,
     FIXTURE_BLOCKS.poll,
     FIXTURE_BLOCKS.repositoryInteractive,
+    FIXTURE_BLOCKS.repositoryTracker,
+    paragraph("Greenwood's football team, meanwhile, eats after practice. The Wildcats closed the regular season with a win."),
+    FIXTURE_BLOCKS.finalScore,
     paragraph("Until then, Okafor said, she will keep eating on the steps.")
   ]
 };
@@ -303,5 +367,8 @@ const FIRST_PHASE = new Set(["photo", "gallery", "reportedQuote", "pullQuote", "
 export const FIXTURE_FIRST_PHASE_BODY: ArticleBody = {
   ...FIXTURE_ARTICLE_BODY,
   references: undefined,
-  nodes: FIXTURE_ARTICLE_BODY.nodes.filter((node) => node.type === "paragraph" || node.type === "heading" || node.type === "list" || FIRST_PHASE.has(node.type))
+  nodes: FIXTURE_ARTICLE_BODY.nodes
+    .filter((node) => node.type === "paragraph" || node.type === "heading" || node.type === "list" || FIRST_PHASE.has(node.type))
+    // Inline Source references (and the timeline's attached evidence) came later than the first phase.
+    .map((node) => (node.type === "paragraph" ? { ...node, children: node.children.filter((child) => child.type !== "source") } : node.type === "timeline" ? { ...node, items: node.items.map(({ image: _image, link: _link, document: _document, ...event }) => event) } : node))
 };

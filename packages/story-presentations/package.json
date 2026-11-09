@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Byline's one article entry point: StoryArticle, the presentation resolver (custom, then Immersive when valid, then Standard), the repository registry of custom presentations and flagship visual stories. CMS- and bundler-neutral: the public site (Astro/Vite) and the newsroom Live Preview (Next.js) import the same modules and supply their own asset hosts.",
+  "description": "Byline's one article entry point: StoryArticle, the presentation resolver (custom, then Immersive when valid, then Standard), the repository registry of custom presentations and flagship visual stories, repository interactives and repository trackers. CMS- and bundler-neutral: the public site (Astro/Vite) and the newsroom Live Preview (Next.js) import the same modules and supply their own asset hosts.",
   "exports": {
     ".": "./src/index.ts",
     "./resolve": "./src/resolve.ts",
     "./stories/*": "./src/stories/*",
     "./interactives/*": "./src/interactives/*",
-    "./interactives": "./src/interactives/registry.ts"
+    "./interactives": "./src/interactives/registry.ts",
+    "./trackers": "./src/trackers/registry.ts",
+    "./trackers/*": "./src/trackers/*"
   },
   "dependencies": {
     "@byline/content": "0.1.0",

@@ -1,7 +1,7 @@
 import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
   FIXED_PUBLIC_CONTENT_ROUTES, collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
-  validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
+  snapshotEventReference, validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
 } from "@byline/content";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
@@ -10,7 +10,7 @@ import { collectMediaIds, collectReferenceIds, normalizePayloadStoryBody, type N
 import type { Payload } from "payload";
 import { relationIds } from "../../access/user";
 import { videoFactsFor } from "../../newsroom/video-facts";
-import { repositoryInteractivesForServer } from "../../hooks/story-body";
+import { repositoryInteractivesForServer, repositoryTrackersForServer } from "../../hooks/story-body";
 import type { Story } from "../../payload-types";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../publication-config";
 import { collectCollections, collectCorrections, collectEvents, collectPages, collectPeople, id, iso, prose, publicRead, published, taxonomy, text } from "./datasets";
@@ -71,6 +71,7 @@ function contentLosingIssues(issues: NormalizeIssue[]): string[] {
     if (issue.kind === "unsupported-node") return [`unsupported ${issue.nodeType} at ${issue.path}`];
     if (issue.kind === "unsupported-format") return [`unsupported ${issue.format} formatting at ${issue.path}`];
     if (issue.kind === "unsafe-link") return [`unsafe link at ${issue.path}`];
+    if (issue.kind === "source" && issue.code === "source-incomplete") return [`unfinished source at ${issue.path}: ${issue.message}`];
     if (issue.kind === "block" && isBlockingIssue(issue.issue)) return [`${issue.issue.type} block ${issue.issue.blockId}: ${issue.issue.message}`];
     return [];
   });
@@ -138,6 +139,10 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const catalog = await PreparedMediaCatalog.load(payload, mediaRefs);
   const registry = repositoryInteractivesForServer();
   const interactive = (key: string) => Object.hasOwn(registry, key);
+  const trackerRegistry = repositoryTrackersForServer();
+  const tracker = (key: string) => Object.hasOwn(trackerRegistry, key);
+  // The Event block resolves from the published events dataset itself, so a body and the dataset can never disagree.
+  const eventById = new Map(events.map((row) => [row.id, snapshotEventReference(row)]));
   const stories = rows.map((row): PublicStorySnapshot => {
     const { body, issues } = normalizePayloadStoryBody(row, {
       media: (id) => catalog.articleAsset(Number(id)),
@@ -147,7 +152,9 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
           return story && story.id !== row.id ? snapshotStoryReference(story) : null;
         },
         poll: (id) => polls.get(Number(id)),
-        interactive
+        event: (id) => eventById.get(Number(id)) ?? null,
+        interactive,
+        tracker
       }
     });
     const problems = contentLosingIssues(issues);
@@ -167,7 +174,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const snapshot = { schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION, revision, generatedAt: now.toISOString(), publication, datasets,
     counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])) };
   try {
-    return validatePublicBuildSnapshotV2(snapshot, { interactive });
+    return validatePublicBuildSnapshotV2(snapshot, { interactive, tracker });
   } catch (error) {
     throw new PublicSnapshotError("invalid-projection", (error as Error).message);
   }

@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import { createElement } from "react";
+import { describeRepositoryFeatures, renderRepositoryFeature } from "../repository-features";
 import { FixtureLunchLine, FIXTURE_LUNCH_LINE } from "./fixture-lunch-line";
 import type { RepositoryInteractive, RepositoryInteractiveRegistry } from "./types";
 
@@ -27,15 +26,12 @@ export function repositoryInteractiveRegistry({ fixtures = false }: { fixtures?:
 
 /** The registry as plain data, for a host that must describe interactives without loading any of their code. */
 export function describeRepositoryInteractives(registry: RepositoryInteractiveRegistry): Array<Pick<RepositoryInteractive, "key" | "name" | "description" | "client">> {
-  return Object.values(registry).map(({ key, name, description, client }) => ({ key, name, description, client }));
+  return describeRepositoryFeatures(registry);
 }
 
 /** The body renderer's `renderInteractive` host hook: a registered interactive's static fallback, or nothing. */
 export function renderRepositoryInteractive(registry: RepositoryInteractiveRegistry) {
-  return (block: { key: string; title: string; description: string }): ReactNode => {
-    const entry = registry[block.key];
-    return entry ? createElement(entry.Fallback, { title: block.title, description: block.description }) : null;
-  };
+  return renderRepositoryFeature(registry);
 }
 
 export { FixtureLunchLine };

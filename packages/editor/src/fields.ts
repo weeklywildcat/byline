@@ -4,6 +4,9 @@ import {
   CHAPTER_PLACEMENTS,
   DEFAULT_HEADINGS,
   PLACEMENTS,
+  boundedParagraphs,
+  parseSocialPostUrl,
+  parseTimestamp,
   paragraphsFromText,
   squareRows,
   visualizationHeights,
@@ -15,7 +18,12 @@ import {
   type ChartMapHeight,
   type ChartMapMode,
   type DataTablePresentation,
+  type FinalScoreStatus,
   type GalleryFit,
+  type GalleryLayoutKind,
+  type KeyFactsPresentation,
+  type NativeChartType,
+  type ParagraphNode,
   type MediaId,
   type Placement,
   type PortraitSide
@@ -33,21 +41,38 @@ import { parseYouTubeVideoId } from "@byline/core";
  */
 export type BylineBlockFields = {
   photo: { media: MediaId | null; caption: string; altOverride: string; placement: Placement };
-  gallery: { items: Array<{ id: string; media: MediaId | null; caption: string; altOverride: string }>; fit: GalleryFit };
-  reportedQuote: { text: string; attribution: string };
+  gallery: { items: Array<{ id: string; media: MediaId | null; caption: string; altOverride: string }>; fit: GalleryFit; layout: GalleryLayoutKind };
+  reportedQuote: { text: string; attribution: string; sourceUrl: string; sourceLabel: string };
   pullQuote: { text: string; attribution: string };
-  keyFacts: { heading: string; facts: Array<{ id: string; text: string }> };
-  context: { heading: string; body: string };
-  document: { media: MediaId | null; title: string; context: string; source: string; pages: Array<{ id: string; page: number | null; label: string }> };
-  timeline: { items: Array<{ id: string; label: string; title: string; body: string; current: boolean }> };
+  keyFacts: { heading: string; facts: Array<{ id: string; text: string }>; presentation: KeyFactsPresentation };
+  /** Bounded paragraphs. Stored as JSON; a Context saved before formatting holds plain text, read as paragraphs. */
+  context: { heading: string; body: ParagraphNode[] };
+  document: { media: MediaId | null; title: string; context: string; source: string; pages: Array<{ id: string; page: number | null; label: string; excerpt: string }> };
+  timeline: { items: TimelineFields[] };
   portraitText: { media: MediaId | null; altOverride: string; heading: string; body: string; caption: string; side: PortraitSide };
   visualChapter: { media: MediaId | null; altOverride: string; eyebrow: string; heading: string; dek: string; placement: ChapterPlacement; align: ChapterAlign };
-  video: { url: string; title: string; caption: string; captionsConfirmed: boolean };
-  audio: { media: MediaId | null; title: string; caption: string; transcript: string };
+  video: { url: string; title: string; caption: string; captionsConfirmed: boolean; chapters: ChapterFields[]; transcript: string };
+  audio: { media: MediaId | null; title: string; caption: string; transcript: string; chapters: ChapterFields[] };
   editorsNote: { body: string };
   marginNote: { heading: string; body: string };
   expandable: { heading: string; body: string };
-  chartMap: { mode: ChartMapMode; url: string; image: MediaId | null; altOverride: string; title: string; dek: string; summary: string; source: string; notes: string; credit: string; height: ChartMapHeight };
+  chartMap: {
+    mode: ChartMapMode;
+    url: string;
+    image: MediaId | null;
+    altOverride: string;
+    title: string;
+    dek: string;
+    summary: string;
+    source: string;
+    notes: string;
+    credit: string;
+    height: ChartMapHeight;
+    chartType: NativeChartType;
+    columns: Array<{ id: string; label: string }>;
+    rows: Array<{ id: string; cells: string[] }>;
+    sourceUrl: string;
+  };
   dataTable: { title: string; description: string; columns: Array<{ id: string; label: string }>; rows: Array<{ id: string; cells: string[] }>; presentation: DataTablePresentation; rowHeaders: boolean; source: string; notes: string };
   comparison: { heading: string; leftLabel: string; leftTitle: string; leftBody: string; rightLabel: string; rightTitle: string; rightBody: string };
   keyNumbers: { heading: string; source: string; items: Array<{ id: string; value: string; label: string; context: string }> };
@@ -56,6 +81,28 @@ export type BylineBlockFields = {
   relatedCoverage: { heading: string; stories: Array<{ id: string; story: MediaId | null }> };
   poll: { poll: MediaId | null };
   repositoryInteractive: { key: string; title: string; description: string };
+  repositoryTracker: { key: string; title: string; description: string };
+  event: { event: MediaId | null };
+  socialPost: { url: string; caption: string };
+  finalScore: { sport: string; teamA: string; teamAScore: number | null; teamB: string; teamBScore: number | null; status: FinalScoreStatus; date: string; location: string; note: string };
+};
+
+/** A chapter as stored: `time` is null until the writer types one. */
+export type ChapterFields = { id: string; time: number | null; label: string };
+/** A timeline event as stored: its text, and its optional evidence as flat fields. */
+export type TimelineFields = {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  current: boolean;
+  media: MediaId | null;
+  altOverride: string;
+  caption: string;
+  linkUrl: string;
+  linkLabel: string;
+  document: MediaId | null;
+  documentPage: number | null;
 };
 
 type Raw = Record<string, unknown>;
@@ -82,6 +129,9 @@ export function mediaIdOf(value: unknown): MediaId | null {
   return null;
 }
 
+const chaptersOf = (value: unknown): ChapterFields[] => rows(value).map((row, index) => ({ id: rowId(row, index), time: parseTimestamp(row.time), label: text(row.label) }));
+const score = (value: unknown): number | null => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null);
+
 const pageNumber = (value: unknown): number | null => {
   const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
   return Number.isInteger(number) && number > 0 ? number : null;
@@ -96,27 +146,41 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
   },
   gallery: (raw) => {
     const fields = record(raw);
-    return { items: rows(fields.items).map((row, index) => ({ id: rowId(row, index), media: mediaIdOf(row.media), caption: text(row.caption), altOverride: text(row.altOverride) })), fit: fields.fit === "crop" ? "crop" : "natural" };
+    const layout: GalleryLayoutKind = fields.layout === "essay" || fields.layout === "featured" ? fields.layout : "grid";
+    return { items: rows(fields.items).map((row, index) => ({ id: rowId(row, index), media: mediaIdOf(row.media), caption: text(row.caption), altOverride: text(row.altOverride) })), fit: fields.fit === "crop" ? "crop" : "natural", layout };
   },
-  reportedQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution) }),
+  reportedQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution), sourceUrl: text(record(raw).sourceUrl), sourceLabel: text(record(raw).sourceLabel) }),
   pullQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution) }),
   keyFacts: (raw) => {
     const fields = record(raw);
     const facts = rows(fields.facts).map((row, index) => ({ id: rowId(row, index), text: text(row.text) }));
-    return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.keyFacts, facts: facts.length ? facts : [{ id: "draft-0", text: "" }] };
+    return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.keyFacts, facts: facts.length ? facts : [{ id: "draft-0", text: "" }], presentation: fields.presentation === "compact" ? "compact" : "standard" };
   },
   context: (raw) => {
     const fields = record(raw);
-    return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.context, body: text(fields.body) };
+    return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.context, body: boundedParagraphs(fields.body, LIMITS.contextBody) };
   },
   document: (raw) => {
     const fields = record(raw);
-    return { media: mediaIdOf(fields.media), title: text(fields.title), context: text(fields.context), source: text(fields.source), pages: rows(fields.pages).map((row, index) => ({ id: rowId(row, index), page: pageNumber(row.page), label: text(row.label) })) };
+    return { media: mediaIdOf(fields.media), title: text(fields.title), context: text(fields.context), source: text(fields.source), pages: rows(fields.pages).map((row, index) => ({ id: rowId(row, index), page: pageNumber(row.page), label: text(row.label), excerpt: text(row.excerpt) })) };
   },
   timeline: (raw) => {
-    const items = rows(record(raw).items).map((row, index) => ({ id: rowId(row, index), label: text(row.label), title: text(row.title), body: text(row.body), current: row.current === true }));
+    const items: TimelineFields[] = rows(record(raw).items).map((row, index) => ({
+      id: rowId(row, index),
+      label: text(row.label),
+      title: text(row.title),
+      body: text(row.body),
+      current: row.current === true,
+      media: mediaIdOf(row.media),
+      altOverride: text(row.altOverride),
+      caption: text(row.caption),
+      linkUrl: text(row.linkUrl),
+      linkLabel: text(row.linkLabel),
+      document: mediaIdOf(row.document),
+      documentPage: pageNumber(row.documentPage)
+    }));
     // A new timeline starts with two events to fill: a chronology needs at least two.
-    while (items.length < LIMITS.timelineMin) items.push({ id: `draft-${items.length}`, label: "", title: "", body: "", current: false });
+    while (items.length < LIMITS.timelineMin) items.push(blankTimelineEvent(`draft-${items.length}`));
     return { items };
   },
   portraitText: (raw) => {
@@ -137,19 +201,24 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
   },
   video: (raw) => {
     const fields = record(raw);
-    return { url: text(fields.url), title: text(fields.title), caption: text(fields.caption), captionsConfirmed: fields.captionsConfirmed === true };
+    return { url: text(fields.url), title: text(fields.title), caption: text(fields.caption), captionsConfirmed: fields.captionsConfirmed === true, chapters: chaptersOf(fields.chapters), transcript: text(fields.transcript) };
   },
   audio: (raw) => {
     const fields = record(raw);
-    return { media: mediaIdOf(fields.media), title: text(fields.title), caption: text(fields.caption), transcript: text(fields.transcript) };
+    return { media: mediaIdOf(fields.media), title: text(fields.title), caption: text(fields.caption), transcript: text(fields.transcript), chapters: chaptersOf(fields.chapters) };
   },
   editorsNote: (raw) => ({ body: text(record(raw).body) }),
   marginNote: (raw) => ({ heading: text(record(raw).heading), body: text(record(raw).body) }),
   expandable: (raw) => ({ heading: text(record(raw).heading), body: text(record(raw).body) }),
   chartMap: (raw) => {
     const fields = record(raw);
+    const columns = rows(fields.columns).map((row, index) => ({ id: rowId(row, index), label: text(row.label) }));
+    // A new chart starts as a small table to fill: a label column and one series, three rows.
+    while (columns.length < 2) columns.push({ id: `draft-c${columns.length}`, label: "" });
+    const stored = rows(fields.rows).map((row, index) => ({ id: rowId(row, index), cells: Array.isArray(row.cells) ? row.cells.map(text) : [] }));
+    while (stored.length < 3 && !Array.isArray(fields.rows)) stored.push({ id: `draft-r${stored.length}`, cells: [] });
     return {
-      mode: fields.mode === "static" ? "static" : "interactive",
+      mode: fields.mode === "static" ? "static" : fields.mode === "interactive" ? "interactive" : "native",
       url: text(fields.url),
       image: mediaIdOf(fields.image),
       altOverride: text(fields.altOverride),
@@ -159,7 +228,11 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
       source: text(fields.source),
       notes: text(fields.notes),
       credit: text(fields.credit),
-      height: typeof fields.height === "string" && fields.height in visualizationHeights ? (fields.height as ChartMapHeight) : "standard"
+      height: typeof fields.height === "string" && fields.height in visualizationHeights ? (fields.height as ChartMapHeight) : "standard",
+      chartType: fields.chartType === "line" || fields.chartType === "dot" ? fields.chartType : "bar",
+      columns,
+      rows: squareRows(columns, stored),
+      sourceUrl: text(fields.sourceUrl)
     };
   },
   dataTable: (raw) => {
@@ -221,17 +294,33 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
     return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.relatedCoverage, stories: stories.length ? stories : [{ id: "draft-0", story: null }] };
   },
   poll: (raw) => ({ poll: mediaIdOf(record(raw).poll) }),
-  repositoryInteractive: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) })
+  repositoryInteractive: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
+  repositoryTracker: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
+  event: (raw) => ({ event: mediaIdOf(record(raw).event) }),
+  socialPost: (raw) => ({ url: text(record(raw).url), caption: text(record(raw).caption) }),
+  finalScore: (raw) => {
+    const fields = record(raw);
+    const status: FinalScoreStatus = fields.status === "overtime" || fields.status === "tie" || fields.status === "forfeit" ? fields.status : "final";
+    return { sport: text(fields.sport), teamA: text(fields.teamA), teamAScore: score(fields.teamAScore), teamB: text(fields.teamB), teamBScore: score(fields.teamBScore), status, date: text(fields.date), location: text(fields.location), note: text(fields.note) };
+  }
 };
+
+/** An empty timeline event (a new one, or the blanks a new timeline starts with). */
+export function blankTimelineEvent(id: string): TimelineFields {
+  return { id, label: "", title: "", body: "", current: false, media: null, altOverride: "", caption: "", linkUrl: "", linkLabel: "", document: null, documentPage: null };
+}
+
+const chaptersToArticle = (chapters: ChapterFields[]) => (chapters.length ? { chapters: chapters.map((chapter) => ({ id: chapter.id, time: chapter.time ?? -1, label: chapter.label })) } : {});
+const optionalText = <K extends string>(key: K, value: string) => (value.trim() ? ({ [key]: value } as Record<K, string>) : {});
 
 /** Stored fields → the semantic block (unfinalized: readiness decides what publishes). */
 export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: BylineBlockFields[K]) => ArticleBlockOf<K> } = {
   photo: (id, fields) => ({ type: "photo", id, media: fields.media, caption: fields.caption, ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}), placement: fields.placement }),
-  gallery: (id, fields) => ({ type: "gallery", id, fit: fields.fit, items: fields.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, ...(item.altOverride.trim() ? { altOverride: item.altOverride } : {}) })) }),
-  reportedQuote: (id, fields) => ({ type: "reportedQuote", id, text: fields.text, attribution: fields.attribution }),
+  gallery: (id, fields) => ({ type: "gallery", id, fit: fields.fit, layout: fields.layout, items: fields.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, ...(item.altOverride.trim() ? { altOverride: item.altOverride } : {}) })) }),
+  reportedQuote: (id, fields) => ({ type: "reportedQuote", id, text: fields.text, attribution: fields.attribution, ...optionalText("sourceUrl", fields.sourceUrl), ...optionalText("sourceLabel", fields.sourceLabel) }),
   pullQuote: (id, fields) => ({ type: "pullQuote", id, text: fields.text, ...(fields.attribution.trim() ? { attribution: fields.attribution } : {}) }),
-  keyFacts: (id, fields) => ({ type: "keyFacts", id, heading: fields.heading, facts: fields.facts.map((fact) => ({ id: fact.id, text: fact.text })) }),
-  context: (id, fields) => ({ type: "context", id, heading: fields.heading, body: paragraphsFromText(fields.body, LIMITS.contextBody) }),
+  keyFacts: (id, fields) => ({ type: "keyFacts", id, heading: fields.heading, facts: fields.facts.map((fact) => ({ id: fact.id, text: fact.text })), presentation: fields.presentation }),
+  context: (id, fields) => ({ type: "context", id, heading: fields.heading, body: fields.body }),
   document: (id, fields) => ({
     type: "document",
     id,
@@ -239,9 +328,22 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     ...(fields.title.trim() ? { title: fields.title } : {}),
     ...(fields.context.trim() ? { context: fields.context } : {}),
     ...(fields.source.trim() ? { source: fields.source } : {}),
-    pages: fields.pages.map((ref) => ({ id: ref.id, page: ref.page ?? 0, label: ref.label }))
+    pages: fields.pages.map((ref) => ({ id: ref.id, page: ref.page ?? 0, label: ref.label, ...optionalText("excerpt", ref.excerpt) }))
   }),
-  timeline: (id, fields) => ({ type: "timeline", id, items: fields.items.map((item) => ({ id: item.id, label: item.label, title: item.title, body: item.body, current: item.current })) }),
+  timeline: (id, fields) => ({
+    type: "timeline",
+    id,
+    items: fields.items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      title: item.title,
+      body: item.body,
+      current: item.current,
+      ...(item.media !== null ? { image: { media: item.media, ...optionalText("altOverride", item.altOverride), ...optionalText("caption", item.caption) } } : {}),
+      ...(item.linkUrl.trim() ? { link: { url: item.linkUrl, ...optionalText("label", item.linkLabel) } } : {}),
+      ...(item.document !== null ? { document: { media: item.document, ...(item.documentPage ? { page: item.documentPage } : {}) } } : {})
+    }))
+  }),
   portraitText: (id, fields) => ({
     type: "portraitText",
     id,
@@ -263,8 +365,8 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     placement: fields.placement,
     align: fields.align
   }),
-  video: (id, fields) => ({ type: "video", id, videoId: parseYouTubeVideoId(fields.url), title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), captionsConfirmed: fields.captionsConfirmed }),
-  audio: (id, fields) => ({ type: "audio", id, media: fields.media, title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), transcript: fields.transcript }),
+  video: (id, fields) => ({ type: "video", id, videoId: parseYouTubeVideoId(fields.url), title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), captionsConfirmed: fields.captionsConfirmed, ...chaptersToArticle(fields.chapters), ...optionalText("transcript", fields.transcript) }),
+  audio: (id, fields) => ({ type: "audio", id, media: fields.media, title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), transcript: fields.transcript, ...chaptersToArticle(fields.chapters) }),
   editorsNote: (id, fields) => ({ type: "editorsNote", id, body: paragraphsFromText(fields.body, LIMITS.noteBody) }),
   marginNote: (id, fields) => ({ type: "marginNote", id, ...(fields.heading.trim() ? { heading: fields.heading } : {}), body: paragraphsFromText(fields.body, LIMITS.noteBody) }),
   expandable: (id, fields) => ({ type: "expandable", id, heading: fields.heading, body: paragraphsFromText(fields.body, LIMITS.expandableBody) }),
@@ -281,7 +383,8 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     ...(fields.source.trim() ? { source: fields.source } : {}),
     ...(fields.notes.trim() ? { notes: fields.notes } : {}),
     ...(fields.credit.trim() ? { credit: fields.credit } : {}),
-    height: fields.height
+    height: fields.height,
+    ...(fields.mode === "native" ? { chartType: fields.chartType, data: { columns: fields.columns.map((column) => ({ ...column })), rows: fields.rows.map((row) => ({ id: row.id, cells: [...row.cells] })) }, ...optionalText("sourceUrl", fields.sourceUrl) } : {})
   }),
   dataTable: (id, fields) => ({
     type: "dataTable",
@@ -321,7 +424,26 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
   beforeAfter: (id, fields) => ({ type: "beforeAfter", id, before: fields.before, after: fields.after, beforeLabel: fields.beforeLabel, afterLabel: fields.afterLabel, fit: fields.fit, caption: fields.caption, placement: fields.placement }),
   relatedCoverage: (id, fields) => ({ type: "relatedCoverage", id, heading: fields.heading, stories: fields.stories.map((item) => ({ id: item.id, story: item.story })) }),
   poll: (id, fields) => ({ type: "poll", id, poll: fields.poll }),
-  repositoryInteractive: (id, fields) => ({ type: "repositoryInteractive", id, key: fields.key, title: fields.title, description: fields.description })
+  repositoryInteractive: (id, fields) => ({ type: "repositoryInteractive", id, key: fields.key, title: fields.title, description: fields.description }),
+  repositoryTracker: (id, fields) => ({ type: "repositoryTracker", id, key: fields.key, title: fields.title, description: fields.description }),
+  event: (id, fields) => ({ type: "event", id, event: fields.event }),
+  socialPost: (id, fields) => {
+    const parsed = parseSocialPostUrl(fields.url);
+    return { type: "socialPost", id, url: fields.url, ...(parsed.ok ? { provider: parsed.provider, postId: parsed.postId } : {}), ...optionalText("caption", fields.caption) };
+  },
+  finalScore: (id, fields) => ({
+    type: "finalScore",
+    id,
+    ...optionalText("sport", fields.sport),
+    teamA: fields.teamA,
+    teamAScore: fields.teamAScore,
+    teamB: fields.teamB,
+    teamBScore: fields.teamBScore,
+    status: fields.status,
+    ...optionalText("date", fields.date),
+    ...optionalText("location", fields.location),
+    ...optionalText("note", fields.note)
+  })
 };
 
 /** A stored block node's fields as the semantic block. */

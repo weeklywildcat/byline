@@ -23,7 +23,7 @@ Payload or Lexical JSON. The editor draws the **same** primitives and the
 
 | Package | Owns | Never contains |
 | --- | --- | --- |
-| `@byline/article-body` | The `byline-v1` types, the 24-block registry, limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, WordPress, CSS classes, components, HTML |
+| `@byline/article-body` | The `byline-v1` types, the block registry (28 tools), limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, WordPress, CSS classes, components, HTML |
 | `@byline/ui` (`/article-body`, `article-body.css`, `newsroom/*.css`) | The article's measure, prose, block frames, the visual primitives (`StoryFigure`, `GalleryLayout`, `ReportedQuoteView`, `PullQuoteView`, `SupportingContext`, `DocumentFigure`, `TimelineList/Item`) and the canonical renderer | Payload or Lexical imports; editing state; "isEditing" branches |
 | `@byline/editor` | Payload block configs, the Lexical feature setup, the block editors, the Add menu, `canvas.css` (editor chrome only), and the Payload Lexical → `byline-v1` normalizer | The public renderer |
 | `apps/newsroom` | Wiring: the Story screen, the article canvas wrapper, the Media host adapter, the lead-image control | Block logic |
@@ -285,7 +285,7 @@ The body from this slice drops straight into that path: the renderer reads only
 
 ## The final authoring surface (Phase 9, blocks)
 
-All 24 tools and inline footnotes use the same machinery. Shared pieces, each
+All 28 tools, inline footnotes and inline Source references use the same machinery. Shared pieces, each
 small and used by several tools: `InlineText` (typed where readers see it),
 `BlockShell` (toolbar, readiness note), `SettingsSurface` (a Popover, or a
 bottom Sheet on touch; `SecondarySetting` and the Footnote note use it),

@@ -1,0 +1,230 @@
+/*
+ * The second article-tools pass (byline-v1): Photo Essay and Featured
+ * galleries, compact Key Facts, page excerpts, quote sources, timeline
+ * evidence, media chapters, native charts, Event, Social Post, Final Score,
+ * Repository Tracker and inline Sources. Same three weights and the same
+ * dialect as the rest (docs/editorial-design-system.md): supporting context
+ * is a rule, a small label and smaller reading text; major visual moments get
+ * space, never a frame. No cards, no fills, no shadows, no new colours.
+ *
+ * One scope, shared by the public article, Live Preview and the newsroom
+ * editor canvas, which all draw `.byline-article-view .article-body`.
+ */
+.byline-article-view .article-body {
+  /* ---------------------------------------------------------------- Gallery */
+  /* Photo Essay: one whole photograph after another, each with its caption. */
+  & .byline-gallery.is-essay { --byline-gallery-columns: 1; row-gap: var(--story-moment-space); }
+  & .byline-gallery.is-essay > .byline-gallery-item img { max-height: 85svh; object-fit: contain; width: 100%; }
+  & .byline-gallery.is-essay > .byline-gallery-item > figcaption { max-width: var(--article-width, 760px); }
+  /* Featured: the first photograph across the whole grid, whole; the rest below. */
+  & .byline-gallery.is-featured > .byline-gallery-item:first-child { grid-column: 1 / -1; }
+  & .byline-gallery.is-featured > .byline-gallery-item:first-child img { aspect-ratio: auto; height: auto; max-height: 85svh; object-fit: contain; width: 100%; }
+
+  /* ------------------------------------------------------------- Key Facts */
+  & .byline-key-facts[data-presentation="compact"] li { font-size: .95rem; }
+
+  /* ---------------------------------------------------------- Quote source */
+  & .byline-quote-source { color: var(--story-muted); font-family: var(--story-sans); font-size: .8rem; margin: .4em 0 0; }
+  & .byline-quote-source a { color: inherit; }
+
+  /* -------------------------------------------------------- Document pages */
+  & .byline-document-page-text { display: grid; gap: .2em; min-width: 0; }
+  & .byline-document-page-excerpt { color: var(--story-muted); font-family: var(--story-serif); font-size: .95rem; line-height: 1.45; text-wrap: pretty; }
+
+  /* ------------------------------------------------------ Timeline evidence */
+  & .byline-timeline-evidence { grid-column: 2; margin-top: .45em; }
+  & .byline-timeline-evidence ul { display: flex; flex-wrap: wrap; font-family: var(--story-sans); font-size: .85rem; gap: .25rem 1.25rem; list-style: none; margin: 0; padding: 0; }
+  & .byline-timeline-evidence li { margin: 0; }
+  & .byline-timeline-evidence a { align-items: center; display: inline-flex; min-height: 32px; overflow-wrap: anywhere; }
+  & .byline-timeline-evidence-kind { color: var(--story-soft); font-size: .72rem; font-weight: 700; letter-spacing: .08em; }
+  & .byline-timeline-media { grid-column: 2; margin-top: .75em; max-width: 16rem; }
+  & .byline-timeline-photo { margin: 0; }
+  & .byline-timeline-photo img { display: block; height: auto; width: 100%; }
+  & .byline-timeline-photo figcaption { font-size: .82rem; margin-top: 6px; }
+
+  /* --------------------------------------------------------- Media chapters */
+  & .byline-media-chapters { margin-block: .75rem 0; }
+  & .byline-media-chapters > .byline-kicker { margin: 0 0 .35em; }
+  & .byline-media-chapters ol { list-style: none; margin: 0; padding: 0; }
+  & .byline-media-chapters li { border-block-start: var(--story-rule); margin: 0; }
+  & .byline-media-chapters a { align-items: baseline; color: inherit; display: flex; gap: 1rem; min-height: 44px; padding-block: .6rem; text-decoration: none; }
+  & .byline-chapter-time { color: var(--story-muted); flex: none; font-family: var(--story-sans); font-size: .82rem; font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3.5rem; }
+  & .byline-chapter-label { font-family: var(--story-serif); font-size: 1rem; line-height: 1.35; }
+  & .byline-media-chapters a:is(:hover, :focus-visible) .byline-chapter-label { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  & .byline-media-chapters a[aria-current="true"] .byline-chapter-time { color: var(--story-accent); }
+  & .byline-video .byline-media-chapters, & .byline-video-transcript { max-width: var(--article-width, 760px); }
+
+  /* ----------------------------------------------------------- Native chart */
+  & .byline-visualization[data-mode="native"] .byline-visualization-media { margin-block: .25rem .5rem; }
+  & .byline-native-chart {
+    --chart-label: clamp(5.5rem, 26%, 11rem);
+    --chart-end: 3.25rem;
+    color: var(--ink, #121212);
+    font-family: var(--story-sans);
+    font-size: .85rem;
+    line-height: 1.3;
+  }
+  & .byline-chart-key { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; list-style: none; margin: 0 0 1rem; padding: 0; }
+  & .byline-chart-key li { align-items: center; display: inline-flex; gap: .45rem; margin: 0; }
+  & .byline-chart-swatch { block-size: 12px; display: inline-block; inline-size: 12px; }
+  /* Series differ in fill and outline, not only tone: ink, outlined, hatched, soft. */
+  & :is(.byline-chart-swatch, .byline-chart-bar)[data-series="0"] { background: var(--ink, #121212); }
+  & :is(.byline-chart-swatch, .byline-chart-bar)[data-series="1"] { background: var(--page, #fff); box-shadow: inset 0 0 0 2px var(--ink, #121212); }
+  & :is(.byline-chart-swatch, .byline-chart-bar)[data-series="2"] { background: repeating-linear-gradient(135deg, var(--story-muted) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--story-muted); }
+  & :is(.byline-chart-swatch, .byline-chart-bar)[data-series="3"] { background: var(--story-soft); }
+  & .byline-chart-plot { padding-block-end: 1.6rem; position: relative; }
+  & .byline-chart-ticks { inset: 0 var(--chart-end) 0 var(--chart-label); pointer-events: none; position: absolute; }
+  & .byline-chart-tick { border-inline-start: var(--story-rule); bottom: 1.6rem; left: var(--at); position: absolute; top: 0; }
+  & .byline-chart-tick.is-zero { border-inline-start-color: var(--ink, #121212); }
+  & .byline-chart-tick-label { bottom: -1.5rem; color: var(--story-soft); font-size: .75rem; font-variant-numeric: tabular-nums; position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  & .byline-chart-rows { list-style: none; margin: 0; padding: 0; position: relative; }
+  & .byline-chart-row { align-items: center; column-gap: 0; display: grid; grid-template-columns: var(--chart-label) minmax(0, 1fr); margin: 0; min-height: 2.25rem; padding-block: .3rem; }
+  & .byline-chart-category { overflow-wrap: anywhere; padding-inline-end: .75rem; }
+  & .byline-chart-group { display: grid; gap: 3px; padding-inline-end: var(--chart-end); }
+  & .byline-chart-bar { block-size: 1.1rem; margin-inline-start: var(--from); position: relative; width: max(var(--size), 1px); }
+  & .byline-native-chart:has([data-series="1"]) .byline-chart-bar { block-size: .85rem; }
+  & .byline-chart-bar.is-empty { background: none !important; box-shadow: none !important; width: 0; }
+  & .byline-chart-value { color: var(--ink, #121212); font-size: .78rem; font-variant-numeric: tabular-nums; font-weight: 600; left: 100%; padding-inline-start: .35rem; position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; }
+  & .byline-chart-bar.is-empty .byline-chart-value { color: var(--story-soft); font-weight: 400; }
+  & .byline-chart-bar.is-negative .byline-chart-value { left: auto; padding-inline: 0 .35rem; right: 100%; }
+  /* Dot plot: a hairline per row, one shape per series. */
+  & .byline-chart-track { block-size: 1.25rem; margin-inline-end: var(--chart-end); position: relative; }
+  & .byline-chart-track::before { border-block-start: var(--story-rule); content: ""; inset: 50% 0 auto; position: absolute; }
+  & :is(.byline-chart-dot, .byline-chart-point) { block-size: 12px; inline-size: 12px; position: absolute; transform: translate(-50%, -50%); }
+  & .byline-chart-dot { left: var(--at); top: 50%; }
+  & :is(.byline-chart-dot, .byline-chart-point)[data-series="0"] { background: var(--ink, #121212); border-radius: 50%; }
+  & :is(.byline-chart-dot, .byline-chart-point)[data-series="1"] { background: var(--page, #fff); box-shadow: inset 0 0 0 2px var(--ink, #121212); }
+  & :is(.byline-chart-dot, .byline-chart-point)[data-series="2"] { background: var(--story-muted); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  & :is(.byline-chart-dot, .byline-chart-point)[data-series="3"] { background: var(--story-soft); transform: translate(-50%, -50%) rotate(45deg) scale(.85); }
+  /* Line chart: the lines are SVG; the points, labels and axes are HTML, so text never scales with the drawing. */
+  & .byline-chart-line-plot { padding: 0 7.5rem 0 2.75rem; }
+  & .byline-chart-line-area { aspect-ratio: 16 / 9; position: relative; }
+  & .byline-chart-gridlines { inset: 0; position: absolute; }
+  & .byline-chart-gridline { border-block-start: var(--story-rule); inset-inline: 0; position: absolute; top: calc(100% - var(--at)); }
+  & .byline-chart-gridline.is-zero { border-block-start-color: var(--ink, #121212); }
+  & .byline-chart-gridline .byline-chart-tick-label { bottom: auto; left: -.5rem; top: 0; transform: translate(-100%, -50%); }
+  & .byline-chart-lines { block-size: 100%; inline-size: 100%; inset: 0; overflow: visible; position: absolute; }
+  & .byline-chart-line { fill: none; stroke: var(--ink, #121212); stroke-linejoin: round; stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
+  & .byline-chart-line[data-series="2"] { stroke: var(--story-muted); }
+  & .byline-chart-line[data-series="3"] { stroke: var(--story-soft); }
+  & .byline-chart-point { left: var(--x); top: var(--y); }
+  & .byline-chart-end-label { font-weight: 600; left: 100%; max-width: 7rem; overflow-wrap: anywhere; padding-inline-start: .6rem; position: absolute; top: var(--y); transform: translateY(-50%); }
+  & .byline-chart-x { block-size: 1.5rem; list-style: none; margin: .5rem 0 0; padding: 0; position: relative; }
+  & .byline-chart-x li { color: var(--story-muted); font-size: .75rem; left: var(--x); margin: 0; position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  & .byline-chart-x li:first-child { transform: none; }
+  & .byline-chart-x li:last-child:not(:first-child) { transform: translateX(-100%); }
+  /* Show the data: a native disclosure with the chart's own table. */
+  & .byline-chart-data { border-block: var(--story-rule); margin-block: .5rem 0; }
+  & .byline-chart-data > summary { align-items: center; color: var(--story-muted); cursor: pointer; display: flex; font-family: var(--story-sans); font-size: .85rem; font-weight: 700; gap: .6rem; letter-spacing: .06em; list-style: none; min-height: 44px; text-transform: uppercase; }
+  & .byline-chart-data > summary::-webkit-details-marker { display: none; }
+  & .byline-chart-data > summary::before { border-bottom: 2px solid currentcolor; border-right: 2px solid currentcolor; content: ""; height: .45rem; transform: rotate(-45deg); transition: transform var(--story-motion); width: .45rem; }
+  & .byline-chart-data[open] > summary::before { transform: rotate(45deg); }
+  & .byline-chart-data .byline-data-table { margin-block: 0 1rem; }
+  & .byline-chart-data-caption { block-size: 1px; clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
+
+  /* ------------------------------------------------------------------ Event */
+  & .byline-event { border-block-start: var(--story-rule-strong); font-size: 1rem; line-height: 1.5; margin-block: var(--story-space); padding-block-start: 14px; }
+  & .byline-event > .byline-kicker { margin: 0 0 .6em; }
+  & .byline-event[data-status="canceled"] > .byline-kicker { color: var(--story-accent); }
+  & .byline-event-title { font-family: var(--story-headline); font-size: 1.3rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; margin: 0 0 .35em; text-wrap: balance; }
+  & .byline-event-when { color: var(--ink, #121212); font-family: var(--story-sans); font-size: .95rem; font-weight: 600; margin: 0; }
+  & .byline-event-where { color: var(--story-muted); font-family: var(--story-sans); font-size: .9rem; margin: .15em 0 0; }
+  & .byline-event-description { font-family: var(--story-serif); margin: .6em 0 0; text-wrap: pretty; }
+  & .byline-event-link { font-family: var(--story-sans); font-size: .85rem; margin: .5em 0 0; }
+  & .byline-event-link a { align-items: center; display: inline-flex; min-height: 44px; }
+
+  /* ------------------------------------------------------------ Social Post */
+  & .byline-social-post { --social-width: 540px; --social-height: 640px; margin-block: var(--story-space); }
+  & .byline-social-post[data-provider="tiktok"] { --social-width: 340px; --social-height: 740px; }
+  & .byline-social-post[data-provider="facebook"] { --social-width: 500px; --social-height: 620px; }
+  & .byline-social-post[data-provider="x"], & .byline-social-post[data-provider="bluesky"] { --social-width: 550px; --social-height: 560px; }
+  & .byline-social-frame { border-block: var(--story-rule); max-width: var(--social-width); }
+  & .byline-social-frame[data-state="loading"], & .byline-social-frame[data-state="loaded"] { border-block: 0; min-height: var(--social-height); }
+  & .byline-social-facade { display: grid; gap: .5rem; justify-items: start; padding-block: 1.1rem 1.2rem; }
+  & .byline-social-facade > .byline-kicker { margin: 0; }
+  & .byline-social-facade-note { color: var(--story-muted); font-family: var(--story-serif); font-size: .95rem; line-height: 1.45; margin: 0; max-width: 34rem; }
+  & .byline-social-load { align-items: center; background: none; border: 1px solid var(--ink, #121212); color: var(--ink, #121212); cursor: pointer; display: inline-flex; font: 600 .9rem/1.2 var(--story-sans); gap: .5rem; min-height: 44px; padding: 0 1rem; }
+  & .byline-social-load:is(:hover) { border-color: var(--story-accent); color: var(--story-accent); }
+  & .byline-social-load[disabled] { cursor: progress; opacity: .7; }
+  & .byline-social-error { color: var(--story-accent); font-family: var(--story-sans); font-size: .85rem; margin: 0; }
+  & .byline-social-embed { max-width: 100%; }
+  & .byline-social-embed iframe { border: 0; display: block; height: var(--social-height); max-width: 100%; width: var(--social-width); }
+  & .byline-social-link { font-family: var(--story-sans); font-size: .85rem; margin: .35em 0 0; }
+  & .byline-social-link a { align-items: center; display: inline-flex; min-height: 44px; overflow-wrap: anywhere; }
+
+  /* ------------------------------------------------------------ Final Score */
+  & .byline-final-score { border-block-start: var(--story-rule-strong); margin-block: var(--story-space); padding-block-start: 14px; }
+  & .byline-final-score > .byline-kicker { margin: 0 0 .5em; }
+  & .byline-final-score-rows { display: grid; }
+  & .byline-final-score-row { align-items: baseline; column-gap: 1rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; padding-block: .35rem; }
+  & .byline-final-score-row + .byline-final-score-row { border-block-start: var(--story-rule); }
+  & .byline-final-score-team { font-family: var(--story-headline); font-size: clamp(1.2rem, 1.05rem + .6vw, 1.45rem); font-weight: 500; line-height: 1.2; overflow-wrap: anywhere; }
+  & .byline-final-score-value { font-family: var(--story-headline); font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem); font-variant-numeric: lining-nums tabular-nums; font-weight: 500; letter-spacing: -.01em; line-height: 1; min-width: 2ch; text-align: right; }
+  /* The winner: a stronger weight, nothing else. */
+  & .byline-final-score-row[data-winner] :is(.byline-final-score-team, .byline-final-score-value) { font-weight: 700; }
+  & .byline-final-score-meta { color: var(--story-muted); font-family: var(--story-sans); font-size: .85rem; margin: .6em 0 0; }
+  & .byline-final-score-note { font-family: var(--story-serif); font-size: .95rem; margin: .25em 0 0; }
+
+  /* ----------------------------------------------------- Repository Tracker */
+  & .byline-repository-tracker { border-block-start: var(--story-rule); margin-block: var(--story-moment-space); padding-block-start: 14px; }
+  & .byline-repository-tracker > .byline-kicker { margin: 0 0 .5em; }
+  & .byline-repository-tracker-title { font-family: var(--story-headline); font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem); font-weight: 600; letter-spacing: -.012em; line-height: 1.14; margin: 0 0 .3em; text-wrap: balance; }
+  & .byline-repository-tracker-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.1rem; max-width: var(--article-width, 760px); text-wrap: pretty; }
+  & .byline-repository-tracker-root:empty { display: none; }
+
+  /* ------------------------------------------------------------- Sources */
+  & .byline-source-ref { font-family: var(--story-sans); font-size: .7em; font-weight: 700; line-height: 0; }
+  & .byline-source-ref a { padding: 0 .1em; text-decoration: none; }
+  & .byline-sources { border-block-start: var(--story-rule-strong); font-size: .95rem; line-height: 1.5; margin-block: 3rem 0; padding-block-start: 14px; }
+  & .byline-sources > .byline-kicker { margin: 0 0 .75em; }
+  & .byline-sources ol { margin: 0; padding-left: 1.6em; }
+  & .byline-sources li { margin: 0 0 .6em; overflow-wrap: anywhere; scroll-margin-block: 5rem; }
+  & .byline-sources li::marker { content: "[" counter(list-item) "]  "; font-family: var(--story-sans); font-size: .85em; font-weight: 700; }
+  & .byline-sources li:target { outline: 2px solid var(--story-accent); outline-offset: 4px; }
+  & .byline-source-detail { color: var(--story-soft); font-family: var(--story-sans); font-size: .8rem; }
+  & .byline-source-note { color: var(--story-muted); font-family: var(--story-serif); font-size: .92rem; margin: .2em 0 0; }
+  /* Sources and footnotes sit together at the end: the second one needs less air. */
+  & .byline-sources + .byline-footnotes { margin-block-start: 1.5rem; }
+
+  /* Every control is reachable and visibly focused. */
+  & :is(.byline-quote-source a, .byline-timeline-evidence a, .byline-media-chapters a, .byline-chart-data > summary, .byline-event-link a, .byline-social-load, .byline-social-link a, .byline-source-ref a, .byline-sources a):focus-visible { outline: 2px solid var(--story-accent); outline-offset: 3px; }
+}
+
+/* Two columns of compact facts when the canvas is wide enough to read both. */
+@container byline-content (min-width: 600px) {
+  .byline-article-view .article-body .byline-key-facts[data-presentation="compact"] ul { column-gap: 2rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .byline-article-view .article-body .byline-key-facts[data-presentation="compact"] li { border-block-start: var(--story-rule); padding: .55em 0; }
+  .byline-article-view .article-body .byline-key-facts[data-presentation="compact"] li:nth-child(-n + 2) { border-block-start: 0; padding-top: 0; }
+}
+/* A supporting photograph beside the event, when there is room for three columns. */
+@container byline-content (min-width: 700px) {
+  .byline-article-view .article-body ol.byline-timeline > .byline-timeline-item.has-media { grid-template-columns: var(--timeline-label) minmax(0, 1fr) 9rem; }
+  .byline-article-view .article-body ol.byline-timeline > .byline-timeline-item.has-media > .byline-timeline-media { grid-column: 3; grid-row: 1 / span 3; margin-top: .2em; }
+}
+/* A narrow canvas: chart labels above their bars, line labels left to the key. */
+@container byline-content (max-width: 560px) {
+  .byline-article-view .article-body {
+    & .byline-native-chart { --chart-label: 0px; --chart-end: 2.75rem; }
+    & .byline-chart-row { grid-template-columns: minmax(0, 1fr); row-gap: .2rem; }
+    & .byline-chart-category { font-weight: 600; }
+    & .byline-chart-line-plot { padding-inline-end: .5rem; }
+    & .byline-chart-line-area { aspect-ratio: 4 / 3; }
+    & .byline-chart-end-label { display: none; }
+    & .byline-native-chart[data-chart="line"] .byline-chart-key { display: flex; }
+  }
+}
+/* A single-series line chart has no key, and two or more get end labels and a key. */
+.byline-article-view .article-body .byline-native-chart[data-chart="line"] .byline-chart-key { display: none; }
+@container byline-content (max-width: 560px) {
+  .byline-article-view .article-body .byline-native-chart[data-chart="line"] .byline-chart-key { display: flex; }
+}
+
+@media (forced-colors: active) {
+  .byline-article-view .article-body {
+    & :is(.byline-chart-swatch, .byline-chart-bar, .byline-chart-dot, .byline-chart-point) { forced-color-adjust: none; }
+    & :is(.byline-chart-swatch, .byline-chart-bar, .byline-chart-dot, .byline-chart-point)[data-series="0"] { background: CanvasText; }
+    & :is(.byline-chart-swatch, .byline-chart-bar, .byline-chart-dot, .byline-chart-point):is([data-series="1"], [data-series="2"], [data-series="3"]) { background: Canvas; box-shadow: inset 0 0 0 2px CanvasText; }
+    & .byline-chart-line { stroke: CanvasText; }
+    & .byline-social-load { border-color: ButtonText; color: ButtonText; }
+  }
+}

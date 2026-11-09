@@ -137,12 +137,12 @@ export function useCanvasEditable(): boolean {
 /** Inline blocks are told by node type, not `instanceof`, so a second copy of the Lexical modules cannot hide them. */
 const $isInlineBlockNode = (node: LexicalNode | null | undefined): node is LexicalNode & { getFields: () => unknown; setFields: (fields: never, preventFormStateUpdate?: boolean) => void } => Boolean(node) && node!.getType() === "inlineBlock";
 
-/** Every footnote reference in reading order. Numbers are never stored: they are positions in this list. */
-function $footnoteKeys(): string[] {
+/** Every inline reference of one kind (footnote, source) in reading order. Numbers are never stored: they are positions in this list. */
+function $inlineKeys(blockType: string): string[] {
   const keys: string[] = [];
   const visit = (node: LexicalNode) => {
     if ($isInlineBlockNode(node)) {
-      if ((node.getFields() as Fields).blockType === "footnote") keys.push(node.getKey());
+      if ((node.getFields() as Fields).blockType === blockType) keys.push(node.getKey());
       return;
     }
     if ($isElementNode(node)) node.getChildren().forEach(visit);
@@ -150,6 +150,61 @@ function $footnoteKeys(): string[] {
   visit($getRoot());
   return keys;
 }
+const $footnoteKeys = () => $inlineKeys("footnote");
+
+/**
+ * One inline Source reference: its fields, its derived number (Sources number
+ * independently of footnotes) and the edits it makes, as ordinary Lexical updates.
+ */
+export function useInlineSource(nodeKey: string) {
+  const [editor] = useLexicalComposerContext();
+  const editable = useLexicalEditable();
+  const subscribe = useCallback((listener: () => void) => editor.registerUpdateListener(listener), [editor]);
+  const read = useCallback(() => editor.getEditorState().read(() => {
+    const node = $getNodeByKey(nodeKey);
+    if (!$isInlineBlockNode(node)) return "null";
+    return JSON.stringify({ fields: node.getFields(), number: $inlineKeys("source").indexOf(nodeKey) + 1 });
+  }), [editor, nodeKey]);
+  const json = useSyncExternalStore(subscribe, read, read);
+  const state = json === "null" ? null : (JSON.parse(json) as { fields: Fields; number: number });
+  const write = useCallback((patch: Fields) => {
+    if (!editor.isEditable()) return;
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if ($isInlineBlockNode(node)) node.setFields({ ...(node.getFields() as Fields), ...patch } as never, true);
+    }, { discrete: true, tag: [SKIP_DOM_SELECTION_TAG] });
+  }, [editor, nodeKey]);
+  const remove = useCallback(() => {
+    if (!editor.isEditable()) return;
+    editor.update(() => {
+      $getNodeByKey(nodeKey)?.remove();
+    });
+  }, [editor, nodeKey]);
+  return { editor, editable, fields: state?.fields ?? {}, number: state?.number ?? 0, write, remove };
+}
+
+/**
+ * Returns the writer to the sentence after a Footnote or Source Popover closes:
+ * the caret just after the reference (or where it was, when `remove` drops an
+ * empty one) and focus in the story. Without it a reference opened by
+ * inserting it hands focus back to the story with no caret, which Lexical puts
+ * at the top of the article.
+ */
+export function returnToText(editor: LexicalEditor, nodeKey: string, { remove = false }: { remove?: boolean } = {}): void {
+  if (!editor.isEditable()) return;
+  editor.update(() => {
+    const node = $getNodeByKey(nodeKey);
+    if (!node) return;
+    if (remove) {
+      node.selectPrevious();
+      node.remove();
+    } else node.selectNext(0, 0);
+  });
+  editor.focus();
+}
+
+/** Why a SettingsSurface closed: an outside press leaves focus where the writer put it. */
+export const closedInPlace = (details?: { reason?: string }) => details?.reason === "outside-press" || details?.reason === "focus-out";
 
 /**
  * One footnote reference: its note, its derived number (the position among all

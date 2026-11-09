@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, type ArticleBlock, type MediaId } from "@byline/article-body";
-import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
+import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_TRACKER_KEY, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
 import { BLOCK_FIELD_READERS } from "../src/fields";
 import { collectReferenceIds, normalizePayloadArticleBody } from "../src/normalize";
 import { enforcePrivilegedBlocks, hasPrivilegedBlocks } from "../src/permissions";
@@ -9,7 +9,7 @@ import { BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
 const media = (id: MediaId) => FIXTURE_MEDIA[String(id)] ?? null;
-const references = { story: (id: MediaId) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: MediaId) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY };
+const references = { story: (id: MediaId) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: MediaId) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const normalize = (state: unknown, refs = references) => normalizePayloadArticleBody(state, { media, references: refs });
 
 const block = (value: ArticleBlock) => ({ type: "block", version: 2, format: "", fields: blockFields(value) });
@@ -75,13 +75,14 @@ describe("footnotes in the normalizer", () => {
 describe("references in the normalizer", () => {
   const related = (...ids: Array<MediaId | null>): ArticleBlock => ({ ...FIXTURE_BLOCKS.relatedCoverage, stories: ids.map((story, i) => ({ id: `s${i}`, story })) });
 
-  it("collects the Stories and Polls a body names", () => {
-    expect(collectReferenceIds(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY))).toEqual({ stories: [501, 502], polls: [601] });
+  it("collects the Stories, Polls and Events a body names", () => {
+    expect(collectReferenceIds(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY))).toEqual({ stories: [501, 502], polls: [601], events: [701] });
   });
 
   it("resolves public-safe facts into the body, never copying them into the block", () => {
-    const { body } = normalize(state(block(FIXTURE_BLOCKS.relatedCoverage), block(FIXTURE_BLOCKS.poll)));
+    const { body } = normalize(state(block(FIXTURE_BLOCKS.relatedCoverage), block(FIXTURE_BLOCKS.poll), block(FIXTURE_BLOCKS.event)));
     expect(body.references).toEqual(FIXTURE_REFERENCES);
+    expect(JSON.stringify(body.nodes)).not.toContain("School board budget vote");
     expect(JSON.stringify(body.nodes)).not.toContain("Greenwood adds a second lunch period");
     expect(Object.keys(body.media)).toEqual(["104"]);
   });

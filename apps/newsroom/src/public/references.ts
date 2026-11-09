@@ -1,4 +1,4 @@
-import type { PublicPollReference, PublicStoryReference } from "@byline/article-body";
+import { safeWebUrl, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
 import { publicStoryPath } from "@byline/content";
 
 /**
@@ -72,4 +72,36 @@ export function publicPollReference(doc: unknown, now: Date = new Date()): Publi
   const closes = text(doc.closesAt) ? Date.parse(text(doc.closesAt)) : null;
   const inWindow = (opens === null || now.getTime() >= opens) && (closes === null || now.getTime() < closes);
   return { id, question, options, votingOpen: status === "open" && inWindow };
+}
+
+/**
+ * A published Event's public facts, for the Event block. Only a published,
+ * untrashed Event with a title and a start resolves; drafts, deleted and
+ * malformed events resolve to nothing, so the block is left out (and refused
+ * at publication). Times stay instants; the renderer reads them in the
+ * publication's timezone.
+ */
+export function publicEventReference(doc: unknown): PublicEventReference | null {
+  if (!isDoc(doc) || doc.id === undefined) return null;
+  if (doc._status !== "published" || doc.deletedAt) return null;
+  const title = text(doc.title);
+  const start = Date.parse(text(doc.startAt));
+  if (!title || !Number.isFinite(start)) return null;
+  const end = Date.parse(text(doc.endAt));
+  const eventType = text(doc.eventType);
+  const location = text(doc.location);
+  const description = text(doc.description);
+  const externalUrl = safeWebUrl(text(doc.externalUrl));
+  return {
+    id: doc.id as number | string,
+    title: title.slice(0, 200),
+    ...(eventType ? { eventType: eventType.slice(0, 60) } : {}),
+    startAt: new Date(start).toISOString(),
+    ...(Number.isFinite(end) && end >= start ? { endAt: new Date(end).toISOString() } : {}),
+    allDay: doc.allDay === true,
+    ...(location ? { location: location.slice(0, 200) } : {}),
+    ...(description ? { description: description.slice(0, 2000) } : {}),
+    ...(externalUrl ? { externalUrl } : {}),
+    eventStatus: doc.eventStatus === "canceled" ? "canceled" : "scheduled"
+  };
 }

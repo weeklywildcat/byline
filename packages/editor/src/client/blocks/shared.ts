@@ -1,6 +1,6 @@
 "use client";
 
-import { blockIssues, blockMediaIds, blockPollIds, blockStoryIds, mediaKey, type ArticleBlock, type ArticleBlockType, type ArticleMediaAsset, type BlockIssue, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
+import { blockEventIds, blockIssues, blockMediaIds, blockPollIds, blockStoryIds, mediaKey, type ArticleBlock, type ArticleBlockType, type ArticleMediaAsset, type BlockIssue, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, type BylineBlockFields } from "../../fields";
 import { useBylineEditorHost } from "../host";
@@ -28,16 +28,22 @@ const NONE: readonly BlockIssue[] = [];
  * warning.
  */
 export function useReadiness<K extends ArticleBlockType>(type: K, id: string, raw: unknown): readonly BlockIssue[] {
-  const { store, stories, polls, interactives } = useBylineEditorHost();
+  const { store, stories, polls, events, interactives, trackers } = useBylineEditorHost();
   const subscribe = useCallback((listener: () => void) => {
-    const stops = [store.subscribe(listener), stories.subscribe(listener), polls.subscribe(listener)];
+    const stops = [store.subscribe(listener), stories.subscribe(listener), polls.subscribe(listener), events.subscribe(listener)];
     return () => stops.forEach((stop) => stop());
-  }, [polls, stories, store]);
+  }, [events, polls, stories, store]);
   const snapshot = useCallback(() => {
     const block = articleBlockFromFields(type, id, raw) as ArticleBlock;
     const media = new Map<string, ArticleMediaAsset | null>();
     const storyFacts = new Map<string, PublicStoryReference | null>();
     const pollFacts = new Map<string, PublicPollReference | null>();
+    const eventFacts = new Map<string, PublicEventReference | null>();
+    for (const eventId of blockEventIds(block)) {
+      const entry = events.get(eventId);
+      if (entry.status === "loading") return "[]";
+      eventFacts.set(mediaKey(eventId), entry.asset);
+    }
     for (const mediaId of blockMediaIds(block)) {
       const entry = store.get(mediaId);
       if (entry.status === "loading") return "[]";
@@ -57,9 +63,11 @@ export function useReadiness<K extends ArticleBlockType>(type: K, id: string, ra
     return JSON.stringify(blockIssues(block, (mediaId) => media.get(mediaKey(mediaId)) ?? null, {
       story: (storyId) => storyFacts.get(mediaKey(storyId)) ?? null,
       poll: (pollId) => pollFacts.get(mediaKey(pollId)) ?? null,
-      interactive: (key) => Boolean(interactives?.some((entry) => entry.key === key))
+      event: (eventId) => eventFacts.get(mediaKey(eventId)) ?? null,
+      interactive: (key) => Boolean(interactives?.some((entry) => entry.key === key)),
+      tracker: (key) => Boolean(trackers?.some((entry) => entry.key === key))
     }));
-  }, [id, interactives, polls, raw, stories, store, type]);
+  }, [events, id, interactives, polls, raw, stories, store, trackers, type]);
   const json = useSyncExternalStore(subscribe, snapshot, snapshot);
   return useMemo(() => (json === "[]" ? NONE : (JSON.parse(json) as BlockIssue[])), [json]);
 }

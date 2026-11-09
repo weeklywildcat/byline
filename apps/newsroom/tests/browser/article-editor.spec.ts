@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { ARTICLE_BLOCK_TYPES } from "@byline/article-body";
 import { articleMediaFromPayload, collectMediaIds, normalizePayloadArticleBody } from "@byline/editor/normalize";
-import { addWithMenu, block, body, caretAfter, createStory, ensureMedia, lexical, login, pageOverflow, paragraph, PDF_NAME, pickInMedia, readDraft, readMediaDocs, signIn, slash, waitForSaved } from "./helpers";
+import { addWithMenu, block, body, caretAfter, createStory, ensureMedia, expectToolbarClear, lexical, login, pageOverflow, paragraph, PDF_NAME, pickInMedia, readDraft, readMediaDocs, signIn, slash, waitForSaved } from "./helpers";
 
 /**
  * Writing a real Weekly Wildcat story with the Byline editor, end to end:
@@ -20,6 +19,9 @@ const ANCHORS = {
   district: "The district's 2026 budget request",
   ending: "Until then, Okafor said, she will keep eating on the steps."
 };
+
+/** The eight blocks this story writes; the newer article tools have their own spec (article-tools.spec.ts). */
+const FIRST_PHASE_BLOCKS = ["photo", "gallery", "reportedQuote", "pullQuote", "keyFacts", "context", "document", "timeline"] as const;
 
 let editorToken = "";
 let media: Record<string, number> = {};
@@ -160,7 +162,8 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   await page.keyboard.type("Research on school meals has found that students with less than 20 minutes to eat throw away more food and eat fewer fruits and vegetables.");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Lunch is also the only meal of the day for some students: 38% of Greenwood students qualify for free or reduced-price meals.");
-  await expect(context.locator("aside > p > textarea")).toHaveCount(2);
+  // Context is one bounded rich field holding the article's own paragraphs (bold, italic and links allowed).
+  await expect(context.locator(".byline-rich-field > p")).toHaveCount(2);
 
   await caretAfter(page, ANCHORS.express);
   await addWithMenu(page, "quote", /Pull Quote/);
@@ -205,6 +208,8 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   await timeline.getByRole("button", { name: "Remove event" }).click();
   await expect(timeline.locator(".byline-timeline-item")).toHaveCount(4);
   await expect(page.locator("[data-byline-editor-announcer]")).toContainText(/Event removed/);
+  // The toolbar never covers the paragraph above: the next step clicks that paragraph's last line.
+  await expectToolbarClear(timeline);
 
   await caretAfter(page, ANCHORS.district);
   await addWithMenu(page, "pdf", /Document/);
@@ -214,9 +219,11 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   await documentBlock.getByRole("textbox", { name: "Document title" }).fill("Nutrition Services budget request, 2026");
   await documentBlock.getByRole("textbox", { name: "Why it matters" }).fill("The request asks for a third serving window and two part-time cashiers, and lists Greenwood's average wait times by period.");
   await documentBlock.getByRole("textbox", { name: "Source" }).fill("Greenwood School District, released Oct. 21");
-  await documentBlock.getByRole("button", { name: "Page reference" }).click();
-  await documentBlock.getByRole("spinbutton", { name: /Page number/ }).fill("4");
-  await documentBlock.getByRole("textbox", { name: /What is on page/ }).fill("Wait times by school and lunch period");
+  // Page references are typed in the block: Add page focuses the new reference's page number.
+  await documentBlock.getByRole("button", { name: "Add page" }).click();
+  await expect(documentBlock.getByRole("spinbutton", { name: "Page number for reference 1" })).toBeFocused();
+  await page.keyboard.type("4");
+  await documentBlock.getByRole("textbox", { name: "What is on page 4" }).fill("Wait times by school and lunch period");
   await expect(documentBlock.locator("object")).toHaveAttribute("data", /#view=FitH/);
 
   // Everything is Payload's form: one autosave covers it all.
@@ -231,7 +238,7 @@ test("writes the story: prose, slash insertion and all eight blocks", async ({ p
   const { body: article, issues } = normalizePayloadArticleBody(story.body, { media: (id) => assets.get(String(id)) ?? null });
   expect(issues).toEqual([]);
   const sequence = article.nodes.map((node) => node.type);
-  for (const type of ARTICLE_BLOCK_TYPES) expect(sequence, `the story has a ${type}`).toContain(type);
+  for (const type of FIRST_PHASE_BLOCKS) expect(sequence, `the story has a ${type}`).toContain(type);
   expect(sequence).toEqual([
     "paragraph", "paragraph", "photo", "paragraph", "reportedQuote", "heading", "paragraph", "list", "gallery", "keyFacts", "paragraph", "pullQuote", "context", "paragraph", "document", "timeline", "paragraph"
   ]);
@@ -272,7 +279,8 @@ test("keeps the editor state across tabs and saves edits made just before leavin
   await openStory(page);
   const caption = block(page, "photo").getByRole("textbox", { name: "Caption" });
   await caption.click();
-  await page.keyboard.press("End");
+  // The end of the caption, not of the visual line clicked (a long caption wraps).
+  await caption.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(element.value.length, element.value.length));
   await page.keyboard.type(" (Tab test.)");
   await page.getByRole("tab", { name: "Plan" }).click();
   await page.getByRole("tab", { name: "Write" }).click();
@@ -300,7 +308,7 @@ test("never submits the story from a dialog, popover or block field", async ({ p
   await page.getByRole("textbox", { name: "Alt text for this story" }).press("Enter");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Add photo, quote, facts…" }).click();
-  await page.getByPlaceholder("Find a tool: photo, quote, timeline…").press("Escape");
+  await page.getByRole("combobox", { name: "Find a story tool" }).press("Escape");
   await waitForSaved(page);
   expect(submits).toEqual([]);
 });
@@ -313,8 +321,8 @@ test("is read-only while another user holds the story", async ({ page, browser, 
   await signIn(other, baseURL!, adminToken);
   const second = await other.newPage();
   await second.goto(`${baseURL}/admin/collections/stories/${storyId}`);
-  const readOnly = second.getByRole("button", { name: /read.only|view/i });
-  await readOnly.first().click({ timeout: 30_000 });
+  // Payload's lock dialog; not the story's own Preview button, which also says "view".
+  await second.getByRole("button", { name: "View read-only" }).click({ timeout: 30_000 });
   await expect(second.getByText("Someone else is editing this story.")).toBeVisible();
   const lockedBody = body(second);
   await expect(lockedBody).toHaveAttribute("contenteditable", "false");
@@ -340,11 +348,8 @@ for (const width of [1920, 1366, 1180, 820, 390]) {
     await reported.getByRole("textbox", { name: "Quote" }).click();
     const toolbar = reported.locator(".byline-block-chrome");
     await expect(toolbar).toBeVisible();
-    const [above, bar] = await Promise.all([
-      reported.evaluate((frame) => frame.previousElementSibling!.getBoundingClientRect().bottom),
-      toolbar.boundingBox()
-    ]);
-    expect(bar!.y).toBeGreaterThanOrEqual(above - 0.5);
+    // Measured once the block has opened its room (the margin animates).
+    await expectToolbarClear(reported);
     if (width < 768) {
       // Touch: chrome sits in the flow with 44px targets; Add opens a Sheet.
       const target = await toolbar.getByRole("button").first().boundingBox();
@@ -354,7 +359,7 @@ for (const width of [1920, 1366, 1180, 820, 390]) {
       await page.keyboard.press("Escape");
     } else {
       await page.getByRole("button", { name: "Add photo, quote, facts…" }).click();
-      await expect(page.getByPlaceholder("Find a tool: photo, quote, timeline…")).toBeVisible();
+      await expect(page.getByRole("combobox", { name: "Find a story tool" })).toBeVisible();
       await page.keyboard.press("Escape");
     }
     // The Media picker opens at every width.

@@ -9,7 +9,7 @@ import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { ArticleImage, GalleryLayout, StoryFigure } from "@byline/ui/article-body";
-import { ArrowLeft, ArrowRight, Crop, ImagePlus, Images, ImageUp, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Crop, ImagePlus, Images, ImageUp, Pencil, Star, Trash2 } from "lucide-react";
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { moveDirection, moveItem, removeItem } from "../../items";
@@ -211,11 +211,14 @@ function MissingCredit({ id }: { id: MediaId }) {
   );
 }
 
-function GalleryItemEditor({ item, index, count, readOnly, onCaption, onAlt, onMove, onReplace, onRemove }: {
+function GalleryItemEditor({ item, index, count, readOnly, featured, onFeature, onCaption, onAlt, onMove, onReplace, onRemove }: {
   item: { id: string; media: MediaId | null; caption: string; altOverride: string };
   index: number;
   count: number;
   readOnly: boolean;
+  /** Featured layout: the first photograph is the featured one; any other can be made featured. */
+  featured: boolean;
+  onFeature: () => void;
   onCaption: (value: string) => void;
   onAlt: (value: string) => void;
   onMove: (direction: -1 | 1) => void;
@@ -233,6 +236,7 @@ function GalleryItemEditor({ item, index, count, readOnly, onCaption, onAlt, onM
           {asset ? <ArticleImage asset={asset} alt={altFor(asset, item.altOverride)} /> : <MediaStatus status={item.media === null || media.status === "missing" ? "missing" : "loading"} kind="image" />}
           {readOnly ? null : (
             <ButtonGroup className="byline-item-actions" aria-label={`Actions for ${name}`} data-byline-chrome="">
+              {featured && index > 0 ? <ToolButton label="Make featured" onClick={onFeature}><Star /></ToolButton> : null}
               <ToolButton label="Move earlier" disabled={index === 0} onClick={() => onMove(-1)}><ArrowLeft /></ToolButton>
               <ToolButton label="Move later" disabled={index === count - 1} onClick={() => onMove(1)}><ArrowRight /></ToolButton>
               <ToolButton label="Replace" onClick={onReplace}><ImagePlus /></ToolButton>
@@ -245,7 +249,7 @@ function GalleryItemEditor({ item, index, count, readOnly, onCaption, onAlt, onM
       caption={
         <InlineText
           className="byline-caption"
-          label={`Caption for ${name}`}
+          label={`Caption for ${featured && index === 0 ? "the featured photograph" : name}`}
           placeholder="Caption"
           value={item.caption}
           maxLength={LIMITS.caption}
@@ -306,6 +310,19 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
     set({ items: items.map((item, i) => (i === index ? { ...item, media: asset.id } : item)) });
     announce("Photograph replaced.");
   };
+  // Featured is the first photograph: making one featured moves it to the front. No separate state is stored.
+  const feature = (index: number) => {
+    const item = items[index];
+    if (!item || index === 0) return;
+    set({ items: [item, ...items.filter((_, i) => i !== index)] });
+    announce(`Photograph ${index + 1} is now the featured photograph.`);
+    focusIn(root(), `.byline-gallery > :nth-child(1) figcaption .byline-field`);
+  };
+  const setLayout = (layout: "grid" | "essay" | "featured") => {
+    if (layout === fields.layout) return;
+    set({ layout });
+    announce(layout === "essay" ? "Photo Essay: one photograph after another." : layout === "featured" ? "Featured: the first photograph leads." : "Grid.");
+  };
 
   return (
     <BlockShell
@@ -317,18 +334,29 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
           <ButtonGroup>
             <ToolTextButton label="Add photos" icon={<ImagePlus />} disabled={full} onClick={() => void addMore()} />
           </ButtonGroup>
-          <ToggleGroup aria-label="Fit" variant="outline" size="sm" spacing={0} value={[fields.fit]} onValueChange={(next) => {
-            const fit = next[0] as "natural" | "crop" | undefined;
-            if (fit && fit !== fields.fit) set({ fit });
+          <ToggleGroup aria-label="Layout" variant="outline" size="sm" spacing={0} value={[fields.layout]} onValueChange={(next) => {
+            const layout = next[0] as "grid" | "essay" | "featured" | undefined;
+            if (layout) setLayout(layout);
           }}>
-            <ToggleGroupItem value="natural">Whole</ToggleGroupItem>
-            <ToggleGroupItem value="crop">Even grid</ToggleGroupItem>
+            <ToggleGroupItem value="grid">Grid</ToggleGroupItem>
+            <ToggleGroupItem value="essay">Photo Essay</ToggleGroupItem>
+            <ToggleGroupItem value="featured">Featured</ToggleGroupItem>
           </ToggleGroup>
+          {/* A Photo Essay always shows whole photographs: fit only matters for a grid. */}
+          {fields.layout !== "essay" ? (
+            <ToggleGroup aria-label="Fit" variant="outline" size="sm" spacing={0} value={[fields.fit]} onValueChange={(next) => {
+              const fit = next[0] as "natural" | "crop" | undefined;
+              if (fit && fit !== fields.fit) set({ fit });
+            }}>
+              <ToggleGroupItem value="natural">Whole</ToggleGroupItem>
+              <ToggleGroupItem value="crop">Even grid</ToggleGroupItem>
+            </ToggleGroup>
+          ) : null}
         </>
       ) : null}
     >
       {items.length ? (
-        <GalleryLayout count={items.length} fit={fields.fit}>
+        <GalleryLayout count={items.length} fit={fields.fit} layout={fields.layout}>
           {items.map((item, index) => (
             <GalleryItemEditor
               key={item.id}
@@ -336,6 +364,8 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
               index={index}
               count={items.length}
               readOnly={readOnly}
+              featured={fields.layout === "featured"}
+              onFeature={() => feature(index)}
               onCaption={(caption) => set({ items: items.map((row) => (row.id === item.id ? { ...row, caption } : row)) })}
               onAlt={(altOverride) => set({ items: items.map((row) => (row.id === item.id ? { ...row, altOverride } : row)) })}
               onMove={(direction) => move(index, direction)}

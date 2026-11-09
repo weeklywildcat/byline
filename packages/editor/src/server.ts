@@ -12,9 +12,9 @@ import {
   ParagraphFeature,
   UnorderedListFeature
 } from "@payloadcms/richtext-lexical";
-import { BYLINE_BODY_BLOCKS, BYLINE_FOOTNOTE_BLOCK } from "./schema";
+import { BYLINE_BODY_BLOCKS, BYLINE_FOOTNOTE_BLOCK, BYLINE_SOURCE_BLOCK } from "./schema";
 
-export { BYLINE_BODY_BLOCKS, BYLINE_BLOCK_COMPONENT, BYLINE_FOOTNOTE_BLOCK, BYLINE_FOOTNOTE_COMPONENT } from "./schema";
+export { BYLINE_BODY_BLOCKS, BYLINE_BLOCK_COMPONENT, BYLINE_FOOTNOTE_BLOCK, BYLINE_FOOTNOTE_COMPONENT, BYLINE_SOURCE_BLOCK, BYLINE_SOURCE_COMPONENT } from "./schema";
 
 /**
  * The journalism prose surface: paragraphs, H2/H3, bold, italic, links and
@@ -52,7 +52,7 @@ export const BylineCanvasFeature = createServerFeature({
 
 /** The story body: prose plus the Byline story blocks, in the Add menu's order. */
 export function articleBodyFeatures() {
-  return [...proseFeatures(), BlocksFeature({ blocks: ARTICLE_BLOCK_TYPES.map((type) => BYLINE_BODY_BLOCKS[type]), inlineBlocks: [BYLINE_FOOTNOTE_BLOCK] }), BylineCanvasFeature()];
+  return [...proseFeatures(), BlocksFeature({ blocks: ARTICLE_BLOCK_TYPES.map((type) => BYLINE_BODY_BLOCKS[type]), inlineBlocks: [BYLINE_FOOTNOTE_BLOCK, BYLINE_SOURCE_BLOCK] }), BylineCanvasFeature()];
 }
 
 /**
@@ -64,6 +64,6 @@ export const articleBodyEditor = lexicalEditor({
   admin: {
     hideAddBlockButton: true,
     hideGutter: true,
-    placeholder: "Write the story. Type / to add a photo, quote, chart, timeline or footnote."
+    placeholder: "Write the story. Type / to add a photo, quote, chart, timeline, footnote or source."
   }
 });

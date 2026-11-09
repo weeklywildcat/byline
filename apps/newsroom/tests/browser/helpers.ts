@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type BrowserContext, type Locator, type Page } from "@playwright/test";
 
 /** Local accounts from apps/newsroom/.env (never printed). */
 function env(): Record<string, string> {
@@ -144,6 +144,10 @@ export async function caretAfter(page: Page, text: string): Promise<void> {
     const anchor = key ? editor?.getElementByKey(key) : null;
     return Boolean(anchor && element.contains(anchor));
   }), { message: `Lexical selection in "${text}"` }).toBe(true);
+  // A writer's hand leaves the mouse: a pointer resting on the line would hover (and highlight)
+  // whichever slash-menu item opens under it, depending on where Payload places the menu.
+  const viewport = page.viewportSize();
+  await page.mouse.move((viewport?.width ?? 1366) - 4, (viewport?.height ?? 900) - 4);
 }
 
 /** Types a slash command and runs the menu item it finds (waiting for Payload's menu, as a writer would). */
@@ -171,9 +175,22 @@ export async function pickInMedia(page: Page, names: string[], confirm: RegExp):
 /** Adds a block with the explicit Add menu (Command), typing a search. */
 export async function addWithMenu(page: Page, search: string, item: RegExp): Promise<void> {
   await page.getByRole("button", { name: "Add photo, quote, facts…" }).click();
-  const input = page.getByRole("combobox", { name: "Find a story tool" }).or(page.getByPlaceholder("Find a tool: photo, quote, timeline…"));
-  await input.first().fill(search);
+  const input = page.getByRole("combobox", { name: "Find a story tool" });
+  await input.fill(search);
   await page.locator("[data-slot=command-item]").filter({ hasText: item }).first().click();
+}
+
+/**
+ * The selected block's toolbar sits in the room the block reserves above itself, never over
+ * the element before it (whatever the toolbar's wrapped height at this width).
+ */
+export async function expectToolbarClear(frame: Locator): Promise<void> {
+  await expect.poll(() => frame.evaluate((element) => {
+    const chrome = element.querySelector(":scope .byline-block-chrome");
+    const previous = element.previousElementSibling;
+    if (!chrome || !previous || getComputedStyle(chrome).opacity === "0") return null;
+    return Math.floor(chrome.getBoundingClientRect().top - previous.getBoundingClientRect().bottom);
+  }), { message: "toolbar clear of the element above" }).toBeGreaterThanOrEqual(0);
 }
 
 /** Horizontal page overflow, the thing a narrow screen must never have. */

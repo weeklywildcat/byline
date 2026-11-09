@@ -7,7 +7,8 @@ import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
-import { ArticleImage, PollBlockView, RelatedCoverageView } from "@byline/ui/article-body";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { ArticleImage, EventView, formatEventWhen, PollBlockView, RelatedCoverageView } from "@byline/ui/article-body";
 import { ArrowDown, ArrowUp, Plus, Replace, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { newRowId } from "../../fields";
@@ -15,7 +16,7 @@ import { insertItem, moveItem, removeItem } from "../../items";
 import { BlockShell, SettingsSurface, ToolButton, ToolTextButton } from "../chrome";
 import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
-import { useAnnounce, useBylineEditorHost, usePollChoice, useStoryChoice, type PollChoice, type StoryChoice } from "../host";
+import { useAnnounce, useBylineEditorHost, useEventChoice, usePollChoice, useStoryChoice, type EventChoice, type PollChoice, type StoryChoice } from "../host";
 import { BlockIcon } from "../icons";
 import { useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
@@ -42,49 +43,79 @@ function useSearch<T>(search: ((query: string) => Promise<T[]>) | undefined, que
   return state;
 }
 
-/** A searchable list of published Stories. Never offers the story being edited. */
+/** One published story as a picker row. */
+function StoryRow({ story, onSelect }: { story: StoryChoice; onSelect: () => void }) {
+  return (
+    <CommandItem value={String(story.id)} onSelect={onSelect} className="items-start gap-3 py-2">
+      {story.thumbnailAsset ? <img src={story.thumbnailAsset.previewSrc ?? story.thumbnailAsset.src} alt="" className="size-10 shrink-0 object-cover" /> : null}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="font-medium">{story.headline}</span>
+        <span className="text-xs text-muted-foreground">{[story.section, formatDate(story.publishedAt)].filter(Boolean).join(" · ")}</span>
+      </span>
+    </CommandItem>
+  );
+}
+
+/**
+ * Published Stories to link: Suggested (ranked by Byline's own related-story
+ * rules for this story) and Search (by headline). Choosing either writes the
+ * same ordinary Story relationship; nothing is ever added without a choice.
+ * Never offers the story being edited or one already chosen.
+ */
 function StoryPicker({ onChoose, taken, trigger, title }: { onChoose: (story: StoryChoice) => void; taken: readonly string[]; trigger: React.ReactElement; title: string }) {
-  const { searchStories, stories } = useBylineEditorHost();
+  const { searchStories, suggestStories, stories } = useBylineEditorHost();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const { items, loading, failed } = useSearch(searchStories, query, open);
-  const available = items.filter((story) => !taken.includes(String(story.id)));
+  const [tab, setTab] = useState<string>(suggestStories ? "suggested" : "search");
+  const searched = useSearch(searchStories, query, open && tab === "search");
+  const suggested = useSearch(suggestStories, "", open && tab === "suggested");
+  const available = (items: StoryChoice[]) => items.filter((story) => !taken.includes(String(story.id)));
+  const choose = (story: StoryChoice) => {
+    stories.prime([{ id: story.id, value: story }]);
+    onChoose(story);
+    setOpen(false);
+    setQuery("");
+  };
+  const status = (state: { loading: boolean; failed: boolean }, empty: string) => (
+    <>
+      {state.loading ? <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Spinner />{tab === "search" ? "Searching…" : "Finding related stories…"}</div> : null}
+      {state.failed ? <div className="p-3 text-sm" role="alert">That did not finish. Try again.</div> : null}
+      {!state.loading && !state.failed ? <CommandEmpty>{empty}</CommandEmpty> : null}
+    </>
+  );
+  const search = (
+    <Command shouldFilter={false} loop className="byline-inserter">
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Search by headline" aria-label="Search published stories" />
+      <CommandList className="max-h-[min(50dvh,22rem)]">
+        {status(searched, "No published story matches.")}
+        <CommandGroup>{available(searched.items).map((story) => <StoryRow key={String(story.id)} story={story} onSelect={() => choose(story)} />)}</CommandGroup>
+      </CommandList>
+    </Command>
+  );
   return (
-    <SettingsSurface open={open} onOpenChange={setOpen} title={title} description="Published stories only." trigger={trigger}>
-      <Command shouldFilter={false} loop className="byline-inserter">
-        <CommandInput value={query} onValueChange={setQuery} placeholder="Search by headline" aria-label="Search published stories" />
-        <CommandList className="max-h-[min(50dvh,22rem)]">
-          {loading ? <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Spinner />Searching…</div> : null}
-          {failed ? <div className="p-3 text-sm" role="alert">The search did not finish. Try again.</div> : null}
-          {!loading && !failed ? <CommandEmpty>No published story matches.</CommandEmpty> : null}
-          <CommandGroup>
-            {available.map((story) => (
-              <CommandItem
-                key={String(story.id)}
-                value={String(story.id)}
-                onSelect={() => {
-                  stories.prime([{ id: story.id, value: story }]);
-                  onChoose(story);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className="items-start gap-3 py-2"
-              >
-                {story.thumbnailAsset ? <img src={story.thumbnailAsset.previewSrc ?? story.thumbnailAsset.src} alt="" className="size-10 shrink-0 object-cover" /> : null}
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-medium">{story.headline}</span>
-                  <span className="text-xs text-muted-foreground">{[story.section, formatDate(story.publishedAt)].filter(Boolean).join(" · ")}</span>
-                </span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
+    <SettingsSurface open={open} onOpenChange={setOpen} title={title} description="Published stories only. Nothing is added until you choose it." trigger={trigger}>
+      {suggestStories ? (
+        <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
+          <TabsList className="w-full">
+            <TabsTrigger value="suggested">Suggested</TabsTrigger>
+            <TabsTrigger value="search">Search</TabsTrigger>
+          </TabsList>
+          <TabsContent value="suggested">
+            <Command loop className="byline-inserter">
+              <CommandList className="max-h-[min(50dvh,22rem)]" aria-label="Suggested stories">
+                {status(suggested, "No related published stories yet. Search instead.")}
+                <CommandGroup>{available(suggested.items).map((story) => <StoryRow key={String(story.id)} story={story} onSelect={() => choose(story)} />)}</CommandGroup>
+              </CommandList>
+            </Command>
+          </TabsContent>
+          <TabsContent value="search">{search}</TabsContent>
+        </Tabs>
+      ) : search}
     </SettingsSurface>
   );
 }
 
-function RelatedItem({ story: id, readOnly, index, count, onChoose, onMove, onRemove }: { story: MediaId | null; readOnly: boolean; index: number; count: number; onChoose: (story: StoryChoice) => void; onMove: (direction: -1 | 1) => void; onRemove: () => void }) {
+function RelatedItem({ story: id, taken, readOnly, index, count, onChoose, onMove, onRemove }: { story: MediaId | null; taken: readonly string[]; readOnly: boolean; index: number; count: number; onChoose: (story: StoryChoice) => void; onMove: (direction: -1 | 1) => void; onRemove: () => void }) {
   const entry = useStoryChoice(id);
   const story = entry.asset;
   const name = `story ${index + 1} of ${count}`;
@@ -93,7 +124,7 @@ function RelatedItem({ story: id, readOnly, index, count, onChoose, onMove, onRe
       {id === null ? (
         <div className="byline-related-empty" data-byline-chrome="" contentEditable={false}>
           {readOnly ? <span>No story chosen.</span> : (
-            <StoryPicker title="Choose a story" taken={[]} onChoose={onChoose} trigger={<Button type="button" variant="outline" size="sm"><Plus />Choose a published story</Button>} />
+            <StoryPicker title="Choose a story" taken={taken} onChoose={onChoose} trigger={<Button type="button" variant="outline" size="sm"><Plus />Choose a published story</Button>} />
           )}
         </div>
       ) : story ? (
@@ -118,7 +149,7 @@ function RelatedItem({ story: id, readOnly, index, count, onChoose, onMove, onRe
           <ToolButton label="Move earlier" disabled={index === 0} onClick={() => onMove(-1)}><ArrowUp /></ToolButton>
           <ToolButton label="Move later" disabled={index === count - 1} onClick={() => onMove(1)}><ArrowDown /></ToolButton>
           {id !== null ? (
-            <StoryPicker title="Replace the story" taken={[]} onChoose={onChoose} trigger={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Replace ${name}`}><Replace /></Button>} />
+            <StoryPicker title="Replace the story" taken={taken} onChoose={onChoose} trigger={<Button type="button" variant="ghost" size="icon-sm" aria-label={`Replace ${name}`}><Replace /></Button>} />
           ) : null}
           <ToolButton label={`Remove ${name}`} onClick={onRemove}><Trash2 /></ToolButton>
         </ButtonGroup>
@@ -154,6 +185,7 @@ export function RelatedCoverageEditor({ node, id, nodeKey }: BlockEditorProps) {
           <RelatedItem
             key={item.id}
             story={item.story}
+            taken={taken}
             readOnly={readOnly}
             index={index}
             count={items.length}
@@ -259,6 +291,89 @@ export function PollEditor({ node, id }: BlockEditorProps) {
         <div className="byline-media-status" data-status={entry.status} role={entry.status === "missing" ? "alert" : undefined}>
           {entry.status === "loading" ? <Spinner /> : null}
           <span>{entry.status === "loading" ? "Loading…" : "This poll is gone. Choose another."}</span>
+        </div>
+      )}
+    </BlockShell>
+  );
+}
+
+
+/** A searchable list of published Events. Each row: the title, then when and where. */
+function EventPicker({ onChoose, trigger, title }: { onChoose: (event: EventChoice) => void; trigger: React.ReactElement; title: string }) {
+  const { searchEvents, events, timeZone, locale } = useBylineEditorHost();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const { items, loading, failed } = useSearch(searchEvents, query, open);
+  return (
+    <SettingsSurface open={open} onOpenChange={setOpen} title={title} description="Published school and community events." trigger={trigger}>
+      <Command shouldFilter={false} loop className="byline-inserter">
+        <CommandInput value={query} onValueChange={setQuery} placeholder="Search by event name" aria-label="Search published events" />
+        <CommandList className="max-h-[min(50dvh,22rem)]">
+          {loading ? <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Spinner />Searching…</div> : null}
+          {failed ? <div className="p-3 text-sm" role="alert">The search did not finish. Try again.</div> : null}
+          {!loading && !failed ? <CommandEmpty>No published event matches.</CommandEmpty> : null}
+          <CommandGroup>
+            {items.map((event) => (
+              <CommandItem key={String(event.id)} value={String(event.id)} onSelect={() => {
+                events.prime([{ id: event.id, value: event }]);
+                onChoose(event);
+                setOpen(false);
+                setQuery("");
+              }} className="items-start gap-3 py-2">
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-medium">{event.title}{event.eventStatus === "canceled" ? " (canceled)" : ""}</span>
+                  <span className="text-xs text-muted-foreground">{[formatEventWhen(event, timeZone, locale), event.location].filter(Boolean).join(" · ")}</span>
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </SettingsSurface>
+  );
+}
+
+/**
+ * Event: a published Event record, drawn exactly as readers will see it. Only
+ * the relationship is stored; the title, time, place and status come from the
+ * Event when the story renders, so a change there reaches every story.
+ */
+export function EventEditor({ node, id, nodeKey }: BlockEditorProps) {
+  const [fields, set] = useTypedFields("event", node);
+  const issues = useReadiness("event", id, node.fields);
+  const announce = useAnnounce();
+  const { timeZone, locale } = useBylineEditorHost();
+  const entry = useEventChoice(fields.event);
+  const chooseRef = useRef<HTMLButtonElement>(null);
+  useFocusWhenCreated(nodeKey, chooseRef);
+  const readOnly = !node.editable;
+  const event = entry.asset;
+  const choose = (chosen: EventChoice) => {
+    set({ event: chosen.id });
+    announce(`${chosen.title} chosen.`);
+  };
+  return (
+    <BlockShell
+      type="event"
+      node={node}
+      issues={issues}
+      actions={fields.event !== null ? <EventPicker title="Replace the event" onChoose={choose} trigger={<Button type="button" variant="ghost" size="sm"><Replace />Replace event</Button>} /> : null}
+    >
+      {fields.event === null ? (
+        <Empty className="byline-media-empty" data-byline-chrome="" contentEditable={false}>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><BlockIcon icon="event" /></EmptyMedia>
+            <EmptyTitle>Choose an event</EmptyTitle>
+            <EmptyDescription>Add a published school or community event.</EmptyDescription>
+          </EmptyHeader>
+          {readOnly ? null : <EventPicker title="Choose an event" onChoose={choose} trigger={<Button ref={chooseRef} type="button" size="sm">Choose an event</Button>} />}
+        </Empty>
+      ) : event ? (
+        <EventView headingId={`${id}-heading`} event={event} timeZone={timeZone} locale={locale} />
+      ) : (
+        <div className="byline-media-status" data-status={entry.status} role={entry.status === "missing" ? "alert" : undefined}>
+          {entry.status === "loading" ? <Spinner /> : null}
+          <span>{entry.status === "loading" ? "Loading…" : "This event is not published, or is gone. Choose another."}</span>
         </div>
       )}
     </BlockShell>

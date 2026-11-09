@@ -60,15 +60,20 @@ describe("the canonical ArticleBody renderer", () => {
 
   it("pairs two gallery photographs, each with its caption and credit", () => {
     const html = render(only(FIXTURE_BLOCKS.gallery));
-    expect(html).toContain('<div class="byline-block byline-block-gallery alignwide" data-block-type="gallery"><div class="byline-gallery is-pair">');
+    expect(html).toContain('<div class="byline-block byline-block-gallery alignwide" data-block-type="gallery"><div class="byline-gallery is-pair" data-layout="grid">');
     expect(html.match(/<figure class="byline-gallery-item">/g)).toHaveLength(2);
     expect(html).toContain("Photo: Jordan Lee");
     expect(render(only({ ...FIXTURE_BLOCKS.gallery, fit: "crop" }))).toContain('class="byline-gallery is-cropped is-pair"');
+    // A gallery saved before layouts existed has none, and renders exactly as a grid.
+    expect(render(only({ ...FIXTURE_BLOCKS.gallery, layout: undefined }))).toContain('<div class="byline-gallery is-pair" data-layout="grid">');
   });
 
   it("draws quotes and supporting context in the shared family", () => {
-    expect(render(only(FIXTURE_BLOCKS.reportedQuote))).toContain('<blockquote class="byline-reported-quote"><p>We are feeding');
-    expect(render(only(FIXTURE_BLOCKS.reportedQuote))).toContain("<cite>Denise Royal, Greenwood cafeteria manager</cite></blockquote>");
+    const { sourceUrl: _url, sourceLabel: _label, ...plainQuote } = FIXTURE_BLOCKS.reportedQuote;
+    expect(render(only(plainQuote))).toContain('<blockquote class="byline-reported-quote"><p>We are feeding');
+    expect(render(only(plainQuote))).toContain("<cite>Denise Royal, Greenwood cafeteria manager</cite></blockquote>");
+    // Quote → attribution → an optional, restrained source link.
+    expect(render(only(FIXTURE_BLOCKS.reportedQuote))).toContain('<cite>Denise Royal, Greenwood cafeteria manager</cite><p class="byline-quote-source">Source: <a href="https://example.org/board/2025-10-21-minutes" rel="noopener">School board minutes, Oct. 21</a></p></blockquote>');
     expect(render(only(FIXTURE_BLOCKS.pullQuote))).toContain('<figure class="byline-pull-quote"><blockquote><p>Some days');
     const facts = render(only(FIXTURE_BLOCKS.keyFacts));
     expect(facts).toContain('<aside class="byline-key-facts" aria-labelledby="blk-facts-heading"><h2 id="blk-facts-heading">Key facts</h2><ul><li>Greenwood serves');
@@ -79,7 +84,9 @@ describe("the canonical ArticleBody renderer", () => {
   it("always links the document directly, with structured page references", () => {
     const html = render(only(FIXTURE_BLOCKS.document));
     expect(html).toContain('<a href="document.pdf">Nutrition Services budget request, 2026</a>');
-    expect(html).toContain('<a href="document.pdf#page=4">Page 4</a><span>Wait times by school and lunch period</span>');
+    expect(html).toContain('<a href="document.pdf#page=4">Page 4</a><span class="byline-document-page-text"><span class="byline-document-page-label">Wait times by school and lunch period</span><span class="byline-document-page-excerpt">Greenwood&#x27;s second lunch has the longest average wait in the district, 14 minutes.</span></span>');
+    // The excerpt is the reporter's words about the page; nothing claims the PDF itself is highlighted.
+    expect(html).not.toMatch(/highlight/i);
     expect(html).toContain('<a class="byline-document-open" href="document.pdf">Open the document</a>');
     expect(html).toContain('<object data="document.pdf#view=FitH" type="application/pdf"');
     expect(html).toContain("Source: Greenwood School District");
