@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
 import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -98,6 +99,12 @@ export function ReviewThreads({ threads, timeZone, canReply, onReply, onResolve,
 function Thread({ thread, timeZone, canReply, onReply, onResolve, onRemove, focused }: { thread: ReviewCommentView; timeZone: string; canReply: boolean; onReply?: (thread: ReviewCommentView, body: string) => void; onResolve?: (thread: ReviewCommentView, resolved: boolean) => void; onRemove?: (thread: ReviewCommentView) => void; focused: boolean }) {
   const [replying, setReplying] = useState(false);
   const [text, setText] = useState("");
+  const sendReply = () => {
+    if (!text.trim()) return;
+    onReply?.(thread, text.trim());
+    setText("");
+    setReplying(false);
+  };
   return (
     <Item variant="outline" size="sm" className={focused ? "flex-col items-stretch ring-2 ring-ring/40" : "flex-col items-stretch"} data-review-thread={thread.id} data-thread-state={thread.state}>
       <ItemContent className="gap-1.5">
@@ -117,10 +124,10 @@ function Thread({ thread, timeZone, canReply, onReply, onResolve, onRemove, focu
         {thread.state !== "pending" && onResolve ? <Button type="button" size="xs" variant="ghost" onClick={() => onResolve(thread, thread.state !== "resolved")}>{thread.state === "resolved" ? "Reopen" : "Resolve"}</Button> : null}
       </ItemFooter>
       {replying ? (
-        <form className="flex w-full flex-col gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); if (text.trim()) { onReply?.(thread, text.trim()); setText(""); setReplying(false); } }}>
+        <InlineForm label="Reply to comment" className="flex w-full flex-col gap-2" onSubmit={sendReply} onCancel={() => setReplying(false)}>
           <Textarea rows={2} value={text} autoFocus aria-label="Reply" onChange={(event) => setText(event.target.value)} />
-          <div className="flex justify-end gap-2"><Button type="button" size="xs" variant="ghost" onClick={() => setReplying(false)}>Cancel</Button><Button type="submit" size="xs" disabled={!text.trim()}>Reply</Button></div>
-        </form>
+          <div className="flex justify-end gap-2"><Button type="button" size="xs" variant="ghost" onClick={() => setReplying(false)}>Cancel</Button><Button type="button" size="xs" disabled={!text.trim()} onClick={sendReply}>Reply</Button></div>
+        </InlineForm>
       ) : null}
     </Item>
   );

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createStory, lexical, login, paragraph, signIn, waitForSaved } from "./helpers";
+import { createStory, lexical, login, paragraph, signIn } from "./helpers";
 
 /**
  * The reporter-first Story screen (docs/story-screen.md): opening a Story
@@ -66,7 +66,7 @@ test("Reporting is a focused mode with Back to story, Back/Forward, and Sources 
   const rail = page.locator("aside[aria-label='Sources and appointments'], [role=dialog]:has-text('Sources & appointments')").first();
   await rail.getByRole("button", { name: "Add source" }).click();
   const dialog = page.getByRole("dialog", { name: /source/i });
-  await dialog.getByLabel(/Name|Who/).first().fill("District food services");
+  await dialog.getByRole("textbox", { name: "Label" }).fill("District food services");
   await dialog.getByRole("button", { name: /Add source|Save/ }).click();
   await expect(rail.getByText("District food services")).toBeVisible();
   await page.goBack();
@@ -122,5 +122,46 @@ test("the Angle is edited inline and saved", async ({ page }) => {
   await rail.getByRole("textbox", { name: "Angle" }).fill("Why the canteen closed and whether it can return.");
   await rail.getByRole("button", { name: "Save" }).click();
   await expect(rail.getByText("Why the canteen closed and whether it can return.")).toBeVisible();
-  await waitForSaved(page);
+  // The Angle is a Byline record, not a document field: it persists without saving the Story.
+  await page.reload();
+  await expect(page.locator("[data-story-context-rail]").getByText("Why the canteen closed and whether it can return.")).toBeVisible({ timeout: 60_000 });
+});
+
+test("Reporting capture saves notes, note edits and links in place, never reloading the Story", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "?view=reporting");
+  // A marker that only survives if the document is never reloaded or submitted.
+  await page.evaluate(() => { (window as unknown as { __noReload: boolean }).__noReload = true; });
+  const stillHere = () => page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload === true);
+  const notebook = page.locator("[data-story-view=reporting]");
+
+  await notebook.getByRole("button", { name: "Capture" }).click();
+  await page.getByRole("menuitem", { name: "Note" }).click();
+  const composer = page.locator("[data-note-composer]");
+  await expect(composer).toHaveAttribute("role", "group");
+  await composer.getByRole("textbox", { name: "Note" }).fill("Cafeteria manager says");
+  // Enter is a newline in a note; it must not submit anything.
+  await composer.getByRole("textbox", { name: "Note" }).press("Enter");
+  await composer.getByRole("textbox", { name: "Note" }).pressSequentially("the district wants bids by March.");
+  await composer.getByRole("button", { name: "Save note" }).click();
+  await expect(notebook.getByText(/the district wants bids by March\./)).toBeVisible();
+  expect(await stillHere()).toBe(true);
+
+  // Editing a note inline, saved with ⌘/Ctrl+Enter.
+  await notebook.locator("[data-material=note]").filter({ hasText: "bids by March" }).getByRole("button", { name: "Edit" }).click();
+  const editor = notebook.getByRole("group", { name: "Edit note" }).getByRole("textbox", { name: "Note" });
+  await editor.fill("Cafeteria manager: district wants bids by April.");
+  await editor.press("ControlOrMeta+Enter");
+  await expect(notebook.getByText("Cafeteria manager: district wants bids by April.")).toBeVisible();
+  expect(await stillHere()).toBe(true);
+
+  // A link, added with Enter in its single-line field.
+  await notebook.getByRole("button", { name: "Capture" }).click();
+  await page.getByRole("menuitem", { name: "Add link" }).click();
+  const link = notebook.getByRole("textbox", { name: "Link address" });
+  await link.fill("https://www.example.org/district-food-contract");
+  await link.press("Enter");
+  await expect(notebook.getByText(/example\.org/).first()).toBeVisible();
+  expect(await stillHere()).toBe(true);
+  await expect(page).toHaveURL(/view=reporting/);
 });

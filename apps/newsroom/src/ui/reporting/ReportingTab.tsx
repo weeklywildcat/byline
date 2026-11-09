@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -21,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -271,21 +273,21 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
     onError: (error: Error) => toast.error(error.message)
   });
   return (
-    <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); if (text.trim()) save.mutate(); }} data-note-composer="">
+    <InlineForm label="New note" className="grid gap-2" onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} onCancel={onCancel} data-note-composer="">
       <InputGroup>
         <InputGroupTextareaAutoFocus value={text} onChange={setText} />
         <InputGroupAddon align="block-end" className="justify-between">
           <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground"><Checkbox checked={confidential} onCheckedChange={(next) => setConfidential(next === true)} />Confidential</label>
-          <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="submit" size="sm" disabled={!text.trim() || save.isPending}>Save note</Button></div>
+          <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="button" size="sm" disabled={!text.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save note</Button></div>
         </InputGroupAddon>
       </InputGroup>
-      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."}</p>
-    </form>
+      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">⌘/Ctrl+Enter saves.</span></p>
+    </InlineForm>
   );
 }
 
 function InputGroupTextareaAutoFocus({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} />;
+  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} />;
 }
 
 function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenContext; onDone: () => void; onCancel: () => void }) {
@@ -300,15 +302,20 @@ function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenConte
     onSuccess: () => { toast.success("Link added to this story."); onDone(); },
     onError: (failure: Error) => setError(failure.message)
   });
+  const submit = () => {
+    if (!url.trim() || save.isPending) return;
+    setError(null);
+    save.mutate();
+  };
   return (
-    <form className="grid gap-1.5" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); setError(null); save.mutate(); }}>
+    <InlineForm label="Add a link" className="grid gap-1.5" onSubmit={submit} onCancel={onCancel}>
       <InputGroup>
         <InputGroupAddon><Link2 aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput autoFocus type="url" value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
-        <InputGroupAddon align="inline-end"><Button type="submit" size="xs" disabled={!url.trim() || save.isPending}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
+        <InputGroupAddon align="inline-end"><Button type="button" size="xs" disabled={!url.trim() || save.isPending} onClick={submit}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
       </InputGroup>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    </form>
+    </InlineForm>
   );
 }
 
@@ -407,10 +414,10 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
       <span className="pt-0.5 text-muted-foreground [&_svg]:size-4">{iconFor(item)}</span>
       <div className="min-w-0">
         {editing && item.kind === "note" ? (
-          <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); if (text.trim()) saveNoteText.mutate(); }}>
-            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setEditing(false); }} />
-            <div className="flex gap-2"><Button type="submit" size="sm" disabled={saveNoteText.isPending || !text.trim()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.kind === "note" ? item.text : ""); }}>Cancel</Button></div>
-          </form>
+          <InlineForm label="Edit note" className="grid gap-2" onSubmit={() => { if (text.trim() && !saveNoteText.isPending) saveNoteText.mutate(); }} onCancel={() => { setEditing(false); setText(item.text); }}>
+            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} />
+            <div className="flex gap-2"><Button type="button" size="sm" disabled={saveNoteText.isPending || !text.trim()} onClick={() => saveNoteText.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.text); }}>Cancel</Button></div>
+          </InlineForm>
         ) : (
           <>
             <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium [overflow-wrap:anywhere]">
