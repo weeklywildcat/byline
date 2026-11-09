@@ -161,16 +161,16 @@ describe("recordings, ground rules and transcription", () => {
     expect(file.groundRules).toMatchObject({ rule: "on-record", recordingPermission: true, sourceId: ids.coach });
     expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
     // A private provider queues transcription automatically.
-    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: ids.recording } } })).docs[0];
+    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: ids.recording } }, depth: 0 })).docs[0];
     expect(transcript).toMatchObject({ state: "queued", source: ids.coach, appointment: ids.interview, origin: "machine" });
     ids.transcript = transcript.id;
   });
 
   it("does not let a later Source edit rewrite the captured snapshot", async () => {
-    await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "background" }, overrideAccess: true });
+    await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "background" }, overrideAccess: true, context: { bylineSystem: true } });
     const file = await payload.findByID({ collection: "reporting-files", id: ids.recording, depth: 0 });
     expect((file.groundRules as { rule: string }).rule).toBe("on-record");
-    await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "on-record" }, overrideAccess: true });
+    await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "on-record" }, overrideAccess: true, context: { bylineSystem: true } });
   });
 
   it("transcribes on the reporting queue, stores provider-neutral segments and tells the uploader", async () => {
@@ -192,13 +192,13 @@ describe("recordings, ground rules and transcription", () => {
     providerMode = "permanent";
     const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("broken.wav") });
     await runReporting();
-    const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } } })).docs[0];
+    const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } }, depth: 0 })).docs[0];
     expect(failed).toMatchObject({ state: "failed", failure: "Unsupported audio codec." });
 
     providerMode = "temporary";
     const flaky = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("flaky.wav") });
     await runReporting();
-    const queued = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: flaky.body.id } } })).docs[0];
+    const queued = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: flaky.body.id } }, depth: 0 })).docs[0];
     expect(queued.state).toBe("queued");
     expect(queued.attempts).toBe(1);
     expect(queued.failure).toContain("503");
@@ -250,7 +250,7 @@ describe("quotes, verification and provenance", () => {
   it("never offers off-the-record words for insertion, and refuses to publish them by reference without an editor's audited override", async () => {
     const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: { sourceId: ids.tipster }, file: wav("tipster.wav") });
     await runReporting();
-    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: recording.body.id } } })).docs[0];
+    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: recording.body.id } }, depth: 0 })).docs[0];
     const quote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params: { id: transcript.id }, data: { segmentIds: ["s0"] } });
     expect(quote.body.use.action).toBe("blocked");
     expect(quote.body.attribution).toBe("");

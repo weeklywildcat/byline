@@ -15,6 +15,7 @@ import * as migration_20261107_224351_remember_story_public_paths from './202611
 import * as migration_20261108_163507_video_facts from './20261108_163507_video_facts';
 import * as migration_20261108_165129_notifications from './20261108_165129_notifications';
 import * as migration_20261108_173200_public_deploy_hook from './20261108_173200_public_deploy_hook';
+import * as migration_20261109_035544_reporting from './20261109_035544_reporting';
 
 export const migrations = [
   {
@@ -95,11 +96,16 @@ export const migrations = [
   {
     up: migration_20261108_165129_notifications.up,
     down: migration_20261108_165129_notifications.down,
-    name: '20261108_165129_notifications'
+    name: '20261108_165129_notifications',
   },
   {
     up: migration_20261108_173200_public_deploy_hook.up,
     down: migration_20261108_173200_public_deploy_hook.down,
-    name: '20261108_173200_public_deploy_hook'
+    name: '20261108_173200_public_deploy_hook',
+  },
+  {
+    up: migration_20261109_035544_reporting.up,
+    down: migration_20261109_035544_reporting.down,
+    name: '20261109_035544_reporting'
   },
 ];
