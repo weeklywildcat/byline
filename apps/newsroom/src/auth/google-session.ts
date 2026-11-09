@@ -3,6 +3,13 @@ import { commitTransaction, getFieldsToSign, initTransaction, jwtSign, killTrans
 import { addSessionToUser, generatePayloadCookie } from "payload/shared";
 import type { GoogleIdentity } from "./google-identity";
 
+type GoogleSessionRow = {
+  id: number;
+  email: string;
+  google_subject: string | null;
+  enabled: boolean;
+};
+
 /** Called only after Google's identity has been verified. Lock the matching rows
  * until the binding and session commit together. The unique subject index also
  * prevents two different account rows from claiming the same subject. */
@@ -16,13 +23,14 @@ export async function createGoogleSession(req: PayloadRequest, { email, subject 
     const tx = (payload.db as unknown as PostgresAdapter).sessions[String(await req.transactionID)]?.db;
     if (!tx) throw new Error("Google sign-in transaction unavailable.");
 
-    const matches = await tx.execute<{ id: number; email: string; google_subject: string | null; enabled: boolean }>(
+    const matches = await tx.execute<GoogleSessionRow>(
       sql`select id, lower(btrim(email)) as email, google_subject, enabled from users
           where google_subject = ${subject} or lower(btrim(email)) = ${email}
           order by id for update`,
     );
-    const bound = matches.rows.filter(row => row.google_subject === subject);
-    const byEmail = matches.rows.filter(row => row.email === email);
+    const rows = matches.rows as GoogleSessionRow[];
+    const bound = rows.filter((row) => row.google_subject === subject);
+    const byEmail = rows.filter((row) => row.email === email);
     const account = bound.length === 1 ? bound[0] : bound.length === 0 && byEmail.length === 1 ? byEmail[0] : null;
     if (!account || account.enabled !== true || (account.google_subject !== null && account.google_subject !== subject)) {
       await killTransaction(req);
