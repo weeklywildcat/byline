@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import { APIError } from "payload";
+import sharp from "sharp";
+import { localToInstant } from "../domain/dates";
+import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
+import { exifCapturedAt } from "./exif";
 import { REPORTING_LIMITS, validClientKey } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import type { ScreenContext } from "../newsroom/screen-models";
@@ -120,4 +124,64 @@ export async function setSourceGroundRules(ctx: ScreenContext, sourceId: number,
   if (input.note !== undefined) data.groundRulesNote = cleanText(input.note, REPORTING_LIMITS.groundRulesNote);
   const updated = await ctx.req.payload.update({ collection: "sources", id: sourceId, data, ...as(ctx) });
   return { id: updated.id, groundRules: updated.groundRules, recordingPermission: updated.recordingPermission === true, groundRulesNote: updated.groundRulesNote ?? "" };
+}
+
+/* ------------------------------------------------------------------ photos */
+
+export type PhotoInput = { assignmentId?: unknown; clientKey?: unknown; capturedAt?: unknown };
+
+/**
+ * A photograph for the Story. Photos go to Media, the one asset system
+ * (never a private reporting file), carrying what Byline already knows: the
+ * uploader, the Story, the person's one open production assignment on it when
+ * that is unambiguous, the original file's hash, the capture time from EXIF
+ * (else the device's file time), and, for staff photography, the
+ * photographer's Person name as creator and credit. Rights and alt text stay
+ * deliberate: an outside photo is never marked cleared because it uploaded.
+ */
+export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, input: PhotoInput): Promise<CaptureResult & { assignment: { id: number; title: string } | null }> {
+  const file = ctx.req.file;
+  if (!file) throw new APIError("Choose a photo.", 400);
+  if (!String(file.mimetype ?? "").toLowerCase().startsWith("image/")) throw new APIError("That file is not a photo. Attach it as a file instead.", 400);
+  const context = await resolveCaptureContext(ctx.req, { storyId, assignmentId: input.assignmentId, inferAssignment: true });
+  const { payload } = ctx.req;
+  const clientKey = validClientKey(input.clientKey);
+  if (clientKey) {
+    const found = await payload.find({ collection: "media", where: { "capture.clientKey": { equals: clientKey } }, depth: 0, limit: 1, overrideAccess: true, req: ctx.req });
+    const existing = found.docs[0];
+    if (existing) {
+      if (String(existing.uploadedBy) !== String(ctx.user.id)) throw new APIError("That capture key is already in use.", 409);
+      return { kind: "media", id: existing.id, duplicate: true, status: "saved", assignment: context.assignment };
+    }
+  }
+  const originalHash = createHash("sha256").update(file.data).digest("hex");
+  let capturedAt: string | null = null;
+  try {
+    const metadata = await sharp(file.data).metadata();
+    const local = exifCapturedAt(metadata.exif);
+    if (local) capturedAt = localToInstant(local.replace("T", " ").slice(0, 16), ctx.timeZone);
+  } catch {
+    capturedAt = null;
+  }
+  if (!capturedAt && typeof input.capturedAt === "string" && !Number.isNaN(Date.parse(input.capturedAt))) capturedAt = new Date(input.capturedAt).toISOString();
+  const person = ctx.user.linkedPerson === null ? null : await payload.findByID({ collection: "people", id: ctx.user.linkedPerson, depth: 0, overrideAccess: true, req: ctx.req, disableErrors: true, select: { name: true } });
+  const publication = publicationConfigFromGlobal(await readPublishedPublication(payload, ctx.req), 0);
+  const name = typeof person?.name === "string" ? person.name : "";
+  const created = await payload.create({
+    collection: "media",
+    data: {
+      ...(name ? { creator: name.slice(0, 160), credit: `${name} / ${publication.identity.name}`.slice(0, 200) } : {}),
+      ...(capturedAt ? { capturedAt } : {}),
+      capture: { story: storyId, assignment: context.assignment?.id ?? null, originalHash, ...(clientKey ? { clientKey } : {}) }
+    } as never,
+    file,
+    ...as(ctx),
+    context: { ...ctx.req.context, bylineSystem: true }
+  });
+  if (context.assignment) {
+    const assignment = await payload.findByID({ collection: "production-assignments", id: context.assignment.id, depth: 0, overrideAccess: true, req: ctx.req });
+    const media = [...new Set([...(assignment.media ?? []).map((entry) => Number(typeof entry === "object" && entry ? entry.id : entry)), created.id])];
+    await payload.update({ collection: "production-assignments", id: context.assignment.id, data: { media, ...(assignment.status === "assigned" || assignment.status === "needed" ? { status: "uploaded" } : {}) }, overrideAccess: true, depth: 0, req: ctx.req, context: { ...ctx.req.context, bylineSystem: true } });
+  }
+  return { kind: "media", id: created.id, duplicate: false, status: "saved", assignment: context.assignment };
 }

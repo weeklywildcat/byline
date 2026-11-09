@@ -86,8 +86,8 @@ beforeAll(async () => {
   const asEditor = { req: await reqAs("assigned"), overrideAccess: false as const };
   ids.coach = (await payload.create({ collection: "sources", data: { story: ids.story, label: "Coach Smith", role: "Head coach", groundRules: "on-record", recordingPermission: true }, ...asEditor })).id;
   ids.tipster = (await payload.create({ collection: "sources", data: { story: ids.story, label: "Booster club parent", groundRules: "off-record" }, ...asEditor })).id;
-  ids.interview = (await payload.create({ collection: "appointments", data: { story: ids.story, title: "Interview Coach Smith", kind: "interview", source: ids.coach, scheduleMode: "exact", startAt: new Date(Date.now() + 3600_000).toISOString() }, ...asEditor })).id;
-  ids.assignment = (await payload.create({ collection: "production-assignments", data: { story: ids.story, title: "Game photos", type: "photo", assignees: [accounts.bob.id] }, ...asEditor })).id;
+  ids.interview = (await payload.create({ collection: "appointments", data: { story: ids.story, title: "Interview Coach Smith", kind: "interview", source: ids.coach, scheduleMode: "exact", startAt: new Date(Date.now() + 3600_000).toISOString() } as never, ...asEditor })).id;
+  ids.assignment = (await payload.create({ collection: "production-assignments", data: { story: ids.story, title: "Game photos", type: "photo", assignees: [accounts.bob.id] } as never, ...asEditor })).id;
   setTranscriptionProviderForTests(stub);
 }, 300_000);
 

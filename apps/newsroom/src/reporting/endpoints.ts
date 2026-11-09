@@ -1,6 +1,6 @@
 import type { Endpoint } from "payload";
 import { body, handle, idParam } from "../newsroom/http";
-import { createReportingNote, deleteReportingMaterial, setSourceGroundRules, updateReportingFile, updateReportingNote, uploadReportingFile, type FileInput, type NoteInput } from "./capture";
+import { createReportingNote, deleteReportingMaterial, setSourceGroundRules, updateReportingFile, updateReportingNote, uploadCapturePhoto, uploadReportingFile, type FileInput, type NoteInput, type PhotoInput } from "./capture";
 import { storyReporting } from "./material";
 import {
   createSelection,
@@ -32,6 +32,7 @@ export const reportingEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/reporting", method: "get", handler: handle((ctx, req) => storyReporting(ctx, idParam(req))) },
   { path: "/byline/stories/:id/reporting/notes", method: "post", handler: handle(async (ctx, req) => createReportingNote(ctx, idParam(req), await body<NoteInput>(req))) },
   { path: "/byline/stories/:id/reporting/files", method: "post", handler: handle(async (ctx, req) => uploadReportingFile(ctx, idParam(req), await body<FileInput>(req))) },
+  { path: "/byline/stories/:id/reporting/photos", method: "post", handler: handle(async (ctx, req) => uploadCapturePhoto(ctx, idParam(req), await body<PhotoInput>(req))) },
   { path: "/byline/stories/:id/reporting/transcripts", method: "post", handler: handle(async (ctx, req) => importTranscript(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/reporting/quotes", method: "get", handler: handle((ctx, req) => storyQuotes(ctx, idParam(req))) },
   { path: "/byline/reporting/notes/:id", method: "patch", handler: handle(async (ctx, req) => updateReportingNote(ctx, idParam(req), await body(req))) },
