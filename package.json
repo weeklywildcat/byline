@@ -48,7 +48,8 @@
     "typecheck:newsroom": "npm run typecheck --workspace @byline/newsroom",
     "test:newsroom": "npm run test --workspace @byline/newsroom",
     "test:newsroom:integration": "npm run test:integration --workspace @byline/newsroom",
-    "tracker": "node scripts/repository-tracker.mjs"
+    "tracker": "node scripts/repository-tracker.mjs",
+    "deploy:newsroom": "bash scripts/deploy-newsroom.sh"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
