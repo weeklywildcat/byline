@@ -106,6 +106,9 @@ export async function publishDatasetRelease(req: PayloadRequest, datasetId: numb
   }
   const current = storedRelease(dataset.release);
   if (current && current.descriptor.revision === revision && (await store.verify(current.filename, current.descriptor.sha256, current.descriptor.bytes))) {
+    if ((await readWorkingRevision(req.payload, datasetId)) !== revision) {
+      throw new DataError("revision-changed", "Someone changed this dataset while it was being published. Publish again to include their change.", 409);
+    }
     return { descriptor: current.descriptor, revision, reused: true };
   }
   // 2–3. Collect and project.
