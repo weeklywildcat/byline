@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { normalizeLiveCoverage } from "@byline/core";
 import { createLocalReq, getPayload, type Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -5,7 +7,7 @@ import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { readCurrentRevision, readPublicationState } from "../../src/db/publication-state";
 import { DEPLOY_PUBLIC_SITE_TASK } from "../../src/public/deployment";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK } from "../../src/public/queue";
-import { collectPublicSnapshot } from "../../src/public/snapshot/collect";
+import { SnapshotStore } from "../../src/public/snapshot/store";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -265,8 +267,14 @@ describe("the public feed", () => {
       expect(await pendingJobs(PREPARE_PUBLIC_SNAPSHOT_TASK)).toHaveLength(0);
       expect(await pendingJobs(DEPLOY_PUBLIC_SITE_TASK)).toHaveLength(1);
 
-      const snapshot = await collectPublicSnapshot(payload, { revision });
-      const publicStory = snapshot.datasets.stories.find((entry) => entry.id === story.game);
+      const completed = state.completed!;
+      const artifactPath = new SnapshotStore().pathFor(completed.filename);
+      expect(artifactPath).not.toBeNull();
+      const bytes = await readFile(artifactPath!);
+      expect(bytes.byteLength).toBe(completed.bytes);
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(completed.sha256);
+      const artifact = JSON.parse(bytes.toString("utf8")) as { datasets: { stories: Array<{ id: number; live?: unknown }> } };
+      const publicStory = artifact.datasets.stories.find((entry) => entry.id === story.game);
       expect(JSON.stringify(publicStory?.live)).toContain(marker);
 
       // The next publication job delivers that promoted identity to Workers
