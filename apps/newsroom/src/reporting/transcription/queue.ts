@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { APIError, type CollectionAfterChangeHook, type Payload, type PayloadRequest, type TaskConfig } from "payload";
 import { relationId } from "../../access/user";
@@ -5,16 +6,22 @@ import { recordStoryActivity } from "../../newsroom/story-activity";
 import { notifyTranscriptReady } from "../notifications";
 import { privateReportingDir } from "../paths";
 import { fasterWhisperProvider } from "./faster-whisper";
-import { PermanentTranscriptionError, TemporaryTranscriptionError, transcriptionConfig, type TranscriptionProvider } from "./provider";
+import {
+  PermanentTranscriptionError,
+  TemporaryTranscriptionError,
+  transcriptionConfig,
+  type TranscriptionProgress,
+  type TranscriptionProvider
+} from "./provider";
 
 /**
  * Transcription jobs (docs/reporting.md#jobs). Long-running work lives on its
  * own `reporting` queue (worker: `npm run jobs:reporting`), so a 45-minute
  * interview never delays publication, snapshots or maintenance.
  *
- * Temporary infrastructure failures are retried with backoff; malformed or
- * unsupported audio fails once and says why. Upload and manual import never
- * depend on transcription being configured.
+ * The provider's service job is idempotent for one logical run. Payload may
+ * retry a dropped connection, but Whisper keeps doing (or returns) the same
+ * work instead of starting a duplicate CPU-heavy transcription.
  */
 export const REPORTING_QUEUE = "reporting";
 export const TRANSCRIBE_TASK = "transcribe-reporting-file";
@@ -35,6 +42,15 @@ const activeProvider = () => (providerOverride !== undefined ? providerOverride 
 
 type Jobs = { queue: (args: Record<string, unknown>) => Promise<unknown> };
 
+const newRun = () => ({
+  transcriptionRunToken: randomUUID(),
+  progressPercent: null,
+  progressMessage: "Waiting to transcribe",
+  transcriptionStartedAt: null,
+  lastProgressAt: null,
+  completedAt: null
+});
+
 /**
  * Creates (or re-queues) the transcript for a recording. The transcript
  * inherits the recording's story, source, appointment, confidentiality and
@@ -52,15 +68,39 @@ export async function queueTranscription(req: PayloadRequest, fileId: number, { 
     const row = existing.docs[0];
     if (row.state === "ready" && row.origin === "manual") throw new APIError("This recording already has a manual transcript.", 409);
     if (row.state === "queued" || row.state === "processing") return row.id;
-    await req.payload.update({ collection: "reporting-transcripts", id: row.id, data: { state: "queued", failure: null, attempts: 0, origin: "machine", provider: provider.id, model: provider.model }, overrideAccess: true, depth: 0, context, req });
+    await req.payload.update({
+      collection: "reporting-transcripts",
+      id: row.id,
+      data: {
+        state: "queued",
+        failure: null,
+        attempts: 0,
+        origin: "machine",
+        provider: provider.id,
+        model: provider.model,
+        ...newRun()
+      },
+      overrideAccess: true, depth: 0, context, req
+    });
     transcriptId = row.id;
   } else {
     const created = await req.payload.create({
       collection: "reporting-transcripts",
       data: {
-        story: relationId(file.story) as number, file: fileId, source: relationId(file.source) as number | null, appointment: relationId(file.appointment) as number | null,
-        confidential: file.confidential === true, groundRules: file.groundRules ?? null, state: "queued", origin: "machine", provider: provider.id, model: provider.model,
-        createdBy: (requestedBy ?? relationId(file.createdBy)) as number | null, capturedAt: file.capturedAt ?? new Date().toISOString(), attempts: 0
+        story: relationId(file.story) as number,
+        file: fileId,
+        source: relationId(file.source) as number | null,
+        appointment: relationId(file.appointment) as number | null,
+        confidential: file.confidential === true,
+        groundRules: file.groundRules ?? null,
+        state: "queued",
+        origin: "machine",
+        provider: provider.id,
+        model: provider.model,
+        createdBy: (requestedBy ?? relationId(file.createdBy)) as number | null,
+        capturedAt: file.capturedAt ?? new Date().toISOString(),
+        attempts: 0,
+        ...newRun()
       },
       overrideAccess: true, depth: 0, context, req
     });
@@ -81,7 +121,12 @@ export const queueTranscriptionAfterUpload: CollectionAfterChangeHook = async ({
 };
 
 async function markFailed(payload: Payload, req: PayloadRequest, id: number, failure: string) {
-  await payload.update({ collection: "reporting-transcripts", id, data: { state: "failed", failure: failure.slice(0, 400) }, overrideAccess: true, depth: 0, context: { bylineSystem: true }, req });
+  await payload.update({
+    collection: "reporting-transcripts",
+    id,
+    data: { state: "failed", failure: failure.slice(0, 400), progressMessage: "Transcription failed", lastProgressAt: new Date().toISOString() },
+    overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+  });
 }
 
 export const transcribeReportingFileTask: TaskConfig = {
@@ -108,16 +153,80 @@ export const transcribeReportingFileTask: TaskConfig = {
       await markFailed(payload, req, id, "The recording is gone.");
       return { output: { failed: true } };
     }
+
     const attempts = (typeof transcript.attempts === "number" ? transcript.attempts : 0) + 1;
-    await payload.update({ collection: "reporting-transcripts", id, data: { state: "processing", attempts, failure: null }, overrideAccess: true, depth: 0, context: { bylineSystem: true }, req });
+    const runToken = typeof transcript.transcriptionRunToken === "string" && transcript.transcriptionRunToken
+      ? transcript.transcriptionRunToken
+      : randomUUID();
+    const startedAt = transcript.transcriptionStartedAt ?? new Date().toISOString();
+    await payload.update({
+      collection: "reporting-transcripts",
+      id,
+      data: {
+        state: "processing",
+        attempts,
+        failure: null,
+        transcriptionRunToken: runToken,
+        transcriptionStartedAt: startedAt,
+        progressMessage: transcript.progressMessage || "Starting transcription",
+        lastProgressAt: new Date().toISOString()
+      },
+      overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+    });
+
+    let lastProgressWrite = 0;
+    let lastState = "";
+    let lastPercent: number | null = null;
+    let lastMessage = "";
+    const recordProgress = async (progress: TranscriptionProgress) => {
+      const now = Date.now();
+      const changed = progress.state !== lastState || progress.percent !== lastPercent || progress.message !== lastMessage;
+      if (!changed || (now - lastProgressWrite < 4_000 && progress.state === lastState)) return;
+      lastProgressWrite = now;
+      lastState = progress.state;
+      lastPercent = progress.percent;
+      lastMessage = progress.message;
+      await payload.update({
+        collection: "reporting-transcripts",
+        id,
+        data: {
+          state: progress.state === "queued" ? "queued" : "processing",
+          progressPercent: progress.percent,
+          progressMessage: progress.message,
+          lastProgressAt: new Date(now).toISOString()
+        },
+        overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+      });
+    };
+
     try {
       const result = await provider.transcribe(
-        { path: path.join(privateReportingDir(), path.basename(file.filename)), filename: file.filename, mimeType: file.mimeType ?? "application/octet-stream", language: transcript.language ?? null },
-        AbortSignal.timeout(4 * 60 * 60 * 1000)
+        {
+          path: path.join(privateReportingDir(), path.basename(file.filename)),
+          filename: file.filename,
+          mimeType: file.mimeType ?? "application/octet-stream",
+          language: transcript.language ?? null,
+          jobKey: `transcript-${id}-${runToken}`
+        },
+        AbortSignal.timeout(4 * 60 * 60 * 1000),
+        recordProgress
       );
       await payload.update({
         collection: "reporting-transcripts", id,
-        data: { state: "ready", origin: "machine", provider: provider.id, model: provider.model, language: result.language, durationMs: result.durationMs, segments: result.segments, completedAt: new Date().toISOString(), failure: null },
+        data: {
+          state: "ready",
+          origin: "machine",
+          provider: provider.id,
+          model: provider.model,
+          language: result.language,
+          durationMs: result.durationMs,
+          segments: result.segments,
+          completedAt: new Date().toISOString(),
+          failure: null,
+          progressPercent: 100,
+          progressMessage: "Transcript ready",
+          lastProgressAt: new Date().toISOString()
+        },
         overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
       });
       if (!file.durationMs && result.durationMs) await payload.update({ collection: "reporting-files", id: file.id, data: { durationMs: result.durationMs }, overrideAccess: true, depth: 0, context: { bylineSystem: true }, req });
@@ -134,8 +243,19 @@ export const transcribeReportingFileTask: TaskConfig = {
         await markFailed(payload, req, id, `${message} Byline stopped retrying; try again later.`);
         return { output: { failed: true } };
       }
-      // Back in the queue; Payload retries with backoff.
-      await payload.update({ collection: "reporting-transcripts", id, data: { state: "queued", failure: message.slice(0, 400) }, overrideAccess: true, depth: 0, context: { bylineSystem: true }, req });
+      // Back in Payload's queue, but the service job keeps the same run key.
+      // A retry can reattach to work that is still running instead of duplicating it.
+      await payload.update({
+        collection: "reporting-transcripts",
+        id,
+        data: {
+          state: "queued",
+          failure: message.slice(0, 400),
+          progressMessage: "Waiting to retry transcription",
+          lastProgressAt: new Date().toISOString()
+        },
+        overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+      });
       throw error;
     }
   }
