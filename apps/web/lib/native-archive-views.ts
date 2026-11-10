@@ -5,7 +5,7 @@ import { getNativeSnapshot } from "./native-snapshot";
 import type { ArchiveAuthor, ArchiveCategory, ArchiveGuestContributor, ArchiveMedia, ArchivePage, ArchivePost, ArchiveTag } from "./public-content";
 
 type NativeLiveCoverage = PublicBuildSnapshotV2["datasets"]["stories"][number]["live"];
-type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt">;
+type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt"> & { updates?: unknown[] };
 
 /**
  * Archive pages and cards only need the coverage state. Keeping the full live
