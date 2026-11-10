@@ -23,6 +23,7 @@ import * as migration_20261109_164800_live_desk_reason from './20261109_164800_l
 import * as migration_20261109_182945_newsroom_review from './20261109_182945_newsroom_review';
 import * as migration_20261109_213214_cms_url_default from './20261109_213214_cms_url_default';
 import * as migration_20261110_193200_transcription_jobs from './20261110_193200_transcription_jobs';
+import * as migration_20261110_195045 from './20261110_195045_byline_data';
 
 export const migrations = [
   {
@@ -143,11 +144,16 @@ export const migrations = [
   {
     up: migration_20261109_213214_cms_url_default.up,
     down: migration_20261109_213214_cms_url_default.down,
-    name: '20261109_213214_cms_url_default'
+    name: '20261109_213214_cms_url_default',
   },
   {
     up: migration_20261110_193200_transcription_jobs.up,
     down: migration_20261110_193200_transcription_jobs.down,
-    name: '20261110_193200_transcription_jobs'
+    name: '20261110_193200_transcription_jobs',
+  },
+  {
+    up: migration_20261110_195045.up,
+    down: migration_20261110_195045.down,
+    name: '20261110_195045_byline_data'
   },
 ];

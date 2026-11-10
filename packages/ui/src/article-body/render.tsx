@@ -64,7 +64,7 @@ import {
   YouTubePlayer,
   youTubeWatch
 } from "./primitives";
-import { ChartDataTable, EventView, FinalScoreView, finalScoreDetails, MediaChapters, NativeChart, RepositoryTrackerFigure, SocialPostFigure } from "./tools";
+import { ChartDataTable, DataProjectFigure, EventView, FinalScoreView, finalScoreDetails, MediaChapters, NativeChart, RepositoryTrackerFigure, SocialPostFigure } from "./tools";
 
 /**
  * The canonical renderer for a `byline-v1` body. It reads only the semantic
@@ -91,6 +91,14 @@ export type ArticleRenderHost = {
   renderInteractive?: (block: ArticleBlockOf<"repositoryInteractive">) => ReactNode;
   /** A registered repository tracker's server-rendered content. */
   renderTracker?: (block: ArticleBlockOf<"repositoryTracker">) => ReactNode;
+  /**
+   * A published Data Project drawn by the host: its heading, description,
+   * the project's own server-rendered presentation and its notes. The host
+   * resolves the project from the same published Data the project's page
+   * uses; this renderer never imports Data, Payload or a presentation. A
+   * harness without a Data host gets the story's own words, no data.
+   */
+  renderDataProject?: (block: ArticleBlockOf<"dataProject">) => ReactNode;
   /** True in a private preview: social posts keep their facade and never offer to load. */
   preview?: boolean;
 };
@@ -615,6 +623,14 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
       </RepositoryTrackerFigure>
     </ArticleBlockFrame>
   ),
+  dataProject: ({ block, context }) => {
+    if (block.project === null) return null;
+    return (
+      <ArticleBlockFrame type="dataProject" placement="wide">
+        {context.host.renderDataProject ? context.host.renderDataProject(block) : <DataProjectFigure headingId={`${block.id}-heading`} title={block.title} description={block.description} />}
+      </ArticleBlockFrame>
+    );
+  },
   event: ({ block, context }) => {
     const event = block.event === null ? null : context.references.events?.[mediaKey(block.event)];
     if (!event) return null;

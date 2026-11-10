@@ -76,7 +76,7 @@ describe("references in the normalizer", () => {
   const related = (...ids: Array<MediaId | null>): ArticleBlock => ({ ...FIXTURE_BLOCKS.relatedCoverage, stories: ids.map((story, i) => ({ id: `s${i}`, story })) });
 
   it("collects the Stories, Polls and Events a body names", () => {
-    expect(collectReferenceIds(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY))).toEqual({ stories: [501, 502], polls: [601], events: [701] });
+    expect(collectReferenceIds(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY))).toEqual({ stories: [501, 502], polls: [601], events: [701], dataProjects: [] });
   });
 
   it("resolves public-safe facts into the body, never copying them into the block", () => {

@@ -246,6 +246,7 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
   poll: { type: "poll", id: "blk-poll", poll: 601 },
   repositoryInteractive: { type: "repositoryInteractive", id: "blk-interactive", key: FIXTURE_INTERACTIVE_KEY, title: "Build your own lunch schedule", description: "A calculator that shows how a change in period length changes the longest wait." },
   repositoryTracker: { type: "repositoryTracker", id: "blk-tracker", key: FIXTURE_TRACKER_KEY, title: "Where the sidewalk project stands", description: "The Main Street sidewalk project has finished two of its five phases; the crossing at Greenwood High is next." },
+  dataProject: { type: "dataProject", id: "blk-data-project", project: 1, title: "Where the sidewalk project stands", description: "Milestones, funding and the work still left to do on the Main Street sidewalk." },
   event: { type: "event", id: "blk-event", event: 701 },
   socialPost: { type: "socialPost", id: "blk-social", url: "https://www.instagram.com/p/C0ffEeLunch1/", provider: "instagram", postId: "C0ffEeLunch1", caption: "The student council posted its survey results on Instagram the morning they were released." },
   finalScore: { type: "finalScore", id: "blk-score", sport: "Football", teamA: "Greenwood", teamAScore: 42, teamB: "Abbeville", teamBScore: 14, status: "final", date: "2025-10-17", location: "Wildcat Stadium", note: "Region championship" }

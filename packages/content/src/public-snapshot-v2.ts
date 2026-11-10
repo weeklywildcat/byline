@@ -8,7 +8,8 @@ import { stableSerialize } from "./digests";
 import { publicStoryPath } from "./publication-dates";
 import { escapeHtml, type PublicStory, type PublicTerm } from "./story";
 
-export const PUBLIC_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+/** Snapshot v2's wire version. The current producer writes v3 (`public-snapshot-v3.ts`); builds still accept v2. */
+export const PUBLIC_SNAPSHOT_V2_SCHEMA_VERSION = 2 as const;
 export const PUBLIC_POLL_MIN_RESULTS_VOTES = 5;
 
 const text = z.string();
@@ -112,7 +113,7 @@ const datasets = obj({
  */
 const frontPage = obj({ placements: z.record(z.string().regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/).max(80), id), activatedAt: instant });
 export const publicBuildSnapshotV2Schema = obj({
-  schemaVersion: z.literal(PUBLIC_SNAPSHOT_SCHEMA_VERSION), revision: count, generatedAt: instant, publication, datasets,
+  schemaVersion: z.literal(PUBLIC_SNAPSHOT_V2_SCHEMA_VERSION), revision: count, generatedAt: instant, publication, datasets,
   counts: z.record(datasets.keyof(), count),
   frontPage: frontPage.optional()
 });
@@ -132,10 +133,25 @@ const requireFact = (condition: unknown, detail: string) => {
 };
 const same = (left: unknown, right: unknown) => stableSerialize(left) === stableSerialize(right);
 
-export function validatePublicBuildSnapshotV2(value: unknown, options: { interactive?: (key: string) => boolean; tracker?: (key: string) => boolean } = {}): PublicBuildSnapshotV2 {
+export type SnapshotRegistryOptions = { interactive?: (key: string) => boolean; tracker?: (key: string) => boolean };
+
+/** Snapshot v2 and v3 share these sections; v3 only adds `data`. */
+export const snapshotSchemaParts = { publication, datasets, frontPage, instant, count } as const;
+
+export function validatePublicBuildSnapshotV2(value: unknown, options: SnapshotRegistryOptions = {}): PublicBuildSnapshotV2 {
   const result = publicBuildSnapshotV2Schema.safeParse(value);
   if (!result.success) throw new Error(`Invalid Byline build snapshot: ${result.error.issues.slice(0, 6).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
   const snapshot = value as PublicBuildSnapshotV2;
+  validateSnapshotFacts(snapshot, options);
+  return snapshot;
+}
+
+/**
+ * The runtime invariants every snapshot version shares (IDs, counts, routes,
+ * relationships, bodies, Media, Front Page). `beforeRedirects` lets a newer
+ * version claim its own routes before redirect targets are checked.
+ */
+export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "schemaVersion">, options: SnapshotRegistryOptions = {}, hooks: { beforeRedirects?: (claim: (path: string) => void, stories: ReadonlySet<number>) => void; dataProjects?: ReadonlySet<number> } = {}): void {
   const { publication, datasets: data } = snapshot;
   requireFact(publication.revision === snapshot.revision, "publication revision differs");
   try {
@@ -280,9 +296,12 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
     }
     for (const node of row.body.nodes) {
       if (node.type === "repositoryInteractive" && options.interactive) requireFact(options.interactive(node.key), `Story ${row.id} uses unregistered interactive ${node.key}`);
+      // Defense in depth: a Data Project block must name a project this same snapshot publishes (v2 has no Data at all).
+      if (node.type === "dataProject") requireFact(typeof node.project === "number" && hooks.dataProjects?.has(node.project), `Story ${row.id} embeds Data Project ${String(node.project)}, which is not in this snapshot's Data section`);
       if (node.type === "repositoryTracker" && options.tracker) requireFact(options.tracker(node.key), `Story ${row.id} uses unregistered tracker ${node.key}`);
     }
   }
+  hooks.beforeRedirects?.(claim, new Set(stories.keys()));
   const fixedDestinations = new Set(FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path));
   for (const row of data.redirects) {
     requireFact(!isCodeOwnedPublicPath(row.from), `redirect source ${row.from} is reserved`);
@@ -295,7 +314,6 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: { interac
     for (const storyId of placed) requireFact(stories.has(storyId), `front page places Story ${storyId}, which is not in the snapshot`);
     requireFact(new Set(placed).size === placed.length, "front page places a Story twice");
   }
-  return snapshot;
 }
 
 export function publicSnapshotContributor(person: PublicPersonSnapshot): PublicStory<number>["contributors"][number] {

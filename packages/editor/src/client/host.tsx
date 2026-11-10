@@ -2,6 +2,7 @@
 
 import type { ArticleMediaAsset, MediaId, PublicEventReference, PublicPollReference, PublicStoryReference } from "@byline/article-body";
 import { mediaKey } from "@byline/article-body";
+import type { DataProjectChoice } from "../data-project";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 /**
@@ -56,6 +57,24 @@ export type BylineEditorHost = {
   searchEvents?: (query: string) => Promise<EventChoice[]>;
   /** One Event's public facts, or null when it is not published or is gone. */
   loadEvent?: (id: MediaId) => Promise<EventChoice | null>;
+  /**
+   * Data Projects a writer may place in a story: searchable, ordered by
+   * publication (published, then unpublished changes, then drafts). Small
+   * choices only, never a project's rows, bindings or presentation code.
+   */
+  searchDataProjects?: (query: string) => Promise<DataProjectChoice[]>;
+  /** One Data Project's choice facts, or null when it is gone or this account cannot read it. */
+  loadDataProject?: (id: MediaId) => Promise<DataProjectChoice | null>;
+  /** Opens the Data Project in the Data workspace. */
+  dataProjectHref?: (id: MediaId) => string;
+  /** The Data workspace itself (a quiet link in the picker; projects are never created from a story). */
+  dataWorkspaceHref?: string;
+  /**
+   * The real presentation of a Data Project, drawn by the host (the editor
+   * never imports Data, Next or Payload). Published data when the project has
+   * a published version, working data when it is only a draft.
+   */
+  renderDataProject?: (project: DataProjectChoice) => ReactNode;
   /** The publication's timezone and locale, for event times on the canvas. */
   timeZone?: string;
   locale?: string;
@@ -69,6 +88,8 @@ export type BylineEditorHost = {
 
 /** Inserts one Byline block with initial fields where the writer is; false when the editor is read-only. */
 export type StoryBlockInserter = (type: "reportedQuote", fields: Record<string, unknown>) => boolean;
+
+export type { DataProjectChoice, DataProjectPublication } from "../data-project";
 
 /** A published Story as the picker and the canvas show it. Facts come from the Story, never from the block. */
 export type StoryChoice = PublicStoryReference & { thumbnailAsset?: ArticleMediaAsset | null };
@@ -87,7 +108,7 @@ type RecordStore<T> = {
 
 type MediaStore = RecordStore<ArticleMediaAsset> & { primeAssets: (assets: ArticleMediaAsset[]) => void };
 
-type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; events: RecordStore<EventChoice>; announce: (message: string) => void };
+type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; events: RecordStore<EventChoice>; dataProjects: RecordStore<DataProjectChoice>; announce: (message: string) => void };
 
 const HostContext = createContext<EditorHostContext | null>(null);
 
@@ -135,6 +156,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
   const stories = useMemo(() => createRecordStore<StoryChoice>(async (id) => (await hostRef.current.loadStory?.(id)) ?? null), []);
   const polls = useMemo(() => createRecordStore<PollChoice>(async (id) => (await hostRef.current.loadPoll?.(id)) ?? null), []);
   const events = useMemo(() => createRecordStore<EventChoice>(async (id) => (await hostRef.current.loadEvent?.(id)) ?? null), []);
+  const dataProjects = useMemo(() => createRecordStore<DataProjectChoice>(async (id) => (await hostRef.current.loadDataProject?.(id)) ?? null), []);
   // One polite live region for block edits (added, moved, removed): decorators render
   // through portals, so the announcer lives here, above the editor.
   const [message, setMessage] = useState("");
@@ -142,7 +164,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
     setMessage("");
     window.requestAnimationFrame(() => setMessage(next));
   }, []);
-  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, events, announce }), [announce, events, host, polls, stories, store]);
+  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, events, dataProjects, announce }), [announce, dataProjects, events, host, polls, stories, store]);
   return (
     <HostContext value={value}>
       {children}
@@ -189,6 +211,13 @@ export function useEventChoice(id: MediaId | null): Entry<EventChoice> {
   const { events } = useBylineEditorHost();
   const read = useCallback(() => (id === null ? MISSING_NONE : events.get(id)), [id, events]);
   return useSyncExternalStore(events.subscribe, read, read);
+}
+
+/** One Data Project's choice facts for display, loaded once. */
+export function useDataProjectChoice(id: MediaId | null): Entry<DataProjectChoice> {
+  const { dataProjects } = useBylineEditorHost();
+  const read = useCallback(() => (id === null ? MISSING_NONE : dataProjects.get(id)), [id, dataProjects]);
+  return useSyncExternalStore(dataProjects.subscribe, read, read);
 }
 
 /** Picks media through Byline's picker and primes the cache with what was chosen. */

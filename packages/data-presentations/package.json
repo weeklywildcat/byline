@@ -1,0 +1,31 @@
+{
+  "name": "@byline/data-presentations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Byline Data's presentation SDK: defineDataTemplate (reusable, chosen in the newsroom) and defineDataPresentation (one project's repository-coded experience), the registry and its plain descriptors, the deterministic prepare step and the shared DataProjectView host. The built-in templates use exactly the same contract. Depends on React and @byline/data only: never Payload, Next or Astro, and no bundler-specific imports (each host loads styles.css and client.ts itself).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sdk": "./src/sdk.ts",
+    "./registry": "./src/registry.ts",
+    "./client": "./src/client.ts",
+    "./data-project.css": "./src/data-project.css",
+    "./data-embed.css": "./src/data-embed.css",
+    "./templates/*": "./src/templates/*",
+    "./presentations/*": "./src/presentations/*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@byline/data": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "react-dom": "19.2.7",
+    "vitest": "4.1.12"
+  }
+}

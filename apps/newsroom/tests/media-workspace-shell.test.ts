@@ -11,7 +11,7 @@ const src = (file: string) => readFileSync(path.join(root, "src", file), "utf8")
 
 describe("Media in the newsroom", () => {
   it("is a destination after Calendar, for everyone, with no Planning and no raw Media collection", () => {
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data"]);
     expect(NAVIGATION.find((item) => item.key === "media")).toEqual({ key: "media", label: "Media", path: "/media", minimumRole: "staff" });
     expect(navigationFor("staff").some((item) => item.path.startsWith("/collections/"))).toBe(false);
     expect(locationFor("/admin/media", "/admin")).toEqual([{ label: "Media" }]);

@@ -21,7 +21,7 @@ import {
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_TRACKER_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
-const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
+const refs = { dataProject: (id: number | string) => (String(id) === "1" ? { id } : null), story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceDir = join(import.meta.dirname, "../src");
 
 it("collapses whitespace around line feeds and preserves other spacing", () => {

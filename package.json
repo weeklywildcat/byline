@@ -12,7 +12,7 @@
     "typecheck:packages": "tsc --noEmit -p tsconfig.packages.json",
     "typecheck:frontend": "npm run typecheck --workspace @byline/web",
     "test": "npm run test:packages && npm run test:frontend && npm run test:newsroom",
-    "test:packages": "npm run test:packages --workspace @byline/web && npm run test:admin-runtime && npm run test:newsroom-screens && npm run test:article-body && npm run test:editor",
+    "test:packages": "npm run test:packages --workspace @byline/web && npm run test:admin-runtime && npm run test:newsroom-screens && npm run test:article-body && npm run test:editor && npm run test:data",
     "test:newsroom-screens": "npm run test --workspace @byline/newsroom-screens",
     "test:article-body": "npm run test --workspace @byline/article-body",
     "test:editor": "npm run test --workspace @byline/editor",
@@ -23,13 +23,15 @@
     "build:frontend": "npm run build --workspace @byline/web",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "story-presentation": "node scripts/story-presentation.mjs",
-    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-shared-style-contracts.mjs && node --test scripts/story-presentation.test.mjs scripts/repository-tracker.test.mjs",
+    "data-presentation": "node scripts/data-presentation.mjs",
+    "verify:contracts": "node scripts/verify-monorepo-contracts.mjs && node scripts/verify-shared-style-contracts.mjs && node --test scripts/story-presentation.test.mjs scripts/repository-tracker.test.mjs scripts/data-presentation.test.mjs",
     "dev:newsroom": "npm run dev --workspace @byline/newsroom",
     "typecheck:newsroom": "npm run typecheck --workspace @byline/newsroom",
     "test:newsroom": "npm run test --workspace @byline/newsroom",
     "test:newsroom:integration": "npm run test:integration --workspace @byline/newsroom",
     "tracker": "node scripts/repository-tracker.mjs",
-    "deploy:newsroom": "bash scripts/deploy-newsroom.sh"
+    "deploy:newsroom": "bash scripts/deploy-newsroom.sh",
+    "test:data": "npm run test --workspace @byline/data && npm run test --workspace @byline/data-presentations"
   },
   "devDependencies": {
     "@types/react": "19.2.18",

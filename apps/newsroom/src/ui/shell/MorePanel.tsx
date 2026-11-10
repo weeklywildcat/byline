@@ -55,7 +55,7 @@ export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, after
     <div className="grid gap-4 px-2 pb-2">
       <MoreGroup title="Workspaces">
         <MoreLink href={`${admin}/field`} label="Field Mode" icon={NotebookPen} follow={follow} />
-        {items.filter((item) => item.key === "media" || item.key === "collections").map(link)}
+        {items.filter((item) => item.key === "media" || item.key === "collections" || item.key === "data").map(link)}
       </MoreGroup>
       {team && (
         <MoreGroup title="Team">

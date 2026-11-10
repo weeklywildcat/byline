@@ -1,0 +1,20 @@
+/*
+ * The frame a Data Project gets inside a Story (DataProjectEmbedView): the
+ * Story's own heading and description, the presentation, and a compact source
+ * and update line. Presentation-specific styles live in each presentation's
+ * styles.css, scoped under .data-presentation-<key>. Hairlines and type, no
+ * boxes; the tokens are the article's own.
+ */
+.data-project-embed { margin: 0; min-width: 0; padding: 14px 0 0; border-block-start: 1px solid var(--rule-strong, #121212); }
+.data-project-embed-kicker { color: var(--accent, #73192a); font-family: var(--font-ui, system-ui, sans-serif); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; margin: 0 0 0.5em; text-transform: uppercase; }
+.data-project-embed .data-project-embed-title { margin-block-start: 0; font-family: var(--font-headline, inherit); font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem); font-weight: 600; letter-spacing: -0.012em; line-height: 1.14; margin: 0 0 0.3em; text-wrap: balance; }
+.data-project-embed .data-project-embed-description { color: var(--muted, #545454); font-family: var(--font-serif, Georgia, serif); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.1rem; max-width: 40em; text-wrap: pretty; }
+.data-project-embed .data-project-body { min-width: 0; }
+.data-project-embed-notes { border-block-start: 1px solid var(--rule, #e2e2e2); color: var(--muted, #545454); font-family: var(--font-ui, system-ui, sans-serif); font-size: 0.85rem; margin-block-start: 1.1rem; padding-block-start: 10px; }
+.data-project-embed-notes p { margin: 0; }
+.data-project-embed-notes p + p { margin-block-start: 0.25rem; }
+.data-project-embed-notes a { color: var(--ink, #121212); font-weight: 700; }
+.data-project-embed-notes a:hover, .data-project-embed-notes a:focus-visible { color: var(--accent, #73192a); }
+@media (prefers-reduced-motion: reduce) {
+  .data-project-embed *, .data-project-embed *::before, .data-project-embed *::after { animation: none !important; transition: none !important; }
+}

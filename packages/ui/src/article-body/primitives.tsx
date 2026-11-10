@@ -34,6 +34,7 @@ export function articleBlockPlacement(block: { type: ArticleBlockType; placement
     case "chartMap":
     case "repositoryInteractive":
     case "repositoryTracker":
+    case "dataProject":
       return "wide";
     default:
       return "column";

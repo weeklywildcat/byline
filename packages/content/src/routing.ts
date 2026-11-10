@@ -1,5 +1,5 @@
 export type RouteKind =
-  | "home" | "article" | "page" | "category" | "author" | "coverage"
+  | "home" | "article" | "page" | "category" | "author" | "coverage" | "data"
   | "redirect" | "sports" | "search" | "feed" | "sitemap" | "robots" | "not-found" | "other";
 
 export type RouteManifestEntry = {
@@ -42,6 +42,8 @@ export const FIXED_PUBLIC_CONTENT_ROUTES: readonly RouteManifestEntry[] = [
   { path: "/staff/", kind: "author" },
   { path: "/corrections/", kind: "other" },
   { path: "/coverage/", kind: "coverage" },
+  // Byline Data: the index of published Data Projects; each project is /data/<slug>/.
+  { path: "/data/", kind: "data" },
   ...CODE_ROUTED_PAGE_SLUGS.map((slug): RouteManifestEntry => ({ path: `/${slug}/`, kind: "page" })),
   { path: "/media-kit/", kind: "page" },
   { path: "/open-source/", kind: "page" },

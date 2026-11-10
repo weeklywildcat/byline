@@ -273,6 +273,13 @@ export type PollBlock = { type: "poll"; id: string; poll: MediaId | null };
 export type RepositoryInteractiveBlock = { type: "repositoryInteractive"; id: string; key: string; title: string; description: string };
 /** A registered, repository-owned tracker. Its content and design live in the repository; the article stores only the key and editorial text. */
 export type RepositoryTrackerBlock = { type: "repositoryTracker"; id: string; key: string; title: string; description: string };
+/**
+ * A published Byline Data Project, by its stable ID. The project's rows,
+ * bindings, releases, settings and presentation are never copied: the host
+ * resolves them from the published Data Project when the story renders. Only
+ * the article-facing heading and description belong to this story.
+ */
+export type DataProjectBlock = { type: "dataProject"; id: string; project: MediaId | null; title: string; description: string };
 /** A published school or community Event. Facts come from `references.events`; nothing is copied. */
 export type EventBlock = { type: "event"; id: string; event: MediaId | null };
 
@@ -330,6 +337,7 @@ export type ArticleBlock =
   | PollBlock
   | RepositoryInteractiveBlock
   | RepositoryTrackerBlock
+  | DataProjectBlock
   | EventBlock
   | SocialPostBlock
   | FinalScoreBlock;
@@ -401,6 +409,12 @@ export type PublicEventReference = {
   externalUrl?: string;
   eventStatus: "scheduled" | "canceled";
 };
+
+/**
+ * A Data Project the host confirmed is published. Deliberately only the ID:
+ * the story never carries the project's rows, bindings, releases or settings.
+ */
+export type PublicDataProjectReference = { id: MediaId };
 
 /** Public-safe facts about other records the nodes name, keyed by `String(id)`. Never private data. */
 export type ArticleReferences = {

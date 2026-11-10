@@ -15,7 +15,7 @@ import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from
  * `Cache-Control: private, no-store`, and does not exist (404) without a
  * configured token.
  *
- * - `GET /api/byline/build/snapshot`: a cheap pointer read. 200 with the v1
+ * - `GET /api/byline/build/snapshot`: a cheap pointer read. 200 with the
  *   pointer when a completed snapshot exists for the CURRENT revision, schema
  *   and producer; 503 `byline_snapshot_not_ready` (the only condition that
  *   permits direct-source recovery) when it does not; 500
@@ -42,8 +42,21 @@ function buildBase(req: PayloadRequest): string {
   return url.origin;
 }
 
+/**
+ * Schema negotiation: a build names the wire versions it can read in
+ * `X-Byline-Snapshot-Versions` (e.g. `2,3`). A newsroom that only has a
+ * version the build can't read refuses with 406 instead of handing it bytes
+ * it would reject. A build that sends nothing is served as before.
+ */
+export function refuseUnsupportedSchema(req: Pick<PayloadRequest, "headers">, schemaVersion: number): Response | null {
+  const header = req.headers?.get?.("x-byline-snapshot-versions");
+  if (!header) return null;
+  const versions = header.split(",").map((entry) => Number(entry.trim())).filter(Number.isSafeInteger);
+  return versions.includes(schemaVersion) ? null : buildRefusal(406, { code: "byline_snapshot_schema_unsupported", message: `This newsroom produces Snapshot v${schemaVersion}; the build reads ${versions.map((entry) => `v${entry}`).join(", ") || "nothing"}.`, schemaVersion });
+}
+
 export async function serveSnapshotDiscovery(req: PayloadRequest): Promise<Response> {
-  const refused = authenticateBuildRequest(req);
+  const refused = authenticateBuildRequest(req) ?? refuseUnsupportedSchema(req, PUBLIC_SNAPSHOT_SCHEMA_VERSION);
   if (refused) return refused;
   const state = await readPublicationState(req.payload);
   if (state.pointerCorrupt) {
@@ -85,7 +98,7 @@ export async function serveSnapshotArtifact(req: PayloadRequest, store = new Sna
 }
 
 export async function serveDirectSnapshot(req: PayloadRequest, options: { afterCollect?: () => Promise<void> } = {}): Promise<Response> {
-  const refused = authenticateBuildRequest(req);
+  const refused = authenticateBuildRequest(req) ?? refuseUnsupportedSchema(req, PUBLIC_SNAPSHOT_SCHEMA_VERSION);
   if (refused) return refused;
   const raw = (req.searchParams ?? new URLSearchParams()).get("revision") ?? "";
   if (!/^\d{1,16}$/.test(raw) || !Number.isSafeInteger(Number(raw))) return buildRefusal(400, { code: "byline_snapshot_revision_required", message: "Pass the current public revision from discovery: ?revision=R." });

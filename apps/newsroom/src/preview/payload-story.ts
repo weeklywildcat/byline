@@ -226,7 +226,10 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
         // Live Preview populates relationships from the published Event (draft: false reads); a draft Event never resolves.
         event: (id) => publicEventReference(records.events.get(mediaKey(id))),
         interactive: (key) => interactiveKeys.has(key),
-        tracker: (key) => trackerKeys.has(key)
+        tracker: (key) => trackerKeys.has(key),
+        // Live Preview always draws the block and states the project's publication state itself (PreviewDataProject);
+        // whether the story can publish is decided on the server and in the editor, never by what happened to be populated here.
+        dataProject: (id) => ({ id })
       }
     }
   );

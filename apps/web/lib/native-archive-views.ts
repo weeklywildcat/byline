@@ -1,10 +1,10 @@
-import { largestNaturalImage, legacyRenditionsFromManifest, publicationLocalMinute, publicationUtcDateTime, publicationLocalDateTime, type PublicBuildSnapshotV2, type PublicMediaSnapshot, type PublicPersonSnapshot } from "@byline/content";
+import { largestNaturalImage, legacyRenditionsFromManifest, publicationLocalMinute, publicationUtcDateTime, publicationLocalDateTime, type PublicBuildSnapshot, type PublicMediaSnapshot, type PublicPersonSnapshot } from "@byline/content";
 import { escapeHtml } from "@byline/content/story";
 import type { SchoolEvent } from "./headless";
 import { getNativeSnapshot } from "./native-snapshot";
 import type { ArchiveAuthor, ArchiveCategory, ArchiveGuestContributor, ArchiveMedia, ArchivePage, ArchivePost, ArchiveTag } from "./public-content";
 
-type NativeLiveCoverage = PublicBuildSnapshotV2["datasets"]["stories"][number]["live"];
+type NativeLiveCoverage = PublicBuildSnapshot["datasets"]["stories"][number]["live"];
 type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt"> & { updates?: unknown[] };
 
 /**
@@ -21,7 +21,7 @@ export function archiveLiveState(live: ArchiveLiveState | null) {
  * directory. Canonical article rendering reads native Stories directly.
  * This adapter is local to the web app and never serializes a structured body.
  */
-export function nativeArchiveViews({ datasets, publication }: PublicBuildSnapshotV2) {
+export function nativeArchiveViews({ datasets, publication }: PublicBuildSnapshot) {
   const site = publication.urls.publicSite.replace(/\/+$/, "");
   const local = (iso: string) => publicationLocalDateTime(iso, publication.timezone);
   const media = new Map(datasets.media.map((entry) => [entry.id, entry]));
@@ -128,7 +128,7 @@ function archiveImage(entry: PublicMediaSnapshot, caption: string): ArchiveMedia
   };
 }
 
-export function nativeUpcomingEvents(snapshot: PublicBuildSnapshotV2, limit: number, now = new Date()): SchoolEvent[] {
+export function nativeUpcomingEvents(snapshot: PublicBuildSnapshot, limit: number, now = new Date()): SchoolEvent[] {
   const { locale, timezone: timeZone } = snapshot.publication;
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
   const time = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });

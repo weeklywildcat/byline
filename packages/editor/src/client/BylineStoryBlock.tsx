@@ -3,6 +3,7 @@
 import { isArticleBlockType, type ArticleBlockType } from "@byline/article-body";
 import { useBlockComponentContext } from "@payloadcms/richtext-lexical/client";
 import type { ComponentType } from "react";
+import { DataProjectEditor } from "./blocks/data-project";
 import { DocumentEditor } from "./blocks/document";
 import { AudioEditor, ChartMapEditor, RepositoryInteractiveEditor, RepositoryTrackerEditor, VideoEditor } from "./blocks/embeds";
 import { ComparisonEditor, EditorsNoteEditor, ExpandableEditor, KeyNumbersEditor, MarginNoteEditor } from "./blocks/explain";
@@ -48,6 +49,7 @@ export const BLOCK_EDITORS: { readonly [K in ArticleBlockType]: ComponentType<Bl
   poll: PollEditor,
   repositoryInteractive: RepositoryInteractiveEditor,
   repositoryTracker: RepositoryTrackerEditor,
+  dataProject: DataProjectEditor,
   event: EventEditor,
   socialPost: SocialPostEditor,
   finalScore: FinalScoreEditor

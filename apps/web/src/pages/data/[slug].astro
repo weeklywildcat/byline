@@ -1,0 +1,28 @@
+---
+import "@byline/data-presentations/data-project.css";
+import { getBuildSnapshot } from "@/lib/build-snapshot";
+import { hasDataPresentationClient } from "@/lib/data-presentation-client";
+import { publicDataPresentationRegistry } from "@/lib/native-snapshot";
+import { publicDataProjects } from "@/lib/public-data";
+import { routeCacheKey } from "@/lib/route-cache";
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/data/[slug]/page";
+export async function getStaticPaths() {
+  const snapshot = await getBuildSnapshot();
+  return publicDataProjects().map((project) => ({ params: { slug: project.slug }, cacheKey: routeCacheKey(snapshot, "data", project.slug) }));
+}
+const params = { slug: Astro.params.slug! };
+const project = publicDataProjects().find((entry) => entry.slug === params.slug)!;
+const descriptor = publicDataPresentationRegistry()[project.presentation.key]?.descriptor;
+// A presentation that declares a client.ts it doesn't have fails the build: never a silently inert page.
+if (!descriptor || (descriptor.client && !hasDataPresentationClient(descriptor.kind, descriptor.key))) throw new Error(`Data project ${project.slug} has no public host for presentation ${project.presentation.key}`);
+const metadata = await getMetadata({ params: Promise.resolve(params) });
+---
+<BaseLayout metadata={metadata}>
+  <Page params={Promise.resolve(params)} />
+  <script>
+    // Only a presentation with a client.ts downloads the loader and its own chunk; the page is complete without either.
+    const article = document.querySelector<HTMLElement>("[data-data-client] [data-data-presentation]");
+    if (article) import("@/lib/data-presentation-client").then(({ startPublicDataPresentation }) => startPublicDataPresentation(article));
+  </script>
+</BaseLayout>

@@ -2,6 +2,7 @@ import type { CollectionConfig } from "payload";
 import { sql } from "@payloadcms/db-postgres";
 import { drizzleFor } from "../publication-media/state";
 import { withPublicChangeTracking, type PublicSlice, type PublicTrackingOptions } from "./revision";
+import { dataProjectPublicSlice } from "../data/collections";
 import {
   collectionPublicSlice,
   correctionPublicSlice,
@@ -50,7 +51,10 @@ export const PUBLIC_COLLECTIONS: Record<string, { slice: PublicSlice; options?: 
   polls: { slice: pollPublicSlice },
   "live-updates": { slice: liveUpdatePublicSlice },
   "video-facts": { slice: videoFactsPublicSlice },
-  media: { slice: mediaPublicSlice, options: { ignoreCreate: true } }
+  media: { slice: mediaPublicSlice, options: { ignoreCreate: true } },
+  // Byline Data: a published project's main row. Datasets and rows are working data; a release
+  // advances the revision itself, in its promotion's transaction (data/releases.ts).
+  "data-projects": { slice: dataProjectPublicSlice }
 };
 
 /** Adds public change tracking to a collection that participates in the public projection. */

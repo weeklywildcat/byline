@@ -1,0 +1,777 @@
+{
+  "schemaVersion": 3,
+  "revision": 7,
+  "generatedAt": "2026-11-10T15:00:00.000Z",
+  "publication": {
+    "schemaVersion": 1,
+    "revision": 7,
+    "identity": {
+      "name": "Weekly Wildcat",
+      "shortName": "Weekly Wildcat",
+      "description": "Student journalism from the Weekly Wildcat newsroom in Ninety Six, South Carolina.",
+      "organizationName": "Ninety Six High School",
+      "tagline": "Ninety Six High School's Official Student Newspaper"
+    },
+    "location": {
+      "display": "Ninety Six, S.C.",
+      "city": "Ninety Six",
+      "region": "South Carolina",
+      "country": "US",
+      "address": "640 South Cambridge Street, Ninety Six, SC"
+    },
+    "locale": "en-US",
+    "timezone": "America/New_York",
+    "urls": {
+      "publicSite": "https://weeklywildcat.com",
+      "cms": "https://byline.weeklywildcat.com",
+      "contact": "/contact/"
+    },
+    "branding": {
+      "masthead": {
+        "url": "/brand/weekly-wildcat-wide-logo.svg",
+        "alt": "Weekly Wildcat",
+        "width": null,
+        "height": null
+      },
+      "logo": {
+        "url": "/brand/weekly-wildcat-logo.svg",
+        "alt": "Weekly Wildcat",
+        "width": null,
+        "height": null
+      },
+      "organizationLogo": {
+        "url": "/organization-logo.png",
+        "alt": "Ninety Six High School",
+        "width": 1024,
+        "height": 1024
+      },
+      "icons": [
+        {
+          "url": "/favicon-32.png",
+          "alt": "",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "url": "/icon-192.png",
+          "alt": "",
+          "width": 192,
+          "height": 192
+        },
+        {
+          "url": "/icon-512.png",
+          "alt": "",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "url": "/apple-touch-icon.png",
+          "alt": "",
+          "width": 180,
+          "height": 180
+        }
+      ],
+      "defaultSocialImage": {
+        "url": "/media-kit/open-graph-social.png",
+        "alt": "Weekly Wildcat",
+        "width": 1200,
+        "height": 600
+      }
+    },
+    "appearance": {
+      "theme": "weekly-wildcat",
+      "tokenOverrides": {}
+    },
+    "sections": [
+      {
+        "name": "News",
+        "slug": "news",
+        "description": "News from Ninety Six High School and the Ninety Six community, reported by Weekly Wildcat student journalists.",
+        "active": true
+      },
+      {
+        "name": "Sports",
+        "slug": "sports",
+        "description": "Scores, results and reporting on Ninety Six High School Wildcats athletics from the Weekly Wildcat.",
+        "active": true
+      },
+      {
+        "name": "Opinion",
+        "slug": "opinion",
+        "description": "Editorials, columns and student voices on life at Ninety Six High School and beyond.",
+        "active": true
+      },
+      {
+        "name": "Features",
+        "slug": "features",
+        "description": "People, programs and stories from Ninety Six High School and the community around it.",
+        "active": true
+      },
+      {
+        "name": "Arts & Culture",
+        "slug": "culture",
+        "description": "Theater, music, art and the creative life of Ninety Six High School and the Ninety Six community.",
+        "active": true
+      }
+    ],
+    "navigation": [
+      {
+        "label": "News",
+        "url": "/category/news/",
+        "locations": [
+          "header"
+        ]
+      },
+      {
+        "label": "Sports",
+        "url": "/category/sports/",
+        "locations": [
+          "header"
+        ],
+        "feature": "sports"
+      },
+      {
+        "label": "Opinion",
+        "url": "/category/opinion/",
+        "locations": [
+          "header"
+        ]
+      },
+      {
+        "label": "Features",
+        "url": "/category/features/",
+        "locations": [
+          "header"
+        ]
+      },
+      {
+        "label": "News",
+        "url": "/category/news/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Columns"
+      },
+      {
+        "label": "Features",
+        "url": "/category/features/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Columns"
+      },
+      {
+        "label": "Opinion",
+        "url": "/category/opinion/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Columns"
+      },
+      {
+        "label": "Arts & Culture",
+        "url": "/category/culture/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Columns"
+      },
+      {
+        "label": "Sports",
+        "url": "/category/sports/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Columns",
+        "feature": "sports"
+      },
+      {
+        "label": "Terms & Service",
+        "url": "/terms/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Policies"
+      },
+      {
+        "label": "Privacy Policy",
+        "url": "/privacy/",
+        "locations": [
+          "footer"
+        ],
+        "group": "Policies"
+      },
+      {
+        "label": "About us",
+        "url": "/about/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Media Kit",
+        "url": "/media-kit/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Open Source",
+        "url": "/open-source/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Advertise with Us",
+        "url": "/advertise/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Join our team",
+        "url": "/join/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Staff",
+        "url": "/staff/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      },
+      {
+        "label": "Diversity & Inclusion",
+        "url": "/diversity-inclusion/",
+        "locations": [
+          "footer"
+        ],
+        "group": "About"
+      }
+    ],
+    "social": [
+      {
+        "service": "instagram",
+        "label": "Instagram",
+        "url": "https://www.instagram.com/theweeklywildcat"
+      },
+      {
+        "service": "tiktok",
+        "label": "TikTok",
+        "url": "https://www.tiktok.com/@weeklywildcat"
+      }
+    ],
+    "features": {
+      "sports": true,
+      "events": true,
+      "polls": true,
+      "newsletter": true,
+      "discord": true
+    },
+    "licensing": {
+      "copyrightNotice": "© Weekly Wildcat",
+      "imageLicenseUrl": "/image-license/",
+      "acquireLicensePage": "/image-license/"
+    },
+    "seo": {
+      "defaultTitle": "Weekly Wildcat",
+      "defaultDescription": "Student journalism from the Weekly Wildcat newsroom in Ninety Six, South Carolina.",
+      "organizationType": "Organization"
+    }
+  },
+  "datasets": {
+    "stories": [
+      {
+        "id": 9001,
+        "slug": "where-the-sidewalk-stands",
+        "title": "Where the sidewalk stands",
+        "titleHtml": "Where the sidewalk stands",
+        "kicker": "",
+        "excerptHtml": "Data inside a story.",
+        "href": "/2026/11/10/news/where-the-sidewalk-stands/",
+        "url": "https://weeklywildcat.com/2026/11/10/news/where-the-sidewalk-stands/",
+        "publishedAt": "2026-11-10T14:05:00.000Z",
+        "modifiedAt": "2026-11-10T14:05:00.000Z",
+        "body": {
+          "format": "byline-v1",
+          "version": 1,
+          "media": {},
+          "nodes": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Crews have been working on Main Street since spring."
+                }
+              ]
+            },
+            {
+              "type": "dataProject",
+              "id": "embed-sidewalk",
+              "project": 1,
+              "title": "Where the sidewalk project stands",
+              "description": "Two of five phases are done; the crossing at Greenwood High is next."
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Meanwhile, the bands competed."
+                }
+              ]
+            },
+            {
+              "type": "dataProject",
+              "id": "embed-bands",
+              "project": 2,
+              "title": "How the bands ranked",
+              "description": "Every marching band's score from the fall competition."
+            },
+            {
+              "type": "dataProject",
+              "id": "embed-again",
+              "project": 1,
+              "title": "The same project, a second time",
+              "description": "A story may place one project more than once."
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "That is where things stand."
+                }
+              ]
+            }
+          ]
+        },
+        "image": null,
+        "leadCaption": "",
+        "section": {
+          "key": "section-1",
+          "name": "News",
+          "href": "/category/news/"
+        },
+        "sections": [
+          {
+            "key": "section-1",
+            "name": "News",
+            "href": "/category/news/"
+          }
+        ],
+        "sectionKeys": [
+          "section-1"
+        ],
+        "topics": [],
+        "topicKeys": [],
+        "contributors": [],
+        "contributorKeys": [],
+        "athleteMeta": [],
+        "corrections": [],
+        "reportingNote": [],
+        "live": null,
+        "format": "standard",
+        "presentation": "standard",
+        "immersiveAlignment": "bottom-left",
+        "primaryVideo": null,
+        "videoMetadata": null,
+        "video": null,
+        "listed": true
+      },
+      {
+        "id": 9002,
+        "slug": "how-the-bands-ranked",
+        "title": "How the bands ranked",
+        "titleHtml": "How the bands ranked",
+        "kicker": "",
+        "excerptHtml": "Data inside a story.",
+        "href": "/2026/11/10/news/how-the-bands-ranked/",
+        "url": "https://weeklywildcat.com/2026/11/10/news/how-the-bands-ranked/",
+        "publishedAt": "2026-11-10T13:05:00.000Z",
+        "modifiedAt": "2026-11-10T13:05:00.000Z",
+        "body": {
+          "format": "byline-v1",
+          "version": 1,
+          "media": {},
+          "nodes": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "The fall competition is over."
+                }
+              ]
+            },
+            {
+              "type": "dataProject",
+              "id": "plain-bands",
+              "project": 2,
+              "title": "How the bands ranked",
+              "description": "Every marching band's score from the fall competition."
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "The sidewalk project, by date."
+                }
+              ]
+            },
+            {
+              "type": "dataProject",
+              "id": "embed-timeline",
+              "project": 3,
+              "title": "The sidewalk project, by date",
+              "description": "Every milestone in order."
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Congratulations to all."
+                }
+              ]
+            }
+          ]
+        },
+        "image": null,
+        "leadCaption": "",
+        "section": {
+          "key": "section-1",
+          "name": "News",
+          "href": "/category/news/"
+        },
+        "sections": [
+          {
+            "key": "section-1",
+            "name": "News",
+            "href": "/category/news/"
+          }
+        ],
+        "sectionKeys": [
+          "section-1"
+        ],
+        "topics": [],
+        "topicKeys": [],
+        "contributors": [],
+        "contributorKeys": [],
+        "athleteMeta": [],
+        "corrections": [],
+        "reportingNote": [],
+        "live": null,
+        "format": "standard",
+        "presentation": "standard",
+        "immersiveAlignment": "bottom-left",
+        "primaryVideo": null,
+        "videoMetadata": null,
+        "video": null,
+        "listed": true
+      }
+    ],
+    "people": [],
+    "sections": [
+      {
+        "id": 1,
+        "slug": "news",
+        "name": "News",
+        "description": "News from Ninety Six High School and the Ninety Six community, reported by Weekly Wildcat student journalists.",
+        "href": "/category/news/"
+      },
+      {
+        "id": 2,
+        "slug": "sports",
+        "name": "Sports",
+        "description": "Scores, results and reporting on Ninety Six High School Wildcats athletics from the Weekly Wildcat.",
+        "href": "/category/sports/"
+      },
+      {
+        "id": 3,
+        "slug": "opinion",
+        "name": "Opinion",
+        "description": "Editorials, columns and student voices on life at Ninety Six High School and beyond.",
+        "href": "/category/opinion/"
+      },
+      {
+        "id": 4,
+        "slug": "features",
+        "name": "Features",
+        "description": "People, programs and stories from Ninety Six High School and the community around it.",
+        "href": "/category/features/"
+      },
+      {
+        "id": 5,
+        "slug": "culture",
+        "name": "Arts & Culture",
+        "description": "Theater, music, art and the creative life of Ninety Six High School and the Ninety Six community.",
+        "href": "/category/culture/"
+      }
+    ],
+    "topics": [],
+    "pages": [],
+    "corrections": [],
+    "collections": [],
+    "events": [],
+    "polls": [],
+    "media": [],
+    "redirects": []
+  },
+  "counts": {
+    "stories": 2,
+    "people": 0,
+    "sections": 5,
+    "topics": 0,
+    "pages": 0,
+    "corrections": 0,
+    "collections": 0,
+    "events": 0,
+    "polls": 0,
+    "media": 0,
+    "redirects": 0
+  },
+  "data": {
+    "projects": [
+      {
+        "id": 1,
+        "slug": "main-street-sidewalk",
+        "title": "Main Street sidewalk project",
+        "deck": "Which phases of the Main Street sidewalk project are done, what's underway and what's left.",
+        "href": "/data/main-street-sidewalk/",
+        "presentation": {
+          "kind": "custom",
+          "key": "fixture-sidewalk-project"
+        },
+        "settings": {},
+        "bindings": [
+          {
+            "slot": "phases",
+            "dataset": "main-street-sidewalk-phases",
+            "fields": {
+              "name": "name",
+              "status": "status",
+              "detail": "detail",
+              "date": "date"
+            },
+            "release": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea"
+          }
+        ],
+        "source": "Greenwood city engineering department; Weekly Wildcat reporting.",
+        "methodology": "Weekly Wildcat reporters check the city's project page and meeting minutes every week.\n\nDates are when a phase finished or is scheduled to.",
+        "indexing": "public",
+        "publishedAt": "2026-10-20T15:00:00.000Z",
+        "modifiedAt": "2026-10-26T02:00:00.000Z",
+        "dataUpdatedAt": "2026-10-20T14:00:00.000Z",
+        "relatedStories": []
+      },
+      {
+        "id": 2,
+        "slug": "marching-band-rankings",
+        "title": "Marching band rankings",
+        "deck": "Saturday's regional marching band competition, by final score.",
+        "href": "/data/marching-band-rankings/",
+        "presentation": {
+          "kind": "template",
+          "key": "ranking"
+        },
+        "settings": {
+          "order": "desc",
+          "limit": 0,
+          "bars": true,
+          "valueLabel": "Score"
+        },
+        "bindings": [
+          {
+            "slot": "entries",
+            "dataset": "marching-band-results",
+            "fields": {
+              "name": "band",
+              "value": "score",
+              "highlight": "local"
+            },
+            "release": "746828e7952ddb4cf442c9f810c636850727c407909bce3161538e321143716a"
+          }
+        ],
+        "source": "Regional Band Directors Association.",
+        "methodology": "",
+        "indexing": "public",
+        "publishedAt": "2026-10-20T15:00:00.000Z",
+        "modifiedAt": "2026-10-26T02:00:00.000Z",
+        "dataUpdatedAt": "2026-10-26T01:30:00.000Z",
+        "relatedStories": []
+      },
+      {
+        "id": 3,
+        "slug": "sidewalk-timeline",
+        "title": "Main Street sidewalk timeline",
+        "deck": "",
+        "href": "/data/sidewalk-timeline/",
+        "presentation": {
+          "kind": "template",
+          "key": "timeline"
+        },
+        "settings": {
+          "order": "oldest",
+          "groupByYear": true,
+          "linkLabel": "Read more"
+        },
+        "bindings": [
+          {
+            "slot": "events",
+            "dataset": "main-street-sidewalk-phases",
+            "fields": {
+              "title": "name",
+              "date": "date",
+              "detail": "detail",
+              "status": "status"
+            },
+            "release": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea"
+          }
+        ],
+        "source": "",
+        "methodology": "",
+        "indexing": "noindex",
+        "publishedAt": "2026-10-20T15:00:00.000Z",
+        "modifiedAt": "2026-10-26T02:00:00.000Z",
+        "dataUpdatedAt": "2026-10-20T14:00:00.000Z",
+        "relatedStories": []
+      }
+    ],
+    "releases": [
+      {
+        "sha256": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea",
+        "bytes": 1499,
+        "dataset": "main-street-sidewalk-phases",
+        "title": "Main Street sidewalk phases",
+        "revision": 12,
+        "releasedAt": "2026-10-20T14:00:00.000Z",
+        "records": 5,
+        "fields": [
+          {
+            "key": "name",
+            "label": "Phase",
+            "required": true,
+            "visibility": "public",
+            "type": "text",
+            "options": {
+              "maxLength": 500
+            }
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "required": false,
+            "visibility": "public",
+            "type": "select",
+            "options": {
+              "choices": [
+                {
+                  "value": "done",
+                  "label": "Done",
+                  "tone": "positive"
+                },
+                {
+                  "value": "underway",
+                  "label": "Underway",
+                  "tone": "caution"
+                },
+                {
+                  "value": "planned",
+                  "label": "Planned"
+                }
+              ]
+            }
+          },
+          {
+            "key": "detail",
+            "label": "Detail",
+            "required": false,
+            "visibility": "public",
+            "type": "longText",
+            "options": {
+              "maxLength": 10000
+            }
+          },
+          {
+            "key": "date",
+            "label": "Date",
+            "required": false,
+            "visibility": "public",
+            "type": "date",
+            "options": {}
+          }
+        ]
+      },
+      {
+        "sha256": "746828e7952ddb4cf442c9f810c636850727c407909bce3161538e321143716a",
+        "bytes": 1189,
+        "dataset": "marching-band-results",
+        "title": "Marching band results",
+        "revision": 4,
+        "releasedAt": "2026-10-26T01:30:00.000Z",
+        "records": 5,
+        "fields": [
+          {
+            "key": "band",
+            "label": "Band",
+            "required": true,
+            "visibility": "public",
+            "type": "text",
+            "options": {
+              "maxLength": 500
+            }
+          },
+          {
+            "key": "score",
+            "label": "Score",
+            "required": false,
+            "visibility": "public",
+            "type": "number",
+            "options": {
+              "decimals": 1
+            }
+          },
+          {
+            "key": "division",
+            "label": "Division",
+            "required": false,
+            "visibility": "public",
+            "type": "select",
+            "options": {
+              "choices": [
+                {
+                  "value": "a",
+                  "label": "Class A"
+                },
+                {
+                  "value": "aa",
+                  "label": "Class AA"
+                }
+              ]
+            }
+          },
+          {
+            "key": "local",
+            "label": "Local school",
+            "required": false,
+            "visibility": "public",
+            "type": "boolean",
+            "options": {}
+          }
+        ]
+      }
+    ]
+  }
+}

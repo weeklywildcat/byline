@@ -23,7 +23,7 @@ Payload or Lexical JSON. The editor draws the **same** primitives and the
 
 | Package | Owns | Never contains |
 | --- | --- | --- |
-| `@byline/article-body` | The `byline-v1` types, the block registry (28 tools), limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, CSS classes, components, HTML |
+| `@byline/article-body` | The `byline-v1` types, the block registry (29 tools), limits, the pure data-table / footnote / reference / outline helpers, the closed runtime validator, the Chart / Map provider allowlist (type, label, description, aliases, family, icon), limits, readiness rules (`finalizeBlock`), credit resolution, a fixture story | Payload, Lexical, React, Next, Astro, CSS classes, components, HTML |
 | `@byline/ui` (`/article-body`, `article-body.css`, `newsroom/*.css`) | The article's measure, prose, block frames, the visual primitives (`StoryFigure`, `GalleryLayout`, `ReportedQuoteView`, `PullQuoteView`, `SupportingContext`, `DocumentFigure`, `TimelineList/Item`) and the canonical renderer | Payload or Lexical imports; editing state; "isEditing" branches |
 | `@byline/editor` | Payload block configs, the Lexical feature setup, the block editors, the Add menu, `canvas.css` (editor chrome only), and the Payload Lexical → `byline-v1` normalizer | The public renderer |
 | `apps/newsroom` | Wiring: the Story screen, the article canvas wrapper, the Media host adapter, the lead-image control | Block logic |
@@ -99,6 +99,7 @@ Semantic data (the contract; `packages/article-body/src/types.ts`):
 | `context` | `{ heading, body: paragraph[] }` |
 | `document` | `{ media, title?, context?, source?, pages: [{ id, page, label }] }` (≤12) |
 | `timeline` | `{ items: [{ id, label, title, body, current }] }` (2–25) |
+| `dataProject` | `{ project, title, description }` (title ≤200, description ≤600): a published [Byline Data](byline-data.md#story-embeds) Project by ID and this story's own heading and description. Nothing else |
 
 `label` is editorial text ("Fall 2026"), not a date. Gallery columns are not
 stored: two photographs pair, larger galleries use the responsive grid by
@@ -285,7 +286,7 @@ The body from this slice drops straight into that path: the renderer reads only
 
 ## The final authoring surface (Phase 9, blocks)
 
-All 28 tools, inline footnotes and inline Source references use the same machinery. Shared pieces, each
+All 29 tools, inline footnotes and inline Source references use the same machinery. Shared pieces, each
 small and used by several tools: `InlineText` (typed where readers see it),
 `BlockShell` (toolbar, readiness note), `SettingsSurface` (a Popover, or a
 bottom Sheet on touch; `SecondarySetting` and the Footnote note use it),
@@ -302,6 +303,21 @@ as plain data.
   the slash menu, so slash matches labels and slugs only (`/chart`, `/table`,
   `/video`, `/poll`); the Add menu carries the aliases. Privileged tools are not
   offered to staff.
+- **Data Project** (Data & visual; any staff writer): the Add menu's Command in a
+  wide Popover (a bottom Sheet on touch), searching title, description and
+  presentation name, grouped Published / Unpublished changes / Drafts through
+  the host's `searchDataProjects` (`GET /api/byline/data/projects?search=`;
+  one project's facts: `/projects/:id/choice`). The first choice fills the
+  story's heading and description from the project's title and deck; replacing
+  the project moves only copy still equal to the old project's own
+  (`dataProjectSelection`). The canvas draws the project's real presentation
+  through the host's `renderDataProject` (the private `/preview/data?embed=1`
+  frame, which sizes itself, is sandboxed so no link can leave the editor, and
+  shows published data whenever the project has a published version). A draft
+  project may be chosen while writing but is a blocking note
+  ("Publish this Data Project before publishing the story."); unpublished
+  changes are informational (readers see the published version). The server
+  applies the same rule at publication (`embeddableDataProjects`).
 - **Footnotes** use Payload's supported inline blocks: a Footnote button in the
   selection toolbar plus the slash entry. The reference is edited through its
   own Popover/Sheet; closing an empty one removes it.
@@ -324,7 +340,7 @@ cells use a JSON array per row; no other field uses a side channel.
 `normalizePayloadArticleBody(state, { media, references })` also resolves the
 reference table and registered interactives; `collectMediaIds` and
 `collectReferenceIds` read the one exhaustive `blockMediaIds` / `blockStoryIds` /
-`blockPollIds` in `@byline/article-body`, so a new block cannot be missed by media
+`blockPollIds` / `blockDataProjectIds` in `@byline/article-body`, so a new block cannot be missed by media
 readiness. `validateArticleBody` is the closed runtime validator for a complete
 public body (unknown properties, node or block types, `captionsConfirmed`,
 Lexical or Payload fields, unresolved media or references are errors).

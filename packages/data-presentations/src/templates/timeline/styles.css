@@ -1,0 +1,21 @@
+/* Timeline template. Scoped; loaded only on pages that use it. */
+.data-presentation-timeline .data-timeline { font-family: var(--font-ui, system-ui, sans-serif); }
+.data-presentation-timeline .data-timeline-group + .data-timeline-group { margin-block-start: 2rem; }
+.data-presentation-timeline .data-timeline-year { border-block-end: 2px solid var(--rule-strong, #121212); font-family: var(--font-headline, inherit); font-size: 1.35rem; margin: 0 0 0.25rem; padding-block-end: 0.35rem; }
+.data-presentation-timeline .data-timeline-list { list-style: none; margin: 0; padding: 0; }
+.data-presentation-timeline .data-timeline-entry { border-block-end: 1px solid var(--rule, #e2e2e2); display: grid; gap: 0.25rem 1.5rem; grid-template-columns: 8.5rem minmax(0, 1fr); padding-block: 1rem; }
+.data-presentation-timeline .data-timeline-date { color: var(--muted, #545454); font-size: 0.85rem; font-variant-numeric: tabular-nums; font-weight: 700; padding-block-start: 0.15rem; }
+.data-presentation-timeline .data-timeline-title { font-family: var(--font-headline, inherit); font-size: 1.1rem; line-height: 1.25; margin: 0; }
+.data-presentation-timeline .data-timeline-status { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; margin: 0.35rem 0 0; text-transform: uppercase; }
+.data-presentation-timeline [data-tone="positive"] .data-timeline-status { color: #2f6b3a; }
+.data-presentation-timeline [data-tone="caution"] .data-timeline-status,
+.data-presentation-timeline [data-tone="info"] .data-timeline-status { color: var(--accent, #73192a); }
+.data-presentation-timeline [data-tone="negative"] .data-timeline-status { color: #8a1f11; }
+.data-presentation-timeline .data-timeline-detail { color: var(--ink, #121212); font-family: var(--font-serif, Georgia, serif); font-size: 1rem; line-height: 1.5; margin: 0.4rem 0 0; max-width: 38em; }
+.data-presentation-timeline .data-timeline-link { font-size: 0.9rem; font-weight: 700; margin: 0.5rem 0 0; }
+.data-presentation-timeline .data-timeline-link a { color: var(--accent, #73192a); }
+.data-presentation-timeline .data-timeline-note,
+.data-presentation-timeline .data-timeline-empty { color: var(--muted, #545454); font-size: 0.85rem; margin: 0.75rem 0 0; }
+@media (max-width: 560px) {
+  .data-presentation-timeline .data-timeline-entry { grid-template-columns: minmax(0, 1fr); }
+}

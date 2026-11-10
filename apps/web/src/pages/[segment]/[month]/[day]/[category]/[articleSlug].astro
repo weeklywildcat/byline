@@ -3,6 +3,10 @@ import { renderRepositoryInteractive } from "@byline/story-presentations/interac
 import { getNativeSnapshot, publicInteractiveRegistry, publicTrackerRegistry, nativeStory, nativeStoryRoute } from "@/lib/native-snapshot";
 import { hasInteractiveClient, hasTrackerClient } from "@/lib/repository-interactive-client";
 import { renderPublicTracker, trackerStylesheet } from "@/lib/repository-tracker-host";
+import { hasDataPresentationClient } from "@/lib/data-presentation-client";
+import { createPublicDataProjectRenderer } from "@/lib/data-project-embed-host";
+import { publicDataPresentationRegistry } from "@/lib/native-snapshot";
+import { publicDataProjectById } from "@/lib/public-data";
 import { nativeArticleJsonLd, nativeArticleMetadata } from "@/lib/native-article-seo";
 import { nativeArticleDate, nativeArticlePresentation, nativeBodyImage } from "@/lib/native-article";
 import { articleRenderInputs, routeCacheKey } from "@/lib/route-cache";
@@ -50,6 +54,12 @@ if (presentation.body.format === "byline-v1") {
       const entry = interactiveRegistry[node.key];
       if (!entry || (entry.client && !hasInteractiveClient(node.key))) throw new Error(`Story ${id} has no public host for Repository Interactive ${node.key}`);
     }
+    if (node.type === "dataProject") {
+      // A Data Project the build doesn't have, whose presentation isn't registered, or whose declared client code is missing fails the build: never a blank embed.
+      const project = node.project === null ? undefined : publicDataProjectById(node.project);
+      const descriptor = project ? publicDataPresentationRegistry()[project.presentation.key]?.descriptor : undefined;
+      if (!project || !descriptor || (descriptor.client && !hasDataPresentationClient(descriptor.kind, descriptor.key))) throw new Error(`Story ${id} has no public host for Data Project ${String(node.project)}`);
+    }
     if (node.type === "repositoryTracker") {
       // An unknown tracker, or one whose declared styles or client are missing, fails the build: never a blank tracker.
       const entry = trackerRegistry[node.key];
@@ -68,7 +78,7 @@ const visualStory = isVisualStory(getStoryPresentation(id));
 const slots = {
   shareActions: React.createElement("div", { id: "article-share-island-slot" }),
   primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
-  bodyHost: story ? { imageSources: nativeBodyImage, formatDate: nativeArticleDate, timeZone: publication.timezone, locale: publication.locale, renderInteractive: renderRepositoryInteractive(interactiveRegistry), renderTracker: renderPublicTracker(trackerRegistry) } : undefined,
+  bodyHost: story ? { imageSources: nativeBodyImage, formatDate: nativeArticleDate, timeZone: publication.timezone, locale: publication.locale, renderInteractive: renderRepositoryInteractive(interactiveRegistry), renderTracker: renderPublicTracker(trackerRegistry), renderDataProject: createPublicDataProjectRenderer(publicDataPresentationRegistry()) } : undefined,
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
@@ -93,6 +103,12 @@ const slots = {
         if (interactives?.length) void startRepositoryInteractives(interactives);
         if (trackers?.length) void startRepositoryTrackers(trackers);
       });
+    }
+    // Data Projects placed in the story: each embed enhances on its own root. Only a presentation that declares a
+    // client.ts marks its embed, so a story with none of those downloads neither the loader nor any chunk.
+    const dataEmbeds = body?.querySelectorAll<HTMLElement>("[data-data-embed][data-data-client]");
+    if (dataEmbeds?.length) {
+      import("@/lib/data-presentation-client").then(({ startPublicDataEmbeds }) => void startPublicDataEmbeds(dataEmbeds));
     }
     // A flagship visual story's own client code, if it has any, downloads on its page alone.
     const visualStory = document.querySelector<HTMLElement>("[data-visual-story]");

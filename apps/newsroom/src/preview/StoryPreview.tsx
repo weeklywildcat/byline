@@ -9,6 +9,7 @@ import { STORY_LIVE_PREVIEW_DEPTH } from "./config";
 import { payloadPresentationContext, payloadPublicStory, payloadStorySummary, type PayloadImage } from "./payload-story";
 import { POPULATION_FAILED, createStoryPopulation, type PopulationFailure, type PopulationStatus } from "./population";
 import type { PreviewPublication } from "./publication";
+import { PreviewDataProject } from "./PreviewDataProject";
 import { useStoryAssets } from "./story-assets";
 import type { StoryPreviewContext } from "./context";
 
@@ -118,7 +119,8 @@ function inertSlots(publication: PreviewPublication, interactives: RepositoryInt
       locale: publication.locale,
       preview: true,
       renderInteractive: renderRepositoryInteractive(interactives),
-      renderTracker: renderRepositoryTracker(trackers)
+      renderTracker: renderRepositoryTracker(trackers),
+      renderDataProject: (block) => <PreviewDataProject block={block} timeZone={publication.timeZone} locale={publication.locale} />
     },
     shareActions: <ArticleShareActionsView copyLabel="Copy link" copyIcon="ph:link" status="" />,
     poll: null,

@@ -1,8 +1,10 @@
 import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
   FIXED_PUBLIC_CONTENT_ROUTES, collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
-  snapshotEventReference, validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2, type PublicStorySnapshot
+  snapshotEventReference, validatePublicBuildSnapshotV3, type PublicBuildSnapshotV3, type PublicStorySnapshot
 } from "@byline/content";
+import { collectDataSection } from "../../data/snapshot";
+import { dataPresentationDescriptor } from "../../data/registry";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
 import { formatVideoDuration, normalizePrimaryVideo, parseYouTubeVideoId, youTubeEmbedUrl, type PrimaryVideo } from "@byline/core";
@@ -21,7 +23,7 @@ import { collectLiveCoverage, readLivePlans, readLiveUpdates } from "./live";
 import { collectPolls } from "./polls";
 import { activePlacements } from "../../front-page/server";
 
-type Datasets = PublicBuildSnapshotV2["datasets"];
+type Datasets = PublicBuildSnapshotV3["datasets"];
 type StoryFacts = Omit<PublicStorySnapshot, "body">;
 const ids = (value: unknown) => [...new Set(relationIds(value).map(Number))];
 const term = (row: Datasets["sections"][number], prefix: string): PublicTerm => ({ key: `${prefix}-${row.id}`, name: row.name, href: row.href });
@@ -79,7 +81,7 @@ function contentLosingIssues(issues: NormalizeIssue[]): string[] {
   });
 }
 
-export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV2> {
+export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV3> {
   const { revision } = options;
   const now = options.now?.() ?? new Date();
   const [publicationRow, sectionRows, topicRows, storyRows, pages, events, redirectRows] = await Promise.all([
@@ -146,6 +148,11 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const tracker = (key: string) => Object.hasOwn(trackerRegistry, key);
   // The Event block resolves from the published events dataset itself, so a body and the dataset can never disagree.
   const eventById = new Map(events.map((row) => [row.id, snapshotEventReference(row)]));
+  // Byline Data comes before the Story bodies: a body's Data Project block resolves against the very section the
+  // snapshot publishes (published Projects and the descriptors of exactly the releases they use, never row data).
+  // The related-Story coverage needs only which Stories are public, which the filtered rows already say.
+  const data = await collectDataSection(payload, { publicStories: new Set(rows.map((row) => row.id)) });
+  const dataProjectIds = new Set(data.projects.map((project) => project.id));
   const stories = rows.map((row): PublicStorySnapshot => {
     const { body, issues } = normalizePayloadStoryBody(row, {
       media: (id) => catalog.articleAsset(Number(id)),
@@ -156,6 +163,8 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
         },
         poll: (id) => polls.get(Number(id)),
         event: (id) => eventById.get(Number(id)) ?? null,
+        // Absent from the section (never published, draft-only, deleted, invalid) resolves to null: a blocking issue.
+        dataProject: (id) => (dataProjectIds.has(Number(id)) ? { id } : null),
         interactive,
         tracker
       }
@@ -166,6 +175,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   });
   const paths = new Set([
     ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),
+    ...data.projects.map((row) => row.href),
     ...stories.map((row) => row.href), ...pages.map((row) => row.href), ...sections.map((row) => row.href),
     ...people.filter((row) => row.hasProfilePage).map((row) => `/author/${row.slug}/`),
     ...collections.map((row) => `/coverage/${row.slug}/`)
@@ -181,9 +191,9 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const placements = active ? Object.fromEntries(Object.entries(active.placements).filter(([, storyId]) => publicStoryIds.has(storyId))) : {};
   const snapshot = { schemaVersion: PUBLIC_SNAPSHOT_SCHEMA_VERSION, revision, generatedAt: now.toISOString(), publication, datasets,
     counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])),
-    ...(active && Object.keys(placements).length ? { frontPage: { placements, activatedAt: active.activatedAt } } : {}) };
+    ...(active && Object.keys(placements).length ? { frontPage: { placements, activatedAt: active.activatedAt } } : {}), data };
   try {
-    return validatePublicBuildSnapshotV2(snapshot, { interactive, tracker });
+    return validatePublicBuildSnapshotV3(snapshot, { interactive, tracker, dataPresentation: dataPresentationDescriptor });
   } catch (error) {
     throw new PublicSnapshotError("invalid-projection", (error as Error).message);
   }

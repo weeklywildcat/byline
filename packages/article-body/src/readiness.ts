@@ -480,6 +480,15 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       if (!description) return omit("tracker-description", "Describe what it tracks in words, for readers who cannot see it.");
       return { block: { type: "repositoryTracker", id: block.id, key, title, description }, issues };
     }
+    case "dataProject": {
+      if (block.project === null || block.project === undefined) return omit("data-project-missing", "Choose a Data Project.");
+      if (!refs.dataProject?.(block.project)) return omit("data-project-unavailable", "Publish this Data Project before publishing the story, or choose another. It may also have been deleted.");
+      const title = cleanLine(block.title, LIMITS.dataProjectTitle);
+      const description = cleanText(block.description, LIMITS.dataProjectDescription);
+      if (!title) return omit("data-project-title", "Give the Data Project a heading for this story.");
+      if (!description) return omit("data-project-description", "Describe what it shows in a sentence or two, for readers who cannot use it.");
+      return { block: { type: "dataProject", id: block.id, project: block.project, title, description }, issues };
+    }
     case "event": {
       if (block.event === null || block.event === undefined) return omit("event-missing", "Choose an event.");
       if (!refs.event?.(block.event)) return omit("event-unavailable", "This event is not published, or is gone. Choose a published event.");

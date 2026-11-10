@@ -19,6 +19,8 @@ import "@byline/ui/immersive-article.css";
 import "../../../../web/views/fonts.css";
 import "../../../../web/views/globals.css";
 import "@byline/ui/contributor-profile.css";
+import "@byline/data-presentations/data-project.css";
+import "@byline/data-presentations/data-embed.css";
 import "../../preview/preview.css";
 
 export const metadata: Metadata = {

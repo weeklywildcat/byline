@@ -194,6 +194,7 @@ const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> }
   poll: { type: pick(["poll"]), id: idField, poll: mediaRef },
   repositoryInteractive: { type: pick(["repositoryInteractive"]), id: idField, key: req(L.interactiveKey, true), title: req(L.interactiveTitle, true), description: req(L.interactiveDescription) },
   repositoryTracker: { type: pick(["repositoryTracker"]), id: idField, key: req(L.trackerKey, true), title: req(L.trackerTitle, true), description: req(L.trackerDescription) },
+  dataProject: { type: pick(["dataProject"]), id: idField, project: mediaRef, title: req(L.dataProjectTitle, true), description: req(L.dataProjectDescription) },
   event: { type: pick(["event"]), id: idField, event: mediaRef },
   socialPost: { type: pick(["socialPost"]), id: idField, url: req(L.webUrl, true), provider: pick(["instagram", "threads", "facebook", "tiktok", "x", "bluesky"]), postId: req(200, true), caption: opt(L.socialCaption) },
   finalScore: {

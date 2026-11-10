@@ -1,6 +1,6 @@
 import type { Payload } from "payload";
 import { promoteCompletedSnapshot, readCurrentRevision, readPublicationState, type CompletedSnapshotPointer, type PublicationStateRow } from "../../db/publication-state";
-import type { PublicBuildSnapshotV2 } from "@byline/content";
+import type { PublicBuildSnapshotV3 } from "@byline/content";
 import { collectPublicSnapshot } from "./collect";
 import { isPublicSnapshotError, PublicSnapshotError } from "./errors";
 import { assertPublicSafe } from "./privacy";
@@ -29,11 +29,11 @@ import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from
  */
 
 /** Exact UTF-8 bytes of a snapshot: the one serialization the digest, the store and the endpoints share. */
-export function serializePublicSnapshot(snapshot: PublicBuildSnapshotV2): Buffer {
+export function serializePublicSnapshot(snapshot: PublicBuildSnapshotV3): Buffer {
   return Buffer.from(JSON.stringify(snapshot), "utf8");
 }
 
-export type SnapshotBuildResult = { snapshot: PublicBuildSnapshotV2; bytes: Buffer };
+export type SnapshotBuildResult = { snapshot: PublicBuildSnapshotV3; bytes: Buffer };
 
 /**
  * Collects, validates, privacy-checks and serializes the projection for
@@ -43,7 +43,7 @@ export type SnapshotBuildResult = { snapshot: PublicBuildSnapshotV2; bytes: Buff
 export async function buildPublicSnapshotBytes(payload: Payload, revision: number, options: { afterCollect?: () => Promise<void>; afterRead?: () => Promise<void>; now?: () => Date } = {}): Promise<SnapshotBuildResult> {
   const state = await readPublicationState(payload);
   if (state.currentRevision !== revision) throw new PublicSnapshotError("stale-revision", `Public revision moved from ${revision} to ${state.currentRevision} before collection.`);
-  let snapshot: PublicBuildSnapshotV2;
+  let snapshot: PublicBuildSnapshotV3;
   try {
     // Scheduled facts are evaluated at the revision's clock so direct recovery
     // at R can reproduce the completed artifact even across a time boundary.

@@ -213,6 +213,23 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
   advance the public revision; history is never mutated. The preview is the
   real renderer; keep `front-page/stories.ts` in step with the build's homepage
   pool.
+- **Data** ([docs/byline-data.md](../../docs/byline-data.md)) is `/admin/data`:
+  Datasets (`data-datasets`, `data-records`) are working data and Projects
+  (`data-projects`, Payload drafts) are what readers see. Validate every row
+  write against the schema on the server; field keys are permanent and
+  removed keys are retired. Advance a dataset's working revision only with
+  `advanceWorkingRevision` in the write's own transaction. Publish data only
+  through `publishDatasetRelease` (the release fence); never write
+  `release`/`workingRevision` any other way, never serve a non-current
+  release to the build, never let working rows reach the public projection.
+  Fixture presentations exist only with `BYLINE_STORY_PRESENTATION_FIXTURES=1`
+  outside production. A Story's `dataProject` block stores only a project ID and
+  the story's own heading and description: resolve embeddability only through
+  `embeddableDataProjects` (`data/embed.ts`, a published main row that passes
+  `projectPublicationIssues`), never a draft; keep a project that published
+  Stories embed from being unpublished or deleted (`data/usage.ts`); and keep
+  the Data section collected before Story bodies are normalized in
+  `collectPublicSnapshot`.
 - `src/payload-types.ts` is this app's internal type file. It must never become
   the public site's content contract.
 

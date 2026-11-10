@@ -198,7 +198,7 @@ export { ButtonGroup };
  * mouse, a bottom Sheet on touch or a narrow screen. Controlled, so the caller
  * can open it itself (a new footnote opens its note straight away).
  */
-export function SettingsSurface({ open, onOpenChange, trigger, title, description, align = "start", children }: {
+export function SettingsSurface({ open, onOpenChange, trigger, title, description, align = "start", contentClassName = "w-80", children }: {
   open: boolean;
   /** `details.reason` is Base UI's ("escape-key", "outside-press", …) when it closes the surface. */
   onOpenChange: (open: boolean, details?: { reason?: string }) => void;
@@ -207,6 +207,8 @@ export function SettingsSurface({ open, onOpenChange, trigger, title, descriptio
   title: string;
   description?: string;
   align?: "start" | "center" | "end";
+  /** The Popover's width class (a Sheet is always full width). Defaults to a compact `w-80`. */
+  contentClassName?: string;
   children: ReactNode;
 }) {
   const coarse = useCoarseLayout();
@@ -229,7 +231,7 @@ export function SettingsSurface({ open, onOpenChange, trigger, title, descriptio
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent align={align} className="w-80" data-byline-chrome="">
+      <PopoverContent align={align} className={contentClassName} data-byline-chrome="">
         <PopoverHeader>
           <PopoverTitle>{title}</PopoverTitle>
           {description ? <PopoverDescription>{description}</PopoverDescription> : null}

@@ -28,6 +28,7 @@ export const ARTICLE_BLOCK_TYPES = [
   // Data & visual
   "chartMap",
   "dataTable",
+  "dataProject",
   "comparison",
   "keyNumbers",
   "finalScore",
@@ -58,7 +59,7 @@ export type ArticleBlockIcon =
   | "quote" | "pullQuote" | "facts" | "context" | "editorsNote" | "marginNote" | "expandable" | "document"
   | "chart" | "table" | "comparison" | "numbers" | "annotated" | "beforeAfter"
   | "chapter" | "timeline" | "related" | "poll" | "interactive"
-  | "social" | "score" | "event" | "tracker" | "source";
+  | "social" | "score" | "event" | "tracker" | "source" | "database";
 
 export type ArticleBlockDefinition = {
   type: ArticleBlockType;
@@ -93,6 +94,7 @@ export const ARTICLE_BLOCKS: { readonly [K in ArticleBlockType]: ArticleBlockDef
   document: define({ type: "document", label: "Document (PDF)", description: "A source document readers can open, with the pages that matter.", family: "explain", aliases: ["document", "doc", "pdf", "file", "records", "evidence"], icon: "document" }),
   chartMap: define({ type: "chartMap", label: "Chart / Map", description: "A chart made from your numbers, an embedded chart or map, or a graphic.", family: "data", aliases: ["chart", "graph", "bar chart", "line chart", "dot plot", "map", "datawrapper", "flourish", "google maps", "visualization", "infographic", "spreadsheet"], icon: "chart" }),
   dataTable: define({ type: "dataTable", label: "Data Table", description: "Rows and columns of figures, with headers.", family: "data", aliases: ["table", "spreadsheet", "data", "grid", "rows", "csv"], icon: "table" }),
+  dataProject: define({ type: "dataProject", label: "Data Project", description: "A published Data Project, shown inside the story.", family: "data", aliases: ["data", "dataset", "project", "tracker", "results", "database", "ranking", "table", "interactive", "election", "visualization"], icon: "database" }),
   comparison: define({ type: "comparison", label: "Comparison", description: "Two sides explained next to each other.", family: "data", aliases: ["compare", "versus", "vs", "then and now", "current proposed", "two sides"], icon: "comparison" }),
   finalScore: define({ type: "finalScore", label: "Final Score", description: "A game's result: two teams, two scores.", family: "data", aliases: ["score", "final", "sports", "result", "game", "recap", "matchup", "scoreboard"], icon: "score" }),
   keyNumbers: define({ type: "keyNumbers", label: "Key Numbers", description: "The few figures a reader should remember.", family: "data", aliases: ["numbers", "stats", "statistics", "figures", "by the numbers", "big numbers"], icon: "numbers" }),
@@ -202,6 +204,8 @@ export const ARTICLE_BLOCK_LIMITS = {
   trackerKey: 64,
   trackerTitle: 200,
   trackerDescription: 1000,
+  dataProjectTitle: 200,
+  dataProjectDescription: 600,
   quoteSourceLabel: 120,
   sourceLabel: 160,
   sourceNote: 400,

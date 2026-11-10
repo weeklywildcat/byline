@@ -6,13 +6,14 @@ import { ARTICLE_BLOCK_TYPES, ARTICLE_BLOCKS, finalizeBlock, type ArticleBlock, 
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_TRACKER_KEY, FIXTURE_REFERENCES } from "@byline/article-body/fixtures";
 import { ARTICLE_BLOCK_RENDERERS } from "@byline/ui/article-body";
 import { articleBlockFromFields, BLOCK_FIELD_READERS, BLOCK_TO_ARTICLE, mediaIdOf } from "../src/fields";
+import { dataProjectPublishable, dataProjectSelection, groupDataProjects, type DataProjectChoice } from "../src/data-project";
 import { duplicateItem, insertItem, moveDirection, moveItem, removeItem, setOnlyCurrent } from "../src/items";
-import { articleMediaFromPayload, collectMediaIds, collectMediaUses, normalizePayloadArticleBody, normalizePayloadStoryBody } from "../src/normalize";
+import { articleMediaFromPayload, collectReferenceIds, collectMediaIds, collectMediaUses, normalizePayloadArticleBody, normalizePayloadStoryBody } from "../src/normalize";
 import { BYLINE_BLOCK_COMPONENT, BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
 const media = (id: string | number) => FIXTURE_MEDIA[String(id)] ?? null;
-const references = { story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
+const references = { dataProject: (id: string | number) => (String(id) === "1" ? { id } : null), story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceFiles = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? sourceFiles(path) : [path];
@@ -244,5 +245,95 @@ describe("package boundaries", () => {
         expect(specifier, file).not.toMatch(/richtext-lexical\/(?:react|html|html-async|rsc|migrate)$/);
       }
     }
+  });
+});
+
+describe("Data Project block", () => {
+  const choice = (id: number, title: string, deck: string, publication: DataProjectChoice["publication"]): DataProjectChoice => ({ id, title, deck, publication, presentation: { key: "table", kind: "template", name: "Table" }, publishedAt: null, dataUpdatedAt: null, publicUrl: null });
+  const { dataProject } = FIXTURE_BLOCKS;
+
+  it("is an ordinary Data & visual tool any staff writer may insert", () => {
+    expect(ARTICLE_BLOCKS.dataProject).toMatchObject({ family: "data", label: "Data Project", icon: "database" });
+    expect("privileged" in ARTICLE_BLOCKS.dataProject).toBe(false);
+  });
+
+  it("stores a required project relationship and only the story's own copy", () => {
+    const block = BYLINE_BODY_BLOCKS.dataProject;
+    const fields = block.fields as Array<{ name: string; type: string; relationTo?: string; required?: boolean; maxLength?: number }>;
+    expect(fields.map((field) => field.name)).toEqual(["project", "title", "description"]);
+    expect(fields[0]).toMatchObject({ type: "relationship", relationTo: "data-projects", required: true });
+    expect(fields[1]).toMatchObject({ required: true, maxLength: 200 });
+    expect(fields[2]).toMatchObject({ required: true, maxLength: 600 });
+    // A draft project stays choosable: no filter hides unpublished projects.
+    expect(fields[0]).not.toHaveProperty("filterOptions");
+  });
+
+  it("reads a populated relationship as its ID and ignores anything Payload or a project adds", () => {
+    expect(BLOCK_FIELD_READERS.dataProject({ project: { id: 7, title: "x", bindings: [{ release: "a".repeat(64) }] }, title: "T", description: "D", release: "a".repeat(64), settings: { a: 1 } })).toEqual({ project: 7, title: "T", description: "D" });
+    expect(BLOCK_FIELD_READERS.dataProject({})).toEqual({ project: null, title: "", description: "" });
+    const block = articleBlockFromFields("dataProject", "b1", { project: { id: 7 }, title: "T", description: "D", blockName: "", rows: [1], url: "/data/x/" });
+    expect(Object.keys(block).sort()).toEqual(["description", "id", "project", "title", "type"]);
+  });
+
+  it("round-trips through Lexical and extracts the relationship for the host to resolve", () => {
+    const state = lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: [dataProject], references: undefined, media: {} });
+    expect(collectReferenceIds(state)).toMatchObject({ dataProjects: [1] });
+    const { body, issues } = normalizePayloadArticleBody(state, { media, references });
+    expect(issues).toEqual([]);
+    expect(body.nodes).toEqual([dataProject]);
+    expect(body.references).toBeUndefined();
+    expect(JSON.stringify(body)).not.toMatch(/release|binding|sha256|dataset/i);
+  });
+
+  it("leaves the block out and blocks publication when the project is missing, deleted or draft-only", () => {
+    const state = lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: [{ ...dataProject, project: 99 }], references: undefined, media: {} });
+    const { body, issues } = normalizePayloadArticleBody(state, { media, references });
+    expect(body.nodes).toEqual([]);
+    expect(issues).toEqual([expect.objectContaining({ kind: "block", issue: expect.objectContaining({ code: "data-project-unavailable", effect: "omitted", type: "dataProject" }) })]);
+    // No Data host at all (a harness): the same fail-closed result.
+    expect(normalizePayloadArticleBody(lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: [dataProject], references: undefined, media: {} }), { media, references: { ...references, dataProject: undefined } }).body.nodes).toEqual([]);
+    expect(dataProjectPublishable("draft")).toBe(false);
+    expect(dataProjectPublishable("published")).toBe(true);
+    // Unpublished changes still have a published version readers see.
+    expect(dataProjectPublishable("changed")).toBe(true);
+  });
+
+  it("saves a half-written block while drafting", () => {
+    expect(finalizeBlock({ ...dataProject, project: null, title: "", description: "" }, media, references).issues.map((issue) => issue.effect)).toEqual(["omitted"]);
+    expect(BLOCK_FIELD_READERS.dataProject({ project: null, title: "", description: "" })).toEqual({ project: null, title: "", description: "" });
+  });
+
+  it("defaults the heading and description from the first choice only", () => {
+    const sidewalk = choice(1, "Sidewalk Project", "Tracks milestones.", "published");
+    expect(dataProjectSelection({ project: null, title: "", description: "" }, null, sidewalk)).toEqual({ project: 1, title: "Sidewalk Project", description: "Tracks milestones." });
+    // A project with no deck leaves the description empty (readiness then asks for one).
+    expect(dataProjectSelection({ project: null, title: "", description: "" }, null, choice(2, "Budget", "", "draft")).description).toBe("");
+  });
+
+  it("follows the new project only while the copy is still the old project's own", () => {
+    const old = choice(1, "Sidewalk Project", "Tracks milestones.", "published");
+    const next = choice(2, "Election Center", "Results as they arrive.", "changed");
+    const previous = { title: old.title, deck: old.deck };
+    expect(dataProjectSelection({ project: 1, title: old.title, description: old.deck }, previous, next)).toEqual({ project: 2, title: "Election Center", description: "Results as they arrive." });
+    // Custom heading kept, default description updated, and the other way round.
+    expect(dataProjectSelection({ project: 1, title: "Where the sidewalk stands", description: old.deck }, previous, next)).toEqual({ project: 2, title: "Where the sidewalk stands", description: "Results as they arrive." });
+    expect(dataProjectSelection({ project: 1, title: old.title, description: "Our own words." }, previous, next)).toEqual({ project: 2, title: "Election Center", description: "Our own words." });
+    // Copy a reporter wrote is never overwritten, even when the old project could not be loaded.
+    expect(dataProjectSelection({ project: 1, title: "Mine", description: "Mine too." }, null, next)).toEqual({ project: 2, title: "Mine", description: "Mine too." });
+    // Copy a reporter cleared is not custom copy.
+    expect(dataProjectSelection({ project: 1, title: " ", description: "" }, null, next)).toEqual({ project: 2, title: "Election Center", description: "Results as they arrive." });
+  });
+
+  it("orders picker groups published, then unpublished changes, then drafts, keeping drafts visible", () => {
+    const items = [choice(3, "C", "", "draft"), choice(1, "A", "", "published"), choice(2, "B", "", "changed"), choice(4, "D", "", "published")];
+    expect(groupDataProjects(items).map((group) => [group.heading, group.items.map((item) => item.id)])).toEqual([["Published", [1, 4]], ["Unpublished changes", [2]], ["Drafts", [3]]]);
+    expect(groupDataProjects([])).toEqual([]);
+    expect(groupDataProjects([choice(3, "C", "", "draft")]).map((group) => group.heading)).toEqual(["Drafts"]);
+  });
+
+  it("does not copy Data configuration into the stored block when a project is chosen", () => {
+    const chosen = choice(5, "Referendum", "Yes or no.", "published");
+    const stored = dataProjectSelection({ project: null, title: "", description: "" }, null, { ...chosen, bindings: [{ release: "a".repeat(64) }], settings: { a: 1 } } as never);
+    expect(Object.keys(stored).sort()).toEqual(["description", "project", "title"]);
   });
 });

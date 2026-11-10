@@ -1,0 +1,21 @@
+/* Ranking template. Scoped; loaded only on pages that use it. */
+.data-presentation-ranking .data-ranking { font-family: var(--font-ui, system-ui, sans-serif); }
+.data-presentation-ranking .data-ranking-list { counter-reset: none; list-style: none; margin: 0; padding: 0; }
+.data-presentation-ranking .data-ranking-entry { align-items: baseline; border-block-end: 1px solid var(--rule, #e2e2e2); display: grid; gap: 0.25rem 1rem; grid-template-columns: 3rem minmax(0, 1fr) auto; padding-block: 0.85rem 0.75rem; position: relative; }
+
+.data-presentation-ranking .data-ranking-rank { font-family: var(--font-headline, inherit); font-size: 1.5rem; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; }
+.data-presentation-ranking .data-ranking-name { font-size: 1.05rem; font-weight: 600; min-width: 0; }
+.data-presentation-ranking .data-ranking-flag { color: var(--accent, #73192a); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.data-presentation-ranking .data-ranking-detail { color: var(--muted, #545454); display: block; font-family: var(--font-serif, Georgia, serif); font-size: 0.95rem; font-weight: 400; margin-block-start: 0.15rem; }
+.data-presentation-ranking .data-ranking-value { font-size: 1.05rem; font-variant-numeric: tabular-nums; font-weight: 700; text-align: end; white-space: nowrap; }
+.data-presentation-ranking .data-ranking-value-label { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+.data-presentation-ranking .data-ranking-bar { background: var(--rule, #e2e2e2); grid-column: 2 / -1; height: 6px; position: relative; }
+.data-presentation-ranking .data-ranking-bar::before { background: var(--ink, #121212); content: ""; inset: 0 auto 0 0; position: absolute; width: var(--data-share, 0%); }
+.data-presentation-ranking [data-highlight="true"] .data-ranking-bar::before { background: var(--accent, #73192a); }
+.data-presentation-ranking [data-highlight="true"] .data-ranking-rank { color: var(--accent, #73192a); }
+.data-presentation-ranking .data-ranking-note,
+.data-presentation-ranking .data-ranking-empty { color: var(--muted, #545454); font-size: 0.85rem; margin: 0.75rem 0 0; }
+@media (max-width: 480px) {
+  .data-presentation-ranking .data-ranking-entry { grid-template-columns: 2.25rem minmax(0, 1fr) auto; }
+  .data-presentation-ranking .data-ranking-rank { font-size: 1.2rem; }
+}

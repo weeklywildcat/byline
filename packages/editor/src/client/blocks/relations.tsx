@@ -23,7 +23,7 @@ import { useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 const formatDate = (iso: string) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
 
 /** A debounced, cancellable search: each keystroke supersedes the last, and a stale answer is never shown. */
-function useSearch<T>(search: ((query: string) => Promise<T[]>) | undefined, query: string, open: boolean) {
+export function useSearch<T>(search: ((query: string) => Promise<T[]>) | undefined, query: string, open: boolean, attempt = 0) {
   const [state, setState] = useState<{ items: T[]; loading: boolean; failed: boolean }>({ items: [], loading: false, failed: false });
   useEffect(() => {
     if (!open || !search) return;
@@ -39,7 +39,7 @@ function useSearch<T>(search: ((query: string) => Promise<T[]>) | undefined, que
       live = false;
       window.clearTimeout(timer);
     };
-  }, [open, query, search]);
+  }, [open, query, search, attempt]);
   return state;
 }
 

@@ -104,6 +104,9 @@ export interface Config {
     'review-workflows': ReviewWorkflow;
     'review-runs': ReviewRun;
     'review-comments': ReviewComment;
+    'data-datasets': DataDataset;
+    'data-records': DataRecord;
+    'data-projects': DataProject;
     users: User;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
@@ -161,6 +164,9 @@ export interface Config {
     'review-workflows': ReviewWorkflowsSelect<false> | ReviewWorkflowsSelect<true>;
     'review-runs': ReviewRunsSelect<false> | ReviewRunsSelect<true>;
     'review-comments': ReviewCommentsSelect<false> | ReviewCommentsSelect<true>;
+    'data-datasets': DataDatasetsSelect<false> | DataDatasetsSelect<true>;
+    'data-records': DataRecordsSelect<false> | DataRecordsSelect<true>;
+    'data-projects': DataProjectsSelect<false> | DataProjectsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
@@ -1545,6 +1551,105 @@ export interface ReviewComment {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-datasets".
+ */
+export interface DataDataset {
+  id: number;
+  title: string;
+  /**
+   * Permanent: projects and releases refer to the dataset by it.
+   */
+  key: string;
+  description?: string | null;
+  schema:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  workingRevision?: number | null;
+  workingChangedAt?: string | null;
+  release?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-records".
+ */
+export interface DataRecord {
+  id: number;
+  dataset: number | DataDataset;
+  recordId: string;
+  values:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  position?: number | null;
+  included?: boolean | null;
+  createdBy?: (number | null) | User;
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-projects".
+ */
+export interface DataProject {
+  id: number;
+  title: string;
+  slug: string;
+  deck?: string | null;
+  presentationKind: 'template' | 'custom';
+  presentation: string;
+  bindings:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  settings:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  source?: string | null;
+  methodology?: string | null;
+  indexing: 'public' | 'noindex';
+  relatedStories?: (number | Story)[] | null;
+  publishedAt?: string | null;
+  createdBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1774,6 +1879,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'polls';
         value: number | Poll;
+      } | null)
+    | ({
+        relationTo: 'data-projects';
+        value: number | DataProject;
       } | null)
     | ({
         relationTo: 'users';
@@ -2631,6 +2740,59 @@ export interface ReviewCommentsSelect<T extends boolean = true> {
   resolvedBy?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-datasets_select".
+ */
+export interface DataDatasetsSelect<T extends boolean = true> {
+  title?: T;
+  key?: T;
+  description?: T;
+  schema?: T;
+  workingRevision?: T;
+  workingChangedAt?: T;
+  release?: T;
+  createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-records_select".
+ */
+export interface DataRecordsSelect<T extends boolean = true> {
+  dataset?: T;
+  recordId?: T;
+  values?: T;
+  position?: T;
+  included?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-projects_select".
+ */
+export interface DataProjectsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  deck?: T;
+  presentationKind?: T;
+  presentation?: T;
+  bindings?: T;
+  settings?: T;
+  source?: T;
+  methodology?: T;
+  indexing?: T;
+  relatedStories?: T;
+  publishedAt?: T;
+  createdBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3557,6 +3719,18 @@ export interface BylineDataTableBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'dataTable';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineDataProjectBlock".
+ */
+export interface BylineDataProjectBlock {
+  project: number | DataProject;
+  title: string;
+  description: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'dataProject';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

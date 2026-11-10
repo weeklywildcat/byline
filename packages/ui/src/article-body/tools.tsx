@@ -327,6 +327,25 @@ export function finalScoreDetails(block: Pick<FinalScoreBlock, "date" | "locatio
 }
 
 // ---------------------------------------------------------------------------
+// Data Project: the story's own heading and description around the project's
+// real presentation. The public site draws the project through its host
+// (`renderDataProject`); this is the editor's canvas and the plain fallback a
+// harness without a Data host gets: complete words, no data.
+// ---------------------------------------------------------------------------
+
+export function DataProjectFigure({ headingId, title, description, publication, footer, children }: { headingId: string; title: ReactNode; description: ReactNode; publication?: "draft" | "published" | "changed"; footer?: ReactNode; children?: ReactNode }): ReactNode {
+  return (
+    <section className="byline-data-project" aria-labelledby={headingId} data-publication={publication}>
+      <p className="byline-kicker">Data</p>
+      <h2 className="byline-data-project-title" id={headingId}>{title}</h2>
+      <p className="byline-data-project-description">{description}</p>
+      {children}
+      {footer ? <p className="byline-data-project-footer">{footer}</p> : null}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Repository Tracker: like a repository interactive, a distinct editorial idea.
 // ---------------------------------------------------------------------------
 

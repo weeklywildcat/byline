@@ -120,6 +120,34 @@ if (snapshot) {
   process.env.BYLINE_PREPARED_SNAPSHOT_FILE = file;
   if (publicationMediaDescriptors.length) await writeFile(path.join(projectRoot, ".byline-build", "publication-media-descriptors.json"), JSON.stringify(publicationMediaDescriptors));
 }
+// Byline Data: exactly the releases the accepted snapshot (or the fixture) names, verified
+// (bytes, SHA-256, canonical schema, descriptor) and materialized BEFORE Astro renders, because
+// presentations render their rows on the server. Astro then reads only these local files.
+const dataStarted = performance.now();
+const { loadFixtureDataSection, materializeDataReleases, buildDataEndpoint } = await tsImport("../lib/data-releases.ts", import.meta.url);
+let dataSection = { projects: [], releases: [] };
+let dataSource = null;
+if (snapshot) {
+  dataSection = snapshot.data;
+  const offline = process.env.BYLINE_BUILD_DATA_DIR?.trim();
+  const endpoint = process.env.BYLINE_NEWSROOM_BUILD_DATA_URL?.trim() || (payloadBuildUrl ? buildDataEndpoint(payloadBuildUrl) : "");
+  dataSource = offline ? { kind: "fixture", directory: path.resolve(projectRoot, offline) } : endpoint ? { kind: "newsroom", endpoint, token: process.env.BYLINE_BUILD_TOKEN ?? "" } : null;
+} else if (process.env.BYLINE_CONTENT_MODE?.endsWith("-fixture")) {
+  const fixtureData = await loadFixtureDataSection(projectRoot);
+  dataSection = fixtureData.section;
+  dataSource = { kind: "fixture", directory: fixtureData.directory };
+}
+if (dataSection.releases.length && !dataSource) throw new Error("This snapshot names Data releases: set BYLINE_NEWSROOM_BUILD_URL (or BYLINE_NEWSROOM_BUILD_DATA_URL, or BYLINE_BUILD_DATA_DIR) and BYLINE_BUILD_TOKEN.");
+const dataDirectory = path.join(projectRoot, ".byline-build", "data");
+await mkdir(path.join(projectRoot, ".byline-build"), { recursive: true });
+const dataFile = path.join(projectRoot, ".byline-build", "public-data.json");
+await writeFile(dataFile, JSON.stringify(dataSection));
+const dataMetrics = dataSection.releases.length ? await materializeDataReleases(dataSection, dataSource, dataDirectory) : { files: 0, bytes: 0, requests: 0 };
+if (dataMetrics.files) console.log(`[byline] Data: ${dataSection.projects.length} projects, ${dataMetrics.files} releases (${(dataMetrics.bytes / 1024).toFixed(1)} KB) verified.`);
+process.env.BYLINE_PREPARED_DATA_FILE = dataFile;
+process.env.BYLINE_PREPARED_DATA_DIR = dataDirectory;
+const dataMs = performance.now() - dataStarted;
+
 const buildStarted = performance.now();
 let buildOutput = "";
 const child = spawn(process.execPath, [...(snapshot ? ["--import", path.join(projectRoot, "scripts/assert-snapshot-network.mjs")] : []), astroCommand, ...astroArguments], {
@@ -156,6 +184,13 @@ if (isBuild && publicationMediaDescriptors.length) {
   console.log(`[byline] Publication media: ${result.written} written, ${result.unchanged} unchanged, ${(result.bytes / 1024 / 1024).toFixed(1)} MB in ${publicationMediaDescriptors.length} files.`);
 }
 
+// The exact verified release bytes, public at /_byline/data/<sha256>.json for presentations' optional client code.
+if (isBuild && dataSection.releases.length) {
+  const target = path.join(projectRoot, "out", "_byline", "data");
+  await mkdir(target, { recursive: true });
+  for (const { sha256 } of dataSection.releases) await cp(path.join(dataDirectory, `${sha256}.json`), path.join(target, `${sha256}.json`));
+}
+
 if (astroArguments[0] === "build") {
   const cleanLog = buildOutput.replace(/\x1b\[[0-9;]*m/g, "");
   const restored = (cleanLog.match(/\((?:restored|cached)\)/g) || []).length;
@@ -163,7 +198,7 @@ if (astroArguments[0] === "build") {
   await writeFile(path.join(projectRoot, ".byline-build", "frontend-phases.json"), JSON.stringify({
     totalStartedAt, acquisitionMs, downloadMs, parseMs, snapshotBytes, snapshotIdentity, cmsRequests,
     dataMode: acquisitionMode,
-    snapshotSource, publicationMedia: publicationMediaMetrics,
+    snapshotSource, publicationMedia: publicationMediaMetrics, data: { projects: dataSection.projects.length, ...dataMetrics, ms: dataMs },
     buildIdentity, commit: process.env.WORKERS_CI_COMMIT_SHA || process.env.CF_PAGES_COMMIT_SHA || null,
     branch: process.env.WORKERS_CI_BRANCH || process.env.CF_PAGES_BRANCH || null,
     astroMs: performance.now() - buildStarted, routes: { rendered: emitted - restored, restored, emitted },

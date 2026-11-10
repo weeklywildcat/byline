@@ -76,6 +76,7 @@ const PASCAL: Record<ArticleBlockType, string> = {
   poll: "Poll",
   repositoryInteractive: "RepositoryInteractive",
   repositoryTracker: "RepositoryTracker",
+  dataProject: "DataProject",
   event: "Event",
   socialPost: "SocialPost",
   finalScore: "FinalScore"
@@ -335,6 +336,12 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "key", type: "text", required: true, maxLength: LIMITS.trackerKey },
     { name: "title", type: "text", required: true, maxLength: LIMITS.trackerTitle },
     { name: "description", type: "textarea", required: true, maxLength: LIMITS.trackerDescription }
+  ]),
+  // Only the relationship and this story's own heading and description: rows, bindings, releases and the presentation come from the published Data Project.
+  dataProject: storyBlock("dataProject", [
+    { name: "project", type: "relationship", relationTo: "data-projects", required: true },
+    { name: "title", type: "text", required: true, maxLength: LIMITS.dataProjectTitle },
+    { name: "description", type: "textarea", required: true, maxLength: LIMITS.dataProjectDescription }
   ]),
   // Only the relationship: the Event's title, time and place are read from the Event when the story renders.
   event: storyBlock("event", [{ name: "event", type: "relationship", relationTo: "events", required: true, filterOptions: publishedEvents }]),

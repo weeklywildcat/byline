@@ -22,7 +22,7 @@
 }
 
 /* Editor chrome inside the article uses Nova's surface colours, not the article's same-named tokens. */
-.byline-article-canvas :is(.byline-block-chrome, .byline-row-actions, .byline-item-actions, .byline-media-empty, .byline-media-status, .byline-add-bar, .byline-gutter-inserter, .byline-document-attachment, .byline-block-note, .byline-list-footer, .byline-credit-missing, .byline-timeline-hint, .byline-confirm, .byline-chart-editor-data, .byline-tracker-standin, .byline-social-permalink, .byline-timeline-document-field) {
+.byline-article-canvas :is(.byline-block-chrome, .byline-row-actions, .byline-item-actions, .byline-media-empty, .byline-media-status, .byline-add-bar, .byline-gutter-inserter, .byline-document-attachment, .byline-block-note, .byline-list-footer, .byline-credit-missing, .byline-timeline-hint, .byline-confirm, .byline-chart-editor-data, .byline-tracker-standin, .byline-data-project-status, .byline-social-permalink, .byline-timeline-document-field) {
   --accent: var(--byline-ui-accent);
   --muted: var(--byline-ui-muted);
 }
@@ -377,3 +377,7 @@
   .byline-article-canvas .byline-block:is(:focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"]))::after { border-color: Highlight; }
   .byline-block-chrome { border-color: CanvasText; }
 }
+
+/* Data Project: the status line sits quietly above the real presentation, which is drawn by the host in its own frame. */
+.byline-article-canvas .byline-data-project-status { align-items: center; color: var(--muted-foreground, #71717a); display: flex; flex-wrap: wrap; font-family: var(--byline-chrome-font); font-size: 12px; gap: 8px; margin: 0 0 10px; }
+.byline-article-canvas .byline-data-project-stage { min-width: 0; }

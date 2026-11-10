@@ -1,0 +1,22 @@
+{
+  "name": "@byline/data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Byline Data's framework-neutral contract: dataset schemas with immutable field keys, typed record values, the closed query language, immutable public releases, presentation descriptors and project bindings, CSV. No Payload, Next, Astro or React.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./csv": "./src/csv.ts",
+    "./query": "./src/query.ts",
+    "./format": "./src/format.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "4.1.12"
+  }
+}

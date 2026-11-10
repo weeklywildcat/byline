@@ -79,7 +79,7 @@ describe("the Calendar breakpoint", () => {
 
 describe("Calendar navigation", () => {
   it("is Home, Stories, Calendar, Media, Collections: a destination of its own, with no generic Planning", () => {
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data"]);
     expect(NAVIGATION.find((item) => item.key === "calendar")).toEqual({ key: "calendar", label: "Calendar", path: "/calendar", minimumRole: "staff" });
     expect(NAVIGATION.map((item) => item.key)).not.toContain("planning");
   });

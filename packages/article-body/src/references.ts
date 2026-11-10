@@ -1,6 +1,6 @@
 import { mediaKey } from "./media";
 import { sourceRefs } from "./evidence";
-import type { ArticleBlock, ArticleBody, ArticleBodyNode, ArticleReferences, MediaId, PublicEventReference, PublicPollReference, PublicStoryReference } from "./types";
+import type { ArticleBlock, ArticleBody, ArticleBodyNode, ArticleReferences, MediaId, PublicDataProjectReference, PublicEventReference, PublicPollReference, PublicStoryReference } from "./types";
 import { isArticleBlock } from "./types";
 
 /**
@@ -43,6 +43,7 @@ export function blockMediaIds(block: ArticleBlock): MediaId[] {
     case "poll":
     case "repositoryInteractive":
     case "repositoryTracker":
+    case "dataProject":
     case "event":
     case "socialPost":
     case "finalScore":
@@ -58,6 +59,10 @@ export function blockStoryIds(block: ArticleBlock): MediaId[] {
 
 export function blockPollIds(block: ArticleBlock): MediaId[] {
   return block.type === "poll" ? present(block.poll) : [];
+}
+
+export function blockDataProjectIds(block: ArticleBlock): MediaId[] {
+  return block.type === "dataProject" ? present(block.project) : [];
 }
 
 export function blockEventIds(block: ArticleBlock): MediaId[] {
@@ -87,6 +92,10 @@ export function bodyPollIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
   return unique(nodes.filter(isArticleBlock).flatMap(blockPollIds));
 }
 
+export function bodyDataProjectIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
+  return unique(nodes.filter(isArticleBlock).flatMap(blockDataProjectIds));
+}
+
 export function bodyEventIds(nodes: readonly ArticleBodyNode[]): MediaId[] {
   return unique(nodes.filter(isArticleBlock).flatMap(blockEventIds));
 }
@@ -112,6 +121,12 @@ export type ReferenceLookup = {
   interactive?: (key: string) => boolean;
   /** Whether a repository tracker with this key is registered. */
   tracker?: (key: string) => boolean;
+  /**
+   * The published Data Project with this ID, or null when it is missing,
+   * deleted, never published or has no valid public representation. Only the
+   * ID is kept: the host resolves everything else when the story renders.
+   */
+  dataProject?: (id: MediaId) => PublicDataProjectReference | null | undefined;
 };
 
 export type { ArticleReferences };

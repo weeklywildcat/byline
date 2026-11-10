@@ -95,7 +95,7 @@ describe("immutable snapshot artifacts and retention", () => {
     const snapshots = store();
     const bytes = Buffer.from('{"schemaVersion":1}', "utf8");
     const first = await snapshots.write(bytes, 4);
-    expect(first.filename).toMatch(/^snapshot-v2-r4-[0-9a-f]{64}\.json$/);
+    expect(first.filename).toMatch(/^snapshot-v3-r4-[0-9a-f]{64}\.json$/);
     expect(await snapshots.verify(first.filename, first.sha256, first.bytes)).toBe(true);
     // Identical bytes are reused.
     expect(await snapshots.write(bytes, 4)).toEqual(first);

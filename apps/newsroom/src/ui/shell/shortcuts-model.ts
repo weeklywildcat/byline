@@ -15,6 +15,7 @@ export const GO_KEYS: Readonly<Record<string, string>> = {
   calendar: "c",
   media: "m",
   collections: "o",
+  data: "a",
   people: "p",
   "front-page": "f",
   distribution: "d",

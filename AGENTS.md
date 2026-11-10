@@ -8,19 +8,21 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 - `apps/web/`: static Astro rendering, public routes, SEO, feeds, redirects, and build verification. See [its guide](apps/web/AGENTS.md).
 - `packages/content/` and `packages/article-body/`: public snapshot and semantic article contracts.
 - `packages/story-presentations/`: article presentation resolver, shared article host, and bespoke layouts. Read [its guide](packages/story-presentations/AGENTS.md) before custom story work.
+- `packages/data/` and `packages/data-presentations/`: the Byline Data contract (datasets, releases, bindings) and the presentation SDK with its templates. Read [Byline Data](docs/byline-data.md), the [general Data guide](packages/data/AGENTS.md) (which path fits a request, how to add a Story block) and the [presentation guide](packages/data-presentations/AGENTS.md) before Data work.
 - `packages/newsroom-ui/` and `packages/newsroom-screens/`: private UI components and screens.
 - `packages/ui/`, `packages/design/`, and `packages/theme-weekly-wildcat/`: public UI, layout contracts, and the Weekly Wildcat theme.
 
 ## Architecture rules
 
 - Payload owns editorial content, access, drafts, jobs, and publishing. Keep planning state on the unversioned story plan. Project public content through explicit allowlists.
-- Astro consumes a local, validated Snapshot v2 and produces `apps/web/out/`. Keep static output and the compatibility guard in `apps/web/next.config.ts`. Rendering makes no newsroom requests. No SSR, public authentication, or public database.
+- Astro consumes a local, validated Snapshot v3 (v2 is still read) and produces `apps/web/out/`. Keep static output and the compatibility guard in `apps/web/next.config.ts`. Rendering makes no newsroom requests. No SSR, public authentication, or public database.
 - Keep credentials, private newsroom facts, and media originals out of public snapshots and artifacts.
 - Keep one shared article renderer and one presentation resolver. Standard and Immersive are the built-in modes; bespoke layouts and repository interactives live in the presentation package.
 - Keep the homepage layout in code. Front Page placements choose stories for existing slots; they do not change the design.
 - Apple platforms ([docs/apple-platforms.md](docs/apple-platforms.md)): use the `--byline-safe-*` variables for anything touching a screen edge, `touch-hit` for small raw controls, and `any-pointer: coarse` (never `pointer: coarse`) for touch sizing. Never sniff the user agent. Context menus mount for every input; only hover previews are hover-gated. Do not move the 768px or 1200px navigation breakpoints.
 - Sports records are an archive. Keep historical routes and redirects; do not add live game, team, or roster management.
 - Keep poll votes in the newsroom's dedicated table. The public static site does not accept votes.
+- Byline Data: datasets are working data; only an editor's Publish makes an immutable, content-addressed release, and public pages render releases materialized before Astro runs. Private fields never enter a release. Newsroom users never enter code; presentations are repository code that declares what it reads. A Story embeds a published Project by ID (the `dataProject` block) and never copies its data.
 
 ## Development
 

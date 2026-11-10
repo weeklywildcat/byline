@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { sql } from "@payloadcms/db-postgres";
-import { type PublicBuildSnapshotV2 } from "@byline/content";
+import { type PublicBuildSnapshot } from "@byline/content";
 import type { ContentHealthIssue, ContentHealthResponse } from "@byline/newsroom-screens/planning/planning-model";
 import { APIError, commitTransaction, initTransaction, killTransaction, type PayloadRequest, type TaskConfig } from "payload";
 import { atLeast, relationId } from "../../access/user";
@@ -103,7 +103,7 @@ export const contentHealthTask: TaskConfig = {
       if (!file) throw new Error("Invalid snapshot location.");
       const bytes = await readFile(file);
       if (bytes.length !== pointer.bytes || createHash("sha256").update(bytes).digest("hex") !== pointer.sha256) throw new Error("Snapshot did not match its published digest.");
-      const snapshot = JSON.parse(bytes.toString("utf8")) as PublicBuildSnapshotV2;
+      const snapshot = JSON.parse(bytes.toString("utf8")) as PublicBuildSnapshot;
       const story = storyId ? snapshot.datasets.stories.find((item) => item.id === storyId) :
         snapshot.datasets.stories.filter((item) => item.id > run!.cursor).sort((a, b) => a.id - b.id)[0];
       const findings = story ? await scanPublishedStory(snapshot, story) : [];
