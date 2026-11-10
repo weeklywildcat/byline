@@ -95,11 +95,12 @@ export type PublishedRelease = { descriptor: DataReleaseDescriptor; revision: nu
 
 export async function publishDatasetRelease(req: PayloadRequest, datasetId: number, options: { expectedRevision?: number; now?: Date; store?: DataReleaseStore; hooks?: ReleaseHooks; actor: number | string | null }): Promise<PublishedRelease> {
   const store = options.store ?? new DataReleaseStore();
-  const dataset = (await req.payload.findByID({ collection: "data-datasets", id: datasetId, ...system(req) }).catch(() => null)) as DatasetRow | null;
-  if (!dataset) throw new DataError("not-found", "That dataset doesn't exist.", 404);
-  // 1. The revision this release is for.
+  // 1. Capture the revision before reading the schema. If the schema changes
+  // between these reads, its revision bump makes the final fence lose.
   const revision = await readWorkingRevision(req.payload, datasetId);
   if (revision === null) throw new DataError("not-found", "That dataset doesn't exist.", 404);
+  const dataset = (await req.payload.findByID({ collection: "data-datasets", id: datasetId, ...system(req) }).catch(() => null)) as DatasetRow | null;
+  if (!dataset) throw new DataError("not-found", "That dataset doesn't exist.", 404);
   if (options.expectedRevision !== undefined && options.expectedRevision !== revision) {
     throw new DataError("revision-changed", "The data changed since you reviewed it. Look at the latest rows, then publish again.", 409, { revision });
   }
@@ -146,6 +147,16 @@ export async function publishDatasetRelease(req: PayloadRequest, datasetId: numb
   const owns = await initTransaction(req);
   try {
     const db = await drizzleFor(req.payload, req);
+    // Project publication locks every dataset it binds. Taking the same row
+    // lock here makes project publication and release promotion serialize.
+    await db.execute(sql`select id from data_datasets where id = ${datasetId} for update`);
+    if ((await readWorkingRevision(req.payload, datasetId, req)) !== revision) {
+      throw new DataError("revision-changed", "Someone changed this dataset while it was being published. Publish again to include their change.", 409);
+    }
+    // The earlier check is a fast preflight. This locked recheck is the one
+    // that closes the race with a project becoming public concurrently.
+    const finalBroken = await brokenProjects(req, dataset.key, descriptor);
+    if (finalBroken.length) throw new DataError("breaks-projects", `Publishing this would break public projects. ${finalBroken.join(" ")}`, 409, { issues: finalBroken });
     const result = await db.execute(sql`update data_datasets set release = ${JSON.stringify(pointer)}::jsonb where id = ${datasetId} and working_revision = ${revision} returning id`);
     if (!(result.rowCount ?? result.rows.length)) throw new DataError("revision-changed", "Someone changed this dataset while it was being published. Publish again to include their change.", 409);
     await recordPublicMutation(req, `data release ${dataset.key}`, { force: true });
