@@ -1,0 +1,7 @@
+---
+import "@byline/data-presentations/data-project.css";
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/data/page";
+const metadata = await getMetadata();
+---
+<BaseLayout metadata={metadata}><Page /></BaseLayout>

@@ -1,4 +1,5 @@
 import { getNativeSnapshot } from "./native-snapshot";
+import { publicDataProjects } from "./public-data";
 import { publicPageHref } from "./native-archive-views";
 import { routeCacheDependency } from "./route-cache";
 import {
@@ -110,7 +111,8 @@ function routeEntries(input: {
     .filter(({ path }) => path !== "/sports/" && path !== "/sports/schedule/")
     .map(({ path, target }) => ({ path, kind: "redirect" as const, redirectTo: target, delivery: "edge" as const }));
   const redirects = getNativeSnapshot()?.datasets.redirects.map(({ from, to }): RouteManifestEntry => ({ path: from, redirectTo: to, kind: "redirect", delivery: "edge" })) ?? [];
-  return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports, ...redirects];
+  const data = publicDataProjects().map((project): RouteManifestEntry => ({ path: project.href, kind: "data", digest: archiveRouteDigest([project, project.bindings.map((binding) => binding.release)]) }));
+  return [...fixed, ...articles, ...pages, ...categories, ...authors, ...coverages, ...sports, ...redirects, ...data];
 }
 
 async function loadSnapshot(): Promise<WebBuildSnapshot> {
@@ -177,7 +179,8 @@ export const getBuildSnapshot = memoizeBuildSnapshot(async () => {
     ...snapshot.categories.filter((category) => !isHiddenCategory(category)).map((category) => ({ path: `/category/${category.slug}/`, ...routeCacheDependency(snapshot, "category", category.id) })),
     ...snapshot.contributors.map((person) => ({ path: getContributorHref(person), ...routeCacheDependency(snapshot, "author", contributorIdentity(person)) })),
     ...snapshot.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.includes(page.slug)).map((page) => ({ path: publicPageHref(page), ...routeCacheDependency(snapshot, "page", page.slug) })),
-    ...snapshot.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, ...routeCacheDependency(snapshot, "coverage", coverage.slug) }))
+    ...snapshot.sports.coverages.map((coverage) => ({ path: `/coverage/${coverage.slug}/`, ...routeCacheDependency(snapshot, "coverage", coverage.slug) })),
+    ...publicDataProjects().map((project) => ({ path: project.href, ...routeCacheDependency(snapshot, "data", project.slug) }))
   ];
   await Promise.all([
     writeFile(path.join(buildDirectory, "route-cache-keys.json"), `${JSON.stringify(cacheKeys, null, 2)}\n`),

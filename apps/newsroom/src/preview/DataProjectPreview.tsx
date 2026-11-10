@@ -62,7 +62,7 @@ export async function DataProjectPreview({ payload, user, projectId, source }: {
   return (
     <main className="byline-preview-page byline-publication-preview" data-data-preview={source}>
       {source === "working" ? <p className="byline-preview-stale" role="note">Working data · not what readers see yet</p> : null}
-      <div style={{ padding: "0 20px" }}>
+      <div style={{ padding: "24px 20px 48px" }}>
         <DataProjectView
           resolved={outcome.resolved}
           host={{ styles: () => null }}

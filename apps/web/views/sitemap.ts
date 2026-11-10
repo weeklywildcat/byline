@@ -4,6 +4,7 @@ import { filterVisibleContentPosts, isHiddenCategory } from "@/lib/content";
 import { PUBLIC_SECTIONS } from "@/lib/sections";
 import { getPublicationConfig } from "@/lib/publication";
 import { buildSitemapEntries } from "@/lib/sitemap";
+import { publicDataProjects } from "@/lib/public-data";
 import {
   getAllAuthors,
   getAllCategories,
@@ -25,7 +26,7 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
   ]);
   const contributors = await optionalBuildData("public snapshot: contributors", getAllPublicContributors, authors);
 
-  return buildSitemapEntries({
+  const entries = buildSitemapEntries({
     siteUrl: getSiteUrl(),
     timeZone: publication.timezone,
     posts: filterVisibleContentPosts(allPosts),
@@ -36,4 +37,13 @@ export default async function sitemap(): Promise<SitemapEntry[]> {
     coverages,
     features: { sports: publication.features.sports }
   });
+  // Byline Data: indexable projects, dated by their newest release (never a draft or a noindex project).
+  const data = publicDataProjects().filter((project) => project.indexing === "public");
+  if (!data.length) return entries;
+  const latest = (dates: string[]) => new Date(dates.sort().at(-1)!);
+  return [
+    ...entries,
+    { url: `${getSiteUrl()}/data/`, lastModified: latest(data.map((project) => project.dataUpdatedAt)), changeFrequency: "daily", priority: 0.6 },
+    ...data.map((project) => ({ url: `${getSiteUrl()}${project.href}`, lastModified: latest([project.dataUpdatedAt, project.modifiedAt]), changeFrequency: "daily" as const, priority: 0.7 }))
+  ];
 }

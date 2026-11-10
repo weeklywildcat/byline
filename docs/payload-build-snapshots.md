@@ -1,7 +1,9 @@
 # Payload public build snapshots
 
-Payload projects its published records into the native **Public Snapshot v2**
-contract in `@byline/content`. The artifact is the complete content input for
+Payload projects its published records into the native **Public Snapshot v3**
+contract in `@byline/content`: Snapshot v2's content plus Byline Data's
+published projects and release descriptors ([Byline Data](byline-data.md#snapshot-v3)).
+Builds still read v2. The artifact is the complete content input for
 the static Astro build. The renderer gets canonical public Stories, including
 their semantic bodies, and renders them with the same article presentation
 builder and components as Live Preview.
@@ -40,8 +42,8 @@ timestamp use their creation instant.
 
 The version numbers serve separate purposes.
 
-- **Snapshot schema version 2** identifies the public wire format.
-- **Producer version 1** identifies this projection and serialization. Bump it
+- **Snapshot schema version 3** identifies the public wire format (v2 is still read).
+- **Producer version 4** identifies this projection and serialization. Bump it
   when changing the bytes that would otherwise be reused for the same revision.
 - **Public content revision** advances only on a committed public change.
 - **Publication Media recipe version** identifies the preparation algorithm for
@@ -71,9 +73,12 @@ revision fence distinguishes such races from invalid public records.
 ## Immutable artifact
 
 ```text
-<BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v2/
-  snapshot-v2-r<R>-<sha256>.json
+<BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v3/
+  snapshot-v3-r<R>-<sha256>.json
 ```
+
+Data Releases use the same immutable artifact store
+(`public/artifacts/store.ts`) under `data/v1/<sha256>.json`.
 
 `SnapshotStore` stages a file in the final directory, fsyncs it and finalizes it
 atomically without replacing a previous file. It verifies an existing file
@@ -89,8 +94,9 @@ and return `Cache-Control: private, no-store`.
 
 | Request | Result |
 | --- | --- |
-| `GET /api/byline/build/snapshot` | The completed v2 pointer for the current revision, or 503 with `byline_snapshot_not_ready`. A corrupt pointer fails. |
-| `GET /api/byline/build/snapshot/:sha256` | The exact retained v2 bytes for the advertised digest. |
+| `GET /api/byline/build/snapshot` | The completed pointer for the current revision, or 503 with `byline_snapshot_not_ready`. A corrupt pointer fails. A build that names its readable versions in `X-Byline-Snapshot-Versions` gets 406 for any other. |
+| `GET /api/byline/build/snapshot/:sha256` | The exact retained bytes for the advertised digest. |
+| `GET /api/byline/build/data/:sha256` | The exact bytes of a dataset's current Data Release; 404 for an obsolete or unknown one. |
 | `GET /api/byline/build/direct?revision=R` | Builds the same validated artifact if discovery reports not ready and R is current. A revision race or a newly completed pointer returns 409 so the build can rediscover within a bounded retry. |
 
 The build verifies the schema, revision, digest and size of an advertised
@@ -134,8 +140,8 @@ them under `out/_byline/media`.
 
 ## Native datasets
 
-The v2 envelope contains `schemaVersion`, `revision`, `generatedAt`,
-`publication`, `datasets` and `counts`. The JSON Schema documents the wire
+The envelope contains `schemaVersion`, `revision`, `generatedAt`,
+`publication`, `datasets`, `counts`, optional `frontPage` and (v3) `data`. The JSON Schema documents the wire
 format and `validatePublicBuildSnapshotV2` checks its runtime invariants.
 
 | Dataset | Public facts |

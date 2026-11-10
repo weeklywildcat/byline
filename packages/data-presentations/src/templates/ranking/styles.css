@@ -2,7 +2,7 @@
 .data-presentation-ranking .data-ranking { font-family: var(--font-ui, system-ui, sans-serif); }
 .data-presentation-ranking .data-ranking-list { counter-reset: none; list-style: none; margin: 0; padding: 0; }
 .data-presentation-ranking .data-ranking-entry { align-items: baseline; border-block-end: 1px solid var(--rule, #e2e2e2); display: grid; gap: 0.25rem 1rem; grid-template-columns: 3rem minmax(0, 1fr) auto; padding-block: 0.85rem 0.75rem; position: relative; }
-.data-presentation-ranking .data-ranking-entry:first-child { border-block-start: 2px solid var(--rule-strong, #121212); }
+
 .data-presentation-ranking .data-ranking-rank { font-family: var(--font-headline, inherit); font-size: 1.5rem; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; }
 .data-presentation-ranking .data-ranking-name { font-size: 1.05rem; font-weight: 600; min-width: 0; }
 .data-presentation-ranking .data-ranking-flag { color: var(--accent, #73192a); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }

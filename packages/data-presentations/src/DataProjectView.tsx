@@ -30,7 +30,7 @@ export function DataProjectView({ resolved, host, notes, related, kicker = "Data
   const { project, format } = props;
   const methodology = paragraphs(notes.methodology);
   return (
-    <article className={`data-project data-presentation-${key}`} data-data-project={project.id} data-data-presentation={key} data-data-source={resolved.source}>
+    <article className={`data-project data-presentation-${key}`} data-data-project={project.id} data-data-presentation={key} data-data-presentation-kind={definition.descriptor.kind} data-data-source={resolved.source}>
       {definition.descriptor.styles ? host.styles(key) : null}
       <header className="data-project-header">
         {kicker ? <p className="data-project-kicker">{kicker}</p> : null}

@@ -38,6 +38,8 @@ import { serveBuildMedia } from "../src/publication-media/build-endpoint";
 import { drizzleFor } from "../src/publication-media/state";
 import { serveDirectSnapshot, serveSnapshotArtifact, serveSnapshotDiscovery } from "../src/public/snapshot/endpoints";
 import { runPublicSnapshotPreparation } from "../src/public/snapshot/prepare";
+import { publishDatasetRelease } from "../src/data/releases";
+import { serveDataRelease } from "../src/data/snapshot";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "../../..");
@@ -187,7 +189,26 @@ async function seed() {
   const page = await payload.create({ collection: "pages", data: { title: "About the newsroom", slug: "about-the-newsroom", summary: "Who we are.", body: { root: { type: "root", version: 1, children: [{ type: "heading", tag: "h2", version: 1, children: [{ type: "text", text: "Our mission", format: 0, version: 1 }] }, { type: "paragraph", version: 1, children: [{ type: "text", text: "We are student journalists.", format: 0, version: 1 }] }] } }, _status: "published" } });
   await payload.create({ collection: "pages", data: { parent: page.id, title: "Contact our newsroom", slug: "contact-our-newsroom",
     summary: "Get in touch.", _status: "published" } });
-  return { structured, late, plain };
+  // Byline Data: a dataset with a private field and an excluded row, an immutable release, and a
+  // published project with the custom fixture presentation. The private values are sentinels.
+  const editorReq = await createLocalReq({ user: { ...owner, collection: "users" } as never }, payload);
+  const choices = [{ value: "done", label: "Done", tone: "positive" }, { value: "underway", label: "Underway", tone: "caution" }, { value: "planned", label: "Planned" }];
+  const dataset = await payload.create({ collection: "data-datasets", data: { title: "Sidewalk phases", key: "sidewalk-phases", schema: { retiredKeys: [], fields: [
+    { key: "name", label: "Phase", type: "text", required: true, visibility: "public", options: { maxLength: 500 } },
+    { key: "status", label: "Status", type: "select", required: true, visibility: "public", options: { choices } },
+    { key: "detail", label: "Detail", type: "longText", required: false, visibility: "public", options: { maxLength: 10000 } },
+    { key: "contact", label: "City contact", type: "text", required: false, visibility: "private", options: { maxLength: 500 } }
+  ] } } as never, req: editorReq, overrideAccess: false });
+  for (const [position, values, included] of [
+    [1, { name: "Survey and design", status: "done", detail: "Finished in March.", contact: "SENTINEL-DATA-PRIVATE-FIELD" }, true],
+    [2, { name: "Greenwood High crossing", status: "underway", detail: "Signals arrive in November." }, true],
+    [3, { name: "SENTINEL-DATA-EXCLUDED-ROW", status: "planned" }, false]
+  ] as const) await payload.create({ collection: "data-records", data: { dataset: dataset.id, values, position, included } as never, req: editorReq, overrideAccess: false });
+  const released = await publishDatasetRelease(editorReq, dataset.id, { actor: owner.id });
+  const project = await payload.create({ collection: "data-projects", draft: true, data: { title: "Sidewalk tracker", slug: "sidewalk-tracker", presentationKind: "custom", presentation: "fixture-sidewalk-project", indexing: "public", settings: {}, source: "City engineering.", methodology: "Checked weekly.",
+    bindings: [{ slot: "phases", dataset: "sidewalk-phases", fields: { name: "name", status: "status", detail: "detail" } }], relatedStories: [structured], _status: "draft" } as never, req: editorReq, overrideAccess: false });
+  await payload.update({ collection: "data-projects", id: project.id, draft: false, data: { _status: "published" } as never, req: editorReq, overrideAccess: false });
+  return { structured, late, plain, dataRelease: released.descriptor.sha256 };
 }
 
 /* ------------------------------------------------------------ build-only API over HTTP */
@@ -196,13 +217,14 @@ async function serve() {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const req = await createLocalReq({}, payload);
     Object.assign(req, { headers: new Headers(Object.entries(request.headers).flatMap(([key, value]): Array<[string, string]> => (typeof value === "string" ? [[key, value]] : []))), url: url.toString(), searchParams: url.searchParams });
-    const match = /^\/api\/byline\/build\/(snapshot|direct|media)(?:\/([0-9a-f]{64}))?$/.exec(url.pathname);
+    const match = /^\/api\/byline\/build\/(snapshot|direct|media|data)(?:\/([0-9a-f]{64}))?$/.exec(url.pathname);
     let res: Response;
     try {
       if (!match) res = new Response("not found", { status: 404 });
       else if (match[1] === "snapshot" && !match[2]) res = await serveSnapshotDiscovery(req);
       else if (match[1] === "snapshot") res = await serveSnapshotArtifact(Object.assign(req, { routeParams: { sha256: match[2] } }));
       else if (match[1] === "direct") res = await serveDirectSnapshot(req);
+      else if (match[1] === "data") res = await serveDataRelease(Object.assign(req, { routeParams: { sha256: match[2] } }));
       else res = await serveBuildMedia(Object.assign(req, { routeParams: { sha256: match[2] } }));
     } catch (error) {
       res = new Response(String(error), { status: 500 });
@@ -320,7 +342,13 @@ for (const fact of ["byline-footnote-ref", "fnref-fn-timing", "fnref-fn-survey",
 }
 if (!/<img[^>]+src[Ss]et="[^"]*\/_byline\/media\/images\/[^"]*\d+w,/.test(structuredHtml)) problems.push("missing prepared responsive image candidates");
 const torture = snapshot.datasets.stories.find((entry: { id: number }) => entry.id === ids.structured);
-if (snapshot.schemaVersion !== 2 || torture?.body?.format !== "byline-v1") problems.push("accepted snapshot lacks the native structured Story");
+if (snapshot.schemaVersion !== 3 || torture?.body?.format !== "byline-v1") problems.push("accepted snapshot lacks the native structured Story");
+// Byline Data: the project's page renders its published release, and exactly that release is public.
+const dataRoute = "data/sidewalk-tracker/index.html";
+const dataHtml = filesA.includes(dataRoute) ? readFileSync(path.join(a.out, dataRoute), "utf8") : "";
+if (!dataHtml || !dataHtml.includes("Greenwood High crossing") || !dataHtml.includes("About this data") || !dataHtml.includes("Board approves")) problems.push("missing the rendered Data project page or its related coverage");
+if (!filesA.includes(`_byline/data/${ids.dataRelease}.json`) || filesA.filter((file) => file.startsWith("_byline/data/")).length !== 1) problems.push("the public Data release files are not exactly the snapshot's");
+if (snapshot.data?.projects?.[0]?.bindings?.[0]?.release !== ids.dataRelease) problems.push("the snapshot's Data project does not use the published release");
 if (snapshot.datasets.polls[0]?.results?.totalVotes !== 6) problems.push("closed Poll public aggregate is missing");
 const images = [...structuredHtml.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
 if (!images.length || images.some((src) => !src.startsWith("/_byline/media/") && !src.startsWith("https://weeklywildcat.com/_byline/media/") && !src.startsWith("/brand/") && !src.includes("/_byline/media/"))) problems.push(`story images are not all prepared media: ${images.slice(0, 5).join(", ")}`);

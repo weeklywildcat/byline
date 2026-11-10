@@ -1,4 +1,5 @@
-import { nativeMedia, nativeStory } from "./native-snapshot";
+import { nativeMedia, nativeStory, publicDataPresentationRegistry } from "./native-snapshot";
+import { publicDataProject, publicDataSection } from "./public-data";
 import { nativeArticlePresentation } from "./native-article";
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
@@ -29,7 +30,7 @@ export function articleRenderInputs(snapshot: WebBuildSnapshot, post: ArchivePos
   };
 }
 
-export type DynamicRouteKind = "article" | "category" | "author" | "page" | "coverage";
+export type DynamicRouteKind = "article" | "category" | "author" | "page" | "coverage" | "data";
 export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRouteKind, id: string | number, publication = getPublicationConfig()) {
   // Revision changes alone must not invalidate every page. All presentation
   // state does: navigation, branding, SEO, feature gates, URLs and locale.
@@ -59,6 +60,19 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
   } else if (kind === "page") {
     data = snapshot.pages.find((entry) => entry.slug === id);
     dependencies = { page: id };
+  } else if (kind === "data") {
+    // A Data page changes with its project, the exact releases it uses (by digest), its presentation's
+    // descriptor and its related Stories' public facts; never with an unrelated dataset or release.
+    const project = publicDataProject(String(id));
+    if (!project) throw new Error(`No public Data project ${id} for incremental rendering`);
+    const shas = new Set(project.bindings.map((binding) => binding.release));
+    data = {
+      project,
+      releases: publicDataSection().releases.filter((release) => shas.has(release.sha256)),
+      presentation: publicDataPresentationRegistry()[project.presentation.key]?.descriptor ?? null,
+      related: project.relatedStories.map((storyId) => { const story = nativeStory(storyId); return story ? { id: story.id, title: story.title, href: story.href } : null; })
+    };
+    dependencies = { project: project.slug, releases: [...shas], related: project.relatedStories };
   } else {
     const coverage = snapshot.sports.coverages.find((entry) => entry.slug === id);
     // The page shows each story's photo, byline and reading time, not just the coverage record.

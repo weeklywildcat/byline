@@ -1,0 +1,232 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "slug": "main-street-sidewalk",
+      "title": "Main Street sidewalk project",
+      "deck": "Which phases of the Main Street sidewalk project are done, what's underway and what's left.",
+      "href": "/data/main-street-sidewalk/",
+      "presentation": {
+        "kind": "custom",
+        "key": "fixture-sidewalk-project"
+      },
+      "settings": {},
+      "bindings": [
+        {
+          "slot": "phases",
+          "dataset": "main-street-sidewalk-phases",
+          "fields": {
+            "name": "name",
+            "status": "status",
+            "detail": "detail",
+            "date": "date"
+          },
+          "release": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea"
+        }
+      ],
+      "source": "Greenwood city engineering department; Weekly Wildcat reporting.",
+      "methodology": "Weekly Wildcat reporters check the city's project page and meeting minutes every week.\n\nDates are when a phase finished or is scheduled to.",
+      "indexing": "public",
+      "publishedAt": "2026-10-20T15:00:00.000Z",
+      "modifiedAt": "2026-10-26T02:00:00.000Z",
+      "dataUpdatedAt": "2026-10-20T14:00:00.000Z",
+      "relatedStories": []
+    },
+    {
+      "id": 2,
+      "slug": "marching-band-rankings",
+      "title": "Marching band rankings",
+      "deck": "Saturday's regional marching band competition, by final score.",
+      "href": "/data/marching-band-rankings/",
+      "presentation": {
+        "kind": "template",
+        "key": "ranking"
+      },
+      "settings": {
+        "order": "desc",
+        "limit": 0,
+        "bars": true,
+        "valueLabel": "Score"
+      },
+      "bindings": [
+        {
+          "slot": "entries",
+          "dataset": "marching-band-results",
+          "fields": {
+            "name": "band",
+            "value": "score",
+            "highlight": "local"
+          },
+          "release": "746828e7952ddb4cf442c9f810c636850727c407909bce3161538e321143716a"
+        }
+      ],
+      "source": "Regional Band Directors Association.",
+      "methodology": "",
+      "indexing": "public",
+      "publishedAt": "2026-10-20T15:00:00.000Z",
+      "modifiedAt": "2026-10-26T02:00:00.000Z",
+      "dataUpdatedAt": "2026-10-26T01:30:00.000Z",
+      "relatedStories": []
+    },
+    {
+      "id": 3,
+      "slug": "sidewalk-timeline",
+      "title": "Main Street sidewalk timeline",
+      "deck": "",
+      "href": "/data/sidewalk-timeline/",
+      "presentation": {
+        "kind": "template",
+        "key": "timeline"
+      },
+      "settings": {
+        "order": "oldest",
+        "groupByYear": true,
+        "linkLabel": "Read more"
+      },
+      "bindings": [
+        {
+          "slot": "events",
+          "dataset": "main-street-sidewalk-phases",
+          "fields": {
+            "title": "name",
+            "date": "date",
+            "detail": "detail",
+            "status": "status"
+          },
+          "release": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea"
+        }
+      ],
+      "source": "",
+      "methodology": "",
+      "indexing": "noindex",
+      "publishedAt": "2026-10-20T15:00:00.000Z",
+      "modifiedAt": "2026-10-26T02:00:00.000Z",
+      "dataUpdatedAt": "2026-10-20T14:00:00.000Z",
+      "relatedStories": []
+    }
+  ],
+  "releases": [
+    {
+      "sha256": "b179d85a66fa98dca343f7e8cfe8f6dc91dcce3938be847daa84d200963b1aea",
+      "bytes": 1499,
+      "dataset": "main-street-sidewalk-phases",
+      "title": "Main Street sidewalk phases",
+      "revision": 12,
+      "releasedAt": "2026-10-20T14:00:00.000Z",
+      "records": 5,
+      "fields": [
+        {
+          "key": "name",
+          "label": "Phase",
+          "required": true,
+          "visibility": "public",
+          "type": "text",
+          "options": {
+            "maxLength": 500
+          }
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "required": false,
+          "visibility": "public",
+          "type": "select",
+          "options": {
+            "choices": [
+              {
+                "value": "done",
+                "label": "Done",
+                "tone": "positive"
+              },
+              {
+                "value": "underway",
+                "label": "Underway",
+                "tone": "caution"
+              },
+              {
+                "value": "planned",
+                "label": "Planned"
+              }
+            ]
+          }
+        },
+        {
+          "key": "detail",
+          "label": "Detail",
+          "required": false,
+          "visibility": "public",
+          "type": "longText",
+          "options": {
+            "maxLength": 10000
+          }
+        },
+        {
+          "key": "date",
+          "label": "Date",
+          "required": false,
+          "visibility": "public",
+          "type": "date",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "sha256": "746828e7952ddb4cf442c9f810c636850727c407909bce3161538e321143716a",
+      "bytes": 1189,
+      "dataset": "marching-band-results",
+      "title": "Marching band results",
+      "revision": 4,
+      "releasedAt": "2026-10-26T01:30:00.000Z",
+      "records": 5,
+      "fields": [
+        {
+          "key": "band",
+          "label": "Band",
+          "required": true,
+          "visibility": "public",
+          "type": "text",
+          "options": {
+            "maxLength": 500
+          }
+        },
+        {
+          "key": "score",
+          "label": "Score",
+          "required": false,
+          "visibility": "public",
+          "type": "number",
+          "options": {
+            "decimals": 1
+          }
+        },
+        {
+          "key": "division",
+          "label": "Division",
+          "required": false,
+          "visibility": "public",
+          "type": "select",
+          "options": {
+            "choices": [
+              {
+                "value": "a",
+                "label": "Class A"
+              },
+              {
+                "value": "aa",
+                "label": "Class AA"
+              }
+            ]
+          }
+        },
+        {
+          "key": "local",
+          "label": "Local school",
+          "required": false,
+          "visibility": "public",
+          "type": "boolean",
+          "options": {}
+        }
+      ]
+    }
+  ]
+}

@@ -124,10 +124,17 @@ export function DataGrid(props: DataGridProps) {
   }, [active, size.rows, size.cols]);
 
   const cellElement = useCallback((position: CellPosition) => grid.current?.querySelector<HTMLElement>(`[data-cell="${position.row}:${position.col}"]`) ?? null, []);
+  // A pending "focus this cell" frame must never steal focus from an editor that opened meanwhile
+  // (a double-click's first click queues one; the editor then focuses its own input).
+  const focusFrame = useRef<number | null>(null);
   const focusCell = useCallback((position: CellPosition | null) => {
     if (!position) return;
-    requestAnimationFrame(() => {
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+    focusFrame.current = requestAnimationFrame(() => {
+      focusFrame.current = null;
       const element = cellElement(position);
+      const focused = element?.ownerDocument.activeElement;
+      if (focused && focused !== element && element?.contains(focused)) return;
       element?.focus({ preventScroll: false });
       element?.scrollIntoView({ block: "nearest", inline: "nearest" });
     });
@@ -139,6 +146,10 @@ export function DataGrid(props: DataGridProps) {
   }, [focusCell]);
 
   const beginEdit = useCallback((position: CellPosition, initial?: string) => {
+    if (focusFrame.current !== null) {
+      cancelAnimationFrame(focusFrame.current);
+      focusFrame.current = null;
+    }
     const field = fields[position.col];
     const row = rows[position.row];
     if (!field || !row) return;
