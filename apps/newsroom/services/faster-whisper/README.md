@@ -27,6 +27,34 @@ Choose the model for the hardware (`small` or `medium` on CPU, `large-v3`
 on a GPU). Nothing assumes a GPU. Keep the service on a private network; set
 `BYLINE_TRANSCRIPTION_TOKEN` on both sides to require a bearer token.
 
+### CPU performance
+
+The service exposes faster-whisper/CTranslate2's main CPU tuning controls:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `WHISPER_DEVICE` | `auto` | Set `cpu` on a CPU-only server. |
+| `WHISPER_COMPUTE_TYPE` | `default` | Use `int8` for faster, lower-memory CPU inference. |
+| `WHISPER_CPU_THREADS` | library default | Intra-op CPU threads. Prefer the number of physical cores, not SMT/logical threads. |
+| `WHISPER_BATCH_SIZE` | `1` | `>1` enables faster-whisper's `BatchedInferencePipeline`; higher values trade RAM for throughput. |
+| `WHISPER_WORD_TIMESTAMPS` | `0` | Individual word alignment. Byline only needs segment timestamps, so leave this off. |
+| `WHISPER_MAX_WORKERS` | `1` | Number of whole recordings that may transcribe concurrently. |
+
+For a 4-core / 8-thread CPU newsroom server with 16 GB RAM, a sensible starting
+point for the `small` model is:
+
+```sh
+WHISPER_DEVICE=cpu
+WHISPER_COMPUTE_TYPE=int8
+WHISPER_CPU_THREADS=4
+WHISPER_BATCH_SIZE=4
+WHISPER_MAX_WORKERS=1
+WHISPER_WORD_TIMESTAMPS=0
+```
+
+Benchmark before raising `WHISPER_BATCH_SIZE`: batched inference can be much
+faster, but memory usage increases with the batch size and model.
+
 ## Long recordings
 
 The service does not hold a single HTTP response open while Whisper works.
