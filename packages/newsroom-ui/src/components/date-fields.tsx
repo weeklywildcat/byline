@@ -15,6 +15,7 @@ import { Button } from "../ui/button";
 import { Calendar } from "../ui/calendar";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { FormField, describedBy, type FieldChrome } from "./form-fields";
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -72,6 +73,21 @@ export function timeZoneLabel(timeZone: string, at: Date = new Date(), locale?: 
   }
 }
 
+const COMPLETE_CLOCK = /^\d{2}:\d{2}(:\d{2})?$/;
+
+/** An instant on `day` for naming its timezone: noon UTC is the same calendar day in every newsroom zone. */
+const instantOnDay = (day: string): Date => (DAY.test(day) ? new Date(`${day}T12:00:00Z`) : new Date());
+
+/**
+ * How far the calendar's month and year dropdowns reach: back to 1980 (a migrated
+ * story keeps its original date) and ten years ahead, widened to hold the value
+ * already chosen.
+ */
+export function calendarBounds(selected?: Date, now: Date = new Date()): { startMonth: Date; endMonth: Date } {
+  const year = selected?.getFullYear();
+  return { startMonth: new Date(Math.min(1980, year ?? 1980), 0), endMonth: new Date(Math.max(now.getFullYear() + 10, year ?? 0), 11) };
+}
+
 type DateButtonProps = {
   id?: string;
   value: string;
@@ -104,7 +120,7 @@ export function DateButton({ id, value, onChange, placeholder = "Any date", disa
       <span className={value ? "truncate" : "truncate text-muted-foreground"}>{formatWallTime(value, { withTime: false }) || placeholder}</span>
     </PopoverTrigger>
     <PopoverContent className="w-auto gap-0 p-0" align="start">
-      <Calendar mode="single" selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) { emit(dayFromDate(date)); change(false); } }} />
+      <Calendar mode="single" captionLayout="dropdown" {...calendarBounds(selected)} selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) { emit(dayFromDate(date)); change(false); } }} />
       {clearable && value ? <div className="border-t p-1.5"><Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => { emit(""); change(false); }}>Clear date</Button></div> : null}
     </PopoverContent>
   </Popover>;
@@ -137,49 +153,78 @@ export type DateTimeFieldProps = FieldChrome & {
   prompt?: ReactNode;
 };
 
-/** A labelled day-and-time picker: calendar, quick times, an exact time input and the timezone it is read in. */
+/**
+ * A labelled day-and-time picker: calendar with month and year dropdowns, quick
+ * times, an exact time input and the timezone it is read in.
+ *
+ * `onChange` receives a whole date-and-time or "", never half of one: a day
+ * without a clock (or a clock being retyped) is held in the field, shown as
+ * "pick a time", and reported as "" so a form cannot save it as some default
+ * hour. Closing the popover on a half-finished pick puts back the value it was
+ * opened with; "Clear" is the way to remove a value.
+ */
 export function DateTimeField({ label, value, onChange, timeZone, seconds = false, disabled, clearable = true, placeholder = "Choose a date and time", defaultTime = DEFAULT_TIME, prompt, onClose, error, hint, optional }: DateTimeFieldProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<{ day: string; time: string } | null>(null);
   const latest = useRef(value);
   latest.current = value;
+  const baseline = useRef("");
   const emit = (next: string) => { latest.current = next; onChange(next); };
-  const change = (next: boolean) => { setOpen(next); if (!next) onClose?.(latest.current); };
+  const wholeValue = (candidate: string) => Boolean(splitWallTime(candidate)?.time);
+  const change = (next: boolean) => {
+    if (next) baseline.current = wholeValue(value) ? value : "";
+    else {
+      if (!wholeValue(latest.current) && latest.current !== baseline.current) emit(baseline.current);
+      setDraft(null);
+    }
+    setOpen(next);
+    if (!next) onClose?.(latest.current);
+  };
   const parts = splitWallTime(value);
-  const selected = parts ? dateFromDay(parts.day) : undefined;
-  const clock = parts?.time ?? "";
-  const zone = timeZone ? timeZoneLabel(timeZone) : "";
-  const shortZone = timeZone ? timeZoneLabel(timeZone, new Date(), undefined, "short") : "";
-  const setTime = (time: string) => {
-    if (!parts) return;
-    emit(joinWallTime(parts.day, time));
+  const complete = Boolean(parts?.time);
+  const day = parts?.day ?? draft?.day ?? "";
+  const clock = parts ? parts.time : draft?.time ?? "";
+  const selected = day ? dateFromDay(day) : undefined;
+  const at = instantOnDay(day);
+  const zone = timeZone ? timeZoneLabel(timeZone, at) : "";
+  const shortZone = timeZone ? timeZoneLabel(timeZone, at, undefined, "short") : "";
+  const startClock = seconds ? `${defaultTime}:00` : defaultTime;
+  const choose = (nextDay: string, nextClock: string) => {
+    if (nextDay && COMPLETE_CLOCK.test(nextClock)) {
+      setDraft(null);
+      emit(joinWallTime(nextDay, nextClock));
+    } else {
+      setDraft({ day: nextDay, time: nextClock });
+      if (latest.current) emit("");
+    }
   };
   return <FormField id={id} label={label} error={error} hint={hint} optional={optional}>
     <Popover open={open} onOpenChange={change}>
       <PopoverTrigger render={<Button id={id} type="button" variant="outline" disabled={disabled} className="w-full justify-start font-normal" aria-invalid={error ? true : undefined} aria-describedby={describedBy(id, error, hint)} />}>
         <CalendarClock aria-hidden="true" className="text-muted-foreground" />
-        <span className={value ? "truncate" : "truncate text-muted-foreground"}>{formatWallTime(value) || placeholder}</span>
-        {shortZone && value ? <span title={zone} className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{shortZone}</span> : null}
+        {complete ? <span className="truncate">{formatWallTime(value)}</span> : day ? <span className="truncate">{formatWallTime(day, { withTime: false })}<span className="text-muted-foreground"> · pick a time</span></span> : <span className="truncate text-muted-foreground">{placeholder}</span>}
+        {shortZone && complete ? <span title={zone} className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{shortZone}</span> : null}
       </PopoverTrigger>
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         {prompt ? <p className="max-w-64 border-b px-3 py-2 text-xs text-muted-foreground">{prompt}</p> : null}
-        <Calendar mode="single" selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) emit(joinWallTime(dayFromDate(date), clock || (seconds ? `${defaultTime}:00` : defaultTime))); }} />
+        <Calendar mode="single" captionLayout="dropdown" {...calendarBounds(selected)} selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) choose(dayFromDate(date), COMPLETE_CLOCK.test(clock) ? clock : startClock); }} />
         <div className="grid gap-2 border-t p-3">
           <div className="flex items-center gap-2">
             <label htmlFor={`${id}-time`} className="text-xs font-medium">Time</label>
-            <Input id={`${id}-time`} type="time" step={seconds ? 1 : 60} className="h-7 w-auto" disabled={!parts} value={clock} onChange={(event) => setTime(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); change(false); } }} />
+            <Input id={`${id}-time`} type="time" step={seconds ? 1 : 60} className="h-7 w-auto" disabled={!day} value={clock} aria-invalid={day && !complete ? true : undefined} onChange={(event) => choose(day, event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); change(false); } }} />
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Quick times">
             {TIME_PRESETS.map((preset) => {
               const time = seconds ? `${preset.time}:00` : preset.time;
-              return <Button key={preset.time} type="button" size="xs" variant={clock === time ? "secondary" : "outline"} disabled={!parts} aria-pressed={clock === time} onClick={() => setTime(time)}>{preset.label}</Button>;
+              return <Button key={preset.time} type="button" size="xs" variant={clock === time ? "secondary" : "outline"} disabled={!day} aria-pressed={clock === time} onClick={() => choose(day, time)}>{preset.label}</Button>;
             })}
           </div>
           {zone ? <p className="text-xs text-muted-foreground">Times are in {zone}.</p> : null}
-          {!parts ? <p className="text-xs text-muted-foreground">Pick a day first.</p> : null}
+          {!day ? <p className="text-xs text-muted-foreground">Pick a day first.</p> : !complete ? <p role="status" className="text-xs text-muted-foreground">Enter a time to finish, or Done keeps the previous one.</p> : null}
         </div>
         <div className="flex items-center justify-between gap-2 border-t p-1.5">
-          {clearable && value ? <Button type="button" variant="ghost" size="sm" onClick={() => { emit(""); change(false); }}><X aria-hidden="true" data-icon="inline-start" />Clear</Button> : <span />}
+          {clearable && (value || draft) ? <Button type="button" variant="ghost" size="sm" onClick={() => { baseline.current = ""; setDraft(null); if (latest.current) emit(""); change(false); }}><X aria-hidden="true" data-icon="inline-start" />Clear</Button> : <span />}
           <Button type="button" size="sm" onClick={() => change(false)}>Done</Button>
         </div>
       </PopoverContent>
@@ -221,9 +266,18 @@ export function rangeText(from: string, to: string, placeholder = "Any date"): s
   return placeholder;
 }
 
+type RangeMode = "between" | "from" | "until";
+const RANGE_MODES: Array<{ value: RangeMode; label: string; hint: string }> = [
+  { value: "between", label: "Between", hint: "Pick the first day, then the last." },
+  { value: "from", label: "From", hint: "Everything from this day on." },
+  { value: "until", label: "Until", hint: "Everything up to and including this day." }
+];
+const modeFor = (from: string, to: string): RangeMode => (from && !to ? "from" : !from && to ? "until" : "between");
+
 /**
- * One range calendar for a filter: the first and last day, either of which may
- * be left open. Quick ranges appear when `today` (the newsroom's day) is known.
+ * One calendar for a filter's first and last day, either of which may be left
+ * open: "Between" picks both, "From" only a start and "Until" only an end. Quick
+ * ranges appear when `today` (the newsroom's day) is known.
  */
 export function DateRangeButton({ from, to, onChange, today, presets = ["today", "next7", "month"], placeholder = "Any date", disabled, id, className, ...aria }: {
   from: string;
@@ -238,10 +292,14 @@ export function DateRangeButton({ from, to, onChange, today, presets = ["today",
   "aria-label"?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<RangeMode>(() => modeFor(from, to));
   const start = dateFromDay(from);
-  const selected: DateRange | undefined = start ? { from: start, to: dateFromDay(to) } : undefined;
+  const end = dateFromDay(to);
+  const selected: DateRange | undefined = start ? { from: start, to: end } : undefined;
   const active = Boolean(from || to);
-  return <Popover open={open} onOpenChange={setOpen}>
+  const bounds = calendarBounds(mode === "until" ? end : start);
+  const hint = RANGE_MODES.find((item) => item.value === mode)?.hint;
+  return <Popover open={open} onOpenChange={(next) => { if (next) setMode(modeFor(from, to)); setOpen(next); }}>
     <PopoverTrigger render={<Button id={id} type="button" variant="outline" disabled={disabled} className={className ?? "w-full justify-start font-normal"} {...aria} />}>
       <CalendarRange aria-hidden="true" className="text-muted-foreground" />
       <span className={active ? "truncate" : "truncate text-muted-foreground"}>{rangeText(from, to, placeholder)}</span>
@@ -253,13 +311,24 @@ export function DateRangeButton({ from, to, onChange, today, presets = ["today",
           return <Button key={preset} type="button" size="xs" variant={range.from === from && range.to === to ? "secondary" : "outline"} onClick={() => { onChange(range.from, range.to); setOpen(false); }}>{PRESET_LABELS[preset]}</Button>;
         })}
       </div> : null}
-      <Calendar mode="range" resetOnSelect selected={selected} defaultMonth={start} onSelect={(range) => {
-        if (!range?.from) return;
-        const first = dayFromDate(range.from);
-        if (range.to) { onChange(first, dayFromDate(range.to)); setOpen(false); } else onChange(first, "");
-      }} />
+      <div className="border-b p-2">
+        <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Kind of date range" value={[mode]} onValueChange={(next: unknown[]) => { const value = next[0]; if (value === "between" || value === "from" || value === "until") setMode(value); }}>
+          {RANGE_MODES.map((item) => <ToggleGroupItem key={item.value} value={item.value}>{item.label}</ToggleGroupItem>)}
+        </ToggleGroup>
+      </div>
+      {mode === "between"
+        ? <Calendar mode="range" resetOnSelect captionLayout="dropdown" {...bounds} selected={selected} defaultMonth={start} onSelect={(range) => {
+          if (!range?.from) return;
+          const first = dayFromDate(range.from);
+          if (range.to) { onChange(first, dayFromDate(range.to)); setOpen(false); } else onChange(first, "");
+        }} />
+        : <Calendar key={mode} mode="single" captionLayout="dropdown" {...bounds} selected={mode === "from" ? start : end} defaultMonth={mode === "from" ? start : end} onSelect={(date) => {
+          if (!date) return;
+          onChange(mode === "from" ? dayFromDate(date) : "", mode === "until" ? dayFromDate(date) : "");
+          setOpen(false);
+        }} />}
       <div className="flex items-center justify-between gap-2 border-t p-1.5">
-        <p className="max-w-52 px-1.5 text-xs text-muted-foreground">Pick a first and last day. One day alone means from that day on.</p>
+        <p className="max-w-52 px-1.5 text-xs text-muted-foreground">{hint}</p>
         {active ? <Button type="button" variant="ghost" size="sm" onClick={() => { onChange("", ""); setOpen(false); }}><X aria-hidden="true" data-icon="inline-start" />Clear</Button> : null}
       </div>
     </PopoverContent>
