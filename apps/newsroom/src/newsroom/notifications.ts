@@ -380,8 +380,15 @@ export async function sendReminder(req: PayloadRequest, input: ReminderJobInput)
   if (!plan || plan.deadline !== input.expectedAt || ACTIVE_PLAN_STAGES_EXCLUDED.includes(String(plan.workflow))) return 0;
   const storyId = relationId(plan.story);
   if (storyId === null) return 0;
-  const story = await payload.findByID({ collection: "stories", id: storyId, draft: false, depth: 0, overrideAccess: true, req, disableErrors: true });
-  if (story?._status === "published") return 0;
+  const published = await payload.find({
+    collection: "stories",
+    where: { and: [{ id: { equals: storyId } }, { _status: { equals: "published" } }] },
+    draft: false,
+    limit: 1,
+    select: {},
+    ...system(req)
+  });
+  if (published.docs.length) return 0;
   return notify(req, {
     kind: "dueDigest",
     recipients: [...(relationId(plan.editor) !== null ? [plan.editor] : []), ...(await usersForPeople(req, relationIds(plan.contributors)))],
