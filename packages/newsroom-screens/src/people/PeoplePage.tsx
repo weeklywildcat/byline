@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
@@ -24,15 +24,10 @@ import {
   EmptyTitle,
 } from "@byline/newsroom-ui/ui/empty";
 import {
-  Field,
-  FieldContent,
-  FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel,
   FieldLegend,
   FieldSet,
-  FieldTitle,
 } from "@byline/newsroom-ui/ui/field";
 import { TextField } from "@byline/newsroom-ui/components/form-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
@@ -51,7 +46,10 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@byline/newsroom-ui/ui/item";
-import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
+import {
+  ChoiceCards,
+  type ChoiceCard,
+} from "@byline/newsroom-ui/components/choice-cards";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
@@ -437,11 +435,7 @@ function PersonListItem({
   );
 }
 
-const PERSON_TYPES: Array<{
-  value: NewPerson["type"];
-  title: string;
-  description: string;
-}> = [
+const PERSON_TYPES: ReadonlyArray<ChoiceCard<NewPerson["type"]>> = [
   {
     value: "active",
     title: "Current staff",
@@ -464,7 +458,6 @@ function NewPersonDialog({
   onClose: () => void;
   onCreated: (detail: PersonDetail) => void;
 }) {
-  const id = useId();
   const [input, setInput] = useState<NewPerson>({
     name: "",
     type: "active",
@@ -534,33 +527,11 @@ function NewPersonDialog({
             />
             <FieldSet disabled={saving}>
               <FieldLegend variant="label">Type</FieldLegend>
-              <RadioGroup
+              <ChoiceCards
                 value={input.type}
-                onValueChange={(type) =>
-                  setInput({ ...input, type: type as NewPerson["type"] })
-                }
-              >
-                {PERSON_TYPES.map((type) => (
-                  <FieldLabel key={type.value} htmlFor={`${id}-${type.value}`}>
-                    <Field orientation="horizontal">
-                      <FieldContent>
-                        <FieldTitle id={`${id}-${type.value}-title`}>
-                          {type.title}
-                        </FieldTitle>
-                        <FieldDescription id={`${id}-${type.value}-help`}>
-                          {type.description}
-                        </FieldDescription>
-                      </FieldContent>
-                      <RadioGroupItem
-                        id={`${id}-${type.value}`}
-                        value={type.value}
-                        aria-labelledby={`${id}-${type.value}-title`}
-                        aria-describedby={`${id}-${type.value}-help`}
-                      />
-                    </Field>
-                  </FieldLabel>
-                ))}
-              </RadioGroup>
+                onChange={(type) => setInput({ ...input, type })}
+                options={PERSON_TYPES}
+              />
             </FieldSet>
             <TextField
               label="Newsroom role"

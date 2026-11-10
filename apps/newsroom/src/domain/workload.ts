@@ -93,3 +93,25 @@ export function workloadHint(row: Pick<WorkloadRow, "activeStories" | "dueThisWe
   if (row.dueThisWeek) parts.push(`${row.dueThisWeek} due this week`);
   return parts.join(" · ");
 }
+
+/**
+ * How much is on someone's plate, as one of four plain levels, for the Workload
+ * screen only. Every active Story, review, media assignment and Story due this
+ * week is a point; overdue Stories count twice. It describes load, never
+ * output, and the list stays alphabetical: nobody is ordered by it, and the
+ * assignment pickers keep the quiet `workloadHint` line instead.
+ */
+export const LOAD_LEVELS = ["light", "steady", "busy", "stretched"] as const;
+export type LoadLevel = (typeof LOAD_LEVELS)[number];
+export const LOAD_LABELS: Record<LoadLevel, string> = { light: "Light", steady: "Steady", busy: "Busy", stretched: "Stretched" };
+/** The lowest point total for each level. */
+export const LOAD_THRESHOLDS: Record<LoadLevel, number> = { light: 0, steady: 2, busy: 5, stretched: 8 };
+
+export function loadPoints(row: Pick<WorkloadRow, "activeStories" | "dueThisWeek" | "overdue" | "reviews" | "mediaAssignments">): number {
+  return row.activeStories + row.reviews + row.mediaAssignments + row.dueThisWeek + row.overdue * 2;
+}
+
+export function loadLevel(row: Pick<WorkloadRow, "activeStories" | "dueThisWeek" | "overdue" | "reviews" | "mediaAssignments">): LoadLevel {
+  const points = loadPoints(row);
+  return [...LOAD_LEVELS].reverse().find((level) => points >= LOAD_THRESHOLDS[level]) ?? "light";
+}

@@ -17,6 +17,19 @@ test.beforeEach(async ({ context, baseURL }) => {
   await signIn(context, baseURL!, token);
 });
 
+// At desktop widths workflows are a list beside the editor; the current one is marked aria-current.
+const currentWorkflow = (page: Page) => page.getByRole("navigation", { name: "Review workflows" }).locator("[aria-current=page]");
+
+/** The shared calendar popover (newsroom-ui DateField): year, month, then the day. */
+async function pickDay(page: Page, label: string, day: string) {
+  await page.getByRole("button", { name: label }).click();
+  const popover = page.locator("[data-slot=popover-content]");
+  await popover.getByLabel("Choose the Year").selectOption(String(Number(day.slice(0, 4))));
+  await popover.getByLabel("Choose the Month").selectOption(String(Number(day.slice(5, 7)) - 1));
+  await popover.locator(`td[data-day="${day}"] button`).click();
+  await expect(popover).toHaveCount(0);
+}
+
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 
 test("creates a scoped role, adds and removes a member, all from Items, a Sheet and Dialogs", async ({ page }) => {
@@ -81,7 +94,7 @@ test("builds a workflow: reorder with the buttons, save, and preview a real stor
   await page.getByRole("button", { name: "New workflow" }).click();
   await page.getByRole("dialog", { name: "New review workflow" }).getByLabel("Name").fill(name);
   await page.getByRole("button", { name: "Create workflow" }).click();
-  await expect(page.getByRole("combobox", { name: "Workflow" })).toContainText(name);
+  await expect(currentWorkflow(page)).toContainText(name);
 
   // Add a second step, a role step, and edit it in the Sheet.
   await page.getByRole("button", { name: "Add step" }).click();
@@ -107,7 +120,7 @@ test("builds a workflow: reorder with the buttons, save, and preview a real stor
   await expect(page.locator("[data-byline-workflows-screen]").getByText("Unsaved changes", { exact: true })).toBeHidden();
 
   await page.reload();
-  await expect(page.getByRole("combobox", { name: "Workflow" })).toContainText(name);
+  await expect(currentWorkflow(page)).toContainText(name);
   await expect(page.getByRole("list", { name: "Review steps" }).getByRole("listitem").nth(0)).toContainText("Copy check");
 
   // Preview with a story: the same resolver as submission, including unsaved edits.
@@ -160,10 +173,10 @@ test("plans a school year step by step and discards it, changing nothing", async
   await page.goto("/admin/people?view=roles");
   await page.getByRole("link", { name: "New school year" }).click();
   await expect(page.getByRole("heading", { name: "New school year", level: 1 })).toBeVisible();
-  // A fixture year far in the future never overlaps the real ones.
+  // A fixture year years ahead never overlaps the real ones (the calendar offers ten years ahead).
   await page.getByLabel("Name").fill(`Fixture ${stamp}`);
-  await page.getByLabel("First day").fill("2099-08-01");
-  await page.getByLabel("Last day").fill("2100-07-31");
+  await pickDay(page, "First day", "2035-08-01");
+  await pickDay(page, "Last day", "2036-07-31");
   await page.getByRole("button", { name: "Start planning" }).click();
   await expect(page.getByText("Step 1 of 7: New year")).toBeVisible();
   await page.getByRole("button", { name: "Next: Returning staff" }).click();
