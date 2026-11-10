@@ -83,10 +83,10 @@ export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, w
       <DrawerHeader><DrawerTitle>Story actions</DrawerTitle><DrawerDescription>{title}</DrawerDescription></DrawerHeader>
       <div className="flex flex-col px-4 pb-2">
         {destinations.map(({ href, label, Icon, newTab }) => <a key={label} href={href} target={newTab ? "_blank" : undefined} rel={newTab ? "noopener noreferrer" : undefined}
-          className={buttonVariants({ variant: "ghost", className: "justify-start" })} onClick={() => setOpen(false)}>
+          className={buttonVariants({ variant: "ghost", className: "w-full justify-start" })} onClick={() => setOpen(false)}>
           <Icon aria-hidden="true" />{label}{newTab ? <span className="sr-only"> (opens in a new tab)</span> : null}
         </a>)}
-        {additionalActions?.map((action) => <DrawerClose key={action.id} render={<Button type="button" variant="ghost" className="justify-start" />} onClick={action.run}>{action.label}</DrawerClose>)}
+        {additionalActions?.map((action) => <DrawerClose key={action.id} render={<Button type="button" variant="ghost" className="w-full justify-start" />} onClick={action.run}>{action.label}</DrawerClose>)}
         {movable && stages.length ? <section aria-label="Move to" className="mt-2 border-t pt-2">
           <h3 className="px-2.5 py-1 text-sm font-medium">Move to</h3>
           {stages.map((stage) => {
