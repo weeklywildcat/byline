@@ -1,3 +1,4 @@
+import { compareDecimal } from "@byline/data";
 import { defineDataTemplate, field, setting, slot, type DataPresentationProps, type PrepareInput } from "../../sdk";
 
 const datasets = {
@@ -31,16 +32,24 @@ export type RankingModel = { entries: RankedEntry[]; unranked: number; total: nu
 export function rankEntries({ data, settings, format }: PrepareInput<typeof datasets, Settings>): RankingModel {
   const { entries } = data;
   const scored = entries.records.filter((record) => record.roles.value !== null && record.roles.name !== null);
+  const valueField = entries.roles.value;
+  const compareValues = (left: (typeof scored)[number], right: (typeof scored)[number]) =>
+    valueField?.type === "currency"
+      ? compareDecimal(String(left.roles.value), String(right.roles.value))
+      : Number(left.roles.value) - Number(right.roles.value);
   const sign = settings.order === "asc" ? 1 : -1;
-  const sorted = [...scored].sort((a, b) => sign * (Number(a.roles.value) - Number(b.roles.value)) || String(a.roles.name).localeCompare(String(b.roles.name)) || a.id.localeCompare(b.id));
+  const sorted = [...scored].sort((a, b) => sign * compareValues(a, b) || String(a.roles.name).localeCompare(String(b.roles.name)) || a.id.localeCompare(b.id));
   const max = Math.max(0, ...sorted.map((record) => Math.abs(Number(record.roles.value))));
+  let previousRank = 0;
   const ranked = sorted.map((record, index) => {
-    const first = sorted.findIndex((other) => Number(other.roles.value) === Number(record.roles.value));
-    const tied = sorted.filter((other) => Number(other.roles.value) === Number(record.roles.value)).length > 1;
+    const sameAsPrevious = index > 0 && compareValues(sorted[index - 1]!, record) === 0;
+    const sameAsNext = index + 1 < sorted.length && compareValues(record, sorted[index + 1]!) === 0;
+    const rank = sameAsPrevious ? previousRank : index + 1;
+    previousRank = rank;
     return {
       id: record.id,
-      rank: first + 1,
-      tied,
+      rank,
+      tied: sameAsPrevious || sameAsNext,
       name: format.value(entries.roles.name, record.roles.name),
       value: format.value(entries.roles.value, record.roles.value),
       share: max ? Math.round((Math.abs(Number(record.roles.value)) / max) * 1000) / 10 : 0,
