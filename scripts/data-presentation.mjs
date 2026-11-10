@@ -65,6 +65,8 @@ function prepare({ data, format }: PrepareInput<typeof datasets, Settings>): Mod
   };
 }
 
+// If this renders headings, never hard-code the level: the same presentation sits under a page <h1> and under a Story's <h2>.
+// Use headingLevel with headingTag (import it from "../../sdk"): const Title = headingTag(headingLevel); then headingTag(headingLevel, 1) below it.
 function ${component}({ project, model, format }: DataPresentationProps<typeof datasets, Settings, Model>) {
   return (
     <div className="${key}">

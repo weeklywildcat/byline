@@ -1,4 +1,5 @@
 import { createElement, type ReactNode } from "react";
+import type { DataHeadingLevel } from "./sdk";
 import type { ResolvedDataProject } from "./resolve";
 
 /**
@@ -44,13 +45,13 @@ export function dataProjectRootAttributes(resolved: ResolvedDataProject) {
  * carries the release paths `client.ts` reads. Complete without script.
  * Everything around it (headings, notes, frames) belongs to the caller.
  */
-export function DataProjectPresentation({ resolved, host }: { resolved: ResolvedDataProject; host: DataPresentationHost }) {
+export function DataProjectPresentation({ resolved, host, headingLevel }: { resolved: ResolvedDataProject; host: DataPresentationHost; /** The level of the presentation's first internal heading: 2 beneath a page `<h1>`, 3 beneath a Story's `<h2>`. */ headingLevel: DataHeadingLevel }) {
   const { definition, props } = resolved;
   return (
     <>
       {definition.descriptor.styles ? host.styles(definition.descriptor.key) : null}
       <div className="data-project-body" data-data-root="" data-data-releases={JSON.stringify(resolved.releasePaths)}>
-        {createElement(definition.Component, props)}
+        {createElement(definition.Component, { ...props, headingLevel })}
       </div>
     </>
   );
@@ -78,7 +79,7 @@ export function DataProjectView({ resolved, host, notes, related, kicker = "Data
           <time dateTime={project.dataUpdatedAt}>{format.instant(project.dataUpdatedAt)}</time>
         </p>
       </header>
-      <DataProjectPresentation resolved={resolved} host={host} />
+      <DataProjectPresentation resolved={resolved} host={host} headingLevel={2} />
       {notes.source || methodology.length || related ? (
         <footer className="data-project-notes">
           {notes.source ? (
@@ -121,7 +122,7 @@ export function DataProjectEmbedView({ resolved, host, blockId, title, descripti
         <h2 className="data-project-embed-title" id={headingId}>{title}</h2>
         {description ? <p className="data-project-embed-description">{description}</p> : null}
       </header>
-      <DataProjectPresentation resolved={resolved} host={host} />
+      <DataProjectPresentation resolved={resolved} host={host} headingLevel={3} />
       <footer className="data-project-embed-notes">
         {source ? <p className="data-project-embed-source"><span>Source: </span>{source}</p> : null}
         <p className="data-project-embed-meta">

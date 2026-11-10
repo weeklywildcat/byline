@@ -33,6 +33,8 @@ datasets; code only declares which roles it reads.
   Run the privacy sentinel (`PRIVATE-…-SENTINEL` in fixtures) over anything new.
 - The build reads only local, verified release files. No newsroom request during
   rendering; no public database.
+- Presentation headings follow the host's heading context (`headingLevel`,
+  `headingTag`): h2 under a page `<h1>`, h3 under a Story's `<h2>`.
 - Presentations are deterministic at build time (`prepare` runs twice and must
   match). Server HTML is the experience; `client.ts` only enhances.
 - A Story embeds a Project by ID. The Project stays the single source of truth;
@@ -101,8 +103,10 @@ Newsroom browser specs (`apps/newsroom/tests/browser/data-workspace.spec.ts`,
   not. "Published" is not "search-indexable": a `noindex` project still embeds.
 - Collect the Data section before normalizing Story bodies in the snapshot; the
   embed resolves against it.
-- A presentation renders under the story's `<h2>` and possibly twice on a page:
-  no fixed ids, no global queries, `client.ts` per root.
+- A presentation renders under the page's `<h1>` or under a story's `<h2>`, and
+  possibly twice on a page. Take internal headings from the SDK (`headingLevel`
+  and `headingTag`, never a hard-coded `<h2>`); no fixed ids, no global queries,
+  `client.ts` per root.
 - Unpublishing or deleting a project a published Story shows is refused
   (`apps/newsroom/src/data/usage.ts`); the snapshot also fails closed.
 - Fixture presentations (`fixture-` keys) exist only in fixture builds and with

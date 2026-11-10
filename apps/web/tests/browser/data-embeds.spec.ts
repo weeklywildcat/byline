@@ -71,7 +71,7 @@ test("a story with no client presentation downloads no Data code", async ({ page
   const scripts: string[] = [];
   page.on("request", (request) => { if (request.resourceType() === "script") scripts.push(request.url()); });
   await page.goto(PLAIN);
-  await expect(embeds(page)).toHaveCount(1);
+  await expect(embeds(page)).toHaveCount(2);
   await expect(page.getByLabel("Tied for 1")).toHaveCount(2);
   await page.waitForLoadState("networkidle");
   expect(await page.locator("style[data-data-presentation-styles='fixture-sidewalk-project']").count()).toBe(0);
@@ -84,6 +84,41 @@ test("a story with no client presentation downloads no Data code", async ({ page
   expect(withClient.length).toBeGreaterThan(scripts.length);
   expect(withClient.filter((url) => !scripts.includes(url)).length).toBeGreaterThanOrEqual(1);
 });
+
+/** Every heading inside an embed, as [level, text], in document order. */
+async function headings(page: Page, index: number) {
+  return embeds(page).nth(index).evaluate((embed) => [...embed.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((node) => [Number(node.tagName[1]), node.textContent ?? ""] as const));
+}
+
+for (const javaScriptEnabled of [false, true]) {
+  test.describe(`heading hierarchy (JavaScript ${javaScriptEnabled ? "on" : "off"})`, () => {
+    test.use({ javaScriptEnabled });
+
+    test("a Timeline in a story sits under the story's heading: h2, then h3 years, then h4 entries", async ({ page }) => {
+      await page.goto(PLAIN);
+      const timeline = (await headings(page, 1)).map(([level]) => level);
+      expect(timeline[0]).toBe(2);
+      expect(timeline.filter((level) => level === 2)).toHaveLength(1);
+      expect(timeline).toContain(3);
+      expect(timeline).toContain(4);
+      expect(Math.max(...timeline)).toBe(4);
+      // The ranking embed above it keeps its own, untouched outline.
+      expect((await headings(page, 0)).map(([level]) => level)).toEqual([2]);
+      // The page's single h1 is the story's; the outline never skips a level in any embed.
+      expect(await page.locator("h1").count()).toBe(1);
+      for (const level of [timeline]) level.forEach((value, i) => { if (i) expect(value - level[i - 1]!).toBeLessThanOrEqual(1); });
+    });
+
+    test("the same Timeline on its own page stays h1, h2, h3", async ({ page }) => {
+      await page.goto("/data/sidewalk-timeline/");
+      const levels = await page.evaluate(() => [...document.querySelectorAll("main h1, main h2, main h3, main h4")].map((node) => Number(node.tagName[1])));
+      expect(levels[0]).toBe(1);
+      expect(levels).toContain(2);
+      expect(levels).toContain(3);
+      expect(levels).not.toContain(4);
+    });
+  });
+}
 
 test("each presentation's CSS is printed once, however many embeds use it", async ({ page }) => {
   await page.goto(STORY);

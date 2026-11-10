@@ -39,7 +39,8 @@ export type WorkingDataInput = { source: "working"; project: WorkingDataProject;
 
 export type ResolvedDataProject = {
   definition: DataPresentationDefinition;
-  props: DataPresentationProps<any, any, any>;
+  /** Everything but `headingLevel`: that belongs to where the presentation is rendered (page or Story), not to resolving it. */
+  props: Omit<DataPresentationProps<any, any, any>, "headingLevel">;
   source: DataSourceKind;
   /** Slot → the public path of its release bytes (published only), for client enhancement. */
   releasePaths: Record<string, string>;

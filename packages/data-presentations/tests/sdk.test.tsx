@@ -13,6 +13,7 @@ import {
   DataProjectView,
   field,
   fixtureDataPresentations,
+  headingTag,
   resolveDataProject,
   slot,
   type DataPresentationHost
@@ -258,5 +259,82 @@ describe("Story embeds", () => {
   it("prints the frame stylesheet only when the host offers it", () => {
     expect(embed("table", "template", { heading: "name" }, "blk-1")).toContain("data-frame");
     expect(embed("table", "template", { heading: "name" }, "blk-1", undefined, undefined, false)).not.toContain("data-frame");
+  });
+});
+
+/** The page's heading outline, as [tag, text]: what a screen reader's headings list shows. */
+const outline = (html: string) => {
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  return [...root.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((node) => [node.tagName.toLowerCase(), node.textContent ?? ""] as const);
+};
+
+describe("heading hierarchy", () => {
+  const timelineFields = { title: "name", date: "date", status: "status", detail: "detail" };
+  const timelineEmbed = (blockId: string, title: string) => {
+    const registry = dataPresentationRegistry({ fixtures: true });
+    const outcome = resolveDataProject(registry.timeline, { source: "published", project: project("timeline", "template", timelineFields) as never, releases: new Map([[sha, makeRelease()]]) }, format);
+    if (!outcome.ok) throw new Error(outcome.issues.join(" "));
+    return renderToStaticMarkup(<DataProjectEmbedView resolved={outcome.resolved} host={host} blockId={blockId} title={title} description="" source="" href="/data/sidewalk/" />);
+  };
+
+  it("clamps the helper to real heading elements", () => {
+    expect(headingTag(2)).toBe("h2");
+    expect(headingTag(2, 1)).toBe("h3");
+    expect(headingTag(3, 1)).toBe("h4");
+    expect(headingTag(6, 1)).toBe("h6");
+    expect(headingTag(0)).toBe("h1");
+    expect(headingTag(2.9, 1.2)).toBe("h3");
+  });
+
+  it("standalone: h1 project, h2 year, h3 entry", () => {
+    const tags = outline(render("timeline", "template", timelineFields));
+    expect(tags[0]).toEqual(["h1", "Main Street sidewalk"]);
+    expect(tags.filter(([tag]) => tag === "h2").map(([, text]) => text)).toEqual(expect.arrayContaining(["2025"]));
+    expect(tags.some(([tag]) => tag === "h3")).toBe(true);
+    expect(tags.some(([tag]) => tag === "h4")).toBe(false);
+    // Year headings come before the entries they contain, and nothing skips a level.
+    const levels = tags.map(([tag]) => Number(tag[1]));
+    levels.forEach((level, index) => { if (index) expect(level - levels[index - 1]!).toBeLessThanOrEqual(1); });
+  });
+
+  it("in a Story: h2 embed heading, h3 year, h4 entry, and nothing but native headings", () => {
+    const html = timelineEmbed("blk-a", "Where the sidewalk stands");
+    const tags = outline(html);
+    expect(tags[0]).toEqual(["h2", "Where the sidewalk stands"]);
+    expect(tags.filter(([tag]) => tag === "h2")).toHaveLength(1);
+    expect(tags.filter(([tag]) => tag === "h3").map(([, text]) => text)).toContain("2025");
+    expect(tags.some(([tag]) => tag === "h4")).toBe(true);
+    expect(tags.some(([tag]) => tag === "h5")).toBe(false);
+    expect(html).not.toMatch(/role="heading"|aria-level/);
+    const levels = tags.map(([tag]) => Number(tag[1]));
+    levels.forEach((level, index) => { if (index) expect(level - levels[index - 1]!).toBeLessThanOrEqual(1); });
+  });
+
+  it("several embeds each keep their own outline and do not interfere", () => {
+    const outlines = [timelineEmbed("blk-1", "First"), timelineEmbed("blk-2", "Second")].map(outline);
+    expect(outlines[0]![0]).toEqual(["h2", "First"]);
+    expect(outlines[1]![0]).toEqual(["h2", "Second"]);
+    expect(outlines[0]!.map(([tag]) => tag)).toEqual(outlines[1]!.map(([tag]) => tag));
+    const both = outline(timelineEmbed("blk-1", "First") + render("timeline", "template", timelineFields) + timelineEmbed("blk-2", "Second"));
+    expect(both.map(([tag]) => tag).filter((tag) => tag === "h1")).toHaveLength(1);
+  });
+
+  it("a custom presentation gets the same context from the SDK", () => {
+    const nested = defineDataPresentation({
+      key: "fixture-nested-headings", name: "Nested headings", description: "Headings two deep.", fixture: true,
+      datasets: { rows: slot({ label: "Rows", fields: { name: field.text() } }) },
+      Component: ({ data, headingLevel }) => {
+        const Section = headingTag(headingLevel);
+        const Item = headingTag(headingLevel, 1);
+        return <div>{data.rows.records.slice(0, 2).map((row) => <section key={row.id}><Section>Group {String(row.roles.name)}</Section><Item>Detail {String(row.roles.name)}</Item></section>)}</div>;
+      }
+    });
+    const outcome = resolveDataProject(nested, { source: "working", project: { id: 1, title: "Nested", deck: "", slug: "nested", presentation: { kind: "custom", key: "fixture-nested-headings" }, settings: {}, bindings: [{ slot: "rows", dataset: "sidewalk-phases", fields: { name: "name" } }] }, releases: new Map([["sidewalk-phases", makeRelease()]]) }, format);
+    if (!outcome.ok) throw new Error(outcome.issues.join(" "));
+    const page = outline(renderToStaticMarkup(<DataProjectView resolved={outcome.resolved} host={host} notes={{ source: "", methodology: "" }} />)).map(([tag]) => tag);
+    expect(page.slice(0, 5)).toEqual(["h1", "h2", "h3", "h2", "h3"]);
+    const story = outline(renderToStaticMarkup(<DataProjectEmbedView resolved={outcome.resolved} host={host} blockId="blk" title="Story heading" description="" source="" href="/data/nested/" />)).map(([tag]) => tag);
+    expect(story).toEqual(["h2", "h3", "h4", "h3", "h4"]);
   });
 });

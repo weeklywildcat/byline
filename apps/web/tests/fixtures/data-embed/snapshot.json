@@ -426,6 +426,22 @@
               "children": [
                 {
                   "type": "text",
+                  "text": "The sidewalk project, by date."
+                }
+              ]
+            },
+            {
+              "type": "dataProject",
+              "id": "embed-timeline",
+              "project": 3,
+              "title": "The sidewalk project, by date",
+              "description": "Every milestone in order."
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
                   "text": "Congratulations to all."
                 }
               ]

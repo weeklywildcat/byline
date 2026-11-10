@@ -1,5 +1,5 @@
 import { choiceTone } from "@byline/data";
-import { defineDataTemplate, field, setting, slot, type DataPresentationProps, type PrepareInput } from "../../sdk";
+import { defineDataTemplate, field, headingTag, setting, slot, type DataPresentationProps, type PrepareInput } from "../../sdk";
 
 const datasets = {
   events: slot({
@@ -49,19 +49,22 @@ export function buildTimeline({ data, settings, format }: PrepareInput<typeof da
   return { groups, undated: events.records.length - dated.length };
 }
 
-function Timeline({ project, data, model, format }: DataPresentationProps<typeof datasets, Settings, TimelineModel>) {
+function Timeline({ project, data, model, format, headingLevel }: DataPresentationProps<typeof datasets, Settings, TimelineModel>) {
+  // Year headings sit at the host's level (h2 on the page, h3 in a Story); entries one level below.
+  const Year = headingTag(headingLevel);
+  const Entry = headingTag(headingLevel, 1);
   if (!model.groups.length) return <p className="data-timeline-empty">Nothing is on this timeline yet.</p>;
   return (
     <div className="data-timeline">
       {model.groups.map((group) => (
         <section key={group.label || "all"} className="data-timeline-group" aria-label={group.label || data.events.dataset.title}>
-          {group.label ? <h2 className="data-timeline-year">{group.label}</h2> : null}
+          {group.label ? <Year className="data-timeline-year">{group.label}</Year> : null}
           <ol className="data-timeline-list">
             {group.entries.map((entry) => (
               <li key={entry.id} className="data-timeline-entry" data-tone={entry.tone}>
                 <time className="data-timeline-date" dateTime={entry.date}>{entry.dateLabel}</time>
                 <div className="data-timeline-content">
-                  <h3 className="data-timeline-title">{entry.title}</h3>
+                  <Entry className="data-timeline-title">{entry.title}</Entry>
                   {entry.status ? <p className="data-timeline-status">{entry.status}</p> : null}
                   {entry.detail ? entry.detail.split(/\n+/).map((line, index) => <p key={index} className="data-timeline-detail">{line}</p>) : null}
                   {entry.link ? <p className="data-timeline-link"><a href={entry.link} rel="noopener">{project.settings.linkLabel || "Read more"}<span className="data-visually-hidden">: {entry.title}</span></a></p> : null}

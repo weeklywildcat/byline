@@ -87,6 +87,23 @@ export type DataFormatter = {
   timeZone: string;
 };
 
+/**
+ * Heading context. The same presentation renders standalone beneath the page's
+ * `<h1>` and inside a Story beneath the story's own `<h2>`, so it never
+ * hard-codes a level for its internal headings. `headingLevel` is the level of
+ * its FIRST internal heading (2 standalone, 3 in a Story); a heading beneath
+ * that one is `headingTag(headingLevel, 1)`. Native heading elements only: no
+ * `role="heading"` and no `aria-level`.
+ */
+export type DataHeadingLevel = 2 | 3 | 4 | 5 | 6;
+export type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+/** The heading element `offset` levels below `level`, clamped to h1 to h6 (so a deep outline never emits an invalid tag). */
+export function headingTag(level: number, offset = 0): HeadingTag {
+  const clamped = Math.min(6, Math.max(1, Math.trunc(level) + Math.trunc(offset)));
+  return `h${clamped}` as HeadingTag;
+}
+
 export type PrepareInput<Slots extends Record<string, SlotSpec>, Settings> = { data: DataOf<Slots>; settings: Settings; format: DataFormatter };
 
 export type DataPresentationProps<Slots extends Record<string, SlotSpec> = Record<string, SlotSpec>, Settings = Record<string, unknown>, Model = undefined> = {
@@ -97,6 +114,8 @@ export type DataPresentationProps<Slots extends Record<string, SlotSpec> = Recor
   format: DataFormatter;
   /** Public artifact paths by slot. Empty in working newsroom previews. */
   releasePaths?: Partial<Record<Extract<keyof Slots, string>, string>>;
+  /** The level of this presentation's first internal heading, set by the page or Story that hosts it. Use `headingTag`. */
+  headingLevel: DataHeadingLevel;
 };
 
 /** What `client.ts` exports by default: enhance the server-rendered root, return a cleanup. */

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,7 +11,7 @@ import { StructuredArticleBody } from "@byline/ui/article-body";
 import type { ArticleBody } from "@byline/article-body";
 import fixtureSection from "./fixtures/data/public-data.json";
 import { materializeDataReleases } from "@/lib/data-releases";
-import { DATA_EMBED_BLOCKS, dataEmbedBody, dataEmbedSnapshot } from "./fixtures/data-embed";
+import { DATA_EMBED_BLOCKS, DATA_EMBED_TIMELINE, dataEmbedBody, dataEmbedSnapshot } from "./fixtures/data-embed";
 
 /**
  * Data Projects inside Stories (docs/byline-data.md#story-embeds): the public
@@ -130,6 +131,22 @@ describe("the public Story host", () => {
     expect(html.match(/data-data-presentation-styles="fixture-sidewalk-project"/g)).toHaveLength(1);
     expect(html.match(/data-data-embed-styles/g)).toHaveLength(1);
     expect(html.match(/data-data-embed=""/g)).toHaveLength(3);
+  });
+
+  it("places a Timeline's own headings beneath the story's heading, and two embeds do not interfere", async () => {
+    const html = await render(dataEmbedBody([DATA_EMBED_TIMELINE, { ...DATA_EMBED_TIMELINE, id: "embed-timeline-2", title: "Again" }]));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const embeds = [...root.querySelectorAll("[data-data-embed]")];
+    expect(embeds).toHaveLength(2);
+    for (const embed of embeds) {
+      const levels = [...embed.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((node) => Number(node.tagName[1]));
+      expect(levels[0]).toBe(2);
+      expect(levels.filter((level) => level === 2)).toHaveLength(1);
+      expect(levels).toContain(3);
+      expect(levels).toContain(4);
+    }
+    expect(html).not.toMatch(/role="heading"|aria-level/);
   });
 
   it("fails the build rather than printing a blank embed for an unpublished project", async () => {

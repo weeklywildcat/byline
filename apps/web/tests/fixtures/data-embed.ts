@@ -21,6 +21,9 @@ export const DATA_EMBED_BLOCKS = [
   { type: "dataProject", id: "embed-again", project: 1, title: "The same project, a second time", description: "A story may place one project more than once." }
 ] as const;
 
+/** The noindex timeline template (project 3): headings of its own beneath the embed heading. */
+export const DATA_EMBED_TIMELINE = { type: "dataProject", id: "embed-timeline", project: 3, title: "The sidewalk project, by date", description: "Every milestone in order." } as const;
+
 export function dataEmbedBody(nodes: ArticleBody["nodes"] = [...DATA_EMBED_BLOCKS]): ArticleBody {
   return {
     format: "byline-v1", version: 1, media: {},
@@ -40,7 +43,7 @@ export function dataEmbedSnapshot(options: { body?: ArticleBody; data?: PublicDa
   const plain = {
     ...story, id: 9002, slug: "how-the-bands-ranked", title: "How the bands ranked", titleHtml: "How the bands ranked", href: DATA_EMBED_PLAIN_STORY_HREF,
     url: `https://weeklywildcat.com${DATA_EMBED_PLAIN_STORY_HREF}`, publishedAt: "2026-11-10T13:05:00.000Z", modifiedAt: "2026-11-10T13:05:00.000Z",
-    body: { format: "byline-v1" as const, version: 1 as const, media: {}, nodes: [paragraph("The fall competition is over."), { ...DATA_EMBED_BLOCKS[1], id: "plain-bands" }, paragraph("Congratulations to all.")] }
+    body: { format: "byline-v1" as const, version: 1 as const, media: {}, nodes: [paragraph("The fall competition is over."), { ...DATA_EMBED_BLOCKS[1], id: "plain-bands" }, paragraph("The sidewalk project, by date."), DATA_EMBED_TIMELINE, paragraph("Congratulations to all.")] }
   };
   const datasets = {
     stories: options.plainStory ? [story, plain] : [story], people: [], sections: publication.sections.map((entry, index) => ({ id: index + 1, slug: entry.slug, name: entry.name, description: entry.description, href: `/category/${entry.slug}/` })), topics: [], pages: [], corrections: [],

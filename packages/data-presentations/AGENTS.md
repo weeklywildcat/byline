@@ -42,14 +42,21 @@ Add `--client` only when the interaction genuinely needs script.
 - **Scope every selector** under `.data-presentation-<key>`. Hairlines and
   type, not boxes; follow the Weekly Wildcat tokens (`--ink`, `--muted`,
   `--rule`, `--accent`, `--font-ui`, `--font-serif`, `--font-headline`).
-- **One `<h1>`.** `DataProjectView` renders the project's title; a
-  presentation starts at `<h2>`.
+- **Headings come from the SDK, never a literal.** The same presentation renders
+  standalone under the page's `<h1>` and inside a Story under the story's own
+  `<h2>`. Your component receives `headingLevel` (the level of its FIRST internal
+  heading: 2 standalone, 3 in a Story). Use `headingTag(headingLevel)` for that
+  heading and `headingTag(headingLevel, 1)` for the next level down
+  (`const Year = headingTag(headingLevel); <Year>…</Year>`). Native heading
+  elements only: no `role="heading"` or `aria-level`. Never write `<h2>` or `<h3>`
+  by hand, and never emit an `<h1>`. Scoped CSS must select by class, not by tag.
+  The timeline template is the reference: h1 page, h2 year, h3 entry standalone;
+  h2 story, h3 year, h4 entry in a Story.
 - **It also lives inside Stories.** The same presentation renders in
-  `DataProjectEmbedView` under the story's own `<h2>`, possibly twice on one
-  page, in a wide frame (up to ~1040px, down to a phone). Never assume one
-  instance per page: no fixed ids, no `document.querySelector` outside the
-  `root` you are given, and `client.ts` must work on several roots at once.
-  Keep headings few: inside an embed they sit under the story's heading.
+  `DataProjectEmbedView`, possibly twice on one page, in a wide frame (up to
+  ~1040px, down to a phone). Never assume one instance per page: no fixed ids, no
+  `document.querySelector` outside the `root` you are given, and `client.ts` must
+  work on several roots at once.
 - **Keys are permanent** once a project uses them. `fixture-` keys are
   reserved for test fixtures, which hosts refuse outside fixture builds.
 - **No SEO, routing or metadata** in a presentation: the route owns them.

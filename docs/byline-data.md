@@ -311,6 +311,29 @@ randomness or the network fails. External ingestion (election feeds, sports
 APIs, Google Sheets) is a future newsroom job that writes datasets, never
 presentation code.
 
+### Headings
+
+A presentation renders in two places: standalone under the page's `<h1>`, and in
+a Story under the story's own `<h2>`. It therefore never hard-codes the level of
+its internal headings. The renderer passes `headingLevel` (2 standalone, 3 in a
+Story): the level of the presentation's first internal heading. Use the SDK
+helper for it and for each level below:
+
+```tsx
+import { headingTag } from "../../sdk";
+
+function Years({ model, headingLevel }: DataPresentationProps<typeof datasets, Settings, Model>) {
+  const Year = headingTag(headingLevel);        // h2 on the page, h3 in a Story
+  const Entry = headingTag(headingLevel, 1);    // h3 on the page, h4 in a Story
+  return model.years.map((year) => <section key={year.id}><Year>{year.label}</Year><Entry>…</Entry></section>);
+}
+```
+
+`headingTag` clamps to `h1`–`h6`. Use native heading elements, never
+`role="heading"` or `aria-level`, and select them by class in CSS. The rendering
+context is the host's concern (`DataProjectView` passes 2, `DataProjectEmbedView`
+passes 3); `resolveDataProject` does not know where its result will be drawn.
+
 ### Progressive enhancement
 
 The server-rendered HTML must be complete, accessible and useful with
@@ -397,7 +420,9 @@ renderer of a presentation: its stylesheet hook, `[data-data-root]` and its
 release paths. The embed draws a small "Data" kicker, the story's H2 and
 description, the presentation, and a compact "Source · Data updated · View full
 data project →" footer; it never repeats the page's H1, methodology or related
-coverage (those stay on `/data/<slug>/`). In the article the frame is
+coverage (those stay on `/data/<slug>/`). The presentation's own headings sit
+beneath the story's `<h2>` (h3, then h4), through the SDK's heading context
+([Headings](#headings)). In the article the frame is
 `ArticleBlockFrame placement="wide"`, and `ArticleRenderHost.renderDataProject`
 is the host hook (like `renderTracker`): `@byline/ui` never imports Data, the
 registry or Payload. The public host (`apps/web/lib/data-project-embed-host.tsx`)

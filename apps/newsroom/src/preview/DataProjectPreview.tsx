@@ -63,7 +63,7 @@ export async function DataProjectPreview({ payload, user, projectId, source, emb
       <main className="byline-data-embed-preview" data-data-preview={source} data-data-embed-preview="">
         <style>{"html,body{background:transparent!important;margin:0}.byline-data-embed-preview{padding:2px 1px 8px}"}</style>
         <div className={`data-presentation-${key}`} {...dataProjectRootAttributes(outcome.resolved)}>
-          <DataProjectPresentation resolved={outcome.resolved} host={{ styles: () => null }} />
+          <DataProjectPresentation resolved={outcome.resolved} host={{ styles: () => null }} headingLevel={3} />
         </div>
         <DataPreviewAssets presentation={key} kind={outcome.resolved.definition.descriptor.kind} styles={outcome.resolved.definition.descriptor.styles} client={outcome.resolved.definition.descriptor.client} />
         <EmbedLinkGuard />

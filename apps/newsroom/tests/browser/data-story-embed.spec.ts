@@ -78,6 +78,16 @@ async function select(page: Page) {
   await heading(page).focus();
   await expect(frame(page).locator(".byline-block-chrome")).toHaveCSS("opacity", "1");
 }
+/** The saved draft, read through the REST API (a dev server may reset one idle connection, so retry that alone). */
+async function readStored(page: Page, baseURL: string) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return (await readDraft(page.request, baseURL, token, storyId)) as { body: { root: { children: Array<{ fields?: Record<string, unknown> }> } } };
+    } catch (error) {
+      if (attempt >= 3 || !/ECONNRESET|socket hang up/.test(String(error))) throw error;
+    }
+  }
+}
 const picker = (page: Page) => page.locator("[data-data-project-picker]");
 
 async function choose(page: Page, title: string, expectSurface: "popover" | "sheet") {
@@ -136,7 +146,7 @@ test("Add → Data Project → search → choose: the project's real presentatio
   await heading(page).fill("Where the sidewalk stands");
   await description(page).fill("Our own words about it.");
   await waitForSaved(page);
-  const stored = (await readDraft(page.request, page.url().split("/admin")[0]!, token, storyId)) as { body: { root: { children: Array<{ fields?: Record<string, unknown> }> } } };
+  const stored = await readStored(page, new URL(page.url()).origin);
   const saved = stored.body.root.children.find((node) => node.fields?.blockType === "dataProject")!.fields!;
   expect(saved).toMatchObject({ project: projects.published, title: "Where the sidewalk stands", description: "Our own words about it." });
   // Only the relationship and the story's copy are stored.
@@ -159,7 +169,7 @@ test("replacing the project keeps the copy a reporter wrote, and the choice surv
   await expect(heading(page)).toHaveValue("Where the sidewalk stands");
   await expect(frame(page).getByText("Unpublished changes", { exact: true }).first()).toBeVisible();
   // Published version is what the frame draws: the old deck, not the draft deck.
-  const stored = (await readDraft(page.request, page.url().split("/admin")[0]!, token, storyId)) as { body: { root: { children: Array<{ fields?: Record<string, unknown> }> } } };
+  const stored = await readStored(page, new URL(page.url()).origin);
   expect(stored.body.root.children.find((node) => node.fields?.blockType === "dataProject")!.fields!.project).toBe(projects.changed);
 });
 
