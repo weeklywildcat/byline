@@ -30,6 +30,7 @@ const schema: DatasetSchema = {
     f("detail", "Detail", "longText"),
     f("date", "Date", "date"),
     f("score", "Score", "integer"),
+    f("budget", "Budget", "currency", { options: { currency: "USD", scale: 2 } } as never),
     f("winner", "Winner", "boolean"),
     f("notes", "Reporter notes", "longText", { visibility: "private" })
   ],
@@ -43,9 +44,9 @@ function makeRelease(): DataRelease {
     revision: 4,
     releasedAt: "2026-11-09T15:00:00Z",
     records: [
-      { id: "survey", included: true, values: { name: "Survey and design", status: "done", detail: "Finished in March 2025.", date: "2025-03-14", score: 80, winner: false, notes: "PRIVATE-SENTINEL" } },
-      { id: "north", included: true, values: { name: "North segment", status: "done", detail: "Opened Aug. 18, 2025.", date: "2025-08-18", score: 92, winner: true } },
-      { id: "crossing", included: true, values: { name: "Greenwood High crossing", status: "underway", detail: "Signals arrive in November.", date: "2025-11-01", score: 92 } },
+      { id: "survey", included: true, values: { name: "Survey and design", status: "done", detail: "Finished in March 2025.", date: "2025-03-14", score: 80, budget: "999999999999999.98", winner: false, notes: "PRIVATE-SENTINEL" } },
+      { id: "north", included: true, values: { name: "North segment", status: "done", detail: "Opened Aug. 18, 2025.", date: "2025-08-18", score: 92, budget: "999999999999999.99", winner: true } },
+      { id: "crossing", included: true, values: { name: "Greenwood High crossing", status: "underway", detail: "Signals arrive in November.", date: "2025-11-01", score: 92, budget: "1.00" } },
       { id: "south", included: true, values: { name: "South segment", status: "planned", detail: "Bids due in January 2026.", date: null, score: null } }
     ]
   });
@@ -118,6 +119,12 @@ describe("binding and prepare", () => {
     expect(html).toContain("T-1");
     expect(html).toMatch(/without a score is not ranked/);
   });
+
+  it("keeps exact currency amounts distinct when ranking", () => {
+    const html = render("ranking", "template", { name: "name", value: "budget" });
+    expect(html.indexOf("North segment")).toBeLessThan(html.indexOf("Survey and design"));
+    expect(html).not.toContain("T-1");
+  });
 });
 
 describe("server rendering", () => {
@@ -171,6 +178,12 @@ describe("client enhancement", () => {
     scoreHeader.querySelector("button")!.click();
     expect(scoreHeader.getAttribute("aria-sort")).toBe("ascending");
     expect(article.querySelector("tbody tr th")?.textContent).toBe("Survey and design");
+
+    const budgetHeader = [...article.querySelectorAll<HTMLElement>("thead th")].find((cell) => cell.textContent?.includes("Budget"))!;
+    budgetHeader.querySelector("button")!.click();
+    budgetHeader.querySelector("button")!.click();
+    expect(budgetHeader.getAttribute("aria-sort")).toBe("descending");
+    expect(article.querySelector("tbody tr th")?.textContent).toBe("North segment");
   });
 
   it("ignores a release path that is not a public release", async () => {
