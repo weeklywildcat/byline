@@ -168,19 +168,23 @@ test("primary navigation adapts to the viewport and follows guarded newsroom rou
 
   const header = page.locator(".byline-app-header");
   const nav = header.locator(".byline-primary-navigation");
-  const selected = nav.locator('[aria-current="page"]');
+  const selected = nav.locator('[aria-current="page"]:visible');
   const toggle = header.getByRole("button", { name: "Toggle navigation" });
   const create = header.getByRole("button", { name: "Create", exact: true });
   const more = header.locator(".byline-more-trigger");
   const drawer = page.getByRole("dialog", { name: "More", exact: true });
   await expect(nav.getByRole("link")).toHaveText(["Home", "Stories", "Calendar"]);
   await expect(selected).toHaveText("Home");
+  const wordmark = header.getByRole("img", { name: "Weekly Wildcat" });
+  await expect(wordmark).toBeVisible();
+  expect((await wordmark.boundingBox())!.x).toBeGreaterThanOrEqual(20);
+  await expect(header.getByRole("navigation", { name: "breadcrumb" })).toBeHidden();
   await expect(toggle).toBeHidden();
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 320);
   const phoneTabs = await nav.boundingBox();
   expect(phoneTabs).toMatchObject({ x: 0, width: 320, height: 56 });
   expect(phoneTabs!.y + phoneTabs!.height).toBe(640);
-  for (const tab of await nav.locator("a, button").all()) {
+  for (const tab of await nav.locator(":is(a, button):visible").all()) {
     expect(await tab.boundingBox()).toMatchObject({ width: 80 });
     expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
@@ -258,14 +262,25 @@ test("primary navigation adapts to the viewport and follows guarded newsroom rou
   await expect(header.getByRole("link", { name: "Back to Stories" })).toHaveAttribute("href", "/admin/stories");
   await page.goForward();
   await expect(page).toHaveURL(/\/admin\/media$/);
-  for (const width of [767, 768, 1100, 1199, 1200]) {
+  for (const width of [767, 768, 959, 960, 1100, 1199, 1200]) {
     await page.setViewportSize({ width, height: 720 });
     if (width < 1200) {
       await expect(nav).toBeVisible();
       await expect(toggle).toBeHidden();
-      await expect(selected).toHaveCount(0);
+      const mediaTab = nav.getByRole("link", { name: "Media", exact: true });
+      if (width >= 960) {
+        await expect(mediaTab).toBeVisible();
+        await expect(selected).toHaveText("Media");
+      } else {
+        await expect(mediaTab).toBeHidden();
+        await expect(selected).toHaveCount(0);
+      }
       await expect(page.locator("body")).toHaveJSProperty("scrollWidth", width);
       expect(await nav.evaluate((element) => getComputedStyle(element).position)).toBe(width < 768 ? "fixed" : "static");
+      if (width >= 768) {
+        const tabs = (await nav.boundingBox())!;
+        expect(tabs.x + tabs.width / 2).toBeCloseTo(width / 2, 0);
+      }
     } else {
       await expect(nav).toBeHidden();
       await expect(toggle).toBeVisible();
@@ -274,6 +289,10 @@ test("primary navigation adapts to the viewport and follows guarded newsroom rou
   }
 
   await page.setViewportSize({ width: 820, height: 720 });
+  // A late Nova stylesheet must not turn the centered header back into a flex row.
+  await page.addStyleTag({ content: ".byline-ui-root .flex { display: flex }" });
+  const tabletTabs = (await nav.boundingBox())!;
+  expect(tabletTabs.x + tabletTabs.width / 2).toBeCloseTo(410, 0);
   await more.click();
   await expect(drawer).toHaveAttribute("data-slot", "popover-content");
   await page.keyboard.press("Escape");
@@ -289,6 +308,24 @@ test("primary navigation adapts to the viewport and follows guarded newsroom rou
   await page.keyboard.press("Escape");
   await back.click();
   await expect(page).toHaveURL(/\/admin$/);
+  await expect(wordmark).toBeVisible();
+  const logoBox = (await wordmark.boundingBox())!;
+  const headerBox = (await header.boundingBox())!;
+  expect(logoBox.x).toBeGreaterThanOrEqual(20);
+  expect(logoBox.y - headerBox.y).toBeGreaterThanOrEqual(5);
+  expect(headerBox.y + headerBox.height - logoBox.y - logoBox.height).toBeGreaterThanOrEqual(5);
+
+  const mine = page.getByRole("button", { name: "Mine: my stories" });
+  const newsroom = page.getByRole("button", { name: "Newsroom: every visible story" });
+  for (const [active, inactive] of [[mine, newsroom], [newsroom, mine]]) {
+    await active.click();
+    await expect(active).toHaveAttribute("aria-pressed", "true");
+    await expect(inactive).toHaveAttribute("aria-pressed", "false");
+    await expect(active).toHaveCSS("font-weight", "600");
+    await expect(active).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(inactive).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  }
+
   await page.goto(`/admin/collections?collection=${id}`);
   await page.getByRole("button", { name: "Add brief", exact: true }).click();
   const brief = page.getByRole("textbox", { name: "Reporting brief and key angles" });

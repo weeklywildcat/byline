@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@byline/newsroom-ui/lib/utils";
 import { primaryNavigationFor, type primaryLocationFor } from "../../domain/navigation";
 import { NAV_ICONS } from "./nav-items";
 import { MoreNavigation, type MoreAccount } from "./MoreNavigation";
@@ -17,7 +18,7 @@ export function PrimaryNavigation({ admin, role, active, ...account }: MoreAccou
             key={key}
             href={`${admin}${path}` || "/"}
             aria-current={active === key ? "page" : undefined}
-            className="byline-primary-link text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring"
+            className={cn("byline-primary-link text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring", key === "media" && "byline-tablet-media")}
           >
             <Icon className="size-5 shrink-0" aria-hidden="true" />
             {label}

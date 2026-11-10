@@ -71,7 +71,9 @@ export function navigationFor(role: Role): NavItem[] {
 
 export const REVIEW_WORKFLOWS_PATH = "/review-workflows";
 
-const PRIMARY_KEYS = ["home", "stories", "calendar"] as const;
+// Media gets a direct tab when the tablet header has room for it.
+const PRIMARY_KEYS = ["home", "stories", "calendar", "media"] as const;
+const HOME_PARENT = { label: "Home", path: "" };
 type PrimaryKey = (typeof PRIMARY_KEYS)[number];
 
 export function primaryNavigationFor(role: Role): NavItem[] {
@@ -90,13 +92,13 @@ export function primaryLocationFor(pathname: string, adminRoute: string): Primar
   const path = stripAdmin(pathname, adminRoute);
   const destination = NAVIGATION.find((item) => item.path === path);
   const primary = PRIMARY_KEYS.find((key) => key === destination?.key);
-  if (primary) return { key: primary };
+  if (primary) return primary === "media" ? { key: primary, parent: HOME_PARENT } : { key: primary };
   if (storyIdFromPath(pathname, adminRoute) !== null) {
     return { key: "stories", parent: { label: "Stories", path: STORIES_PATH } };
   }
   if (path === REVIEW_WORKFLOWS_PATH) return { key: null, parent: { label: "People", path: "/people" } };
   if (destination || path === "/profile" || path === "/site" || path === SYSTEM_ADMINISTRATION_PATH) {
-    return { key: null, parent: { label: "Home", path: "" } };
+    return { key: null, parent: HOME_PARENT };
   }
   return null;
 }
