@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { APIError, type CollectionAfterChangeHook, type Payload, type PayloadRequest, type TaskConfig } from "payload";
+import { APIError, type CollectionAfterChangeHook, type Payload, type PayloadRequest, type TaskConfig, type Where } from "payload";
 import { relationId } from "../../access/user";
 import { recordStoryActivity } from "../../newsroom/story-activity";
 import { notifyTranscriptReady } from "../notifications";
@@ -120,12 +120,39 @@ export const queueTranscriptionAfterUpload: CollectionAfterChangeHook = async ({
   return doc;
 };
 
-async function markFailed(payload: Payload, req: PayloadRequest, id: number, failure: string) {
-  await payload.update({
+const activeMachineWhere = (id: number, runToken?: string): Where => ({
+  and: [
+    { id: { equals: id } },
+    { origin: { equals: "machine" } },
+    { state: { not_equals: "ready" } },
+    ...(runToken ? [{ transcriptionRunToken: { equals: runToken } }] : [])
+  ]
+});
+
+/**
+ * A machine worker must never overwrite a manual import (or a newer machine
+ * run). Every asynchronous write after work starts is compare-and-set against
+ * the run token and origin instead of trusting the row we read minutes ago.
+ */
+async function updateActiveRun(payload: Payload, req: PayloadRequest, id: number, runToken: string | undefined, data: Record<string, unknown>): Promise<boolean> {
+  const updated = await payload.update({
     collection: "reporting-transcripts",
-    id,
-    data: { state: "failed", failure: failure.slice(0, 400), progressMessage: "Transcription failed", lastProgressAt: new Date().toISOString() },
-    overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+    where: activeMachineWhere(id, runToken),
+    data: data as never,
+    overrideAccess: true,
+    depth: 0,
+    context: { bylineSystem: true },
+    req
+  });
+  return updated.docs.length > 0;
+}
+
+async function markFailed(payload: Payload, req: PayloadRequest, id: number, failure: string, runToken?: string): Promise<boolean> {
+  return updateActiveRun(payload, req, id, runToken, {
+    state: "failed",
+    failure: failure.slice(0, 400),
+    progressMessage: "Transcription failed",
+    lastProgressAt: new Date().toISOString()
   });
 }
 
@@ -159,9 +186,9 @@ export const transcribeReportingFileTask: TaskConfig = {
       ? transcript.transcriptionRunToken
       : randomUUID();
     const startedAt = transcript.transcriptionStartedAt ?? new Date().toISOString();
-    await payload.update({
+    const claimed = await payload.update({
       collection: "reporting-transcripts",
-      id,
+      where: activeMachineWhere(id),
       data: {
         state: "processing",
         attempts,
@@ -173,6 +200,8 @@ export const transcribeReportingFileTask: TaskConfig = {
       },
       overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
     });
+    // A manual import may have won between the initial read and this claim.
+    if (!claimed.docs.length) return { output: { skipped: true } };
 
     let lastProgressWrite = 0;
     let lastState = "";
@@ -186,16 +215,11 @@ export const transcribeReportingFileTask: TaskConfig = {
       lastState = progress.state;
       lastPercent = progress.percent;
       lastMessage = progress.message;
-      await payload.update({
-        collection: "reporting-transcripts",
-        id,
-        data: {
-          state: progress.state === "queued" ? "queued" : "processing",
-          progressPercent: progress.percent,
-          progressMessage: progress.message,
-          lastProgressAt: new Date(now).toISOString()
-        },
-        overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+      await updateActiveRun(payload, req, id, runToken, {
+        state: progress.state === "queued" ? "queued" : "processing",
+        progressPercent: progress.percent,
+        progressMessage: progress.message,
+        lastProgressAt: new Date(now).toISOString()
       });
     };
 
@@ -211,51 +235,45 @@ export const transcribeReportingFileTask: TaskConfig = {
         AbortSignal.timeout(4 * 60 * 60 * 1000),
         recordProgress
       );
-      await payload.update({
-        collection: "reporting-transcripts", id,
-        data: {
-          state: "ready",
-          origin: "machine",
-          provider: provider.id,
-          model: provider.model,
-          language: result.language,
-          durationMs: result.durationMs,
-          segments: result.segments,
-          completedAt: new Date().toISOString(),
-          failure: null,
-          progressPercent: 100,
-          progressMessage: "Transcript ready",
-          lastProgressAt: new Date().toISOString()
-        },
-        overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+      const completed = await updateActiveRun(payload, req, id, runToken, {
+        state: "ready",
+        origin: "machine",
+        provider: provider.id,
+        model: provider.model,
+        language: result.language,
+        durationMs: result.durationMs,
+        segments: result.segments,
+        completedAt: new Date().toISOString(),
+        failure: null,
+        progressPercent: 100,
+        progressMessage: "Transcript ready",
+        lastProgressAt: new Date().toISOString()
       });
+      // A manual import or a newer run won while Whisper was working.
+      if (!completed) return { output: { skipped: true } };
       if (!file.durationMs && result.durationMs) await payload.update({ collection: "reporting-files", id: file.id, data: { durationMs: result.durationMs }, overrideAccess: true, depth: 0, context: { bylineSystem: true }, req });
       await recordStoryActivity(req, transcript.story, "transcript-completed", id);
       await notifyTranscriptReady(req, { storyId: Number(relationId(transcript.story)), transcriptId: id, recipient: relationId(transcript.createdBy) });
       return { output: { segments: result.segments.length } };
     } catch (error) {
       if (error instanceof PermanentTranscriptionError) {
-        await markFailed(payload, req, id, error.message);
-        return { output: { failed: true } };
+        const failed = await markFailed(payload, req, id, error.message, runToken);
+        return { output: failed ? { failed: true } : { skipped: true } };
       }
       const message = error instanceof TemporaryTranscriptionError ? error.message : "Transcription failed unexpectedly.";
       if (attempts >= MAX_ATTEMPTS) {
-        await markFailed(payload, req, id, `${message} Byline stopped retrying; try again later.`);
-        return { output: { failed: true } };
+        const failed = await markFailed(payload, req, id, `${message} Byline stopped retrying; try again later.`, runToken);
+        return { output: failed ? { failed: true } : { skipped: true } };
       }
       // Back in Payload's queue, but the service job keeps the same run key.
       // A retry can reattach to work that is still running instead of duplicating it.
-      await payload.update({
-        collection: "reporting-transcripts",
-        id,
-        data: {
-          state: "queued",
-          failure: message.slice(0, 400),
-          progressMessage: "Waiting to retry transcription",
-          lastProgressAt: new Date().toISOString()
-        },
-        overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+      const queued = await updateActiveRun(payload, req, id, runToken, {
+        state: "queued",
+        failure: message.slice(0, 400),
+        progressMessage: "Waiting to retry transcription",
+        lastProgressAt: new Date().toISOString()
       });
+      if (!queued) return { output: { skipped: true } };
       throw error;
     }
   }
