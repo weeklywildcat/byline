@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { body, createStory, fixturePdf, lexical, login, paragraph, pickDateTime, readDraft, signIn, waitForSaved } from "./helpers";
 
 for (const width of [1440, 820, 390]) {
@@ -24,7 +24,7 @@ for (const width of [1440, 820, 390]) {
       const edit = url.getByRole("button", { name: "Edit URL" });
       await edit.click();
       const dialog = page.getByRole("dialog", { name: "Edit public URL" });
-      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAttribute("data-slot", width < 1000 ? "drawer-content" : "dialog-content");
       await expect(dialog.getByRole("button", { name: "Apply to draft" })).toBeInViewport();
       await page.keyboard.press("Escape");
       await expect(edit).toBeFocused();
@@ -427,3 +427,135 @@ test("More preserves a live Story editor and waits for its autosave before leavi
   await expect(page).toHaveURL(/\/admin\/media$/);
   expect(JSON.stringify((await readDraft(request, baseURL!, token, story)).body)).toContain("The deadline is Friday.");
 });
+
+async function expectTarget(target: Locator, touch: boolean, { square = false } = {}) {
+  await expect(target).toBeVisible();
+  const height = async () => (await target.boundingBox())?.height ?? 0;
+  if (touch) {
+    await expect.poll(height).toBeGreaterThanOrEqual(44);
+    if (square) await expect.poll(async () => (await target.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(44);
+  } else {
+    await expect.poll(height).toBeLessThan(44);
+  }
+}
+
+for (const touch of [false, true]) {
+  test.describe(`Newsroom at 820px with ${touch ? "touch" : "a fine pointer"}`, () => {
+    test.use({ viewport: { width: 820, height: 1180 }, hasTouch: touch });
+
+    test("sizes Nova controls by capability and adapts story filters and Board actions", async ({ page, context, request, baseURL }) => {
+      const token = await login(request, baseURL!, "EDITOR");
+      const headline = `Pointer ergonomics ${touch ? "touch" : "mouse"} ${Date.now()}`;
+      const id = await createStory(request, baseURL!, token, { headline });
+      await signIn(context, baseURL!, token);
+      await page.goto("/admin/stories?view=board");
+      const search = page.getByRole("searchbox", { name: "Search stories" });
+      const more = page.getByRole("button", { name: /^More filters/ });
+      await expectTarget(search, touch);
+      await expectTarget(more, touch);
+      await expectTarget(page.getByRole("combobox", { name: "Workflow", exact: true }), touch);
+      await expectTarget(page.getByRole("tab", { name: "List", exact: true }), touch);
+      await expect(search).toHaveCSS("font-size", touch ? "16px" : "14px");
+      await search.fill(headline);
+      await more.click();
+      const filters = touch ? page.getByRole("dialog", { name: "Filters" }) : page.locator("[data-slot=popover-content]").filter({ has: page.getByRole("combobox", { name: "Publication", exact: true }) });
+      await expect(filters).toHaveAttribute("data-slot", touch ? "drawer-content" : "popover-content");
+      await filters.getByRole("combobox", { name: "Publication", exact: true }).click();
+      const draft = page.getByRole("option", { name: "Draft", exact: true });
+      await expectTarget(draft, touch);
+      await draft.click();
+      await filters.locator("#story-filter-deadline").click();
+      const day = page.locator("[data-slot=popover-content] button[data-day]").first();
+      await expectTarget(day, touch, { square: true });
+      await page.keyboard.press("Escape");
+      if (touch) await filters.getByRole("button", { name: "Done" }).click();
+      else await page.keyboard.press("Escape");
+      await expect(page.getByRole("button", { name: "Remove filter: Draft" })).toBeVisible();
+
+      const card = page.locator(`[data-status=pitch] [data-story-id="${id}"]`);
+      const title = card.getByRole("button", { name: headline, exact: true });
+      const actions = card.getByRole("button", { name: `Actions for ${headline}` });
+      const preview = page.locator("[data-slot=story-hover-preview]");
+      if (touch) {
+        const handle = card.getByRole("img", { name: `Drag ${headline}` });
+        await expectTarget(handle, touch, { square: true });
+        await expect(handle).toHaveCSS("touch-action", "none");
+        await expect(card).toHaveCSS("touch-action", "auto");
+        await expect(actions).toHaveCSS("opacity", "1");
+        await title.tap();
+        const peek = page.getByRole("dialog", { name: headline });
+        await expect(peek).toBeVisible();
+        await expect(preview).toHaveCount(0);
+        await page.keyboard.press("Escape");
+        await expect(peek).toBeHidden();
+      } else {
+        await title.hover();
+        await expect(preview).toBeVisible();
+        await expect(card.getByRole("img", { name: `Drag ${headline}` })).toHaveCount(0);
+        await actions.hover();
+      }
+
+      await expectTarget(actions, touch, { square: true });
+      if (touch) {
+        await actions.tap();
+        const drawer = page.getByRole("dialog", { name: "Story actions" });
+        await expect(drawer).toHaveAttribute("data-slot", "drawer-content");
+        await expect(drawer.getByRole("link", { name: "Open story" })).toBeVisible();
+        await expect(drawer.getByRole("menuitem")).toHaveCount(0);
+        const move = drawer.getByRole("region", { name: "Move to" });
+        await expect(move.getByRole("button", { name: "Pitch" })).toHaveAttribute("aria-current", "true");
+        await move.getByRole("button", { name: "Reporting" }).tap();
+      } else {
+        await actions.click();
+        const submenu = page.getByRole("menuitem", { name: "Move to" });
+        await expectTarget(submenu, touch);
+        await submenu.focus();
+        await page.keyboard.press("ArrowRight");
+        await page.getByRole("menuitemradio", { name: "Reporting", exact: true }).click();
+      }
+      await expect(page.locator(`[data-status=reporting] [data-story-id="${id}"]`)).toBeVisible();
+
+      await page.keyboard.press("Control+k");
+      const command = page.getByRole("combobox", { name: "Search the newsroom" });
+      await expectTarget(command, touch);
+      await command.fill("Open Stories");
+      await expectTarget(page.getByRole("option", { name: "Open Stories" }), touch);
+    });
+
+    test("edits Ground Rules and restores focus from the adaptive source form", async ({ page, context, request, baseURL }) => {
+      const token = await login(request, baseURL!, "EDITOR");
+      const id = await createStory(request, baseURL!, token, { headline: `Ground Rules UX ${Date.now()}` });
+      await signIn(context, baseURL!, token);
+      await page.goto(`/admin/collections/stories/${id}?view=plan&section=reporting`);
+      const reporting = page.locator("#plan-reporting");
+      await reporting.getByRole("button", { name: "Sources & appointments" }).click();
+      const rail = page.getByRole("dialog", { name: "Sources & appointments" });
+      const add = rail.getByRole("button", { name: "Add source" });
+      await add.click();
+      const source = page.getByRole("dialog", { name: "Add source" });
+      await expect(source).toHaveAttribute("data-slot", touch ? "drawer-content" : "dialog-content");
+      await source.getByRole("button", { name: "Add source", exact: true }).click();
+      await expect(source.getByRole("textbox", { name: "Label" })).toBeFocused();
+      await source.getByRole("textbox", { name: "Label" }).fill("Principal Smith");
+      await source.getByRole("button", { name: "Cancel" }).click();
+      const discard = page.getByRole("alertdialog", { name: "Discard unsaved changes?" });
+      await discard.getByRole("button", { name: "Discard changes" }).click();
+      await expect(add).toBeFocused();
+      await add.click();
+      await source.getByRole("textbox", { name: "Label" }).fill("Principal Smith");
+      await source.getByRole("button", { name: "Add source", exact: true }).click();
+
+      const rules = rail.getByRole("button", { name: /^Ground rules for Principal Smith/ });
+      await rules.click();
+      const editor = touch ? page.getByRole("dialog", { name: "Edit ground rules" }) : page.locator("[data-slot=popover-content]").filter({ has: page.getByRole("textbox", { name: "Ground rules note" }) });
+      await expect(editor).toHaveAttribute("data-slot", touch ? "drawer-content" : "popover-content");
+      await expect(editor).toContainText("Principal Smith");
+      const note = editor.getByRole("textbox", { name: "Ground rules note" });
+      await note.fill("Agreed before the interview");
+      await editor.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(editor).toBeHidden();
+      await rules.click();
+      await expect(note).toHaveValue("Agreed before the interview");
+    });
+  });
+}

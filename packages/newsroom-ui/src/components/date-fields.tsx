@@ -212,7 +212,7 @@ export function DateTimeField({ label, value, onChange, timeZone, seconds = fals
         <div className="grid gap-2 border-t p-3">
           <div className="flex items-center gap-2">
             <label htmlFor={`${id}-time`} className="text-xs font-medium">Time</label>
-            <Input id={`${id}-time`} type="time" step={seconds ? 1 : 60} className="h-7 w-auto any-pointer-coarse:h-11" disabled={!day} value={clock} aria-invalid={day && !complete ? true : undefined} onChange={(event) => choose(day, event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); change(false); } }} />
+            <Input id={`${id}-time`} type="time" step={seconds ? 1 : 60} className="h-7 w-auto" disabled={!day} value={clock} aria-invalid={day && !complete ? true : undefined} onChange={(event) => choose(day, event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); change(false); } }} />
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Quick times">
             {TIME_PRESETS.map((preset) => {

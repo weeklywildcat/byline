@@ -58,7 +58,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton type="button" size="lg" tooltip={compact ? { children: user.name, hidden: false } : state === "collapsed" ? user.name : undefined} aria-label={`Account: ${user.name}`} className={cn("data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground", compact && "md:h-8 md:p-0")} />}>
+          <DropdownMenuTrigger render={<SidebarMenuButton type="button" size="lg" tooltip={compact ? { children: user.name, hidden: false } : state === "collapsed" ? user.name : undefined} aria-label={`Account: ${user.name}`} className={cn("data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground", compact && "md:h-8 md:p-0 any-pointer-coarse:justify-center")} />}>
             <Identity user={user} compact={compact} />
             {compact ? null : <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />}
           </DropdownMenuTrigger>

@@ -28,10 +28,10 @@ import { NavUser } from "./NavUser";
 export function BylineIconRail({ items, active, homeHref, user, systemHref, logoutUrl, loginHref }: ShellSidebarProps & { active: string | null }) {
   return (
     <Sidebar collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r border-sidebar-border" data-byline-rail="">
-      <SidebarHeader>
+      <SidebarHeader className="any-pointer-coarse:px-0.5">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip={{ children: "Weekly Wildcat Home", hidden: false }} render={<ShellLink href={homeHref} aria-label="Weekly Wildcat Home" />} className="md:h-8 md:p-0">
+            <SidebarMenuButton size="lg" tooltip={{ children: "Weekly Wildcat Home", hidden: false }} render={<ShellLink href={homeHref} aria-label="Weekly Wildcat Home" />} className="md:h-8 md:p-0 any-pointer-coarse:justify-center">
               <BylineMark />
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -40,7 +40,7 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label="Byline">
-          <SidebarGroup>
+          <SidebarGroup className="any-pointer-coarse:px-0.5">
             <SidebarGroupContent className="px-1.5 md:px-0">
               <SidebarMenu className="gap-0.5">
                 {items.map((item, index) => {
@@ -52,7 +52,7 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
                       <SidebarMenuButton
                         isActive={current}
                         tooltip={{ children: item.label, hidden: false }}
-                        className="px-2.5 md:px-2"
+                        className="px-2.5 md:px-2 any-pointer-coarse:justify-center"
                         render={<ShellLink href={item.href} aria-current={current ? "page" : undefined} />}
                       >
                         {Icon ? <Icon aria-hidden="true" /> : null}
@@ -66,7 +66,7 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
           </SidebarGroup>
         </nav>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="any-pointer-coarse:px-0.5">
         <NavUser compact user={user} systemHref={systemHref} logoutUrl={logoutUrl} loginHref={loginHref} />
       </SidebarFooter>
     </Sidebar>

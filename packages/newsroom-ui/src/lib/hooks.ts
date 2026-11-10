@@ -46,11 +46,12 @@ export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, 
  */
 export function useMediaQuery(query: string, serverValue = false): boolean {
   const subscribe = useCallback((onChange: () => void) => {
-    const media = window.matchMedia(query);
+    const media = window.matchMedia?.(query);
+    if (!media) return () => {};
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [query]);
-  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => serverValue);
+  return useSyncExternalStore(subscribe, () => window.matchMedia?.(query).matches ?? serverValue, () => serverValue);
 }
 
 const MOBILE_BREAKPOINT = 768;
