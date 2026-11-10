@@ -123,8 +123,8 @@ function CornerMenu({ story, statuses, canMoveStories, moving, onMoveStory, work
     className="absolute top-1 right-1 bg-card opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-within/card:opacity-100 any-pointer-coarse:opacity-100 data-popup-open:opacity-100" />;
 }
 
-function StoryDragHandle({ title, ref }: { title: string; ref: (element: HTMLSpanElement | null) => void }) {
-  return <span ref={ref} role="img" aria-label={`Drag ${title || "Untitled story"}`} className="absolute top-1 left-1 flex size-11 touch-none cursor-grab items-center justify-center text-muted-foreground">
+function StoryDragHandle({ ref }: { ref: (element: HTMLSpanElement | null) => void }) {
+  return <span ref={ref} aria-hidden="true" data-story-drag-handle="" className="absolute top-1 left-1 flex size-11 touch-none cursor-grab items-center justify-center text-muted-foreground">
     <GripVertical className="size-4" aria-hidden="true" />
   </span>;
 }
@@ -143,7 +143,7 @@ function BoardCard(props: StoryItemProps) {
         <StoryMeta story={story} timezone={timezone} now={now} />
         <StoryAttentionSignals story={story} />
       </CardContent>
-      {touch && movable ? <StoryDragHandle ref={setHandle} title={story.title} /> : null}
+      {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
     </Card>
   </StoryContextMenu>;
@@ -165,7 +165,7 @@ function DenseRow(props: StoryItemProps) {
         {story.attention ? <StoryAttentionSignals story={story} limit={1} className="max-w-[55%] shrink flex-nowrap [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0" /> : <ProductionSummary story={story} maxSignals={1} empty={null} className="shrink-0 flex-nowrap gap-1 [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0 [&_button]:h-4" />}
         <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={"No deadline"} className="shrink-0 whitespace-nowrap" />
       </div>
-      {touch && movable ? <StoryDragHandle ref={setHandle} title={story.title} /> : null}
+      {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
     </div>
   </StoryContextMenu>;
