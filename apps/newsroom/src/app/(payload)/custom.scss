@@ -3,6 +3,28 @@
 // Byline (src/ui, Nova) owns everything a writer sees; Payload's header,
 // navigation toggler and generic chrome are not part of the product.
 
+// The safe-area contract. The layout opts in with viewport-fit=cover, so any
+// interactive content, header, footer or close control that touches a screen
+// edge must clear all four insets; backgrounds may bleed. `.byline-ui-root`
+// (packages/newsroom-ui/src/styles.css) defines the same names for overlays.
+:root {
+  --byline-safe-top: env(safe-area-inset-top, 0px);
+  --byline-safe-right: env(safe-area-inset-right, 0px);
+  --byline-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --byline-safe-left: env(safe-area-inset-left, 0px);
+}
+
+// Toasts are fixed to the screen corners; keep them off the notch, rounded corners and home indicator.
+.byline-shell-toaster [data-sonner-toaster] {
+  --offset-top: max(24px, var(--byline-safe-top));
+  --offset-right: max(24px, var(--byline-safe-right));
+  --offset-bottom: max(24px, var(--byline-safe-bottom));
+  --offset-left: max(24px, var(--byline-safe-left));
+  --mobile-offset-top: max(16px, var(--byline-safe-top));
+  --mobile-offset-right: max(16px, var(--byline-safe-right));
+  --mobile-offset-left: max(16px, var(--byline-safe-left));
+}
+
 // The Byline sidebar (shadcn Sidebar, src/ui/shell) reserves its own width:
 // its `sidebar-gap` is the first grid column (expanded, icons, or nothing on
 // phones, where it is a sheet) and its panel is fixed to the viewport.
@@ -113,7 +135,7 @@
   .byline-app-header .byline-adaptive-header {
     margin-inline-start: 0;
     gap: 4px;
-    padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
+    padding-inline: max(8px, var(--byline-safe-left)) max(8px, var(--byline-safe-right));
     background-color: var(--background);
 
     .byline-header-actions {
@@ -155,7 +177,7 @@
   }
 
   .byline-app-header .byline-header-home {
-    padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+    padding-inline: max(16px, var(--byline-safe-left), var(--byline-safe-right));
   }
 
   .byline-header-wordmark {
@@ -202,7 +224,7 @@
   .byline-app-header .byline-adaptive-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
-    padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+    padding-inline: max(16px, var(--byline-safe-left), var(--byline-safe-right));
 
     .byline-header-actions {
       margin-inline-start: 0;
@@ -231,7 +253,7 @@
 
 @media (width < 768px) {
   html:has(.byline-primary-navigation) {
-    --byline-bottom-navigation-height: calc(56px + env(safe-area-inset-bottom, 0px));
+    --byline-bottom-navigation-height: calc(56px + var(--byline-safe-bottom));
     scroll-padding-block-end: var(--byline-bottom-navigation-height);
   }
 
@@ -248,7 +270,7 @@
   }
 
   .byline-app-header:has(.byline-adaptive-header) {
-    padding-block-start: env(safe-area-inset-top, 0px);
+    padding-block-start: var(--byline-safe-top);
     background-color: var(--background);
   }
 
@@ -257,8 +279,8 @@
     inset: auto 0 0;
     height: var(--byline-bottom-navigation-height);
     border-block-start: 1px solid var(--border);
-    padding-block-end: env(safe-area-inset-bottom, 0px);
-    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+    padding-block-end: var(--byline-safe-bottom);
+    padding-inline: var(--byline-safe-left) var(--byline-safe-right);
     backdrop-filter: blur(12px);
   }
 

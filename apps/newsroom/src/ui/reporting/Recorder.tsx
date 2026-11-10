@@ -3,6 +3,7 @@
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Mic, Square, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
 import { RECORDING_ACCEPT, recordingMimeType, recordingUploadProblem } from "../../domain/reporting";
 
 export type Recording = { blob: Blob; filename: string; durationMs: number };
@@ -24,6 +25,8 @@ const extension = (mime: string) => (mime.includes("mp4") ? "m4a" : mime.include
 export function useRecorder() {
   const [state, setState] = useState<"idle" | "recording" | "unsupported" | "denied">(() => (typeof window !== "undefined" && (!navigator.mediaDevices?.getUserMedia || pickType() === undefined) ? "unsupported" : "idle"));
   const [elapsed, setElapsed] = useState(0);
+  // A locked phone suspends the page and cuts the recording short: keep the screen on only while recording.
+  useScreenWakeLock(state === "recording");
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startedAt = useRef(0);
