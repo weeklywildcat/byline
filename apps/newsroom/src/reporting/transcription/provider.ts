@@ -19,6 +19,15 @@ export type TranscriptionInput = {
   filename: string;
   mimeType: string;
   language?: string | null;
+  /** Stable for one logical run, including automatic Payload retries. */
+  jobKey: string;
+};
+
+export type TranscriptionProgress = {
+  state: "queued" | "loading-model" | "transcribing";
+  /** 0-100 when Whisper can measure it, otherwise null. */
+  percent: number | null;
+  message: string;
 };
 
 export interface TranscriptionProvider {
@@ -33,7 +42,11 @@ export interface TranscriptionProvider {
    * policy and is never used silently.
    */
   private: boolean;
-  transcribe(input: TranscriptionInput, signal: AbortSignal): Promise<NormalizedTranscript>;
+  transcribe(
+    input: TranscriptionInput,
+    signal: AbortSignal,
+    onProgress?: (progress: TranscriptionProgress) => void | Promise<void>
+  ): Promise<NormalizedTranscript>;
 }
 
 export class TemporaryTranscriptionError extends Error {}
