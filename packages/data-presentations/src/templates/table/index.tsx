@@ -26,7 +26,7 @@ const settings = {
   density: setting.choice({ label: "Rows", default: "comfortable", choices: [{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }] })
 };
 
-function DataTable({ project, data, format }: DataPresentationProps<typeof datasets, { caption: string; searchable: boolean; density: "comfortable" | "compact" }>) {
+function DataTable({ project, data, format, releasePaths }: DataPresentationProps<typeof datasets, { caption: string; searchable: boolean; density: "comfortable" | "compact" }>) {
   const { rows } = data;
   const heading = rows.roles.heading;
   const columns = heading ? [heading, ...rows.fields.filter((entry) => entry.key !== heading.key)] : rows.fields;
@@ -59,7 +59,12 @@ function DataTable({ project, data, format }: DataPresentationProps<typeof datas
           </tbody>
         </table>
       </div>
-      {rows.records.length > shown.length ? <p className="data-table-more">Showing the first {format.count(shown.length, "row")} of {format.count(rows.records.length, "row")}.</p> : null}
+      {rows.records.length > shown.length ? (
+        <p className="data-table-more">
+          Showing the first {format.count(shown.length, "row")} of {format.count(rows.records.length, "row")}.
+          {releasePaths?.rows ? <> <a href={releasePaths.rows} download>Download all rows as JSON</a>.</> : null}
+        </p>
+      ) : null}
     </div>
   );
 }
