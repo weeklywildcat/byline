@@ -148,8 +148,12 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const counted = usePlanningStories(fetchers, countScope, { enabled: Boolean(workspace) });
   const stories = useMemo(() => sortPlanningStories(filterPlanningStories(data?.stories || [], filters, userId ?? undefined), sort), [data, filters, sort, userId]);
 
-  // The List is for work in progress: finished published stories stay out of it until asked for.
-  const listStories = useMemo(() => hideFinishedPublished(stories, { showPublished, publicationState: filters.publicationState }), [filters.publicationState, showPublished, stories]);
+  // Board and List are work-in-progress views. Finished published stories stay
+  // out of both until requested; an explicit Published view always shows them.
+  const workingStories = useMemo(() => hideFinishedPublished(stories, {
+    showPublished,
+    publicationState: filters.publicationState || (filters.workflow === "published" ? "published" : "")
+  }), [filters.publicationState, filters.workflow, showPublished, stories]);
 
   useEffect(() => {
     if (!data) return;
@@ -215,14 +219,14 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
             </TabsList>
           </div>
         </div>
-        <StoryFilters today={siteDay(now, timezone)} filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
+        <StoryFilters today={siteDay(now, timezone)} filters={filters} onChange={changeFilters} showPublished={view === "board" || view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
         {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
         {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
         {loading
           ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
           : <>
-            <TabsContent value="board"><StoryBoard layout={boardLayout} stories={stories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
-            <TabsContent value="list"><StoryList stories={listStories} hiddenPublished={stories.length - listStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
+            <TabsContent value="board"><StoryBoard layout={boardLayout} stories={workingStories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
+            <TabsContent value="list"><StoryList stories={workingStories} hiddenPublished={stories.length - workingStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
             {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
           </>}
       </Tabs>

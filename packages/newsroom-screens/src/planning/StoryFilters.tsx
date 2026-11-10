@@ -60,7 +60,7 @@ export type StoryFiltersProps = {
   statuses: PlanningWorkflowStatus[];
   writers: PlanningPerson[];
   editors: PlanningPerson[];
-  /** The List hides finished published stories; this brings them back. Not a saved-view filter. */
+  /** Board and List hide finished published stories; this brings them back. Not a saved-view filter. */
   showPublished?: { value: boolean; onChange: (value: boolean) => void };
   /** The newsroom's current day (`YYYY-MM-DD`): turns on quick ranges ("Today", "Next 7 days") in the date filters. */
   today?: string;
