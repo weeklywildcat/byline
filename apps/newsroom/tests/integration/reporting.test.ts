@@ -9,7 +9,7 @@ import { reportingEndpoints } from "../../src/reporting/endpoints";
 import { privateReportingDir } from "../../src/reporting/paths";
 import { fasterWhisperProvider } from "../../src/reporting/transcription/faster-whisper";
 import { PermanentTranscriptionError, TemporaryTranscriptionError, type TranscriptionProvider } from "../../src/reporting/transcription/provider";
-import { setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
+import { recoverQueuedTranscriptions, setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -358,6 +358,76 @@ describe("recordings, ground rules and transcription", () => {
     expect(queued.state).toBe("queued");
     expect(queued.attempts).toBe(1);
     expect(queued.failure).toContain("503");
+    providerMode = "ok";
+  });
+
+  it("releases a stale claimed job and resets a legacy retry budget on worker startup", async () => {
+    providerMode = "temporary";
+    const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
+      params: { id: ids.story },
+      data: {},
+      file: wav("stale-worker.wav")
+    });
+    await runReporting();
+    const transcript = (await payload.find({
+      collection: "reporting-transcripts",
+      where: { file: { equals: recording.body.id } },
+      depth: 0
+    })).docs[0];
+
+    await payload.update({
+      collection: "reporting-transcripts",
+      id: transcript.id,
+      data: {
+        state: "processing",
+        attempts: 5,
+        transcriptionRunToken: null,
+        progressMessage: null,
+        lastProgressAt: null
+      },
+      overrideAccess: true,
+      context: { bylineSystem: true }
+    });
+
+    const jobs = await payload.find({
+      collection: "payload-jobs",
+      where: {
+        and: [
+          { taskSlug: { equals: "transcribe-reporting-file" } },
+          { queue: { equals: "reporting" } },
+          { completedAt: { exists: false } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true
+    });
+    const job = jobs.docs.find((row) => {
+      const input = row.input && typeof row.input === "object" && !Array.isArray(row.input) ? row.input as Record<string, unknown> : {};
+      return Number(input.transcriptId) === transcript.id;
+    });
+    expect(job).toBeTruthy();
+    await payload.update({
+      collection: "payload-jobs",
+      id: job!.id,
+      data: { processing: true },
+      overrideAccess: true
+    });
+
+    const recovered = await recoverQueuedTranscriptions(payload);
+    expect(recovered.released).toBeGreaterThanOrEqual(1);
+    expect(recovered.legacyReset).toBeGreaterThanOrEqual(1);
+
+    const fixedTranscript = await payload.findByID({ collection: "reporting-transcripts", id: transcript.id, depth: 0 });
+    expect(fixedTranscript).toMatchObject({
+      state: "queued",
+      attempts: 0,
+      progressMessage: "Waiting to transcribe",
+      transcriptionRunToken: null
+    });
+    const fixedJob = await payload.findByID({ collection: "payload-jobs", id: job!.id, depth: 0, overrideAccess: true });
+    expect(fixedJob.processing).toBe(false);
+    expect(fixedJob.waitUntil).toBeTruthy();
     providerMode = "ok";
   });
 
