@@ -3,7 +3,7 @@ import { managesStory, storyRelationship } from "../src/access/story-context";
 import { atLeast, newsroomUser, relationIds } from "../src/access/user";
 import { validResourceUrl } from "../src/collections/StoryPlans";
 import { addDays, localDay, localToInstant } from "../src/domain/dates";
-import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, NAVIGATION, navigationFor, storyIdFromPath } from "../src/domain/navigation";
+import { activeNavKey, administrationFor, canAdministerSystem, createActionsFor, locationFor, NAVIGATION, navigationFor, primaryLocationFor, primaryNavigationFor, storyIdFromPath } from "../src/domain/navigation";
 import { dateOnly, normalizeAppointmentTiming, TimingError } from "../src/domain/schedule";
 import { isSlug, slugify } from "../src/domain/slug";
 import { CORRECTION_TYPES, STORY_FORMATS, WORKFLOW_STAGES } from "../src/domain/vocabulary";
@@ -227,5 +227,33 @@ describe("slugs and links", () => {
     expect(validResourceUrl("https://user:pass@example.com/")).not.toBe(true);
     expect(validResourceUrl("javascript:alert(1)")).not.toBe(true);
     expect(validResourceUrl("https://example.com/a b")).not.toBe(true);
+  });
+});
+
+describe("adaptive primary navigation", () => {
+  it("projects the same four destinations for newsroom roles without changing desktop destinations", () => {
+    for (const role of ["staff", "editor", "administrator"] as const) {
+      expect(primaryNavigationFor(role).map(({ path }) => path)).toEqual(["", "/stories", "/calendar", "/more"]);
+      expect(navigationFor(role).some(({ key }) => key === "more")).toBe(false);
+    }
+  });
+
+  it("matches canonical views and gives deep links a deterministic parent", () => {
+    const admin = "/desk";
+    expect(primaryLocationFor("/desk/?welcome=1", admin)).toEqual({ key: "home" });
+    expect(primaryLocationFor("/desk/stories?needs_review=1", admin)).toEqual({ key: "stories" });
+    expect(primaryLocationFor("/desk/collections/stories/42/?tab=reporting", admin)).toEqual({ key: "stories", parent: { label: "Stories", path: "/stories" } });
+    expect(primaryLocationFor("/desk/calendar#today", admin)).toEqual({ key: "calendar" });
+    expect(primaryLocationFor("/desk/more", admin)).toEqual({ key: "more" });
+    expect(primaryLocationFor("/desk/review-workflows", admin)).toEqual({ key: "more", parent: { label: "People", path: "/people" } });
+    for (const view of ["media?asset=2", "collections?collection=1", "people?person=2", "front-page", "distribution", "content-health", "profile", "site", "system"]) {
+      expect(primaryLocationFor(`/desk/${view}`, admin)).toEqual({ key: "more", parent: { label: "More", path: "/more" } });
+    }
+  });
+
+  it("excludes authentication, Field Mode, previews, raw administration and paths outside the configured prefix", () => {
+    for (const path of ["", "/desk/login", "/desk/field", "/desk/account", "/preview/story", "/desk/collections/stories", "/desk/collections/stories/create", "/desk/collections/stories/1/versions", "/desk/collections/media/1", "/desk/collections/pages/1", "/desk/globals/distribution-settings", "/desk/media/file", "/desk-extra", "/admin", "/stories"]) {
+      expect(primaryLocationFor(path, "/desk")).toBeNull();
+    }
   });
 });

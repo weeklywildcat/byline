@@ -1,3 +1,7 @@
+/** At narrower widths Byline views use the primary links in the app header. */
+export const ADAPTIVE_NAVIGATION_QUERY = "(width < 1200px)";
+export const BOTTOM_NAVIGATION_QUERY = "(width < 768px)";
+
 /** Remembers whether the desktop sidebar is expanded; read on the server so the first paint is right. */
 export const SIDEBAR_COOKIE = "byline_sidebar";
 

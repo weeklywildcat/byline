@@ -3,8 +3,8 @@
 import { useIsMobile, useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { isCalendarPath, isCollectionsPath, isMediaPath, isStoriesPath, storyIdFromPath } from "../../domain/navigation";
-import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORIES_WORKSPACE_QUERY, STORY_WORKSPACE_QUERY } from "./shell-config";
+import { isCalendarPath, isCollectionsPath, isMediaPath, isStoriesPath, primaryLocationFor, storyIdFromPath } from "../../domain/navigation";
+import { ADAPTIVE_NAVIGATION_QUERY, CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORIES_WORKSPACE_QUERY, STORY_WORKSPACE_QUERY } from "./shell-config";
 
 /**
  * Which composition the one sidebar has on this screen:
@@ -22,8 +22,7 @@ import { CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_Q
  *   sidebar-09's icon rail plus the Collection switcher. The Collections list
  *   itself keeps the ordinary sidebar.
  * Each workspace has its own breakpoint, measured for its own content. Below
- * it the screen keeps the ordinary sidebar and offers its context in a
- * temporary sheet. Viewport width is a layout capability, never the reader's
+ * it the screen offers its context in a temporary sheet. Viewport width is a layout capability, never the reader's
  * expanded/collapsed preference.
  */
 export type ShellComposition = "default" | "story-workspace" | "calendar-workspace" | "media-workspace" | "stories-workspace" | "collection-workspace";
@@ -88,8 +87,18 @@ const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, stories: 
 export const ShellLayoutProvider = ShellLayoutContext;
 export const useShellLayout = () => use(ShellLayoutContext);
 
+export function usePrimaryLocation(adminRoute: string) {
+  return primaryLocationFor(usePathname() ?? "", adminRoute);
+}
+
+export function useAdaptiveNavigation(adminRoute: string) {
+  const location = usePrimaryLocation(adminRoute);
+  const narrow = useMediaQuery(ADAPTIVE_NAVIGATION_QUERY);
+  return Boolean(location && narrow);
+}
+
 /** The current layout, from the address and the viewport (ordinary until hydrated). */
-export function useCurrentShellLayout(adminRoute: string): ShellLayout {
+export function useCurrentShellLayout(adminRoute: string, adaptive: boolean): ShellLayout {
   const pathname = usePathname() ?? "";
   // Only the open Collection is read from the query; other screens' queries never change the layout.
   const params = useSearchParams();
@@ -99,7 +108,9 @@ export function useCurrentShellLayout(adminRoute: string): ShellLayout {
   const mediaWorkspace = useMediaQuery(MEDIA_WORKSPACE_QUERY);
   const storiesWorkspace = useMediaQuery(STORIES_WORKSPACE_QUERY);
   const collectionWorkspace = useMediaQuery(COLLECTION_WORKSPACE_QUERY);
-  const { storyId, stories, calendar, media, collections, collectionId, composition } = shellLayoutFor(pathname, adminRoute, { storyWorkspace, calendarWorkspace, mediaWorkspace, storiesWorkspace, collectionWorkspace }, collection ? `collection=${collection}` : "");
+  const route = shellRouteFor(pathname, adminRoute, collection ? `collection=${collection}` : "");
+  const { storyId, stories, calendar, media, collections, collectionId } = route;
+  const composition = adaptive ? "default" : shellCompositionFor(route, { storyWorkspace, calendarWorkspace, mediaWorkspace, storiesWorkspace, collectionWorkspace });
   return useMemo(() => ({ storyId, stories, calendar, media, collections, collectionId, composition }), [storyId, stories, calendar, media, collections, collectionId, composition]);
 }
 

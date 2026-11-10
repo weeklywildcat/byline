@@ -93,7 +93,7 @@ export function NotificationsBell() {
 
   return (
     <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) { void load(); } else setSettings(false); }}>
-      <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="relative" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} />}>
+      <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="byline-header-notifications relative" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} />}>
         <Bell aria-hidden="true" />
         {unread > 0 ? <Badge className="pointer-events-none absolute -top-1 -right-1 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] tabular-nums">{unread > 99 ? "99+" : unread}</Badge> : null}
       </PopoverTrigger>

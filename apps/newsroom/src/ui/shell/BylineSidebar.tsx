@@ -1,11 +1,12 @@
 "use client";
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
-import { Sidebar } from "@byline/newsroom-ui/ui/sidebar";
+import { Sidebar, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { activeNavKey } from "../../domain/navigation";
 import { DefaultSidebar } from "./DefaultSidebar";
-import { useShellLayout, useSyncSidebarWidthOnMount } from "./layout";
+import { useAdaptiveNavigation, usePrimaryLocation, useShellLayout, useSyncSidebarWidthOnMount } from "./layout";
 import type { ShellSidebarProps } from "./nav-items";
 import { CalendarWorkspaceSidebar } from "./CalendarWorkspaceSidebar";
 import { MediaWorkspaceSidebar } from "./MediaWorkspaceSidebar";
@@ -32,9 +33,13 @@ export const WORKSPACE_SIDEBAR_CLASS = "overflow-hidden *:data-[sidebar=sidebar]
  * sidebar's width. Nothing here names Payload.
  */
 export function BylineSidebar(props: ShellSidebarProps) {
+  const hasPrimary = usePrimaryLocation(props.adminRoute) !== null;
+  const adaptive = useAdaptiveNavigation(props.adminRoute);
+  const { setOpenMobile } = useSidebar();
+  useEffect(() => { if (hasPrimary) setOpenMobile(false); }, [hasPrimary, setOpenMobile]);
   return (
-    <AdminRoot className="byline-shell-nav" toaster={false}>
-      <ContextualSidebar {...props} />
+    <AdminRoot className={hasPrimary ? "byline-shell-nav byline-adaptive-sidebar" : "byline-shell-nav"} toaster={false}>
+      {!adaptive && <ContextualSidebar {...props} />}
     </AdminRoot>
   );
 }

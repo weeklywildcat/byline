@@ -118,7 +118,7 @@ export function NewsroomPresence({ isMobile }: { isMobile: boolean }) {
     setOpen(next);
     if (next) refresh();
   };
-  const trigger = <Button type="button" variant="ghost" aria-label={label} className={isMobile ? "min-h-11 min-w-11 gap-1 px-1" : "min-w-8 px-1.5"} />;
+  const trigger = <Button type="button" variant="ghost" aria-label={label} className={isMobile ? "byline-header-presence min-h-11 min-w-11 gap-1 px-1" : "byline-header-presence min-w-8 px-1.5"} />;
   const body = <PresenceContent snapshot={snapshot} groups={groups} failed={failed} refresh={refresh} close={close} />;
 
   return isMobile ? (
@@ -142,12 +142,13 @@ export function NewsroomPresence({ isMobile }: { isMobile: boolean }) {
     {snapshot ? <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums max-lg:hidden" aria-hidden="true" data-presence-online="">{active.length + 1} online</span> : null}
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={trigger}>
+        <Users className="byline-presence-compact" aria-hidden="true" />
         {active.length ? (
-          <AvatarGroup aria-hidden="true">
+          <AvatarGroup className="byline-presence-avatars" aria-hidden="true">
             {active.slice(0, 3).map((person) => <PresenceAvatar key={person.key} person={person} compact />)}
             {active.length > 3 && <AvatarGroupCount className="text-xs">+{active.length - 3}</AvatarGroupCount>}
           </AvatarGroup>
-        ) : <Users aria-hidden="true" />}
+        ) : <Users className="byline-presence-avatars" aria-hidden="true" />}
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="max-h-[min(70dvh,var(--available-height))] w-92 max-w-[calc(100vw-1rem)] gap-1 p-0">
         <PopoverHeader className="shrink-0 px-4 pt-3 pb-1">

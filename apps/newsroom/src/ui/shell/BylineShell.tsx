@@ -7,7 +7,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { BylineCreateProvider } from "./create";
-import { ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
+import { ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useAdaptiveNavigation, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
 import { ShellNavigationProvider } from "./navigation";
 import { BylineSearchProvider } from "./search";
 import { BylineShortcutsProvider } from "./shortcuts";
@@ -40,12 +40,13 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
   const [client] = useState(createAdminQueryClient);
   const account = useNewsroomAccount();
   const routes = useNewsroomRoutes();
-  const layout = useCurrentShellLayout(routes.admin);
+  const adaptive = useAdaptiveNavigation(routes.admin);
+  const layout = useCurrentShellLayout(routes.admin, adaptive);
   const width = useSidebarWidthLayout(layout);
   const style = useMemo(() => shellSidebarStyle(width.applied), [width.applied]);
   return (
     <QueryClientProvider client={client}>
-      <SidebarProvider defaultOpen={defaultOpen} keyboardShortcut={SIDEBAR_SHORTCUT} persistCookie={SIDEBAR_COOKIE} style={style}>
+      <SidebarProvider defaultOpen={defaultOpen} keyboardShortcut={adaptive ? false : SIDEBAR_SHORTCUT} persistCookie={SIDEBAR_COOKIE} style={style}>
         <ShellLayoutProvider value={layout}>
           <SidebarWidthSyncProvider value={width.sync}>
             <ShellNavigationProvider>

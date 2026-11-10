@@ -185,7 +185,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
       ) : null}
       {draft ? (
         // A bar in the layout, docked under the transcript: it never covers the words being selected.
-        <div role="toolbar" aria-label="Selected words" className="sticky bottom-0 z-10 mt-2 flex flex-wrap items-center gap-2 border-t bg-background py-2">
+        <div role="toolbar" aria-label="Selected words" className="sticky bottom-[var(--byline-bottom-navigation-height,0px)] z-10 mt-2 flex flex-wrap items-center gap-2 border-t bg-background py-2">
           <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">“{draft.text}”</p>
           <div className="flex shrink-0 flex-wrap gap-2">
             {/* Buttons must not take focus from the selection before it is read. */}

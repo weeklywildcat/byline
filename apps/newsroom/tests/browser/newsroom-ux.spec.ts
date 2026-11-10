@@ -155,3 +155,133 @@ test("keyboard command results open Stories, Collections and Media at their dest
   await choose(`Attribution ${key}`, new RegExp(`${key}\\.pdf`));
   await expect(page).toHaveURL(new RegExp(`/admin/media[?].*asset=${mediaId}`));
 });
+
+test("primary navigation adapts to the viewport and follows guarded newsroom routes", async ({ page, context, request, baseURL }) => {
+  const token = await login(request, baseURL!, "ADMIN");
+  const headers = { Authorization: `JWT ${token}`, Origin: baseURL! };
+  const collection = await request.post("/api/byline/collections", { headers, data: { name: "Navigation guard fixture", type: "event" } });
+  expect(collection.ok()).toBeTruthy();
+  const { id } = await collection.json();
+  await signIn(context, baseURL!, token);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/admin/more");
+
+  const header = page.locator(".byline-app-header");
+  const nav = page.getByRole("navigation", { name: "Primary navigation" });
+  const selected = nav.locator('[aria-current="page"]');
+  const toggle = header.getByRole("button", { name: "Toggle navigation" });
+  const create = header.getByRole("button", { name: "Create", exact: true });
+  await expect(nav.getByRole("link")).toHaveText(["Home", "Stories", "Calendar", "More"]);
+  await expect(selected).toHaveText("More");
+  await expect(toggle).toBeHidden();
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 320);
+  await expect(page.getByRole("link", { name: "System administration" })).toBeVisible();
+  await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Review workflows", exact: true }).click();
+  await expect(selected).toHaveText("More");
+  await expect(header.getByRole("link", { name: "Back to People" })).toHaveAttribute("href", "/admin/people");
+  await nav.getByRole("link", { name: "More" }).click();
+
+  await page.getByRole("button", { name: "Sign out" }).scrollIntoViewIfNeeded();
+  const phoneTabs = await nav.boundingBox();
+  expect(phoneTabs).toMatchObject({ x: 0, width: 320, height: 56 });
+  expect(phoneTabs!.y + phoneTabs!.height).toBe(640);
+  for (const tab of await nav.getByRole("link").all()) {
+    expect(await tab.boundingBox()).toMatchObject({ width: 80 });
+    expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await create.click();
+  const chooser = page.getByRole("dialog", { name: "Create", exact: true });
+  await expect(chooser).toBeVisible();
+  await expect(chooser.getByRole("button", { name: "New collection" })).toBeVisible();
+  await chooser.getByRole("button", { name: "New story" }).click();
+  const storyForm = page.getByRole("dialog", { name: "New story", exact: true });
+  await storyForm.getByLabel("What's the story?").fill("Story created from the phone header");
+  await storyForm.getByRole("button", { name: "Create pitch" }).click();
+  await expect(page).toHaveURL(/\/admin\/collections\/stories\/\d+$/);
+  await expect(selected).toHaveText("Stories");
+  await nav.getByRole("link", { name: "More" }).click();
+
+  await page.getByRole("link", { name: "Media", exact: true }).click();
+  await expect(selected).toHaveText("More");
+  const back = header.getByRole("link", { name: "Back to More" });
+  await expect(back).toHaveAttribute("href", "/admin/more");
+  for (const width of [767, 768, 1100, 1199, 1200]) {
+    await page.setViewportSize({ width, height: 720 });
+    if (width < 1200) {
+      await expect(nav).toBeVisible();
+      await expect(toggle).toBeHidden();
+      await expect(selected).toHaveText("More");
+      await expect(page.locator("body")).toHaveJSProperty("scrollWidth", width);
+      expect(await nav.evaluate((element) => getComputedStyle(element).position)).toBe(width < 768 ? "fixed" : "static");
+    } else {
+      await expect(nav).toBeHidden();
+      await expect(toggle).toBeVisible();
+      await expect(page.locator('[data-composition="media-workspace"]')).toBeVisible();
+    }
+  }
+
+  await page.setViewportSize({ width: 820, height: 720 });
+  await create.click();
+  await page.getByRole("menuitem", { name: "Upload media" }).click();
+  const upload = page.getByRole("dialog", { name: "Upload media" });
+  await upload.locator('input[type="file"]').setInputFiles({
+    name: `navigation-${Date.now()}.pdf`,
+    mimeType: "application/pdf",
+    buffer: fixturePdf(1)
+  });
+  await expect(upload.getByText("1 uploaded", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await back.click();
+  await expect(page).toHaveURL(/\/admin\/more$/);
+  await page.goto(`/admin/collections?collection=${id}`);
+  await page.getByRole("button", { name: "Add brief", exact: true }).click();
+  const brief = page.getByRole("textbox", { name: "Reporting brief and key angles" });
+  await brief.fill("Unsaved across a viewport change");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(brief).toHaveValue("Unsaved across a viewport change");
+  await page.setViewportSize({ width: 390, height: 720 });
+  await nav.getByRole("link", { name: "Calendar" }).click();
+  const guard = page.getByRole("alertdialog", { name: "Leave without saving?" });
+  await guard.getByRole("button", { name: "Stay", exact: true }).click();
+  await expect(brief).toHaveValue("Unsaved across a viewport change");
+  await nav.getByRole("link", { name: "Calendar" }).click();
+  await guard.getByRole("button", { name: "Leave anyway" }).click();
+  await expect(selected).toHaveText("Calendar");
+  await page.goBack();
+  await expect(selected).toHaveText("More");
+  await page.goForward();
+  await expect(selected).toHaveText("Calendar");
+
+  await page.goto("/admin/collections/media");
+  await expect(nav).toHaveCount(0);
+  await expect(toggle).toBeVisible();
+});
+
+test("More and the phone Create drawer respect staff access", async ({ page, context, request, baseURL }) => {
+  const token = await login(request, baseURL!, "STAFF");
+  await signIn(context, baseURL!, token);
+  await page.setViewportSize({ width: 390, height: 720 });
+  const story = await createStory(request, baseURL!, token, { headline: "Primary navigation story", slug: `nav-${Date.now()}` });
+  await page.goto(`/admin/collections/stories/${story}?tab=reporting`);
+  const nav = page.getByRole("navigation", { name: "Primary navigation" });
+  await expect(nav.locator('[aria-current="page"]')).toHaveText("Stories");
+  await expect(page.getByRole("link", { name: "Back to Stories", exact: true })).toBeVisible();
+  await nav.getByRole("link", { name: "More" }).click();
+  await expect(page.getByRole("heading", { name: "More", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Media", exact: true })).toBeVisible();
+  for (const destination of ["People", "Review workflows", "Front Page", "Distribution", "Content Health", "Site", "System administration"]) {
+    await expect(page.getByRole("link", { name: destination, exact: true })).toHaveCount(0);
+  }
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: "Create", exact: true });
+  await expect(chooser.getByRole("button")).toHaveText(["New story", "New task", "Upload media", "Cancel"]);
+  await chooser.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("link", { name: "Field Mode" }).click();
+  await expect(page).toHaveURL(/\/admin\/field$/);
+  await expect(nav).toHaveCount(0);
+  await expect(page.locator(".byline-app-header")).toHaveCount(0);
+});
