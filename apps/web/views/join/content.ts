@@ -42,6 +42,11 @@ export const FAQ = [
       "It depends on what you take on. You can start with a small piece of work and take on more as you get comfortable. Our meetings and open newsroom hours give you time to work with other staff, but you do not need to come to every session."
   },
   {
+    question: "Do I have to attend meetings?",
+    answer:
+      "Staff are expected to attend at least one Group Lab or editorial meeting each week. We understand that sports, other activities or personal circumstances can get in the way. If you have a conflict, just let an editor know."
+  },
+  {
     question: "Can I join if I am busy with other activities?",
     answer: "Yes. We are very flexible."
   },
