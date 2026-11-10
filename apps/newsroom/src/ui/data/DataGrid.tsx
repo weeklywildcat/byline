@@ -43,7 +43,7 @@ export type DataGridProps = {
   timeZone: string;
   canEditSchema: boolean;
   onEditField: (key: string | null) => void;
-  onCommit: (row: DataRow, field: FieldDefinition, value: DataValue) => void;
+  onCommit: (row: DataRow, field: FieldDefinition, value: DataValue, base: DataValue) => void;
   onPaste: (plan: PastePlan) => void;
   onToggleIncluded: (row: DataRow) => void;
   onInsertBelow: (row: DataRow) => void;
@@ -87,7 +87,7 @@ export function DataGrid(props: DataGridProps) {
   const { schema, rows, hidden, sort, timeZone, relationships } = props;
   const [sizing, setSizing] = useState<ColumnSizingState>({});
   const [active, setActive] = useState<CellPosition | null>(null);
-  const [editing, setEditing] = useState<{ position: CellPosition; draft: string; error: string | null } | null>(null);
+  const [editing, setEditing] = useState<{ rowId: string; fieldKey: string; base: DataValue; draft: string; error: string | null } | null>(null);
   const grid = useRef<HTMLTableElement | null>(null);
 
   const visibility = useMemo(() => Object.fromEntries(schema.fields.map((field) => [field.key, !hidden.includes(field.key)])), [schema.fields, hidden]);
@@ -115,6 +115,12 @@ export function DataGrid(props: DataGridProps) {
   const visibleColumns = table.getVisibleLeafColumns();
   const fields = visibleColumns.map((column) => (column.columnDef.meta as ColumnMeta).field);
   const size = { rows: rows.length, cols: fields.length };
+  const editingPosition = useMemo<CellPosition | null>(() => {
+    if (!editing) return null;
+    const row = rows.findIndex((entry) => entry.id === editing.rowId);
+    const col = fields.findIndex((entry) => entry.key === editing.fieldKey);
+    return row >= 0 && col >= 0 ? { row, col } : null;
+  }, [editing, rows, fields]);
 
   // Keep the active cell inside the grid as rows and columns come and go.
   useEffect(() => {
@@ -153,18 +159,20 @@ export function DataGrid(props: DataGridProps) {
     const field = fields[position.col];
     const row = rows[position.row];
     if (!field || !row) return;
+    const base = row.values[field.key] ?? null;
     if (field.type === "boolean") {
-      props.onCommit(row, field, row.values[field.key] === true ? false : true);
+      props.onCommit(row, field, base === true ? false : true, base);
       return;
     }
-    setEditing({ position, draft: initial ?? editText(field, row.values[field.key] ?? null, timeZone), error: null });
+    setEditing({ rowId: row.id, fieldKey: field.key, base, draft: initial ?? editText(field, base, timeZone), error: null });
   }, [fields, rows, props, timeZone]);
 
   const commit = useCallback((next: CellPosition | null, override?: DataValue) => {
     if (!editing) return true;
-    const field = fields[editing.position.col];
-    const row = rows[editing.position.row];
-    if (!field || !row) {
+    const field = fields.find((entry) => entry.key === editing.fieldKey);
+    const row = rows.find((entry) => entry.id === editing.rowId);
+    const position = editingPosition;
+    if (!field || !row || !position) {
       setEditing(null);
       return true;
     }
@@ -178,18 +186,18 @@ export function DataGrid(props: DataGridProps) {
       }
       value = parsed.value;
     }
-    if ((row.values[field.key] ?? null) !== value) props.onCommit(row, field, value);
+    if (editing.base !== value) props.onCommit(row, field, value, editing.base);
     setEditing(null);
-    select(next ?? editing.position);
+    select(next ?? position);
     return true;
-  }, [editing, fields, rows, props, select, timeZone]);
+  }, [editing, editingPosition, fields, rows, props, select, timeZone]);
 
   const cancel = useCallback(() => {
     if (!editing) return;
-    const position = editing.position;
+    const position = editingPosition;
     setEditing(null);
     select(position);
-  }, [editing, select]);
+  }, [editing, editingPosition, select]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTableElement>) => {
     if (editing || !active) return;
@@ -208,7 +216,7 @@ export function DataGrid(props: DataGridProps) {
     }
     if ((event.key === "Delete" || event.key === "Backspace") && field && row) {
       event.preventDefault();
-      if ((row.values[field.key] ?? null) !== null) props.onCommit(row, field, null);
+      if ((row.values[field.key] ?? null) !== null) props.onCommit(row, field, null, row.values[field.key] ?? null);
       return;
     }
     if (event.key === "Escape") return;
@@ -240,8 +248,8 @@ export function DataGrid(props: DataGridProps) {
     props.onPaste(planPaste(clipboardCells(text), active, rows, fields));
   };
 
-  const editingField = editing ? fields[editing.position.col] : null;
-  const anchor = editing && editingField && POPOVER_EDITORS.has(editingField.type) ? cellElement(editing.position) : null;
+  const editingField = editing ? fields.find((field) => field.key === editing.fieldKey) ?? null : null;
+  const anchor = editing && editingField && editingPosition && POPOVER_EDITORS.has(editingField.type) ? cellElement(editingPosition) : null;
 
   return (
     <div className="grid min-w-0 gap-0">
@@ -307,21 +315,21 @@ export function DataGrid(props: DataGridProps) {
                   number={(props.rowOffset ?? 0) + rowIndex + 1}
                   fields={fields}
                   active={active?.row === rowIndex ? active.col : null}
-                  editing={editing?.position.row === rowIndex && !POPOVER_EDITORS.has(fields[editing.position.col]?.type ?? "") ? editing : null}
+                  editing={editing && editingPosition?.row === rowIndex && !POPOVER_EDITORS.has(editingField?.type ?? "") ? editing : null}
                   timeZone={timeZone}
                   relationships={relationships}
                   onSelect={(col) => select({ row: rowIndex, col })}
                   onEdit={(col) => beginEdit({ row: rowIndex, col })}
                   onDraft={(draft) => setEditing((current) => (current ? { ...current, draft, error: null } : current))}
                   onCommitKey={(event) => {
-                    if (!editing) return;
+                    if (!editing || !editingPosition) return;
                     if (event.key === "Escape") {
                       event.preventDefault();
                       return cancel();
                     }
                     if (event.key === "Enter" || event.key === "Tab") {
                       event.preventDefault();
-                      commit(moveCell(editing.position, { key: event.key, shiftKey: event.shiftKey }, size));
+                      commit(moveCell(editingPosition, { key: event.key, shiftKey: event.shiftKey }, size));
                     }
                   }}
                   onBlurCommit={() => commit(null)}
@@ -395,7 +403,7 @@ type GridRowProps = {
   number: number;
   fields: FieldDefinition[];
   active: number | null;
-  editing: { position: CellPosition; draft: string; error: string | null } | null;
+  editing: { fieldKey: string; draft: string; error: string | null } | null;
   timeZone: string;
   relationships: RelationshipOptions;
   onSelect: (col: number) => void;
@@ -434,7 +442,7 @@ const GridRow = memo(function GridRow({ row, rowIndex, number, fields, active, e
       {fields.map((field, col) => {
         const value = row.values[field.key] ?? null;
         const isActive = active === col;
-        const isEditing = editing?.position.col === col;
+        const isEditing = editing?.fieldKey === field.key;
         return (
           <TableCell
             key={field.key}
