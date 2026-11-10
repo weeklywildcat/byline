@@ -75,6 +75,8 @@ export type SettingDescriptor =
 
 type SettingBase = { label: string; description?: string };
 type Setting<T extends SettingDescriptor["type"]> = Omit<Extract<SettingDescriptor, { type: T }>, "key">;
+/** A choice setting that remembers its values' literal types, so a component's settings are typed. */
+export type ChoiceSetting<C extends string> = Omit<Setting<"choice">, "default" | "choices"> & { default: C; choices: Array<{ value: C; label: string }> };
 
 /** Presentation settings an editor configures. Closed types; never CSS, HTML, colors or code. */
 export const setting = {
@@ -82,7 +84,7 @@ export const setting = {
   longText: (options: SettingBase & { default?: string; maxLength?: number }): Setting<"longText"> => ({ type: "longText", label: options.label, ...(options.description ? { description: options.description } : {}), default: options.default ?? "", maxLength: options.maxLength ?? 2000 }),
   boolean: (options: SettingBase & { default?: boolean }): Setting<"boolean"> => ({ type: "boolean", label: options.label, ...(options.description ? { description: options.description } : {}), default: options.default ?? false }),
   number: (options: SettingBase & { default: number; min: number; max: number; integer?: boolean }): Setting<"number"> => ({ type: "number", label: options.label, ...(options.description ? { description: options.description } : {}), default: options.default, min: options.min, max: options.max, integer: options.integer ?? true }),
-  choice: <const C extends string>(options: SettingBase & { default: C; choices: ReadonlyArray<{ value: C; label: string }> }): Setting<"choice"> => ({ type: "choice", label: options.label, ...(options.description ? { description: options.description } : {}), default: options.default, choices: options.choices.map((choice) => ({ ...choice })) })
+  choice: <const C extends string>(options: SettingBase & { default: NoInfer<C>; choices: ReadonlyArray<{ value: C; label: string }> }): ChoiceSetting<C> => ({ type: "choice", label: options.label, ...(options.description ? { description: options.description } : {}), default: options.default, choices: options.choices.map((choice) => ({ ...choice })) })
 };
 
 export type SettingValue = string | number | boolean;

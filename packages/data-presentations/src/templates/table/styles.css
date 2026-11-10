@@ -1,0 +1,28 @@
+/* Table template: hairlines and type, no boxes. Scoped; loaded only on pages that use it. */
+.data-presentation-table .data-table { font-family: var(--font-ui, system-ui, sans-serif); font-size: 0.95rem; }
+.data-presentation-table .data-table-scroll { overflow-x: auto; }
+.data-presentation-table .data-table-scroll:focus-visible { outline: 2px solid var(--accent, #73192a); outline-offset: 4px; }
+.data-presentation-table table { border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 100%; }
+.data-presentation-table caption { caption-side: top; color: var(--muted, #545454); font-size: 0.85rem; padding-block-end: 0.75rem; text-align: start; }
+.data-presentation-table thead th { border-block-end: 2px solid var(--rule-strong, #121212); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; padding: 0.5rem 0.75rem 0.5rem 0; text-align: start; text-transform: uppercase; vertical-align: bottom; white-space: nowrap; }
+.data-presentation-table tbody th,
+.data-presentation-table tbody td { border-block-end: 1px solid var(--rule, #e2e2e2); padding: 0.6rem 0.75rem 0.6rem 0; text-align: start; vertical-align: top; }
+.data-presentation-table tbody th { font-weight: 600; }
+.data-presentation-table [data-numeric] { text-align: end; white-space: nowrap; }
+.data-presentation-table [data-empty]::after { color: var(--muted, #545454); content: "—"; }
+.data-presentation-table [data-density="compact"] tbody th,
+.data-presentation-table [data-density="compact"] tbody td { padding-block: 0.3rem; }
+.data-presentation-table a { color: var(--accent, #73192a); }
+.data-presentation-table .data-table-more,
+.data-presentation-table .data-table-status { color: var(--muted, #545454); font-size: 0.85rem; margin: 0.75rem 0 0; min-height: 1.2em; }
+.data-presentation-table .data-table-tools { align-items: end; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: space-between; margin-block-end: 1rem; }
+.data-presentation-table .data-table-tools label { display: grid; gap: 0.25rem; min-width: min(100%, 20rem); }
+.data-presentation-table .data-table-tools-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.data-presentation-table .data-table-tools input { border: 1px solid var(--rule-strong, #121212); border-radius: 0; font: inherit; min-height: 44px; padding: 0 0.75rem; }
+.data-presentation-table .data-table-tools input:focus-visible { outline: 2px solid var(--accent, #73192a); outline-offset: 2px; }
+.data-presentation-table .data-table-sort { align-items: center; background: none; border: 0; color: inherit; cursor: pointer; display: inline-flex; font: inherit; gap: 0.35rem; letter-spacing: inherit; min-height: 32px; padding: 0; text-transform: inherit; }
+.data-presentation-table .data-table-sort::after { content: "↕"; opacity: 0.35; }
+.data-presentation-table [aria-sort="ascending"] .data-table-sort::after { content: "↑"; opacity: 1; }
+.data-presentation-table [aria-sort="descending"] .data-table-sort::after { content: "↓"; opacity: 1; }
+.data-presentation-table .data-table-sort:focus-visible { outline: 2px solid var(--accent, #73192a); outline-offset: 2px; }
+.data-presentation-table [data-numeric] .data-table-sort { flex-direction: row-reverse; }

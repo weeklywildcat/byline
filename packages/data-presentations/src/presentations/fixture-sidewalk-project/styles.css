@@ -1,0 +1,16 @@
+/* Scoped to the fixture presentation; loaded only on pages that use it. Hairlines and type, no boxes. */
+.data-presentation-fixture-sidewalk-project .sidewalk { font-family: var(--font-ui, system-ui, sans-serif); font-size: 0.95rem; }
+.data-presentation-fixture-sidewalk-project .sidewalk-summary { margin-block-end: 1.25rem; max-width: 32rem; }
+.data-presentation-fixture-sidewalk-project .sidewalk-count { font-size: 1.15rem; margin: 0 0 0.5rem; }
+.data-presentation-fixture-sidewalk-project .sidewalk-meter { background: var(--rule, #e2e2e2); height: 8px; }
+.data-presentation-fixture-sidewalk-project .sidewalk-meter span { background: var(--accent, #73192a); display: block; height: 100%; }
+.data-presentation-fixture-sidewalk-project .sidewalk-phases { list-style: none; margin: 0; padding: 0; }
+.data-presentation-fixture-sidewalk-project .sidewalk-phases li { border-block-start: 1px solid var(--rule, #e2e2e2); display: grid; gap: 0.15rem 1rem; grid-template-columns: 6.5rem minmax(0, 1fr); margin: 0; padding-block: 0.7rem; }
+.data-presentation-fixture-sidewalk-project .sidewalk-status { color: var(--muted, #545454); font-size: 0.72rem; font-weight: 700; grid-row: span 3; letter-spacing: 0.08em; text-transform: uppercase; }
+.data-presentation-fixture-sidewalk-project [data-tone="caution"] .sidewalk-status { color: var(--accent, #73192a); }
+.data-presentation-fixture-sidewalk-project .sidewalk-name { font-weight: 600; }
+.data-presentation-fixture-sidewalk-project .sidewalk-date { color: var(--muted, #545454); font-size: 0.8rem; }
+.data-presentation-fixture-sidewalk-project .sidewalk-detail { color: var(--muted, #545454); font-family: var(--font-serif, Georgia, serif); }
+.data-presentation-fixture-sidewalk-project .sidewalk-filter { align-items: center; display: inline-flex; gap: 0.5rem; margin-block-end: 0.75rem; min-height: 44px; }
+.data-presentation-fixture-sidewalk-project .sidewalk-filter:focus-within { outline: 2px solid var(--accent, #73192a); outline-offset: 3px; }
+.data-presentation-fixture-sidewalk-project [data-remaining-only="true"] li[data-remaining="false"] { display: none; }
