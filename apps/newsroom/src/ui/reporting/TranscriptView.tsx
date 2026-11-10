@@ -288,11 +288,17 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
 
 function TranscriptState({ detail, onRetry, retrying, canRetry }: { detail: TranscriptDetail; onRetry: () => void; retrying: boolean; canRetry: boolean }) {
   if (detail.state === "queued" || detail.state === "processing") {
+    const percent = detail.progressPercent === null ? null : Math.round(detail.progressPercent);
+    const label = detail.progressMessage ?? (detail.state === "queued" ? "Waiting to transcribe" : "Transcribing audio");
     return (
-      <div className="grid gap-2 py-4" role="status">
-        {/* Transcription progress cannot be measured, so the bar is indeterminate. */}
-        <Progress value={null} aria-label="Transcribing"><span className="text-sm">{detail.state === "queued" ? "Waiting to transcribe…" : "Transcribing…"}</span></Progress>
-        <p className="text-xs text-muted-foreground">A long interview can take a while. You can leave this page; Byline will tell you when it is ready.{detail.failure ? ` Last attempt: ${detail.failure}` : ""}</p>
+      <div className="grid gap-2 py-4" role="status" aria-live="polite">
+        <Progress value={percent} aria-label={percent === null ? label : `${label}, ${percent}% complete`}>
+          <span className="text-sm">{label}{percent === null ? "…" : ` · ${percent}%`}</span>
+        </Progress>
+        <p className="text-xs text-muted-foreground">
+          A long interview can take a while. You can leave this page; Byline keeps the job running and will tell you when it is ready.
+          {detail.failure ? ` Last attempt: ${detail.failure} Byline will retry automatically.` : ""}
+        </p>
       </div>
     );
   }

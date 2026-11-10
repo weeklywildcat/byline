@@ -19,6 +19,15 @@ export type TranscriptionInput = {
   filename: string;
   mimeType: string;
   language?: string | null;
+  /** Stable for one logical run, including automatic Payload retries. */
+  jobKey: string;
+};
+
+export type TranscriptionProgress = {
+  state: "queued" | "loading-model" | "transcribing";
+  /** 0-100 when Whisper can measure it, otherwise null. */
+  percent: number | null;
+  message: string;
 };
 
 export interface TranscriptionProvider {
@@ -33,7 +42,11 @@ export interface TranscriptionProvider {
    * policy and is never used silently.
    */
   private: boolean;
-  transcribe(input: TranscriptionInput, signal: AbortSignal): Promise<NormalizedTranscript>;
+  transcribe(
+    input: TranscriptionInput,
+    signal: AbortSignal,
+    onProgress?: (progress: TranscriptionProgress) => void | Promise<void>
+  ): Promise<NormalizedTranscript>;
 }
 
 export class TemporaryTranscriptionError extends Error {}
@@ -47,7 +60,7 @@ export type TranscriptionConfig =
  * `BYLINE_TRANSCRIPTION_PROVIDER=faster-whisper` with
  * `BYLINE_TRANSCRIPTION_URL` (the self-hosted service), optional
  * `BYLINE_TRANSCRIPTION_MODEL`, `BYLINE_TRANSCRIPTION_LANGUAGE`,
- * `BYLINE_TRANSCRIPTION_TIMEOUT_MS` (default 30 minutes) and
+ * `BYLINE_TRANSCRIPTION_TIMEOUT_MS` (default 2 hours) and
  * `BYLINE_TRANSCRIPTION_PRIVATE` (default `1`: the service is the
  * newsroom's own; set `0` for anything that leaves the newsroom, which turns
  * automatic queueing off). Anything else: not configured.
@@ -74,7 +87,7 @@ export function transcriptionConfig(env: Record<string, string | undefined> = pr
     url: url.toString().replace(/\/+$/, ""),
     model: env.BYLINE_TRANSCRIPTION_MODEL?.trim() || null,
     language: language && /^[a-z]{2,3}$/.test(language) ? language : null,
-    timeoutMs: Number.isFinite(timeout) && timeout >= 10_000 ? Math.min(timeout, 4 * 60 * 60 * 1000) : 30 * 60 * 1000,
+    timeoutMs: Number.isFinite(timeout) && timeout >= 10_000 ? Math.min(timeout, 4 * 60 * 60 * 1000) : 2 * 60 * 60 * 1000,
     private: isPrivate,
     // Automatic queueing after upload only for a private provider (docs/reporting.md#privacy-policy).
     autoQueue: isPrivate

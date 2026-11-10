@@ -240,6 +240,8 @@ export type TranscriptSummary = {
   quoteCount: number;
   verifiedCount: number;
   failure: string | null;
+  progressPercent: number | null;
+  progressMessage: string | null;
 };
 
 export type ReportingFileMaterial = MaterialBase & {

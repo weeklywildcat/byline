@@ -141,16 +141,32 @@ and word timestamps; the model is configuration and nothing assumes a GPU):
 | `BYLINE_TRANSCRIPTION_URL` | the service's address (no credentials in the URL) |
 | `BYLINE_TRANSCRIPTION_MODEL` | optional model name |
 | `BYLINE_TRANSCRIPTION_LANGUAGE` | optional language hint |
-| `BYLINE_TRANSCRIPTION_TIMEOUT_MS` | default 30 minutes |
+| `BYLINE_TRANSCRIPTION_TIMEOUT_MS` | total processing limit; default 2 hours (max 4 hours) |
 | `BYLINE_TRANSCRIPTION_PRIVATE` | default `1`: the newsroom's own service, so recordings queue automatically after upload. `0` for anything that leaves the newsroom: never queued automatically |
 | `BYLINE_TRANSCRIPTION_TOKEN` | optional bearer token |
 
 Jobs run on their own `reporting` queue (`npm run jobs:reporting`), so a long
-interview never delays publication, snapshots or maintenance. Temporary
-failures (network, 5xx, 429, timeouts) retry with backoff up to five attempts;
-malformed or unsupported audio fails once with its reason. Without a provider
-uploads and manual import work, and the screens say "Transcription is not
-configured". The uploader is notified when a transcript is ready.
+interview never delays publication, snapshots or maintenance. The self-hosted
+service also owns the expensive Whisper work as an idempotent background job:
+Byline submits the recording once, then polls short status responses. A stable
+run key means an automatic Payload retry reattaches to work that is still
+running instead of starting a second transcription.
+
+The service reports **Waiting for transcription worker → Loading Whisper model
+→ Transcribing audio (percent) → Transcript ready**. Byline persists that
+progress on the transcript; Reporting polls active work every five seconds and
+the focused transcript view does the same, so progress survives navigation.
+The service runs one Whisper job at a time by default
+(`WHISPER_MAX_WORKERS=1`) to avoid several CPU-heavy interviews competing on
+a newsroom server. Its `/health` endpoint remains responsive while Whisper is
+working.
+
+Temporary failures (network, 5xx, 429, model-loading failures and processing
+timeouts) retry with backoff up to five attempts; a retry uses the same
+service job where possible. Malformed or unsupported audio fails once with its
+reason. Without a provider uploads and manual import work, and the screens say
+"Transcription is not configured". The uploader is notified when a transcript
+is ready.
 
 ## Screens
 

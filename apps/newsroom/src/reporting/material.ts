@@ -123,7 +123,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   // Transcript summaries: the fields the feed needs, never segments or search text.
   const fileIds = filesPage.docs.map((row) => row.id);
   const transcripts = fileIds.length
-    ? (await payload.find({ collection: "reporting-transcripts", where: { file: { in: fileIds } }, pagination: false, select: { file: true, state: true, origin: true, language: true, durationMs: true, failure: true }, ...as(ctx) })).docs
+    ? (await payload.find({ collection: "reporting-transcripts", where: { file: { in: fileIds } }, pagination: false, select: { file: true, state: true, origin: true, language: true, durationMs: true, failure: true, progressPercent: true, progressMessage: true }, ...as(ctx) })).docs
     : [];
   const selections = transcripts.length
     ? (await payload.find({ collection: "transcript-selections", where: { and: [{ transcript: { in: transcripts.map((row) => row.id) } }, { kind: { equals: "quote" } }] }, pagination: false, select: { transcript: true, state: true }, ...as(ctx) })).docs
@@ -138,7 +138,9 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   }
   const transcriptFor = new Map<number, TranscriptSummary>(transcripts.map((row) => [num(row.file), {
     id: row.id, state: row.state, origin: row.origin, language: row.language ?? null, durationMs: row.durationMs ?? null,
-    quoteCount: quoteCounts.get(row.id)?.total ?? 0, verifiedCount: quoteCounts.get(row.id)?.verified ?? 0, failure: row.failure ?? null
+    quoteCount: quoteCounts.get(row.id)?.total ?? 0, verifiedCount: quoteCounts.get(row.id)?.verified ?? 0, failure: row.failure ?? null,
+    progressPercent: typeof row.progressPercent === "number" ? row.progressPercent : null,
+    progressMessage: row.progressMessage ?? null
   }]));
 
   // Media linked through production assignments, plus Media captured for the Story; one asset appears once.
