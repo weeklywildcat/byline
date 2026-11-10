@@ -1,3 +1,4 @@
+import { compareDecimal } from "@byline/data";
 import type { DataPresentationClient } from "../../sdk";
 
 /**
@@ -55,11 +56,12 @@ const enhance: DataPresentationClient = (root) => {
       const direction = sorted?.index === index && sorted.direction === "ascending" ? "descending" : "ascending";
       sorted = { index, direction };
       const numeric = header.hasAttribute("data-numeric");
+      const exactDecimal = header.getAttribute("data-type") === "currency";
       const key = (row: HTMLTableRowElement) => row.cells[index]?.getAttribute("data-sort") ?? "";
       const ordered = [...original].sort((a, b) => {
         const [left, right] = [key(a), key(b)];
         if (!left || !right) return left === right ? 0 : left ? -1 : 1;
-        const compared = numeric ? Number(left) - Number(right) : left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+        const compared = exactDecimal ? compareDecimal(left, right) : numeric ? Number(left) - Number(right) : left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
         return direction === "ascending" ? compared : -compared;
       });
       body.append(...ordered);
