@@ -68,17 +68,20 @@ export function otherContributors(data: Pick<StoryWorkspace, "story" | "contribu
 }
 
 export type StoryBriefProps = {
-  /** Where the writers are set (Write → Byline), so a reader who can't edit them here knows where. */
+  /** Optional explanation for hosts without an inline byline editor. */
   writersHint?: string;
+  /** Host-owned fields, when the host has the Story's article form available. */
+  writersControl?: ReactNode;
+  sectionControl?: ReactNode;
 };
 
 /**
  * A. Story Brief: the assignment, readable at a glance. The Angle (the plan's
  * brief text) is the prominent part; the facts beside it are who, by when and
- * what is expected. Editors change the editor, deadline and publication
- * target in place; everyone else reads them.
+ * what is expected. A host may supply its article-form controls for reporters
+ * and section; planning fields use their existing access rules.
  */
-export function StoryBrief({ writersHint }: StoryBriefProps) {
+export function StoryBrief({ writersHint, writersControl, sectionControl }: StoryBriefProps) {
   const { data, timezone } = useWorkspace();
   const writers = data.contributors.contributors.length ? data.contributors.contributors : data.story.authors;
   const others = useMemo(() => otherContributors(data), [data]);
@@ -96,14 +99,14 @@ export function StoryBrief({ writersHint }: StoryBriefProps) {
       <div className="flex min-w-0 flex-col gap-1 self-start rounded-lg bg-muted/50 p-3 @min-[720px]/plan-card:p-4" data-story-brief-facts="">
         <h3 className="sr-only">Assignment</h3>
         <FieldGroup className="gap-1">
-          <Fact label={writers.length === 1 ? "Reporter" : "Reporters"}>
-            {writers.length ? <span className="flex min-w-0 items-center gap-2"><PeopleAvatars people={writers} tooltips={false} /><span className="min-w-0">{names(writers)}</span></span> : <span className="text-muted-foreground">No one yet{writersHint ? ` · ${writersHint}` : ""}</span>}
+          <Fact label={writersControl ? "Reporters" : writers.length === 1 ? "Reporter" : "Reporters"}>
+            {writersControl ?? (writers.length ? <span className="flex min-w-0 items-center gap-2"><PeopleAvatars people={writers} tooltips={false} /><span className="min-w-0">{names(writers)}</span></span> : <span className="text-muted-foreground">No one yet{writersHint ? ` · ${writersHint}` : ""}</span>)}
           </Fact>
           {others.length ? <Fact label="Also on it">{others.join(", ")}</Fact> : null}
         </FieldGroup>
         <PlanningProperties compact />
         <FieldGroup className="gap-1">
-          <Fact label="Section">{sections || <span className="text-muted-foreground">None</span>}</Fact>
+          <Fact label="Section">{sectionControl ?? (sections || <span className="text-muted-foreground">None</span>)}</Fact>
           {data.story.publicationState.isScheduled && data.story.publicationState.scheduledAt ? <Fact label="Scheduled">{exactDate(data.story.publicationState.scheduledAt, timezone)}</Fact> : null}
         </FieldGroup>
       </div>

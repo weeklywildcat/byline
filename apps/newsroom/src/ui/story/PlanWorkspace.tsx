@@ -10,6 +10,7 @@ import { useLiveCoverage } from "../live/LiveCoverageProvider";
 import { SavedQuotes } from "../reporting/ReportingReference";
 import { ReportingTab } from "../reporting/ReportingTab";
 import { ShellLink } from "../shell/navigation";
+import { StoryBylineField, StorySectionField } from "./StoryAssignmentFields";
 import { StoryNotes } from "./StoryNotes";
 import type { StoryScreenContext } from "./StoryScreen";
 import { PLAN_SECTIONS, type PlanSection, type StoryLocation, type StoryPlace } from "./story-view";
@@ -67,7 +68,10 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
       <PlanSectionFrame section="brief">
         <WorkspaceGate>
           <WorkspaceStaleNotice />
-          <StoryBrief writersHint="add them as the byline in Write" />
+          <StoryBrief
+            writersControl={context.readOnly ? undefined : <StoryBylineField context={context} label="Reporters" />}
+            sectionControl={context.readOnly ? undefined : <StorySectionField context={context} />}
+          />
         </WorkspaceGate>
       </PlanSectionFrame>
 
