@@ -95,6 +95,8 @@ export type DataPresentationProps<Slots extends Record<string, SlotSpec> = Recor
   /** `prepare`'s output (undefined without one). */
   model: Model;
   format: DataFormatter;
+  /** Public artifact paths by slot. Empty in working newsroom previews. */
+  releasePaths?: Partial<Record<Extract<keyof Slots, string>, string>>;
 };
 
 /** What `client.ts` exports by default: enhance the server-rendered root, return a cleanup. */
