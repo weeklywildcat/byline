@@ -45,6 +45,8 @@ export type HomeShell = {
   setStoryOpener?: (open: ((storyId: number) => void) | null) => void;
 };
 
+const SCOPE_ITEM_CLASS = "aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground";
+
 /** `preferences`: where the host remembers the reader's Mine | Newsroom choice (Payload Preferences, or this browser). */
 export type HomeAppProps = { fetchers: HomeFetchers; currentUserId?: number | null; actionUrls?: HomeActionUrls; shell?: HomeShell; preferences?: HomePreferenceStorage };
 
@@ -268,8 +270,8 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
       <div className="flex shrink-0 items-center gap-2 pt-1">
         {/* Only an editor can look beyond their own stories. My Work is always personal. */}
         {canReview ? <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Show stories for" value={[scope]} onValueChange={(next: unknown[]) => { const value = next[0]; if (value === "mine" || value === "newsroom") changeScope(value); }} data-home-scope="">
-          <ToggleGroupItem value="mine" aria-label="Mine: my stories">Mine</ToggleGroupItem>
-          <ToggleGroupItem value="newsroom" aria-label="Newsroom: every visible story">Newsroom</ToggleGroupItem>
+          <ToggleGroupItem value="mine" aria-label="Mine: my stories" className={SCOPE_ITEM_CLASS}>Mine</ToggleGroupItem>
+          <ToggleGroupItem value="newsroom" aria-label="Newsroom: every visible story" className={SCOPE_ITEM_CLASS}>Newsroom</ToggleGroupItem>
         </ToggleGroup> : null}
         {/* A host shell has its own Search and Create; Home does not repeat them. */}
         {shell ? null : <>

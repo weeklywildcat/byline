@@ -74,9 +74,21 @@
   }
 }
 
+// Keep display rules together so loading Nova's utilities later cannot
+// override the tablet grid with the default header layout.
+.byline-header-row,
+.byline-header-sidebar-trigger {
+  display: flex;
+}
+
+.byline-header-location {
+  display: contents;
+}
+
 // The 1200px transition applies only to canonical Byline views. Each desktop
 // workspace still chooses its own sidebar composition in shell/layout.tsx.
 .byline-primary-navigation,
+.byline-header-wordmark,
 .byline-adaptive-header .byline-header-back,
 .byline-header-create,
 .byline-presence-compact {
@@ -85,11 +97,12 @@
 
 @media (width < 1200px) {
   .byline-adaptive-sidebar,
-  .byline-adaptive-header .byline-header-sidebar-trigger,
-  .byline-adaptive-header .byline-adaptive-parent-crumb,
-  .byline-adaptive-header .byline-header-search [data-slot="kbd-group"],
-  .byline-adaptive-header [data-presence-online],
-  .byline-adaptive-header .byline-presence-avatars {
+  .byline-app-header .byline-adaptive-header .byline-header-home-title,
+  .byline-app-header .byline-adaptive-header .byline-header-sidebar-trigger,
+  .byline-app-header .byline-adaptive-header .byline-adaptive-parent-crumb,
+  .byline-app-header .byline-adaptive-header .byline-header-search [data-slot="kbd-group"],
+  .byline-app-header .byline-adaptive-header [data-presence-online],
+  .byline-app-header .byline-adaptive-header .byline-presence-avatars {
     display: none;
   }
 
@@ -141,6 +154,18 @@
     }
   }
 
+  .byline-app-header .byline-header-home {
+    padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+
+  .byline-header-wordmark {
+    display: block;
+    margin-inline-start: 4px;
+    width: 104px;
+    min-width: 0;
+    height: auto;
+  }
+
   .byline-primary-navigation {
     display: flex;
     flex: none;
@@ -170,6 +195,37 @@
     border-block-end: 2px solid var(--byline-primary-indicator, transparent);
     text-decoration: none;
     white-space: nowrap;
+  }
+}
+
+@media (768px <= width < 1200px) {
+  .byline-app-header .byline-adaptive-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+    padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+
+    .byline-header-actions {
+      margin-inline-start: 0;
+      justify-self: end;
+    }
+  }
+
+  .byline-header-wordmark {
+    width: 112px;
+    max-width: 100%;
+  }
+
+  .byline-app-header .byline-adaptive-header .byline-header-location {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+}
+
+@media (width < 960px) {
+  .byline-primary-link.byline-tablet-media {
+    display: none;
   }
 }
 

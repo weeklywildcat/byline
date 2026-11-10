@@ -231,9 +231,9 @@ describe("slugs and links", () => {
 });
 
 describe("adaptive primary navigation", () => {
-  it("projects the three primary links for newsroom roles without changing desktop destinations", () => {
+  it("projects the adaptive links in order for newsroom roles without changing desktop destinations", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
-      expect(primaryNavigationFor(role).map(({ path }) => path)).toEqual(["", "/stories", "/calendar"]);
+      expect(primaryNavigationFor(role).map(({ path }) => path)).toEqual(["", "/stories", "/calendar", "/media"]);
       expect(navigationFor(role).some(({ key }) => key === "more")).toBe(false);
     }
   });
@@ -245,7 +245,8 @@ describe("adaptive primary navigation", () => {
     expect(primaryLocationFor("/desk/collections/stories/42/?tab=reporting", admin)).toEqual({ key: "stories", parent: { label: "Stories", path: "/stories" } });
     expect(primaryLocationFor("/desk/calendar#today", admin)).toEqual({ key: "calendar" });
     expect(primaryLocationFor("/desk/review-workflows", admin)).toEqual({ key: null, parent: { label: "People", path: "/people" } });
-    for (const view of ["media?asset=2", "collections?collection=1", "people?person=2", "front-page", "distribution", "content-health", "profile", "site", "system"]) {
+    expect(primaryLocationFor("/desk/media?asset=2", admin)).toEqual({ key: "media", parent: { label: "Home", path: "" } });
+    for (const view of ["collections?collection=1", "people?person=2", "front-page", "distribution", "content-health", "profile", "site", "system"]) {
       expect(primaryLocationFor(`/desk/${view}`, admin)).toEqual({ key: null, parent: { label: "Home", path: "" } });
     }
   });
