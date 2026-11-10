@@ -51,6 +51,136 @@ const newRun = () => ({
   completedAt: null
 });
 
+function jobTranscriptId(input: unknown): number | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = (input as Record<string, unknown>).transcriptId;
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Repair the reporting queue before the dedicated worker loop starts.
+ *
+ * This worker is intentionally a single dedicated consumer. Therefore any
+ * unfinished reporting job already marked `processing` at process startup
+ * belongs to a dead/replaced worker and must be released. Active transcript
+ * rows without a live Payload job are re-queued. Legacy rows that never
+ * received a run token are also given a fresh retry budget because their old
+ * attempts came from the pre-job-protocol long HTTP request path.
+ */
+export async function recoverQueuedTranscriptions(payload: Payload): Promise<{
+  active: number;
+  pending: number;
+  released: number;
+  requeued: number;
+  legacyReset: number;
+}> {
+  const [active, jobs] = await Promise.all([
+    payload.find({
+      collection: "reporting-transcripts",
+      where: {
+        and: [
+          { origin: { equals: "machine" } },
+          { state: { in: ["queued", "processing"] } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true,
+      select: {
+        id: true,
+        attempts: true,
+        transcriptionRunToken: true
+      }
+    }),
+    payload.find({
+      collection: "payload-jobs",
+      where: {
+        and: [
+          { taskSlug: { equals: TRANSCRIBE_TASK } },
+          { queue: { equals: REPORTING_QUEUE } },
+          { completedAt: { exists: false } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true,
+      select: {
+        id: true,
+        input: true,
+        hasError: true,
+        processing: true
+      }
+    })
+  ]);
+
+  const activeById = new Map(active.docs.map((transcript) => [transcript.id, transcript]));
+  const pendingIds = new Set<number>();
+  let released = 0;
+
+  for (const job of jobs.docs) {
+    const transcriptId = jobTranscriptId(job.input);
+    if (transcriptId === null || !activeById.has(transcriptId) || job.hasError === true) continue;
+
+    if (job.processing === true) {
+      await payload.update({
+        collection: "payload-jobs",
+        id: job.id,
+        data: {
+          processing: false,
+          waitUntil: new Date().toISOString()
+        },
+        depth: 0,
+        overrideAccess: true
+      });
+      released++;
+    }
+    pendingIds.add(transcriptId);
+  }
+
+  let legacyReset = 0;
+  let requeued = 0;
+  for (const transcript of active.docs) {
+    if (!transcript.transcriptionRunToken && (transcript.attempts ?? 0) > 0) {
+      await payload.update({
+        collection: "reporting-transcripts",
+        id: transcript.id,
+        data: {
+          state: "queued",
+          attempts: 0,
+          failure: null,
+          progressPercent: null,
+          progressMessage: "Waiting to transcribe",
+          transcriptionStartedAt: null,
+          lastProgressAt: null
+        },
+        depth: 0,
+        overrideAccess: true,
+        context: { bylineSystem: true }
+      });
+      legacyReset++;
+    }
+
+    if (pendingIds.has(transcript.id)) continue;
+    await (payload.jobs as unknown as Jobs).queue({
+      task: TRANSCRIBE_TASK,
+      queue: REPORTING_QUEUE,
+      input: { transcriptId: transcript.id },
+      overrideAccess: true
+    });
+    pendingIds.add(transcript.id);
+    requeued++;
+  }
+
+  return {
+    active: active.docs.length,
+    pending: pendingIds.size,
+    released,
+    requeued,
+    legacyReset
+  };
+}
+
 /**
  * Creates (or re-queues) the transcript for a recording. The transcript
  * inherits the recording's story, source, appointment, confidentiality and
