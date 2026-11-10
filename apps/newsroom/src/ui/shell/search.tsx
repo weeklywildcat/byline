@@ -2,7 +2,7 @@
 
 import { HomeCommands } from "@byline/newsroom-screens/home/HomeCommands";
 import { homeKey } from "@byline/newsroom-screens/home/home-query";
-import { CalendarDays, FileText, HeartPulse, ImagePlus, Library, Settings, Smartphone, UserRound } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, ImagePlus, Library, NotebookPen, Settings, UserRound } from "lucide-react";
 import type { commandSearch } from "../../newsroom/command-search";
 import { createBylineRequest } from "../home/payload-fetchers";
 import { useQuery } from "@tanstack/react-query";
@@ -71,7 +71,7 @@ export function BylineSearchProvider({ children }: { children: ReactNode }) {
     { id: "open-stories", label: "Open Stories", icon: FileText, run: () => navigate(`${routes.admin}/stories`) },
     { id: "open-calendar", label: "Open Calendar", icon: CalendarDays, run: () => navigate(`${routes.admin}/calendar`) },
     { id: "open-media", label: "Open Media", icon: ImagePlus, run: () => navigate(`${routes.admin}/media`) },
-    { id: "open-field", label: "Open Field Mode", icon: Smartphone, run: () => navigate(`${routes.admin}/field`) },
+    { id: "open-field", label: "Open Field Mode", icon: NotebookPen, run: () => navigate(`${routes.admin}/field`) },
     ...(account?.role !== "staff" ? [{ id: "open-people", label: "Open People", icon: UserRound, run: () => navigate(`${routes.admin}/people`) }, { id: "open-health", label: "Open Content Health", icon: HeartPulse, run: () => navigate(`${routes.admin}/content-health`) }] : []),
     ...(account?.role === "administrator" ? [{ id: "open-site", label: "Open Site", icon: Settings, run: () => navigate(`${routes.admin}/site`) }, { id: "open-access", label: "Open newsroom access", icon: UserRound, run: () => navigate(`${routes.admin}/people?tab=access`) }, { id: "open-system", label: "System administration", icon: Settings, run: () => navigate(`${routes.admin}/system`) }] : [])
   ];

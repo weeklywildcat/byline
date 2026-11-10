@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avat
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, Keyboard, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
+import { ChevronsUpDown, Keyboard, LogOut, NotebookPen, UserRound, Wrench } from "lucide-react";
 import { ShellLink } from "./navigation";
 import { useSignOut } from "./sign-out";
 import { useBylineShortcuts } from "./shortcuts";
@@ -71,7 +71,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             <DropdownMenuSeparator />
             {user.profileHref ? <DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem> : null}
             {/* Field Mode: the reporter's phone-first capture screen (its own shell, docs/field-mode.md). */}
-            <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><Smartphone aria-hidden="true" />Field Mode</DropdownMenuItem>
+            <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><NotebookPen aria-hidden="true" />Field Mode</DropdownMenuItem>
             <DropdownMenuItem onClick={openHelp}><Keyboard aria-hidden="true" />Keyboard shortcuts<DropdownMenuShortcut>?</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuSeparator />
             {systemHref ? (

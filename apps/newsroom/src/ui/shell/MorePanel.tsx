@@ -6,7 +6,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Kbd } from "@byline/newsroom-ui/ui/kbd";
 import { Separator } from "@byline/newsroom-ui/ui/separator";
-import { BookmarkCheck, ChevronRight, Keyboard, LogOut, Settings, Smartphone, UserRound, Wrench, type LucideIcon } from "lucide-react";
+import { BookmarkCheck, ChevronRight, Keyboard, LogOut, NotebookPen, Settings, UserRound, Wrench, type LucideIcon } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { canAdministerSystem, navigationFor, STORIES_PATH, SYSTEM_ADMINISTRATION_PATH, type NavItem } from "../../domain/navigation";
 import type { MoreAccount } from "./MoreNavigation";
@@ -54,7 +54,7 @@ export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, after
   return (
     <div className="grid gap-4 px-2 pb-2">
       <MoreGroup title="Workspaces">
-        <MoreLink href={`${admin}/field`} label="Field Mode" icon={Smartphone} follow={follow} />
+        <MoreLink href={`${admin}/field`} label="Field Mode" icon={NotebookPen} follow={follow} />
         {items.filter((item) => item.key === "media" || item.key === "collections").map(link)}
       </MoreGroup>
       {team && (
