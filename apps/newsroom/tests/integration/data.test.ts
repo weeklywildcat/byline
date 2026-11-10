@@ -316,6 +316,23 @@ describe("projects and the public snapshot", () => {
     expect((await call("get", path, null, { params: { sha256: "0".repeat(64) }, headers: { authorization: `Bearer ${TOKEN}` } })).status).toBe(404);
   });
 
+  it("won't delete a dataset still used by the published project when the latest draft switches away", async () => {
+    const current = (await call("get", "/byline/data/projects/:id", "editor", { params: { id: ids.project } })).body;
+    const originalBindings = current.project.bindings;
+    const changed = await call("patch", "/byline/data/projects/:id", "editor", {
+      params: { id: ids.project },
+      data: { bindings: [], expectedUpdatedAt: current.project.updatedAt }
+    });
+    expect(changed.status).toBe(200);
+    expect(changed.body.publication).toBe("changed");
+    expect((await call("delete", "/byline/data/datasets/:id", "editor", { params: { id: ids.phases } })).status).toBe(409);
+    const restored = await call("patch", "/byline/data/projects/:id", "editor", {
+      params: { id: ids.project },
+      data: { bindings: originalBindings, expectedUpdatedAt: changed.body.project.updatedAt }
+    });
+    expect(restored.status).toBe(200);
+  });
+
   it("won't delete a dataset a project uses, and unpublishing removes the project from the snapshot", async () => {
     expect((await call("delete", "/byline/data/datasets/:id", "editor", { params: { id: ids.phases } })).status).toBe(409);
     expect((await call("post", "/byline/data/projects/:id/unpublish", "editor", { params: { id: ids.project } })).body.publication).toBe("draft");
