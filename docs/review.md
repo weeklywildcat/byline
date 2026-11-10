@@ -33,7 +33,7 @@ A reviewer decides with the revision they saw, so a retried decision does nothin
 
 ### Feedback {#feedback}
 
-Writers see published feedback in the Story context and in Review, can reply, and can resolve. After changes, **Resubmit** returns to the same step and, usually, the same reviewer.
+Writers see published feedback under the Story header (over Plan and Write) and in Review, can reply, and can resolve. After changes, **Resubmit** returns to the same step and, usually, the same reviewer.
 
 ## Changes since your last review {#changes-since}
 

@@ -1,7 +1,8 @@
 # Reporting
 
 Reporting is the raw material a Story is built from. It lives **inside the
-Story** (the Story screen's **Reporting** tab), never as a separate app.
+Story** (the **Reporting** section of the Story's Plan workspace, see
+[the Story screen](story-screen.md#plan)), never as a separate app.
 
 > Capture once. Preserve provenance. Route by context. Verify deliberately.
 > Publish deliberately. Reuse everywhere.
@@ -122,7 +123,7 @@ The chain stays inspectable (`GET /api/byline/reporting/selections/:id/provenanc
 Source → Appointment → Recording → Transcript → Selection → Verified quote → Reported Quote → Story
 ```
 
-A Reported Quote inserted from the article's **Reporting** sheet carries the
+A Reported Quote inserted from Write's **Reporting reference** carries the
 selection's id in a private block field (`reportingSelection`). The semantic
 article body never includes it (tested), so it never reaches Live Preview, a
 snapshot or the public site. Each Story save maintains the indexed reverse
@@ -153,22 +154,25 @@ configured". The uploader is notified when a transcript is ready.
 
 ## Screens
 
-- **Reporting tab**: search, `+ Capture` (Note, Record, Upload file, Upload
+- **Plan → Reporting**: search, `+ Capture` (Note, Record, Upload file, Upload
   photo, Add link, Import transcript), Up next, a single Material feed with
   view filters (All, Audio, Documents, Photos, Notes), and Sources and
-  Appointments (a rail at ≥880px of the tab, otherwise a Sheet). Capturing from
+  Appointments (a rail at ≥880px of the section, otherwise a Sheet), then the
+  Story's saved quotes and whether each is verified. Capturing from
   a Source or Appointment pre-binds it. Ground rules are edited from the
   Source's badge.
-- **Transcript** (`?tab=reporting&transcript=<id>`): pinned audio, timestamps
+- **Transcript** (`?transcript=<id>`, a focused view with Back to Plan): pinned audio, timestamps
   that seek, the active passage following playback, an `InputGroup` search
   with next/previous and a count, in-place speaker and text edits, and a
   selection bar docked in the layout (never over the words) with Save
   highlight, Save quote and Copy. Source, ground rules and saved quotes sit in
   a Resizable panel at ≥880px, otherwise a Sheet.
-- **Article → Reporting** (Write tab): a Sheet of the Story's saved quotes.
-  Verified quotes: Play source, Copy, Insert quote (the existing Reported Quote
-  block with words and attribution). Unverified: Verify before inserting. Off
-  the record: no insert.
+- **Write → Reporting reference**: the Story's saved quotes, notes,
+  recordings and sources, searchable; a pane beside the article when there is
+  room, otherwise a Sheet. Verified quotes: Play source, Copy, Insert quote
+  (the existing Reported Quote block with words and attribution). Unverified:
+  Verify before inserting. Off the record: no insert. Notes can be copied;
+  transcripts open in full.
 
 ## Privacy
 

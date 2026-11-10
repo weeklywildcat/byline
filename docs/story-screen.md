@@ -1,64 +1,101 @@
 # The Story screen
 
-The default Story is the workspace itself. There is no tab bar. Opening a Story opens the Story; everything else is a focused mode, a Sheet or a Popover. Code: `apps/newsroom/src/ui/story/` (`StoryScreen`, `StoryHeader`) and `packages/newsroom-screens/src/story-context/`.
+A Story has two workspaces, **Plan** and **Write**, as tabs under the Story header. Plan is where a story is prepared, reported and coordinated; Write is the article. They are places to work, not lifecycle stages: moving between them never submits, publishes or changes the Story's stage. Review, History and a Transcript are focused views with a way back, never tabs.
 
-## What the Story contains
-
-Story header, the article editor, the lifecycle and one primary next action, Story Context, the Angle, a Reporting summary, contextual Media, an optional Checklist, and review feedback when there is some.
+Code: `apps/newsroom/src/ui/story/` (`StoryScreen`, `StoryHeader`, `PlanWorkspace`, `WriteTab`, `story-view.ts`), `apps/newsroom/src/ui/reporting/` (the Reporting notebook, `ReportingReference`) and `packages/newsroom-screens/src/story-context/` (`StoryPlan`, `StoryContext`).
 
 ## Header {#header}
 
-The top bar's breadcrumb says where you are: **Stories › the Story's headline** (live as you type, "Untitled story" until it has one). Stories is a link to the list. In a focused mode the mode's name is added (**Stories › headline › Reporting**) and the headline is the way back to the Story. The Story screen publishes this while it is open; nothing is saved.
+The same compact header sits over Plan and Write. The top bar's breadcrumb says where you are: **Stories › the Story's headline** (live as you type, "Untitled story" until it has one); in a focused view the view's name is added and the headline is the way back.
 
-The header holds the lifecycle stage, writers and deadline, and **one** primary lifecycle action for this reader right now: Accept pitch, Start drafting, Submit for review, Resubmit, Review submitted version, or Publish.
+The header holds the lifecycle stage, writers, editor and deadline, the save status, and **one** primary action for this reader right now: Accept pitch, Start drafting, Submit for review, Resubmit, Review submitted version, or Publish. Whose move it is in review ("Waiting for Copy desk", "Changes requested") is a labelled link that opens Review; when a review exists and there is no other status, a **Review** link does the same.
 
-**Right-click the stage** (the colored badge and status beside it) for the moves available to you: the primary action (Accept pitch, Start drafting, Submit for review…), then Put on hold and Drop, or Resume. They are the same actions as the header button and the overflow menu, which remain the keyboard and touch route. Editors also get **Move to stage**: jump straight to Pitch, Reporting, Drafting, Review or Ready without stepping through the ones between. That is the same editor override as Change stage in Story details: it closes any open review, History records it, and the toast has an Undo. The badge is tinted by stage (Pitch violet, Reporting blue, Drafting amber, Review indigo, Ready green, On Hold gray, Dropped red); the stage is always written out, color is a second cue. Staff still cannot force Review or Ready.
+**Right-click the stage** (the colored badge) for the moves available to you: the primary action, then Put on hold and Drop, or Resume. Editors also get **Move to stage** (the editor override; it closes any open review, History records it, and the toast has Undo). The badge is tinted by stage; the stage is always written out.
 
-A labelled **Reporting** button is always visible. It is the way into full Reporting and is deliberately not hidden in a menu. Everything else lives in **one** overflow menu (**More story actions**), never a row of buttons or a second menu: Preview (Payload's Live Preview), Story context when it isn't a rail, Story details, View history, Open in Field Mode, Put on hold, Drop, and, before Ready, Publish now without review.
+Everything occasional is in **one** overflow menu (**More story actions**): Preview (Payload's Live Preview), Story details, View history, Open in Field Mode, Put on hold, Drop, and, before Ready, Publish now without review. Publication actions (Schedule, Unpublish, Move to trash) are the last group and are reachable in every stage for anyone who may publish. **Move to trash** is Payload's recoverable delete, distinct from editorial Drop.
 
-Publication actions (Schedule, Unpublish, Move to trash) are separate from the lifecycle, stay reachable in every stage for anyone who may publish, and are the last group in that same menu.
+Review feedback a writer must act on sits under the header, above the tabs, in both workspaces.
 
-**Story mode** (Standard / Live) is a property of the Story, a row beside Section and Story type in the article's properties, not a bar above the headline. Only editors can change it.
+## Plan | Write {#tabs}
 
-## Focused modes
+The tabs are the newsroom UI kit's shadcn `Tabs` (Base UI underneath), line style, and follow the WAI-ARIA tabs pattern: arrow keys move between them and activate them, the active tab is the one in the tab order, each has a labelled tab panel. They stay visible and directly selectable at every width (never a dropdown). Each tab switch is a history entry, so Back and Forward move between Plan and Write.
 
-| URL | Mode |
+**Write is never unmounted.** Its panel is kept mounted and only hidden while Plan or a focused view shows, so the Lexical editor keeps its unsaved changes, undo history, selection, plugins, autosave and lock. Each workspace keeps its own scroll position. Plan mounts when shown.
+
+### Which workspace opens {#default}
+
+| Address | Opens |
 | --- | --- |
-| (none) | The Story |
-| `?view=reporting` | Full Reporting: sources, appointments, capture, material, recordings, notes, links, files and photos, transcripts, verified quotes, ground rules, search |
-| `?view=history` | Versions, restore, public notices, corrections |
-| `?view=review` | The submitted version, for someone with a review to do |
+| `?view=plan`, `?view=write` | that workspace |
+| `?view=plan&section=reporting` (`brief`, `todo`, `activity`) | Plan, at that section |
+| `?view=review`, `?view=history` | that focused view |
+| `?transcript=<id>` | the transcript, focused, over Plan |
+| nothing | the Story's default |
 
-Each has a **Back to story**, works with the browser's Back and Forward, and never unmounts the article editor: it is hidden while a focused mode is open and restored at the same place, so edits made just before leaving are saved and the Lexical state is never lost.
+The default, decided once per visit and never from the lifecycle: a Story with no article text yet (a new Pitch) opens **Plan**; otherwise the workspace this reader last used on this Story; otherwise **Write**. "Last used" is reader UI state in Payload Preferences (`byline:story:workspace:v1`, the most recent 100 Stories, normalized on read), like Stories saved views: no Users field, migration or endpoint.
 
-### Legacy URLs
+### Older links
 
-Old links keep working. `?tab=reporting` and `?tab=history` open those modes; `?tab=plan` and `?tab=write` open the Story (Plan no longer exists: its parts live in Story Context and Reporting, and an old Plan link opens the Story with its context showing). `?appointment=<id>` and `?transcript=<id>` open Reporting on that record. The `tab` parameter is dropped as soon as you move. An ordinary Story link never picks a mode from the lifecycle.
+Every older address still lands where it meant: `?view=reporting`, `?tab=reporting`, `?appointment=<id>` and `?capture=<intent>` open Plan at Reporting (an appointment opens its dialog, a capture starts it); `?tab=plan` opens Plan; `?tab=production` opens Plan at To do, where media assignments now live; `?tab=write`, `?tab=live` and `?tab=publish` open Write; `?tab=history` opens History; `?tab=reporting&transcript=<id>` opens the transcript. Moving anywhere writes the canonical address.
 
-## Legacy Story view {#legacy-layout}
+## Plan {#plan}
 
-An opt-in for people who want the older arrangement while they get used to the new one. It is off by default. **Legacy Story view** is a checkbox in the account menu (next to Field Mode) and applies to that account everywhere.
+Four sections in reading order, each a heading and its content, separated by rules rather than Cards. **Jump to** links at the top move between them (and focus the section heading).
 
-Only the arrangement changes. The header, article, lifecycle, review and publishing are the same; staff still cannot force Review or Ready from it. The same header sits over **Write / Plan / Production / History** tabs, with no Story Context rail or Sheet:
+- **Story brief.** The **Angle and assignment** (the plan's brief: the central question, what to find out, who to talk to, open questions), edited in place and saved as a planning record. Beside it: reporters, anyone else working on the Story (whoever has its media, tasks or interviews), the editor, deadline and publication target (editors change them here), section, and a schedule if there is one. Under it, what the Story is expected to deliver (its type and its media assignments: "Article · 2 photos · 1 graphic") and its background links.
+- **Reporting.** The Story's reporting notebook ([reporting](reporting.md)): search, capture (note, recording, file, photo, link, transcript import), Up next, the chronological material feed, sources with ground rules, appointments, and the Story's saved quotes with whether each is verified. **Open in Field Mode** is here, labelled. A transcript opens as its own focused view with **Back to Plan**; the transcript editor is never squeezed into a column.
+- **To do.** Tasks (the checklist, one click to check off), interviews and appointments still to happen, how many sources haven't been interviewed, and photos, video and graphics (media assignments, with who, when and status). Each row is the existing record and opens its existing dialog; nothing is copied into a second list.
+- **Activity.** **Questions and notes** (the Story's private discussion; a note stays open until someone resolves it) and the latest **Recent changes**, with **Full history** for the audit trail.
 
-- **Write** is the article. It stays mounted and is only hidden behind the other tabs, so the editor is never remounted by switching tabs or turning the view on or off.
-- **Plan** is the Brief, Reporting plan and Tasks beside Details, Resources, Notes and Activity. **Production** is Media & Production. **History** is the version history. These are the same shared sections Story Context and Reporting are built from.
-- **Reporting** and **Review** are not tabs: the header's Reporting button and Review action still open the focused modes with Back to story, and the Reporting-intent links (`?appointment=`, `?transcript=`) still land in Reporting.
-- **View history** in the overflow menu, `?view=history` and `?tab=history` open the History tab; `?tab=plan` and `?tab=production` open those tabs. Review feedback shows above the tabs.
+## Write {#write}
 
-The choice is stored in Payload Preferences under `byline:story:layout:v1`, per user, like Stories saved views: no Users field, migration or endpoint. It is meant as a transition aid, not a second supported design: new Story features land in the default layout first.
+The article: label, headline, deck, byline, section, topics, story type and **Story mode** (Standard / Live; only editors change it, and Live coverage keeps its own setup, desk and publication rules), the lead image with its caption and alt text, the body with its blocks, and the optional "How we reported this" note. Workflow forms never sit inside the article.
 
-## Story Context {#context}
+When the Story container is at least 1180px wide, **Story context** sits beside the article: the Angle, reporting at a glance, media and the checklist, with shortcuts into Plan. Below that width there is no rail; Plan has the same information.
 
-A rail beside the article when the Story container is at least 1180px wide; the same content in a right **Sheet**, opened from **Story context**, when it isn't. It shows people, the Angle, Up Next (from [Story Attention](story-lifecycle.md#attention)), Reporting at a glance, contextual Media and the review state. The Angle is edited inline and saved.
+### Reporting reference {#reference}
 
-## Checklist {#checklist}
+**Reporting reference**, beside the tabs in Write, opens the Story's reporting for reading while writing: a search box, saved quotes, notes, recordings and transcripts, and sources with their ground rules.
 
-Optional, and only shown when a Story has one. Checklist items are tasks on the Story; checking one off is a single click and counts toward Story Attention (`checklist-due`) when overdue.
+- When the Story container is at least 1000px wide it is a nonmodal pane beside the article (in the rail's place; the article keeps at least ~580px). Below that it is a Sheet with **Back to article**. Either way focus returns to the button when it closes.
+- A **verified** quote can be inserted as the Reported Quote block, keeping its attribution and its link to the transcript selection. An unverified quote says **Verify before inserting** and opens its transcript; an off-the-record one cannot be inserted. Notes can be copied. A transcript opens in full in its focused view. Nothing is inserted on its own.
+
+## Focused views
+
+| View | Reached from | Way back |
+| --- | --- | --- |
+| Review | the header's Review action or status link, a notification | Back to story (a decision also returns) |
+| History | overflow menu → View history | Back to Plan / Back to Write |
+| Transcript | Plan's Reporting, Reporting reference | Back to Plan |
+
+History holds versions and restore, the Front Page, Distribution and corrections, the Story's notes and its full activity. The article stays mounted underneath all of them.
+
+## Story details
+
+Story details (overflow menu) is the secondary place for advanced settings: stage and publication state, the editor override, **Appearance** (presentation, headline position) and **Publishing** (schedule, the public URL and its redirects, publication checks). Routine reporting and workflow never move there.
+
+## Where things moved from {#moved}
+
+The Story used to be one page with a Story Context rail and Reporting as a focused mode (and, optionally, a legacy Write / Plan / Production / History tab bar). The legacy view is retired; its stored preference is ignored.
+
+| Before | Now |
+| --- | --- |
+| Reporting button and `?view=reporting` | Plan → Reporting |
+| Story Context (rail or Sheet): Angle, reporting, media, checklist | Plan → Story brief / Reporting / To do; still a rail beside Write when wide |
+| The article's Quotes Sheet | Write → Reporting reference |
+| Production (media assignments) | Plan → To do |
+| Lead image, captions, alt text | Write |
+| Presentation, URL, publication checks | Story details → Appearance / Publishing |
+| Review | the header's Review action and status link |
+| Social and newsletter distribution | the Distribution Center, and History |
+
+## Responsive {#responsive}
+
+Layout follows the Story container's measured width, never the device. Checked at 390, 600 (a narrow iPad Split View window), 820, 1024, 1194 and 1440px: no horizontal scrolling, both tabs and the primary action on screen, touch-sized tabs, and nothing essential behind an unlabelled icon.
 
 ## Peek {#peek}
 
-Opening a Story from the Board or a list can preview it first. Peek is deliberately light: identity and stage, writers, editor and deadline (editable where the reader is allowed), **Next** from Story Attention, **Preview** when the Story has a public URL, and **Open story**. It has no Tasks, Production, Reporting, Files or Activity: those belong on the Story.
+Opening a Story from the Board or a list can preview it first. Peek is deliberately light: identity and stage, writers, editor and deadline (editable where the reader is allowed), **Next** from Story Attention, **Preview** when the Story has a public URL, and **Open story**. Tasks, reporting, files and activity belong to the Story.
 
 ## Board
 

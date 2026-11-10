@@ -54,11 +54,13 @@ export type StoryContextProps = {
   canCapture?: boolean;
 };
 
-function ContextSection({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+/** A quiet titled group: a small uppercase heading, an optional action, then content. Never a Card. */
+export function ContextSection({ id, title, action, children, level = 2 }: { id: string; title: string; action?: ReactNode; children: ReactNode; level?: 2 | 3 }) {
+  const Heading = level === 3 ? "h3" : "h2";
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2" data-context-section={id}>
       <div className="flex min-h-7 items-center justify-between gap-2">
-        <h2 id={id} className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</h2>
+        <Heading id={id} className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</Heading>
         {action}
       </div>
       {children}
@@ -94,8 +96,13 @@ export function StoryContext({ onOpenReporting, before, leadImage, canCapture = 
 /**
  * What this Story is trying to tell readers. Stored as the plan's brief (the
  * same text and the same conflict check); only the name changed.
+ *
+ * Plan's Story Brief shows the same text larger, as the assignment
+ * (`prominent`), with its own title and prompt.
  */
-export function Angle() {
+export type AngleProps = { title?: string; prompt?: string; prominent?: boolean; level?: 2 | 3; id?: string };
+
+export function Angle({ title = "Angle", prompt = "What is this story trying to tell readers?", prominent = false, level = 2, id = "context-angle" }: AngleProps = {}) {
   const { storyId, client, data, caps, reload, announce, sectionError } = useWorkspace();
   const cache = useWorkspaceCache();
   const [editing, setEditing] = useState(false);
@@ -131,13 +138,13 @@ export function Angle() {
   const cancel = () => { setEditing(false); setError(null); requestAnimationFrame(() => edit.current?.focus()); };
 
   return (
-    <ContextSection id="context-angle" title="Angle" action={canEdit && !editing ? <Button ref={edit} type="button" variant="ghost" size="xs" onClick={start}><Pencil data-icon="inline-start" aria-hidden="true" />{data.brief ? "Edit" : "Add"}</Button> : null}>
+    <ContextSection id={id} title={title} level={level} action={canEdit && !editing ? <Button ref={edit} type="button" variant="ghost" size="xs" onClick={start} aria-label={`${data.brief ? "Edit" : "Add"} ${title.toLowerCase()}`}><Pencil data-icon="inline-start" aria-hidden="true" />{data.brief ? "Edit" : "Add"}</Button> : null}>
       {failed ? <InlineAlert onAction={() => void reload()}>The angle couldn't be loaded.</InlineAlert> : editing ? (
         // Not a native <form>: this sits inside Payload's document form, where a nested submit reloads the page.
-        <div role="group" aria-label="Edit angle" className="flex flex-col gap-2">
+        <div role="group" aria-label={`Edit ${title.toLowerCase()}`} className="flex flex-col gap-2">
           <Field>
-            <FieldLabel htmlFor="context-angle-input" className="sr-only">Angle</FieldLabel>
-            <Textarea id="context-angle-input" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={4} autoFocus disabled={save.isPending} placeholder="What is this story trying to tell readers?" onKeyDown={(event) => { if (event.key === "Escape") cancel(); }} />
+            <FieldLabel htmlFor={`${id}-input`} className="sr-only">{title}</FieldLabel>
+            <Textarea id={`${id}-input`} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={BRIEF_MAX} rows={prominent ? 7 : 4} autoFocus disabled={save.isPending} placeholder={prompt} onKeyDown={(event) => { if (event.key === "Escape") cancel(); if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && draft !== data.brief && !save.isPending) { event.preventDefault(); save.mutate({ text: draft, expected: data.brief }); } }} />
             <FieldDescription>Private to the newsroom. Never article copy.</FieldDescription>
           </Field>
           {error ? <InlineAlert onAction={error.conflict ? () => void reload().then(() => setDraft(cache.read()?.brief ?? "")) : undefined} actionLabel="Reload latest">{error.message}</InlineAlert> : null}
@@ -147,8 +154,8 @@ export function Angle() {
           </div>
         </div>
       ) : data.brief
-        ? <p className="text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{data.brief}</p>
-        : <p className="text-sm text-muted-foreground">{canEdit ? "What is this story trying to tell readers?" : "No angle yet."}</p>}
+        ? <p className={prominent ? "max-w-prose text-base/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]" : "text-sm/relaxed whitespace-pre-wrap [overflow-wrap:anywhere]"} data-story-brief-text="">{data.brief}</p>
+        : <p className="text-sm text-muted-foreground">{canEdit ? prompt : `No ${title.toLowerCase()} yet.`}</p>}
     </ContextSection>
   );
 }
@@ -253,12 +260,12 @@ function mediaDone(assignment: StoryMediaAssignment): boolean {
   return assignment.status === "done" || assignment.status === "selected";
 }
 
-export function MediaContext({ leadImage }: { leadImage: { url: string | null; alt: string | null } | null }) {
+export function MediaContext({ leadImage, title = "Media", level = 2, id = "context-media" }: { leadImage: { url: string | null; alt: string | null } | null; title?: string; level?: 2 | 3; id?: string }) {
   const { data, timezone, now, caps } = useWorkspace();
   const dialog = useDialogTarget<StoryMediaAssignment>("[data-context-add=media]");
   const assignments = [...data.mediaAssignments].sort((a, b) => a.order - b.order);
   return (
-    <ContextSection id="context-media" title="Media">
+    <ContextSection id={id} title={title} level={level}>
       {leadImage?.url ? (
         <div className="flex items-center gap-3">
           <div className="w-16 shrink-0 overflow-hidden rounded-md bg-muted"><AspectRatio ratio={3 / 2}><img src={leadImage.url} alt={leadImage.alt ?? ""} className="size-full object-cover" /></AspectRatio></div>
@@ -285,7 +292,8 @@ export function MediaContext({ leadImage }: { leadImage: { url: string | null; a
           })}
         </ItemGroup>
       ) : null}
-      {caps.manageMedia ? <Button type="button" variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" data-context-add="media" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" aria-hidden="true" />Add media</Button> : null}
+      {!assignments.length && !leadImage?.url ? <p className="text-sm text-muted-foreground">No photos, video or graphics assigned.</p> : null}
+      {caps.manageMedia ? <Button type="button" variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" data-context-add="media" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" aria-hidden="true" />Add media assignment</Button> : null}
       <MediaDialog key={`media-${dialog.session}`} open={dialog.open} assignment={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
     </ContextSection>
   );
@@ -298,7 +306,7 @@ export function MediaContext({ leadImage }: { leadImage: { url: string | null; a
  * spelling. (Interviews are sources and appointments, photos are media,
  * writing is the Story, editing is review.) Stored as the Story's tasks.
  */
-export function Checklist({ startAdding, onAdded }: { startAdding?: boolean; onAdded?: () => void }) {
+export function Checklist({ startAdding, onAdded, title = "Checklist", level = 2, id = "context-checklist" }: { startAdding?: boolean; onAdded?: () => void; title?: string; level?: 2 | 3; id?: string }) {
   const { editorial, data, timezone, now, caps, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const dialog = useDialogTarget<EditorialTask>("[data-context-add=checklist]");
@@ -348,8 +356,8 @@ export function Checklist({ startAdding, onAdded }: { startAdding?: boolean; onA
   };
 
   return (
-    <ContextSection id="context-checklist" title="Checklist" action={caps.addTask ? <Button type="button" variant="ghost" size="icon-xs" aria-label="Add checklist item" data-context-add="checklist" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus aria-hidden="true" /></Button> : null}>
-      {open.length ? <ItemGroup className="gap-0" aria-label="To do">{open.map(row)}</ItemGroup> : <p className="text-sm text-muted-foreground">All done.</p>}
+    <ContextSection id={id} title={title} level={level} action={caps.addTask ? <Button type="button" variant="ghost" size="icon-xs" aria-label="Add checklist item" data-context-add="checklist" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus aria-hidden="true" /></Button> : null}>
+      {open.length ? <ItemGroup className="gap-0" aria-label={`${title}: open`}>{open.map(row)}</ItemGroup> : <p className="text-sm text-muted-foreground">{done.length ? "All done." : "Nothing on the checklist."}</p>}
       {done.length ? (
         <Collapsible>
           <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground" />}>

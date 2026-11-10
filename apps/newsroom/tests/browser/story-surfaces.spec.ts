@@ -105,8 +105,8 @@ test("New story is a title and Create pitch; details are optional, and staff don
   await dialog.getByRole("button", { name: "Hide details" }).click();
   await dialog.getByRole("button", { name: "Create pitch" }).click();
   await expect(page).toHaveURL(/\/admin\/collections\/stories\/\d+/);
-  await expect(page.getByRole("textbox", { name: "Headline" })).toHaveValue(title);
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
+  // A new pitch has no words yet, so it opens Plan, where its assignment is.
+  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "plan");
   await expect(page.getByText("Pitch", { exact: true }).first()).toBeVisible();
 
   await as(page, "STAFF", baseURL!, request);

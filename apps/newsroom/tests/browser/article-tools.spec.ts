@@ -52,7 +52,7 @@ test.beforeEach(async ({ context, baseURL }) => {
 });
 
 async function openStory(page: Page) {
-  await page.goto(`/admin/collections/stories/${storyId}`);
+  await page.goto(`/admin/collections/stories/${storyId}?view=write`);
   await expect(body(page)).toBeVisible({ timeout: 60_000 });
   await expect(body(page)).toHaveAttribute("contenteditable", "true");
 }

@@ -168,7 +168,7 @@ picker and the in-Media navigation guard), `MediaNavigator`, `media-route.ts`,
 (`ui/shell/create.tsx`).
 
 The picker is the existing `MediaPicker` host capability: the Story screen's
-Plan tab's Production assignments and Work both link files through `MediaPickerDialog`, never
+Plan's media assignments (To do) and Work both link files through `MediaPickerDialog`, never
 Payload's raw Media list.
 
 ## Selecting several files
