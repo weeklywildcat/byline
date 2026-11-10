@@ -4,24 +4,25 @@ import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@byline/newsroom-ui/ui/combobox";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Switch } from "@byline/newsroom-ui/ui/switch";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronDown, GripVertical, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, GitBranch, GripVertical, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { blankStep, moveStep, workflowSaveProblems } from "../../domain/role-admin";
 import { REVIEW_TARGET_LABELS, type WorkflowStep } from "../../domain/newsroom-roles";
@@ -40,6 +41,10 @@ import { ShellLink } from "../shell/navigation";
  * go to; nothing about routing is decided in this file.
  */
 
+const appliesNarrowly = (workflow: WorkflowRow) => Boolean(workflow.appliesTo.sections.length || workflow.appliesTo.formats.length);
+/** Which stories a workflow is used for, as the list and the editor both say it. */
+const appliesLabel = (workflow: WorkflowRow) => (appliesNarrowly(workflow) ? "Specific stories" : workflow.isDefault ? "Any story" : "No stories yet");
+
 export function WorkflowScreen() {
   const { api } = useNewsroomRoutes();
   const params = useSearchParams();
@@ -51,28 +56,85 @@ export function WorkflowScreen() {
   });
   const setSelectedId = (id: number | null) => { choose(id); rememberInUrl("workflow", id); };
   const [creating, setCreating] = useState(false);
+  // Switching workflows with unsaved edits asks first, in an AlertDialog.
+  const dirty = useRef(false);
+  const onDirtyChange = useCallback((next: boolean) => { dirty.current = next; }, []);
+  const [pending, setPending] = useState<number | null>(null);
   const selected = data ? data.workflows.find((workflow) => workflow.id === selectedId) ?? data.workflows.find((workflow) => workflow.isDefault) ?? data.workflows[0] ?? null : null;
+  const select = (id: number) => { if (id === selected?.id) return; if (dirty.current) setPending(id); else setSelectedId(id); };
 
   return (
     <AdminRoot toaster={false} className="byline-workflows">
-      <main className="mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6" data-byline-workflows-screen="">
+      <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6" data-byline-workflows-screen="">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
             <h1 className="text-2xl font-semibold tracking-tight">Review workflows</h1>
             <p className="max-w-prose text-sm text-muted-foreground">When a reporter sends a story for review, it goes through the steps of the most specific workflow that applies to it, in order.</p>
           </div>
-          <Button type="button" size="sm" onClick={() => setCreating(true)} disabled={!data}><Plus aria-hidden="true" />New workflow</Button>
+          <Button type="button" onClick={() => setCreating(true)} disabled={!data}><Plus data-icon="inline-start" aria-hidden="true" />New workflow</Button>
         </header>
         <TeamNav current="workflows" />
 
-        {workflows.isError ? <Alert variant="destructive"><AlertTitle>Workflows couldn’t be loaded</AlertTitle><AlertDescription>{problemsOf(workflows.error)[0]}</AlertDescription><AlertAction><Button type="button" size="sm" variant="outline" onClick={() => void workflows.refetch()}>Try again</Button></AlertAction></Alert> : null}
-        {workflows.isPending ? <div className="grid gap-2" aria-busy="true"><Skeleton className="h-9 w-64" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div> : null}
-        {data && selected ? (
-          <Editor key={`${selected.id}:${selected.revision}`} api={api} overview={data} workflow={selected} onSelect={setSelectedId} />
+        {workflows.isError ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>Workflows couldn’t be loaded</AlertTitle><AlertDescription>{problemsOf(workflows.error)[0]}</AlertDescription><AlertAction><Button type="button" size="xs" variant="outline" onClick={() => void workflows.refetch()}>Try again</Button></AlertAction></Alert> : null}
+        {workflows.isPending ? <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]" aria-busy="true"><Skeleton className="hidden h-48 rounded-xl lg:block" /><div className="grid gap-4"><Skeleton className="h-10 w-72" /><Skeleton className="h-64 rounded-xl" /></div></div> : null}
+        {data && !selected ? (
+          <Empty className="rounded-xl border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><GitBranch aria-hidden="true" /></EmptyMedia>
+              <EmptyTitle>No review workflow yet</EmptyTitle>
+              <EmptyDescription>Create one so stories can be sent for review.</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent><Button type="button" size="sm" onClick={() => setCreating(true)}><Plus data-icon="inline-start" aria-hidden="true" />New workflow</Button></EmptyContent>
+          </Empty>
         ) : null}
-        {data && !selected ? <Alert><AlertTitle>No review workflow yet</AlertTitle><AlertDescription>Create one so stories can be sent for review.</AlertDescription></Alert> : null}
+        {data && selected ? (
+          <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
+            <nav aria-label="Review workflows" className="hidden lg:sticky lg:top-16 lg:block">
+              <ItemGroup className="gap-1">
+                {data.workflows.map((workflow) => {
+                  const current = workflow.id === selected.id;
+                  return (
+                    <div role="listitem" key={workflow.id}>
+                      <Item size="sm" render={<button type="button" onClick={() => select(workflow.id)} aria-current={current ? "page" : undefined} />} className={`w-full text-left ${current ? "bg-muted" : "hover:bg-muted/60"}`}>
+                        <ItemContent className="min-w-0">
+                          <ItemTitle className="line-clamp-none break-words">{workflow.name}</ItemTitle>
+                          <ItemDescription className="flex flex-wrap items-center gap-1">
+                            {workflow.isDefault ? <Badge variant="secondary">Default</Badge> : null}
+                            <span className="text-xs">{appliesLabel(workflow)} · {workflow.steps.length} {workflow.steps.length === 1 ? "step" : "steps"}</span>
+                            {workflow.problems.length ? <Badge variant="destructive">{workflow.problems.length} {workflow.problems.length === 1 ? "problem" : "problems"}</Badge> : null}
+                          </ItemDescription>
+                        </ItemContent>
+                      </Item>
+                    </div>
+                  );
+                })}
+              </ItemGroup>
+            </nav>
+            <div className="min-w-0">
+              <div className="mb-4 lg:hidden">
+                <Select value={String(selected.id)} onValueChange={(next) => select(Number(next))}>
+                  <SelectTrigger className="w-full sm:w-72" aria-label="Workflow"><SelectValue>{selected.name}</SelectValue></SelectTrigger>
+                  <SelectContent>{data.workflows.map((entry) => <SelectItem key={entry.id} value={String(entry.id)}>{entry.name}{entry.isDefault ? " (default)" : ""}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <Editor key={`${selected.id}:${selected.revision}`} api={api} overview={data} workflow={selected} onSelect={setSelectedId} onDirtyChange={onDirtyChange} />
+            </div>
+          </div>
+        ) : null}
       </main>
-      {data ? <NewWorkflowDialog api={api} open={creating} onOpenChange={setCreating} onCreated={setSelectedId} /> : null}
+      {data ? <NewWorkflowDialog api={api} open={creating} onOpenChange={setCreating} onCreated={(id) => { dirty.current = false; setSelectedId(id); }} /> : null}
+      <AlertDialog open={pending !== null} onOpenChange={(next) => { if (!next) setPending(null); }}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>Your changes to {selected?.name ?? "this workflow"} haven’t been saved.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Keep editing</AlertDialogCancel>
+            <AlertDialogAction type="button" variant="destructive" onClick={() => { const next = pending; setPending(null); dirty.current = false; if (next !== null) setSelectedId(next); }}>Discard changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminRoot>
   );
 }
@@ -83,15 +145,17 @@ type Draft = { name: string; description: string; sections: string[]; formats: s
 
 const toDraft = (workflow: WorkflowRow): Draft => ({ name: workflow.name, description: workflow.description, sections: workflow.appliesTo.sections.map(String), formats: workflow.appliesTo.formats, isDefault: workflow.isDefault, steps: workflow.steps });
 
-function Editor({ api, overview, workflow, onSelect }: { api: string; overview: WorkflowsOverview; workflow: WorkflowRow; onSelect: (id: number) => void }) {
+function Editor({ api, overview, workflow, onSelect, onDirtyChange }: { api: string; overview: WorkflowsOverview; workflow: WorkflowRow; onSelect: (id: number) => void; onDirtyChange: (dirty: boolean) => void }) {
   const save = useWorkflowWrites(api);
   const [draft, setDraft] = useState<Draft>(() => toDraft(workflow));
   const [openStep, setOpenStep] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [archiving, setArchiving] = useState(false);
-  const ids = { name: useId(), description: useId(), sections: useId(), formats: useId(), default: useId() };
+  const ids = { name: useId(), description: useId(), sections: useId(), formats: useId(), default: useId(), defaultHelp: useId(), settings: useId() };
   const original = useMemo(() => JSON.stringify(toDraft(workflow)), [workflow]);
   const dirty = JSON.stringify(draft) !== original;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
   const known = useMemo(() => ({
     roles: new Map(overview.roles.map((role) => [role.id, { name: role.name, archived: role.archived, scopeKind: role.scopeKind }])),
     users: new Set(overview.people.map((person) => person.id)),
@@ -118,51 +182,64 @@ function Editor({ api, overview, workflow, onSelect }: { api: string; overview: 
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={String(workflow.id)} onValueChange={(next) => { if (dirty && !window.confirm("Discard your unsaved changes to this workflow?")) return; onSelect(Number(next)); }}>
-          <SelectTrigger className="w-64 max-w-full" aria-label="Workflow"><SelectValue>{workflow.name}</SelectValue></SelectTrigger>
-          <SelectContent>{overview.workflows.map((entry) => <SelectItem key={entry.id} value={String(entry.id)}>{entry.name}{entry.isDefault ? " (default)" : ""}</SelectItem>)}</SelectContent>
-        </Select>
-        {workflow.isDefault ? <Badge variant="secondary">Default</Badge> : null}
-        {workflow.appliesTo.sections.length || workflow.appliesTo.formats.length ? <Badge variant="outline">Specific stories</Badge> : <Badge variant="outline">Any story</Badge>}
+    <div className="grid min-w-0 gap-5">
+      <div className="sticky top-12 z-20 -mx-1 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-1 py-2.5" data-workflow-toolbar="">
+        <div className="flex min-w-0 flex-[1_1_16rem] flex-wrap items-center gap-2">
+          <h2 className="min-w-0 break-words text-lg font-semibold tracking-tight">{draft.name || "Untitled workflow"}</h2>
+          {workflow.isDefault ? <Badge variant="secondary">Default</Badge> : null}
+          <Badge variant="outline" className="font-normal">{appliesLabel(workflow)}</Badge>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {dirty ? <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" role="status">Unsaved changes</Badge> : null}
+          {dirty ? <Button type="button" variant="ghost" onClick={() => { setDraft(toDraft(workflow)); setProblems([]); }} disabled={save.isPending}>Discard changes</Button> : null}
+          <Button type="button" onClick={() => submit()} disabled={!dirty || save.isPending || !draft.name.trim()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save workflow</Button>
+        </div>
       </div>
 
-      {problems.length ? <Alert variant="destructive"><AlertTitle>{problems.length === 1 ? "That didn’t save" : "Fix these first"}</AlertTitle><AlertDescription>{problems.map((problem) => <span key={problem} className="block">{problem}</span>)}</AlertDescription></Alert> : null}
-      {!dirty && workflow.problems.length ? <Alert variant="destructive"><AlertTitle>This workflow has problems</AlertTitle><AlertDescription>{workflow.problems.map((problem) => <span key={problem} className="block">{problem}</span>)}</AlertDescription></Alert> : null}
+      {problems.length ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>{problems.length === 1 ? "That didn’t save" : "Fix these first"}</AlertTitle><AlertDescription>{problems.map((problem) => <span key={problem} className="block">{problem}</span>)}</AlertDescription></Alert> : null}
+      {!dirty && workflow.problems.length ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>This workflow has problems</AlertTitle><AlertDescription>{workflow.problems.map((problem) => <span key={problem} className="block">{problem}</span>)}</AlertDescription></Alert> : null}
 
-      <Collapsible>
-        <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="group/details" />}>
-          <ChevronDown aria-hidden="true" className="size-4 transition-transform group-data-[panel-open]/details:rotate-180" />
-          Name and which stories it applies to
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-4">
-          <FieldGroup>
-            <Field><FieldLabel htmlFor={ids.name}>Name</FieldLabel><Input id={ids.name} value={draft.name} maxLength={80} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor={ids.description}>Description</FieldLabel><Textarea id={ids.description} value={draft.description} maxLength={400} rows={2} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor={ids.sections}>Sections</FieldLabel><ChoicesCombobox id={ids.sections} choices={overview.sections.map((section) => ({ value: String(section.id), label: section.name }))} value={draft.sections} onChange={(sections) => setDraft({ ...draft, sections })} placeholder="Any Section" /></Field>
-            <Field><FieldLabel htmlFor={ids.formats}>Story formats</FieldLabel><ChoicesCombobox id={ids.formats} choices={overview.formats} value={draft.formats} onChange={(formats) => setDraft({ ...draft, formats })} placeholder="Any format" /><FieldDescription>With no Sections or formats, this workflow only applies when it’s the default. A story uses the most specific workflow that matches it.</FieldDescription></Field>
-            <Field orientation="horizontal"><Checkbox id={ids.default} checked={draft.isDefault} disabled={workflow.isDefault} onCheckedChange={(checked) => setDraft({ ...draft, isDefault: Boolean(checked) })} /><FieldLabel htmlFor={ids.default} className="font-normal">{workflow.isDefault ? "This is the default workflow (make another one the default to change it)" : "Use for stories no other workflow claims"}</FieldLabel></Field>
-            <div><Button type="button" variant="outline" size="sm" onClick={() => setArchiving(true)} disabled={workflow.isDefault}>Archive workflow</Button></div>
-          </FieldGroup>
-        </CollapsibleContent>
-      </Collapsible>
-
-      <section aria-labelledby="steps-heading" className="grid gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="steps-heading" className="text-base font-medium">Steps, in order</h2>
-          <Button type="button" size="sm" variant="outline" onClick={() => { const next = blankStep(draft.steps); setSteps([...draft.steps, next]); setOpenStep(next.stepId); }}><Plus aria-hidden="true" />Add step</Button>
-        </div>
-        <StepList steps={draft.steps} overview={overview} onOpen={setOpenStep} onMove={move} />
-        {live.length && dirty ? <p className="text-sm text-destructive" role="status">{live[0]}{live.length > 1 ? ` (and ${live.length - 1} more)` : ""}</p> : null}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" onClick={() => submit()} disabled={!dirty || save.isPending || !draft.name.trim()}>{save.isPending ? <Spinner /> : null}Save workflow</Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => { setDraft(toDraft(workflow)); setProblems([]); }} disabled={!dirty || save.isPending}>Discard changes</Button>
-          {dirty ? <span className="text-sm text-muted-foreground" role="status">Unsaved changes</span> : null}
-        </div>
-      </section>
+      <Card role="region" aria-labelledby="steps-heading">
+        <CardHeader>
+          <CardTitle id="steps-heading" role="heading" aria-level={3}>Steps, in order</CardTitle>
+          <CardDescription>Open a step to choose who reviews it. Drag the handle or use the arrows to reorder.</CardDescription>
+          <CardAction><Button type="button" size="sm" variant="outline" onClick={() => { const next = blankStep(draft.steps); setSteps([...draft.steps, next]); setOpenStep(next.stepId); }}><Plus data-icon="inline-start" aria-hidden="true" />Add step</Button></CardAction>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <StepList steps={draft.steps} overview={overview} onOpen={setOpenStep} onMove={move} />
+          {live.length && dirty ? <Alert variant="destructive" role="status"><CircleAlert aria-hidden="true" /><AlertDescription>{live[0]}{live.length > 1 ? ` (and ${live.length - 1} more)` : ""}</AlertDescription></Alert> : null}
+        </CardContent>
+      </Card>
 
       <Preview api={api} workflow={workflow} steps={draft.steps} overview={overview} dirty={dirty} />
+
+      <Card role="region" aria-labelledby={ids.settings}>
+        <CardHeader>
+          <CardTitle id={ids.settings} role="heading" aria-level={3}>Name and which stories it applies to</CardTitle>
+          <CardDescription>A story uses the most specific workflow that matches it.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <Field><FieldLabel htmlFor={ids.name}>Name</FieldLabel><Input id={ids.name} value={draft.name} maxLength={80} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
+            <Field><FieldLabel htmlFor={ids.description}>Description <span className="font-normal text-muted-foreground">Optional</span></FieldLabel><Textarea id={ids.description} value={draft.description} maxLength={400} rows={2} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></Field>
+            <div className="grid gap-x-4 gap-y-6 md:grid-cols-2">
+              <Field><FieldLabel htmlFor={ids.sections}>Sections</FieldLabel><ChoicesCombobox id={ids.sections} choices={overview.sections.map((section) => ({ value: String(section.id), label: section.name }))} value={draft.sections} onChange={(sections) => setDraft({ ...draft, sections })} placeholder="Any Section" /></Field>
+              <Field><FieldLabel htmlFor={ids.formats}>Story formats</FieldLabel><ChoicesCombobox id={ids.formats} choices={overview.formats} value={draft.formats} onChange={(formats) => setDraft({ ...draft, formats })} placeholder="Any format" /></Field>
+            </div>
+            <FieldDescription className="-mt-3">With no Sections or formats, this workflow only applies when it’s the default.</FieldDescription>
+            <Field orientation="horizontal" data-disabled={workflow.isDefault ? true : undefined}>
+              <FieldContent>
+                <FieldLabel htmlFor={ids.default}>Default workflow</FieldLabel>
+                <FieldDescription id={ids.defaultHelp}>{workflow.isDefault ? "This is the default. Make another workflow the default to change it." : "Used for stories no other workflow claims."}</FieldDescription>
+              </FieldContent>
+              <Switch id={ids.default} checked={draft.isDefault} disabled={workflow.isDefault} aria-describedby={ids.defaultHelp} onCheckedChange={(checked) => setDraft({ ...draft, isDefault: checked === true })} />
+            </Field>
+          </FieldGroup>
+        </CardContent>
+        <CardFooter className="border-t">
+          <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setArchiving(true)} disabled={workflow.isDefault} title={workflow.isDefault ? "The default workflow can’t be archived" : undefined}>Archive workflow</Button>
+        </CardFooter>
+      </Card>
 
       <StepSheet
         step={sheetStep}
@@ -176,7 +253,7 @@ function Editor({ api, overview, workflow, onSelect }: { api: string; overview: 
       <AlertDialog open={archiving} onOpenChange={setArchiving}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader><AlertDialogTitle>Archive {workflow.name}?</AlertDialogTitle><AlertDialogDescription>Stories it applies to will use the next most specific workflow, or the default. Reviews already in progress keep the workflow they were submitted with.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel type="button">Cancel</AlertDialogCancel><Button type="button" variant="destructive" disabled={save.isPending} onClick={archive}>Archive</Button></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel type="button">Cancel</AlertDialogCancel><AlertDialogAction type="button" variant="destructive" disabled={save.isPending} onClick={archive}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Archive</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
@@ -233,22 +310,24 @@ function StepRow({ step, index, count, overview, onOpen, onMove }: { step: Workf
     );
   }, [index]);
   const badges = conditionBadges(step, overview);
+  const unrouted = (step.resolver === "role" && step.roleId === null) || (step.resolver === "person" && step.userId === null);
   return (
     <li ref={row} className={over ? "rounded-lg ring-2 ring-ring" : dragging ? "opacity-50" : undefined}>
-      <Item variant="outline" size="sm">
-        <ItemMedia variant="icon">
-          <span ref={handle} className="cursor-grab touch-none rounded p-1 text-muted-foreground" aria-hidden="true" title="Drag to reorder"><GripVertical className="size-4" /></span>
+      <Item variant="outline" size="sm" className={`relative flex-nowrap hover:bg-muted/40 ${unrouted ? "border-destructive/50" : ""}`}>
+        <ItemMedia className="relative z-10 gap-1">
+          <span ref={handle} className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing" aria-hidden="true" title="Drag to reorder"><GripVertical className="size-4" /></span>
+          <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums" aria-hidden="true">{index + 1}</span>
         </ItemMedia>
-        <ItemContent>
-          <ItemTitle>
-            <span className="text-muted-foreground tabular-nums">{index + 1}.</span>
-            <button type="button" className="rounded text-left underline-offset-2 hover:underline focus-visible:outline-2" onClick={() => onOpen(step.stepId)} aria-label={`Edit step ${index + 1}: ${step.label}`}>{step.label}</button>
+        <ItemContent className="min-w-0">
+          <ItemTitle className="line-clamp-none flex-wrap">
+            {/* The whole row opens the step; the handle and arrows sit above this stretched button. */}
+            <button type="button" className="rounded text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50" onClick={() => onOpen(step.stepId)} aria-label={`Edit step ${index + 1}: ${step.label}`}>{step.label}</button>
             <Badge variant="secondary">{REVIEW_TARGET_LABELS[step.target]}</Badge>
           </ItemTitle>
-          <ItemDescription>{describeStep(step, overview)}</ItemDescription>
-          {badges.length ? <div className="flex flex-wrap items-center gap-1"><span className="text-xs text-muted-foreground">Only for</span>{badges.map((badge) => <Badge key={badge} variant="outline">{badge}</Badge>)}</div> : null}
+          <ItemDescription className={unrouted ? "text-destructive" : undefined}>{describeStep(step, overview)}</ItemDescription>
+          {badges.length ? <div className="flex flex-wrap items-center gap-1"><span className="text-xs text-muted-foreground">Only for</span>{badges.map((badge) => <Badge key={badge} variant="outline" className="font-normal">{badge}</Badge>)}</div> : null}
         </ItemContent>
-        <ItemActions>
+        <ItemActions className="relative z-10 gap-0.5">
           <Button type="button" size="icon-sm" variant="ghost" onClick={() => onMove(index, index - 1)} disabled={index === 0} aria-label={`Move step ${index + 1}, ${step.label}, up`}><ArrowUp aria-hidden="true" /></Button>
           <Button type="button" size="icon-sm" variant="ghost" onClick={() => onMove(index, index + 1)} disabled={index === count - 1} aria-label={`Move step ${index + 1}, ${step.label}, down`}><ArrowDown aria-hidden="true" /></Button>
         </ItemActions>
@@ -276,24 +355,29 @@ function Preview({ api, workflow, steps, overview, dirty }: { api: string; workf
   }, [stepsKey]);
 
   return (
-    <section aria-labelledby="preview-heading" className="grid gap-3 rounded-lg border border-border p-4">
-      <div className="grid gap-1">
-        <h2 id="preview-heading" className="text-base font-medium">Preview with story…</h2>
-        <p className="text-sm text-muted-foreground">See who each step would go to for a real story, {dirty ? "including your unsaved changes, " : ""}using the same routing as an actual submission.</p>
-      </div>
-      <Field>
-        <FieldLabel htmlFor={id}>Story</FieldLabel>
-        <Combobox items={choices} value={story} filter={null} inputValue={text} onInputValueChange={setText} onValueChange={(next: StoryHit | null) => { setStory(next); if (next) run(next); }} itemToStringLabel={(hit: StoryHit) => hit.title} isItemEqualToValue={(a: StoryHit, b: StoryHit) => a.id === b.id}>
-          <ComboboxInput id={id} placeholder="Search stories by headline…" />
-          <ComboboxContent>
-            <ComboboxEmpty>{query.length < 2 ? "Type at least two letters." : hits.isFetching ? "Searching…" : "No stories found."}</ComboboxEmpty>
-            <ComboboxList>{(hit: StoryHit) => <ComboboxItem key={hit.id} value={hit}><span className="flex min-w-0 flex-col"><span className="truncate">{hit.title}</span><span className="truncate text-xs text-muted-foreground">{hit.detail}</span></span></ComboboxItem>}</ComboboxList>
-          </ComboboxContent>
-        </Combobox>
-      </Field>
-      {preview.isPending ? <div aria-busy="true" className="grid gap-2"><Skeleton className="h-14" /><Skeleton className="h-14" /></div> : null}
-      {preview.isError ? <FieldError errors={problemsOf(preview.error).map((message) => ({ message }))} /> : null}
-      {preview.data && !preview.isPending ? <PreviewResult result={preview.data} workflow={workflow} overview={overview} admin={admin} /> : null}
+    <section aria-labelledby="preview-heading">
+      <Card>
+        <CardHeader>
+          <CardTitle id="preview-heading" role="heading" aria-level={3}>Preview with story…</CardTitle>
+          <CardDescription>See who each step would go to for a real story, {dirty ? "including your unsaved changes, " : ""}using the same routing as an actual submission.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <Field>
+            <FieldLabel htmlFor={id}>Story</FieldLabel>
+            <Combobox items={choices} value={story} filter={null} inputValue={text} onInputValueChange={setText} onValueChange={(next: StoryHit | null) => { setStory(next); if (next) run(next); }} itemToStringLabel={(hit: StoryHit) => hit.title} isItemEqualToValue={(a: StoryHit, b: StoryHit) => a.id === b.id}>
+              <ComboboxInput id={id} placeholder="Search stories by headline…" className="w-full" />
+              <ComboboxContent>
+                <ComboboxEmpty>{query.length < 2 ? "Type at least two letters." : hits.isFetching ? "Searching…" : "No stories found."}</ComboboxEmpty>
+                <ComboboxList>{(hit: StoryHit) => <ComboboxItem key={hit.id} value={hit}><span className="flex min-w-0 flex-col"><span className="truncate">{hit.title}</span><span className="truncate text-xs text-muted-foreground">{hit.detail}</span></span></ComboboxItem>}</ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </Field>
+          {preview.isPending ? <div aria-busy="true" className="grid gap-2"><Skeleton className="h-14" /><Skeleton className="h-14" /></div> : null}
+          {preview.isError ? <FieldError errors={problemsOf(preview.error).map((message) => ({ message }))} /> : null}
+          {preview.data && !preview.isPending ? <PreviewResult result={preview.data} workflow={workflow} admin={admin} /> : null}
+          {!story && !preview.data ? <p className="text-sm text-muted-foreground">Pick a story to check this workflow against it. Nothing is submitted.</p> : null}
+        </CardContent>
+      </Card>
     </section>
   );
 }
@@ -308,34 +392,36 @@ function fixLink(step: PreviewStep, admin: string, story: RoutingPreview["story"
   }
 }
 
-function PreviewResult({ result, workflow, overview, admin }: { result: RoutingPreview; workflow: WorkflowRow; overview: WorkflowsOverview; admin: string }) {
-  void overview;
+function PreviewResult({ result, workflow, admin }: { result: RoutingPreview; workflow: WorkflowRow; admin: string }) {
   const different = result.actual && result.actual.id !== workflow.id ? result.actual : null;
   return (
     <div className="grid gap-3">
       <p className="text-sm"><span className="font-medium">{result.story.title}</span>{result.story.section ? <span className="text-muted-foreground"> · {result.story.section}</span> : <span className="text-muted-foreground"> · no Section</span>}</p>
-      {different ? <Alert><AlertTitle>This workflow wouldn’t be used for this story</AlertTitle><AlertDescription>Submitting it would go through “{different.name}” instead. This preview shows {workflow.name} so you can check it.</AlertDescription></Alert> : null}
-      {!result.actual && !different ? <Alert variant="destructive"><AlertTitle>No workflow would apply to this story</AlertTitle><AlertDescription>Make one the default so every story can be sent for review.</AlertDescription></Alert> : null}
-      <ItemGroup>
+      {different ? <Alert><CircleAlert aria-hidden="true" /><AlertTitle>This workflow wouldn’t be used for this story</AlertTitle><AlertDescription>Submitting it would go through “{different.name}” instead. This preview shows {workflow.name} so you can check it.</AlertDescription></Alert> : null}
+      {!result.actual && !different ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>No workflow would apply to this story</AlertTitle><AlertDescription>Make one the default so every story can be sent for review.</AlertDescription></Alert> : null}
+      <ItemGroup className="gap-2">
         {result.steps.map((step, index) => {
           const link = fixLink(step, admin, result.story);
           return (
-            <Item key={step.stepId} variant="outline" size="sm" className={step.kind === "failed" ? "border-destructive/50" : undefined}>
-              <ItemContent>
-                <ItemTitle>
-                  <span className="text-muted-foreground tabular-nums">{index + 1}.</span>{step.label}
-                  <Badge variant={step.kind === "failed" ? "destructive" : step.kind === "skipped" ? "outline" : "secondary"}>{step.kind === "failed" ? "Can’t be routed" : step.kind === "skipped" ? "Skipped" : step.kind === "queue" ? "Queue" : "Assigned"}</Badge>
-                </ItemTitle>
-                <ItemDescription>{step.kind === "failed" ? step.detail : step.kind === "skipped" ? step.detail : step.summary}</ItemDescription>
-                {step.kind === "queue" ? <p className="text-sm text-muted-foreground">{step.people.join(", ")}</p> : null}
-                {step.kind === "person" || step.kind === "queue" ? <p className="text-xs text-muted-foreground">{step.detail}{step.waitingFor ? ` · Reporters see “Waiting for ${step.waitingFor}”` : ""}</p> : null}
-              </ItemContent>
-              {link ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={link.href} />}>{link.label}</Button></ItemActions> : null}
-            </Item>
+            <div role="listitem" key={step.stepId}>
+              <Item variant="outline" size="sm" className={step.kind === "failed" ? "border-destructive/50 bg-destructive/5" : step.kind === "skipped" ? "opacity-70" : undefined}>
+                <ItemMedia><span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums" aria-hidden="true">{index + 1}</span></ItemMedia>
+                <ItemContent className="min-w-0">
+                  <ItemTitle className="line-clamp-none flex-wrap">
+                    {step.label}
+                    <Badge variant={step.kind === "failed" ? "destructive" : step.kind === "skipped" ? "outline" : "secondary"}>{step.kind === "failed" ? "Can’t be routed" : step.kind === "skipped" ? "Skipped" : step.kind === "queue" ? "Queue" : "Assigned"}</Badge>
+                  </ItemTitle>
+                  <ItemDescription className="line-clamp-none">{step.kind === "failed" ? step.detail : step.kind === "skipped" ? step.detail : step.summary}</ItemDescription>
+                  {step.kind === "queue" ? <p className="text-sm text-muted-foreground">{step.people.join(", ")}</p> : null}
+                  {step.kind === "person" || step.kind === "queue" ? <p className="text-xs text-muted-foreground">{step.detail}{step.waitingFor ? ` · Reporters see “Waiting for ${step.waitingFor}”` : ""}</p> : null}
+                </ItemContent>
+                {link ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={link.href} />}>{link.label}</Button></ItemActions> : null}
+              </Item>
+            </div>
           );
         })}
       </ItemGroup>
-      {result.failed ? <Alert variant="destructive"><AlertTitle>{result.failed === 1 ? "One step can’t be routed" : `${result.failed} steps can’t be routed`}</AlertTitle><AlertDescription>Submitting this story for review would fail at that step and tell the editors. Fix the role or the workflow, then preview again.</AlertDescription></Alert> : null}
+      {result.failed ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>{result.failed === 1 ? "One step can’t be routed" : `${result.failed} steps can’t be routed`}</AlertTitle><AlertDescription>Submitting this story for review would fail at that step and tell the editors. Fix the role or the workflow, then preview again.</AlertDescription></Alert> : null}
     </div>
   );
 }
@@ -362,16 +448,16 @@ function NewWorkflowDialog({ api, open, onOpenChange, onCreated }: { api: string
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>New review workflow</DialogTitle><DialogDescription>It starts with one step, the story’s editor. You’ll shape the steps and which stories it applies to next.</DialogDescription></DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <FieldGroup>
-            <Field><FieldLabel htmlFor={id}>Name</FieldLabel><Input id={id} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required autoFocus /></Field>
+            <Field><FieldLabel htmlFor={id}>Name</FieldLabel><Input id={id} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Sports review" /></Field>
             {problems.length ? <FieldError errors={problems.map((message) => ({ message }))} /> : null}
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" disabled={save.isPending} />}>Cancel</DialogClose>
-            <Button type="submit" disabled={save.isPending || !name.trim()}>{save.isPending ? <Spinner /> : null}Create workflow</Button>
+            <Button type="submit" disabled={save.isPending || !name.trim()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Create workflow</Button>
           </DialogFooter>
         </form>
       </DialogContent>

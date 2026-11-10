@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workloadHint, workloadRows, type WorkloadInput } from "../src/domain/workload";
+import { loadLevel, loadPoints, workloadHint, workloadRows, type WorkloadInput } from "../src/domain/workload";
 
 const people = [
   { id: 1, name: "Maycie Krajewski", role: "staff" as const },
@@ -77,5 +77,23 @@ describe("workloadHint", () => {
     expect(workloadHint({ activeStories: 2, reviews: 1, dueThisWeek: 1, overdue: 0, mediaAssignments: 0 })).toBe("2 active Stories · 1 review · 1 due this week");
     expect(workloadHint({ activeStories: 1, reviews: 0, dueThisWeek: 0, overdue: 2, mediaAssignments: 3 })).toBe("1 active Story · 3 media assignments · 2 overdue");
     expect(workloadHint({ activeStories: 0, reviews: 0, dueThisWeek: 0, overdue: 0, mediaAssignments: 0 })).toBe("");
+  });
+});
+
+describe("loadLevel", () => {
+  const empty = { activeStories: 0, reviews: 0, dueThisWeek: 0, overdue: 0, mediaAssignments: 0 };
+  it("counts each piece of work once and overdue Stories twice", () => {
+    expect(loadPoints({ activeStories: 2, reviews: 1, mediaAssignments: 1, dueThisWeek: 1, overdue: 1 })).toBe(7);
+  });
+  it("names four plain levels at fixed thresholds", () => {
+    expect(loadLevel(empty)).toBe("light");
+    expect(loadLevel({ ...empty, activeStories: 1 })).toBe("light");
+    expect(loadLevel({ ...empty, activeStories: 2 })).toBe("steady");
+    expect(loadLevel({ ...empty, activeStories: 3, reviews: 2 })).toBe("busy");
+    expect(loadLevel({ ...empty, activeStories: 4, overdue: 2 })).toBe("stretched");
+  });
+  it("never reorders the alphabetical list", () => {
+    const rows = workloadRows({ ...base, reviews: [{ storyId: 1, userIds: [1, 1, 1] }, { storyId: 2, userIds: [1] }, { storyId: 3, userIds: [1] }] });
+    expect(rows.map((entry) => entry.name)).toEqual(["Addyson Reed", "Jeremy Lauten", "Maycie Krajewski"]);
   });
 });

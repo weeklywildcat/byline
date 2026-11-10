@@ -331,7 +331,7 @@ export function PersonEditor({
         data-person-toolbar=""
       >
         {onBack ? (
-          <Breadcrumb className="min-w-0 flex-1" aria-label="Profile breadcrumb">
+          <Breadcrumb className="min-w-0 flex-[1_1_12rem]" aria-label="Profile breadcrumb">
             <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem>
                 <BreadcrumbLink
