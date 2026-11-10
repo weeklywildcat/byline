@@ -4,3 +4,4 @@ export * from "./image-crops";
 export * from "./image-art-direction-intent";
 export * from "./live-coverage";
 export * from "./story-video";
+export * from "./photo-formats";

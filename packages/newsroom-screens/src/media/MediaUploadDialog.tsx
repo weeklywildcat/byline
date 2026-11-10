@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, FileUp, LoaderCircle, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
+import { HEIF_EXTENSIONS, isRawPhotoFile, PRORAW_UNSUPPORTED_MESSAGE } from "@byline/core";
 import type { MediaLibraryFetchers } from "./media-library-api";
 import { acceptsFile, folderPath, formatFilesize, type MediaLibraryAsset, type UploadStatus } from "./media-library-model";
 import { invalidateMediaLibrary, useMediaNavigator } from "./media-query";
@@ -108,7 +109,7 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
       // Payload stops a multipart file once it reaches the limit, so a file of exactly the limit is refused too.
       const sizeOk = !maxBytes || file.size < maxBytes;
       const error = !typeOk
-        ? `Media doesn't accept ${file.type || "this kind of file"}. Use JPEG, PNG, WebP, AVIF, GIF, PDF, MP3, M4A or WAV.`
+        ? isRawPhotoFile(file) ? PRORAW_UNSUPPORTED_MESSAGE : `Media doesn't accept ${file.type || "this kind of file"}. Use JPEG, PNG, WebP, AVIF, GIF, HEIC, PDF, MP3, M4A or WAV.`
         : !sizeOk ? `${formatFilesize(file.size)} is over the ${formatFilesize(maxBytes)} upload limit.` : undefined;
       return { key: `upload-${++sequence}`, file, status: error ? "failed" : "queued", progress: 0, error, retryable: false, folderId: destination };
     });
@@ -156,7 +157,7 @@ export function MediaUploadDialog({ open, onOpenChange, fetchers, folderId, onBu
             <FileUp aria-hidden="true" className="size-7 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Drop files here, or</p>
             <Button type="button" variant="outline" onClick={() => input.current?.click()}>Choose files…</Button>
-            <input ref={input} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden="true" accept={accepted.join(",")} onChange={(event) => { add(event.target.files); event.target.value = ""; }} data-media-upload-input="" />
+            <input ref={input} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden="true" accept={[...accepted, ...HEIF_EXTENSIONS].join(",")} onChange={(event) => { add(event.target.files); event.target.value = ""; }} data-media-upload-input="" />
             <p className="text-xs text-muted-foreground">New files go to <span className="font-medium text-foreground">{destinationLabel}</span>.{maxBytes ? ` Up to ${formatFilesize(maxBytes)} each.` : ""}</p>
           </div>
         </div>

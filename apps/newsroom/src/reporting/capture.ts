@@ -3,6 +3,7 @@ import { APIError } from "payload";
 import sharp from "sharp";
 import { localToInstant } from "../domain/dates";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
+import { assertNotRawPhoto, isHeifUpload } from "../media/heic";
 import { exifCapturedAt } from "./exif";
 import { REPORTING_LIMITS, validClientKey } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
@@ -142,7 +143,9 @@ export type PhotoInput = { assignmentId?: unknown; clientKey?: unknown; captured
 export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, input: PhotoInput): Promise<CaptureResult & { assignment: { id: number; title: string } | null }> {
   const file = ctx.req.file;
   if (!file) throw new APIError("Choose a photo.", 400);
-  if (!String(file.mimetype ?? "").toLowerCase().startsWith("image/")) throw new APIError("That file is not a photo. Attach it as a file instead.", 400);
+  assertNotRawPhoto(file);
+  // iPhone cameras (and some browsers' file pickers) send HEIC with no type or a generic one; Media decodes it to JPEG.
+  if (!String(file.mimetype ?? "").toLowerCase().startsWith("image/") && !isHeifUpload(file)) throw new APIError("That file is not a photo. Attach it as a file instead.", 400);
   const context = await resolveCaptureContext(ctx.req, { storyId, assignmentId: input.assignmentId, inferAssignment: true });
   const { payload } = ctx.req;
   const clientKey = validClientKey(input.clientKey);

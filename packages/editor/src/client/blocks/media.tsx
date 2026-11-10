@@ -1,6 +1,7 @@
 "use client";
 
 import { altFor, ARTICLE_BLOCK_LIMITS as LIMITS, type ArticleMediaAsset, type MediaId, type Placement } from "@byline/article-body";
+import { isHeifFile, isRawPhotoFile, PHOTO_FILE_ACCEPT, PRORAW_UNSUPPORTED_MESSAGE } from "@byline/core";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
@@ -21,7 +22,7 @@ import { useAnnounce, useBylineEditorHost, useEditMediaDetails, useMediaAsset, u
 import { BlockIcon } from "../icons";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
-const ACCEPT = { image: "image/*", document: "application/pdf", audio: "audio/*" } as const;
+const ACCEPT = { image: PHOTO_FILE_ACCEPT, document: "application/pdf", audio: "audio/*" } as const;
 
 /**
  * An unfinished media slot, drawn where the media will be: choose from Byline
@@ -48,9 +49,9 @@ export function MediaPlaceholder({ kind, title, description, multiple = false, r
   };
   const send = async (files: File[]) => {
     if (!upload || readOnly) return;
-    const accepted = files.filter((file) => (kind === "image" ? file.type.startsWith("image/") : kind === "audio" ? file.type.startsWith("audio/") : file.type === "application/pdf"));
+    const accepted = files.filter((file) => (kind === "image" ? (file.type.startsWith("image/") && !isRawPhotoFile(file)) || isHeifFile(file) : kind === "audio" ? file.type.startsWith("audio/") : file.type === "application/pdf"));
     if (!accepted.length) {
-      toast.error(kind === "image" ? "That file is not an image." : kind === "audio" ? "That file is not audio." : "That file is not a PDF.");
+      toast.error(kind === "image" ? files.some(isRawPhotoFile) ? PRORAW_UNSUPPORTED_MESSAGE : "That file is not an image." : kind === "audio" ? "That file is not audio." : "That file is not a PDF.");
       return;
     }
     const uploaded: ArticleMediaAsset[] = [];
