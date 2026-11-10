@@ -305,6 +305,7 @@ function reminderInput(value: unknown): ReminderJobInput | null {
  * deadline or completing work makes an older queued reminder a harmless no-op.
  */
 async function queueReminder(req: PayloadRequest, input: ReminderJobInput, waitUntil: Date) {
+  if (req.context?.bylineImport === true || req.context?.bylineSuppressNotifications === true) return;
   if (!Number.isFinite(waitUntil.getTime()) || waitUntil.getTime() <= Date.now()) return;
   try {
     const jobs = req.payload.jobs as unknown as { queue: (args: Record<string, unknown>) => Promise<unknown> };
@@ -344,40 +345,65 @@ export async function scheduleStoryDeadlineReminder(req: PayloadRequest, doc: Re
   await queueReminder(req, { reminderTarget: "story", recordId, expectedAt: deadline }, waitUntil);
 }
 
+function deadlineReminderWhen(expectedAt: string, now: Date, timeZone = newsroomTimeZone()): "today" | "tomorrow" | null {
+  const dueDay = /^\d{4}-\d{2}-\d{2}$/.test(expectedAt) ? expectedAt : localDay(expectedAt, timeZone);
+  const today = localDay(now, timeZone);
+  if (dueDay === today) return "today";
+  if (dueDay === addDays(today, 1)) return "tomorrow";
+  return null;
+}
+
+function appointmentReminderWhen(expectedAt: string, now: Date): `in ${number} minutes` | "in 1 hour" | null {
+  const remaining = Date.parse(expectedAt) - now.getTime();
+  if (!Number.isFinite(remaining) || remaining <= 0) return null;
+  const minutes = Math.ceil(remaining / 60_000);
+  if (minutes > 120) return null;
+  if (minutes >= 55 && minutes <= 65) return "in 1 hour";
+  return `in ${minutes} minutes`;
+}
+
 /** Run one future reminder after proving its original fact is still current. */
-export async function sendReminder(req: PayloadRequest, input: ReminderJobInput): Promise<number> {
+export async function sendReminder(req: PayloadRequest, input: ReminderJobInput, now = new Date()): Promise<number> {
   const { payload } = req;
   const dedupe = `reminder:${input.reminderTarget}:${input.recordId}:${input.expectedAt}`;
 
   if (input.reminderTarget === "task") {
     const doc = await payload.findByID({ collection: "tasks", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
     if (!doc || doc.state === "completed" || instant(doc.due) !== input.expectedAt) return 0;
+    const when = deadlineReminderWhen(input.expectedAt, now);
+    if (!when || Date.parse(input.expectedAt) <= now.getTime()) return 0;
     return notify(req, {
       kind: "dueDigest", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
-      data: { reminder: { type: "deadline", target: "task", when: "tomorrow" } }
+      data: { reminder: { type: "deadline", target: "task", when } }
     });
   }
 
   if (input.reminderTarget === "production") {
     const doc = await payload.findByID({ collection: "production-assignments", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
     if (!doc || doc.status === "done" || instant(doc.deadline) !== input.expectedAt) return 0;
+    const when = deadlineReminderWhen(input.expectedAt, now);
+    if (!when || Date.parse(input.expectedAt) <= now.getTime()) return 0;
     return notify(req, {
       kind: "dueDigest", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
-      data: { reminder: { type: "deadline", target: "production", when: "tomorrow" } }
+      data: { reminder: { type: "deadline", target: "production", when } }
     });
   }
 
   if (input.reminderTarget === "appointment") {
     const doc = await payload.findByID({ collection: "appointments", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
     if (!doc || doc.scheduleMode !== "exact" || doc.status === "completed" || doc.status === "cancelled" || instant(doc.startAt) !== input.expectedAt) return 0;
+    const when = appointmentReminderWhen(input.expectedAt, now);
+    if (!when) return 0;
     return notify(req, {
       kind: "appointments", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
-      data: { reminder: { type: "appointment", target: "appointment", when: "in 1 hour" } }
+      data: { reminder: { type: "appointment", target: "appointment", when } }
     });
   }
 
   const plan = await payload.findByID({ collection: "story-plans", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
   if (!plan || plan.deadline !== input.expectedAt || ACTIVE_PLAN_STAGES_EXCLUDED.includes(String(plan.workflow))) return 0;
+  const when = deadlineReminderWhen(input.expectedAt, now);
+  if (!when) return 0;
   const storyId = relationId(plan.story);
   if (storyId === null) return 0;
   const published = await payload.find({
@@ -395,7 +421,7 @@ export async function sendReminder(req: PayloadRequest, input: ReminderJobInput)
     story: storyId,
     actor: null,
     dedupe,
-    data: { reminder: { type: "deadline", target: "story", when: "tomorrow" } }
+    data: { reminder: { type: "deadline", target: "story", when } }
   });
 }
 
