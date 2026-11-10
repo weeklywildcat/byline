@@ -8,8 +8,8 @@ import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/d
 import type { ScreenContext } from "./screen-models";
 
 /**
- * Notifications (gap 1 of the editorial review): the WordPress eight,
- * delivered to an in-app inbox and, when SMTP is configured, by email.
+ * Newsroom notifications are delivered to the in-app inbox and, when SMTP is
+ * configured, by email. Future reminders reuse Payload's jobs queue.
  *
  * Triggers are collection hooks (`notification-hooks.ts`) that call
  * `notify()` inside the saving request's transaction, so a notification exists
