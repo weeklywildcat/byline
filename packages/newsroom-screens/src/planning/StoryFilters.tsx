@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { DateRangeButton } from "@byline/newsroom-ui/components/date-fields";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
-import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
@@ -62,6 +62,8 @@ export type StoryFiltersProps = {
   editors: PlanningPerson[];
   /** The List hides finished published stories; this brings them back. Not a saved-view filter. */
   showPublished?: { value: boolean; onChange: (value: boolean) => void };
+  /** The newsroom's current day (`YYYY-MM-DD`): turns on quick ranges ("Today", "Next 7 days") in the date filters. */
+  today?: string;
 };
 
 /**
@@ -69,7 +71,7 @@ export type StoryFiltersProps = {
  * filters stay together on wide screens and wrap naturally when space runs out.
  * Extra refinements still become removable chips, so no filter is invisible.
  */
-export function StoryFilters({ filters, onChange, statuses, writers, editors, showPublished }: StoryFiltersProps) {
+export function StoryFilters({ filters, onChange, statuses, writers, editors, showPublished, today }: StoryFiltersProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const update = (patch: Partial<PlanningFilters>) => onChange(normalizePlanningFilters({ ...filters, ...patch }));
   const chips = [...moreFilterChips(filters), ...(showPublished?.value ? [{ key: "published", label: "Showing published", clear: {} as Partial<PlanningFilters> }] : [])];
@@ -90,12 +92,8 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sh
           <FieldGroup className="gap-3">
             <Field><FieldLabel htmlFor="story-filter-publication">Publication</FieldLabel><OptionSelect id="story-filter-publication" label={"Publication"} value={filters.publicationState} options={PUBLICATION_STATES} onChange={(publicationState) => update({ publicationState })} className="w-full" /></Field>
             <Field><FieldLabel htmlFor="story-filter-visual">Visual status</FieldLabel><OptionSelect id="story-filter-visual" label={"Visual status"} value={filters.visualStatus} options={VISUAL_STATUSES} onChange={(visualStatus) => update({ visualStatus })} className="w-full" /></Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field><FieldLabel htmlFor="story-filter-deadline-from">Deadline from</FieldLabel><Input id="story-filter-deadline-from" type="date" value={filters.deadlineFrom} onChange={(event) => update({ deadlineFrom: event.target.value })} /></Field>
-              <Field><FieldLabel htmlFor="story-filter-deadline-to">Deadline to</FieldLabel><Input id="story-filter-deadline-to" type="date" value={filters.deadlineTo} onChange={(event) => update({ deadlineTo: event.target.value })} /></Field>
-              <Field><FieldLabel htmlFor="story-filter-planned-from">Planned from</FieldLabel><Input id="story-filter-planned-from" type="date" value={filters.plannedFrom} onChange={(event) => update({ plannedFrom: event.target.value })} /></Field>
-              <Field><FieldLabel htmlFor="story-filter-planned-to">Planned to</FieldLabel><Input id="story-filter-planned-to" type="date" value={filters.plannedTo} onChange={(event) => update({ plannedTo: event.target.value })} /></Field>
-            </div>
+            <Field><FieldLabel htmlFor="story-filter-deadline">Deadline</FieldLabel><DateRangeButton id="story-filter-deadline" from={filters.deadlineFrom} to={filters.deadlineTo} today={today} presets={["today", "next7", "month"]} onChange={(deadlineFrom, deadlineTo) => update({ deadlineFrom, deadlineTo })} /></Field>
+            <Field><FieldLabel htmlFor="story-filter-planned">Planned publication</FieldLabel><DateRangeButton id="story-filter-planned" from={filters.plannedFrom} to={filters.plannedTo} today={today} presets={["today", "next7", "month"]} onChange={(plannedFrom, plannedTo) => update({ plannedFrom, plannedTo })} /></Field>
             {showPublished ? <Field orientation="horizontal"><Checkbox id="story-filter-published" checked={showPublished.value} onCheckedChange={(checked) => showPublished.onChange(Boolean(checked))} /><FieldLabel htmlFor="story-filter-published" className="font-normal">Show finished published stories</FieldLabel></Field> : null}
             {([["mine", "Mine"], ["unassigned", "Unassigned"], ["overdue", "Overdue"], ["needsReview", "Needs review"]] as const).map(([key, label]) => <Field key={key} orientation="horizontal"><Checkbox id={`story-filter-${key}`} checked={filters[key]} onCheckedChange={(checked) => update({ [key]: Boolean(checked) })} /><FieldLabel htmlFor={`story-filter-${key}`} className="font-normal">{label}</FieldLabel></Field>)}
           </FieldGroup>

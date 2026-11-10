@@ -230,7 +230,7 @@ export function PeoplePage({
                   {person.name}
                 </ItemTitle>
                 <ItemDescription className="line-clamp-none break-words">
-                  {personSummary(person)}
+                  {personSummary(person, { showStatus: query.view === "all" })}
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="shrink-0">

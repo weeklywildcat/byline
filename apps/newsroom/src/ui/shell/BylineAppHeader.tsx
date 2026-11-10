@@ -10,19 +10,14 @@ import { SidebarTrigger, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useSyncExternalStore } from "react";
+import { Fragment } from "react";
 import { locationFor, storyIdFromPath } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { NewsroomPresence } from "./NewsroomPresence";
 import { NotificationsBell } from "./NotificationsBell";
 import { useBylineSearch } from "./search";
+import { useModifierLabel } from "./shortcuts";
 import { useStoryCrumb } from "./story-crumb";
-
-const subscribeNothing = () => () => {};
-/** ⌘ on Apple devices, Ctrl elsewhere; "Ctrl" during server rendering and hydration. */
-function useModifierLabel() {
-  return useSyncExternalStore(subscribeNothing, () => (/Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent) ? "⌘" : "Ctrl"), () => "Ctrl");
-}
 
 /**
  * The Byline app header (`admin.components.header`): sticky above every admin

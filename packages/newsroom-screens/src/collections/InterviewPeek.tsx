@@ -1,3 +1,4 @@
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
 import { AdminPortalContext, useAdminPortal } from "@byline/newsroom-ui/lib/portal";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { useState } from "react";
@@ -260,11 +261,11 @@ export function InterviewPeek({
                   onChange={(location) => setForm({ ...form, location })}
                   optional
                 />
-                <TextField
+                <DateTimeField
                   label="Completed date / time"
-                  type="datetime-local"
                   value={completed}
                   onChange={setCompleted}
+                  timeZone={timezone}
                   optional
                 />
                 <Field>

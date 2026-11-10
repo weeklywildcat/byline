@@ -138,12 +138,18 @@ export function personInitials(name: string): string {
     : "?";
 }
 
-export function personSummary(person: PersonRow): string {
+/**
+ * One quiet line for a People row: the role, the status when the list mixes
+ * statuses, and only what is unusual (a staff member left out of the directory,
+ * someone with no public profile). A row that says "Current staff · In staff
+ * directory · Public profile" about everyone says nothing about anyone.
+ */
+export function personSummary(person: PersonRow, { showStatus = true }: { showStatus?: boolean } = {}): string {
   return [
     person.newsroomRole,
-    PERSON_STATUSES[person.status],
-    person.directoryVisible ? "In staff directory" : "Outside staff directory",
-    person.hasProfilePage ? "Public profile" : "Byline only",
+    showStatus ? PERSON_STATUSES[person.status] : "",
+    person.status === "active" && !person.directoryVisible ? "Not in staff directory" : "",
+    person.hasProfilePage ? "" : "No public profile",
   ]
     .filter(Boolean)
     .join(" · ");

@@ -197,3 +197,20 @@ export async function expectToolbarClear(frame: Locator): Promise<void> {
 export async function pageOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
+
+/**
+ * Sets a calendar-popover date-and-time field (`DateTimeField`) from the wall-clock
+ * string a native datetime-local input took (`YYYY-MM-DDTHH:mm`). The month and
+ * year dropdowns jump straight to the date, so it does not depend on today's date.
+ */
+export async function pickDateTime(page: Page, scope: Locator, label: string | RegExp, wall: string): Promise<void> {
+  const [day, time] = wall.split("T");
+  await scope.getByRole("button", { name: label }).click();
+  const popover = page.locator("[data-slot=popover-content]");
+  await popover.getByLabel("Choose the Year").selectOption(String(Number(day.slice(0, 4))));
+  await popover.getByLabel("Choose the Month").selectOption(String(Number(day.slice(5, 7)) - 1));
+  await popover.locator(`td[data-day="${day}"] button`).click();
+  if (time) await popover.getByLabel("Time", { exact: true }).fill(time);
+  await popover.getByRole("button", { name: "Done" }).click();
+  await expect(popover).toHaveCount(0);
+}

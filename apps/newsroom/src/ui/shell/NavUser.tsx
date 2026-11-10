@@ -3,12 +3,13 @@
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
 import { useStoryLayout } from "../story/story-layout";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
+import { ChevronsUpDown, Keyboard, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
 import { useState } from "react";
 import { ShellLink, useShellNavigation } from "./navigation";
+import { useBylineShortcuts } from "./shortcuts";
 
 export type ShellUser = { name: string; subtitle: string; avatarUrl: string | null; profileHref?: string | null };
 
@@ -53,6 +54,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
   const { isMobile, state } = useSidebar();
   const [signingOut, setSigningOut] = useState(false);
   const { runGuarded } = useShellNavigation();
+  const { openHelp } = useBylineShortcuts();
   const storyLayout = useStoryLayout();
 
   async function signOut() {
@@ -82,6 +84,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             {user.profileHref ? <DropdownMenuItem render={<ShellLink href={user.profileHref} />}><UserRound aria-hidden="true" />My profile</DropdownMenuItem> : null}
             {/* Field Mode: the reporter's phone-first capture screen (its own shell, docs/field-mode.md). */}
             <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><Smartphone aria-hidden="true" />Field Mode</DropdownMenuItem>
+            <DropdownMenuItem onClick={openHelp}><Keyboard aria-hidden="true" />Keyboard shortcuts<DropdownMenuShortcut>?</DropdownMenuShortcut></DropdownMenuItem>
             {/* Legacy Story view: the older Write / Plan / Production / History tabs. Off by default; per account (docs/story-screen.md#legacy-layout). */}
             <DropdownMenuCheckboxItem checked={storyLayout.layout === "tabs"} onCheckedChange={(checked) => storyLayout.setLayout(checked ? "tabs" : "focused")} data-legacy-story-view="">Legacy Story view</DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />

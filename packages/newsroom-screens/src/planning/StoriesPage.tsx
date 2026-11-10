@@ -18,6 +18,7 @@ import { useStoryPeek } from "../story/StoryPeekHost";
 import { PageHeader } from "./PlanningPage";
 import { StoryViewsPicker, useStoryViews, type AppliedView } from "./StoryViews";
 import { StoryBoard } from "./StoryBoard";
+import { siteDay } from "../home/newsroom-model";
 import { StoryFilters } from "./StoryFilters";
 import { StoryList } from "./StoryList";
 import type { PlanningFetchers } from "./planning-api";
@@ -214,7 +215,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
             </TabsList>
           </div>
         </div>
-        <StoryFilters filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
+        <StoryFilters today={siteDay(now, timezone)} filters={filters} onChange={changeFilters} showPublished={view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
         {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
         {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
         {loading

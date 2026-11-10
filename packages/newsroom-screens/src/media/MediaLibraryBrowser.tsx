@@ -5,6 +5,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { DateRangeButton } from "@byline/newsroom-ui/components/date-fields";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
@@ -199,7 +200,7 @@ export function MediaLibraryBrowser(props: MediaLibraryBrowserProps) {
             </InputGroupAddon>
           ) : null}
         </InputGroup>
-        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} fixedKind={props.fixedKind} />
+        <MediaFilters filters={filters} onChange={onFiltersChange} navigator={navigator} fixedKind={props.fixedKind} timezone={timezone} />
         <Select items={MEDIA_SORTS} value={sort} onValueChange={(value) => { if (value) onSortChange(value as MediaLibrarySort); }}>
           <SelectTrigger aria-label="Sort" className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>{MEDIA_SORTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
@@ -415,7 +416,7 @@ function TileSkeletons() {
 const TYPE_ITEMS = [{ value: ANY, label: "Any type" }, { value: "image", label: "Images" }, { value: "document", label: "PDFs" }, { value: "audio", label: "Audio" }];
 const PUBLICATION_ITEMS = [{ value: ANY, label: "Any state" }, ...(Object.entries(PUBLICATION_ASSET_LABELS) as Array<[MediaPublicationAssetState, string]>).map(([value, label]) => ({ value, label }))];
 
-function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind }) {
+function MediaFilters({ filters, onChange, navigator, fixedKind, timezone }: { filters: MediaLibraryFilters; onChange: (filters: MediaLibraryFilters) => void; navigator?: MediaNavigatorData; fixedKind?: MediaKind; timezone: string }) {
   const count = activeFilterCount(fixedKind ? { ...filters, type: "" } : filters);
   const uploaders = [{ value: ANY, label: "Anyone" }, ...(navigator?.uploaders ?? []).map((person) => ({ value: String(person.id), label: person.name }))];
   const set = (patch: Partial<MediaLibraryFilters>) => onChange({ ...filters, ...patch });
@@ -440,10 +441,7 @@ function MediaFilters({ filters, onChange, navigator, fixedKind }: { filters: Me
               <SelectContent>{uploaders.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field><FieldLabel htmlFor="media-captured-from">Captured from</FieldLabel><Input id="media-captured-from" type="date" value={filters.capturedFrom} onChange={(event) => set({ capturedFrom: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="media-captured-to">Captured to</FieldLabel><Input id="media-captured-to" type="date" value={filters.capturedTo} onChange={(event) => set({ capturedTo: event.target.value })} /></Field>
-          </div>
+          <Field><FieldLabel htmlFor="media-captured">Captured</FieldLabel><DateRangeButton id="media-captured" from={filters.capturedFrom} to={filters.capturedTo} today={siteDay(new Date(), timezone)} presets={["today", "last7", "month"]} onChange={(capturedFrom, capturedTo) => set({ capturedFrom, capturedTo })} /></Field>
           <Field>
             <FieldLabel>Publication assets</FieldLabel>
             <Select items={PUBLICATION_ITEMS} value={filters.publication || ANY} onValueChange={(value) => set({ publication: !value || value === ANY ? "" : (value as MediaPublicationAssetState) })}>

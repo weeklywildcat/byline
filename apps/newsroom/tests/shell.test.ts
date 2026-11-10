@@ -130,6 +130,10 @@ describe("Byline shell composition", () => {
     expect(src("ui/story/StoryScreen.tsx")).toContain("onSubmit={keepSubmitsInByline}");
   });
 
+  it("never asks a third-party avatar service about staff (Payload's default sends a hash of each email to gravatar.com)", () => {
+    expect(src("payload.config.ts")).toMatch(/avatar:\s*"default"/);
+  });
+
   it("creates through the shared Home dialogs, mounted once, and opens new stories on the Byline Story screen", () => {
     const create = src("ui/shell/create.tsx");
     expect(create).toContain("<HomeCreate ");
