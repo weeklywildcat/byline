@@ -267,9 +267,24 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
   const existingTranscript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, limit: 1, ...as(ctx) })).docs[0];
   if (existingTranscript && existingTranscript.state === "ready" && input.replace !== true) throw new APIError("This recording already has a transcript. Choose Replace to import over it.", 409);
   const system = { ...as(ctx), context: { ...ctx.req.context, bylineSystem: true } };
+  const completedAt = new Date().toISOString();
   const data = {
-    state: "ready" as const, origin: "manual" as const, provider: "manual", model: null, language: parsed.language, durationMs: parsed.durationMs ?? (file?.durationMs as number | null) ?? null,
-    segments: parsed.segments, completedAt: new Date().toISOString(), failure: null
+    state: "ready" as const,
+    origin: "manual" as const,
+    provider: "manual",
+    model: null,
+    language: parsed.language,
+    durationMs: parsed.durationMs ?? (file?.durationMs as number | null) ?? null,
+    segments: parsed.segments,
+    completedAt,
+    failure: null,
+    // A manual replacement owns the row immediately. Clearing the machine run
+    // token makes any worker that is still finishing the old recording stale.
+    transcriptionRunToken: null,
+    transcriptionStartedAt: null,
+    progressPercent: 100,
+    progressMessage: "Manual transcript imported",
+    lastProgressAt: completedAt
   };
   const saved = existingTranscript
     ? await payload.update({ collection: "reporting-transcripts", id: existingTranscript.id, data, ...system })
