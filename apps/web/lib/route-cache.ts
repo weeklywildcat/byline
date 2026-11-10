@@ -1,5 +1,5 @@
 import { nativeMedia, nativeStory, publicDataPresentationRegistry } from "./native-snapshot";
-import { publicDataProject, publicDataSection } from "./public-data";
+import { publicDataProject, publicDataProjectById, publicDataSection } from "./public-data";
 import { nativeArticlePresentation } from "./native-article";
 import { stableDigest } from "@byline/content";
 import { buildArticlePresentation } from "./article-presentation";
@@ -30,6 +30,30 @@ export function articleRenderInputs(snapshot: WebBuildSnapshot, post: ArchivePos
   };
 }
 
+/**
+ * What a Story's Data Project blocks draw: for each embedded project, its
+ * public facts, the exact release descriptors its bindings name and its
+ * presentation's descriptor. The embed's heading and description are in the
+ * body already. Another project, dataset or release never appears here, so it
+ * never changes this Story's key.
+ */
+function dataEmbedInputs(story: NonNullable<ReturnType<typeof nativeStory>>) {
+  if (story.body.format !== "byline-v1") return [];
+  const ids = [...new Set(story.body.nodes.flatMap((node) => (node.type === "dataProject" && node.project !== null ? [String(node.project)] : [])))].sort();
+  return ids.map((id) => {
+    const found = publicDataProjectById(id);
+    if (!found) throw new Error(`Story ${story.id} embeds Data Project ${id}, which is not published in this build`);
+    // The standalone page's related coverage is not part of an embed.
+    const { relatedStories: _related, ...project } = found;
+    const shas = new Set(found.bindings.map((binding) => binding.release));
+    return {
+      project,
+      releases: publicDataSection().releases.filter((release) => shas.has(release.sha256)),
+      presentation: publicDataPresentationRegistry()[found.presentation.key]?.descriptor ?? null
+    };
+  });
+}
+
 export type DynamicRouteKind = "article" | "category" | "author" | "page" | "coverage" | "data";
 export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRouteKind, id: string | number, publication = getPublicationConfig()) {
   // Revision changes alone must not invalidate every page. All presentation
@@ -45,8 +69,10 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
     const render = story ? { presentation: nativeArticlePresentation(story), primaryGame: null } : articleRenderInputs(snapshot, post!);
     const mediaIds = story?.body.format === "byline-v1" ? Object.values(story.body.media).map(({ id }) => Number(id)) : [];
     const media = story ? [...new Set([...mediaIds, ...(story.image ? [story.image] : [])])].map(nativeMedia) : undefined;
-    data = { post, story, media, ...render };
-    dependencies = { post: story?.id ?? post!.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
+    const embeds = story ? dataEmbedInputs(story) : [];
+    // Only a story that places Data Projects carries their facts; every other story's key is exactly what it was.
+    data = { post, story, media, ...render, ...(embeds.length ? { dataEmbeds: embeds } : {}) };
+    dependencies = { ...(embeds.length ? { dataProjects: embeds.map((embed) => ({ project: embed.project.id, releases: embed.releases.map((release) => release.sha256) })) } : {}), post: story?.id ?? post!.id, related: render.presentation.relatedStories.map((entry) => entry.id), moreBy: render.presentation.moreByAuthorStories.map((entry) => entry.id), contributors: render.presentation.contributors.map((entry) => entry.id), series: render.presentation.series?.href ?? null };
   } else if (kind === "category") {
     const category = snapshot.categories.find((entry) => String(entry.id) === String(id));
     const posts = snapshot.posts.filter((post) => post.categories.includes(Number(id)) && isGeneralEditorialPost(post));

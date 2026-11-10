@@ -208,6 +208,9 @@ async function seed() {
   const project = await payload.create({ collection: "data-projects", draft: true, data: { title: "Sidewalk tracker", slug: "sidewalk-tracker", presentationKind: "custom", presentation: "fixture-sidewalk-project", indexing: "public", settings: {}, source: "City engineering.", methodology: "Checked weekly.",
     bindings: [{ slot: "phases", dataset: "sidewalk-phases", fields: { name: "name", status: "status", detail: "detail" } }], relatedStories: [structured], _status: "draft" } as never, req: editorReq, overrideAccess: false });
   await payload.update({ collection: "data-projects", id: project.id, draft: false, data: { _status: "published" } as never, req: editorReq, overrideAccess: false });
+  // The structured Story also places the published project (a Data Project block resolves against the Data the snapshot carries).
+  const embed: ArticleBodyNode = { type: "dataProject", id: "blk-data-project", project: project.id, title: "Where the sidewalk project stands", description: "Where each phase of the Main Street sidewalk project stands." };
+  await payload.update({ collection: "stories", id: structured, data: { _status: "published", body: lexicalFromArticleBody({ ...FIXTURE_ARTICLE_BODY, nodes: [...nodes, embed], media: {} } as ArticleBody) } as never, req: editorReq, overrideAccess: false });
   return { structured, late, plain, dataRelease: released.descriptor.sha256 };
 }
 

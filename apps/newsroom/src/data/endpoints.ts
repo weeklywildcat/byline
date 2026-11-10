@@ -2,7 +2,7 @@ import type { Endpoint } from "payload";
 import { body, handle, idParam } from "../newsroom/http";
 import { BUILD_DATA_RELEASE_PATH, serveDataRelease } from "./snapshot";
 import {
-  createDataset, createProject, createRows, dataOverview, datasetDetail, deleteDataset, deleteProject, deleteRows, exportRows, importRows,
+  createDataset, createProject, createRows, dataOverview, dataProjectChoiceById, dataProjectChoices, datasetDetail, deleteDataset, deleteProject, deleteRows, exportRows, importRows,
   projectDetail, publishDataset, publishProject, queryRows, storyChoices, unpublishProject, updateDataset, updateProject, updateRows
 } from "./server";
 
@@ -20,6 +20,8 @@ export const dataEndpoints: Endpoint[] = [
   { path: "/byline/data/datasets/:id/import", method: "post", handler: handle(async (ctx, req) => importRows(ctx, idParam(req), await body(req))) },
   { path: "/byline/data/datasets/:id/export", method: "get", handler: handle((ctx, req) => exportRows(ctx, idParam(req), req.searchParams.get("fields"))) },
   { path: "/byline/data/datasets/:id/publish", method: "post", handler: handle(async (ctx, req) => publishDataset(ctx, idParam(req), await body(req))) },
+  { path: "/byline/data/projects", method: "get", handler: handle((ctx, req) => dataProjectChoices(ctx, String(req.searchParams.get("search") ?? ""))) },
+  { path: "/byline/data/projects/:id/choice", method: "get", handler: handle((ctx, req) => dataProjectChoiceById(ctx, idParam(req))) },
   { path: "/byline/data/projects", method: "post", handler: handle(async (ctx, req) => createProject(ctx, await body(req))) },
   { path: "/byline/data/projects/:id", method: "get", handler: handle((ctx, req) => projectDetail(ctx, idParam(req))) },
   { path: "/byline/data/projects/:id", method: "patch", handler: handle(async (ctx, req) => updateProject(ctx, idParam(req), await body(req))) },

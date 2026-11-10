@@ -172,6 +172,14 @@
   & .byline-repository-tracker-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.1rem; max-width: var(--article-width, 760px); text-wrap: pretty; }
   & .byline-repository-tracker-root:empty { display: none; }
 
+  /* ---------------------------------------------------------- Data Project */
+  & .byline-data-project { border-block-start: var(--story-rule); margin-block: var(--story-moment-space); padding-block-start: 14px; }
+  & .byline-data-project > .byline-kicker { margin: 0 0 .5em; }
+  & .byline-data-project .byline-data-project-title { margin-block-start: 0; font-family: var(--story-headline); font-size: clamp(1.4rem, 1.15rem + 1vw, 1.8rem); font-weight: 600; letter-spacing: -.012em; line-height: 1.14; margin: 0 0 .3em; text-wrap: balance; }
+  & .byline-data-project-description { color: var(--story-muted); font-family: var(--story-serif); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.1rem; max-width: var(--article-width, 760px); text-wrap: pretty; }
+  & .byline-data-project-footer { border-block-start: var(--story-rule); color: var(--story-muted); display: flex; flex-wrap: wrap; font-family: var(--story-sans); font-size: .85rem; gap: .25rem 1rem; margin: 1.1rem 0 0; padding-block-start: 10px; }
+  & .byline-data-project-footer a { color: inherit; font-weight: 700; }
+
   /* ------------------------------------------------------------- Sources */
   & .byline-source-ref { font-family: var(--story-sans); font-size: .7em; font-weight: 700; line-height: 0; }
   & .byline-source-ref a { padding: 0 .1em; text-decoration: none; }

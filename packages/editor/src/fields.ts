@@ -82,6 +82,7 @@ export type BylineBlockFields = {
   poll: { poll: MediaId | null };
   repositoryInteractive: { key: string; title: string; description: string };
   repositoryTracker: { key: string; title: string; description: string };
+  dataProject: { project: MediaId | null; title: string; description: string };
   event: { event: MediaId | null };
   socialPost: { url: string; caption: string };
   finalScore: { sport: string; teamA: string; teamAScore: number | null; teamB: string; teamBScore: number | null; status: FinalScoreStatus; date: string; location: string; note: string };
@@ -296,6 +297,7 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
   poll: (raw) => ({ poll: mediaIdOf(record(raw).poll) }),
   repositoryInteractive: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
   repositoryTracker: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
+  dataProject: (raw) => ({ project: mediaIdOf(record(raw).project), title: text(record(raw).title), description: text(record(raw).description) }),
   event: (raw) => ({ event: mediaIdOf(record(raw).event) }),
   socialPost: (raw) => ({ url: text(record(raw).url), caption: text(record(raw).caption) }),
   finalScore: (raw) => {
@@ -426,6 +428,7 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
   poll: (id, fields) => ({ type: "poll", id, poll: fields.poll }),
   repositoryInteractive: (id, fields) => ({ type: "repositoryInteractive", id, key: fields.key, title: fields.title, description: fields.description }),
   repositoryTracker: (id, fields) => ({ type: "repositoryTracker", id, key: fields.key, title: fields.title, description: fields.description }),
+  dataProject: (id, fields) => ({ type: "dataProject", id, project: fields.project, title: fields.title, description: fields.description }),
   event: (id, fields) => ({ type: "event", id, event: fields.event }),
   socialPost: (id, fields) => {
     const parsed = parseSocialPostUrl(fields.url);

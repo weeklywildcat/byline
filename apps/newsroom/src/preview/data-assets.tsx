@@ -33,3 +33,21 @@ export function DataPreviewAssets({ presentation, kind, styles, client }: { pres
   }, [presentation, folder, styles, client]);
   return null;
 }
+
+/**
+ * Inside the Story editor's frame a link must never navigate the editor: it
+ * opens separately (the frame is also sandboxed without top navigation).
+ */
+export function EmbedLinkGuard() {
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || (anchor.getAttribute("href") ?? "").startsWith("#")) return;
+      event.preventDefault();
+      window.open(anchor.href, "_blank", "noopener,noreferrer");
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+  return null;
+}

@@ -10,6 +10,7 @@
     "./registry": "./src/registry.ts",
     "./client": "./src/client.ts",
     "./data-project.css": "./src/data-project.css",
+    "./data-embed.css": "./src/data-embed.css",
     "./templates/*": "./src/templates/*",
     "./presentations/*": "./src/presentations/*"
   },

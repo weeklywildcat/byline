@@ -21,7 +21,10 @@ The ordinary flow:
 Data → New dataset → paste rows or add fields → Publish data
      → New project → choose a template or custom presentation
      → bind fields → preview → Publish
+     → the project's own page, /data/<slug>/, and/or insert it into a Story
 ```
+
+> Agents: [packages/data/AGENTS.md](../packages/data/AGENTS.md) says which path fits a request (dataset, template, custom presentation, Story embed, new block) and the checks for each.
 
 ## Concepts
 
@@ -339,20 +342,99 @@ Add a case beside `packages/data-presentations/tests/sdk.test.tsx`: build a
 release with `projectRelease`, resolve it with `resolveDataProject`, render
 `DataProjectView` with `renderToStaticMarkup`, and assert the HTML without
 script; drive `client.ts` in jsdom. Then `npm run test:data`,
-`npm run typecheck:packages` and a fixture build.
+`npm run typecheck:packages` and a fixture build. A presentation also renders in
+Story embeds: `npm run build:data-embed-fixture --workspace @byline/web` builds
+the offline Snapshot v3 fixture (a Story placing three projects) and
+`npm run test:browser:data-embeds --workspace @byline/web` drives it.
 
-## Article embeds (follow-up)
+## Story embeds
 
-A published project should be embeddable in a Story without copying its data.
-The contract is prepared (`DataProjectEmbedReference` in `@byline/data`: a
-stable project reference plus article-facing title and text alternative); the
-`dataProject` body block is a follow-up so this change stays reviewable. The
-`repositoryTracker` block remains for compatibility, and Repository
-Interactive is unchanged.
+A published Project can be placed in any Story without copying its data:
+
+```text
+Story → Data Project block → project ID → published Project → its current
+immutable releases → the same template or custom presentation → server-rendered
+```
+
+Add → **Data Project** (Data & visual) is an ordinary tool: any staff writer may
+insert an existing Project (creating, editing and publishing Projects stays with
+editors). The block stores only:
+
+```ts
+{ type: "dataProject"; id: string; project: MediaId | null; title: string; description: string }
+```
+
+`title` and `description` are this story's own heading and description. They
+start as the project's title and deck and the reporter may tailor them; replacing
+the project keeps copy the reporter changed. Rows, bindings, release hashes,
+settings, the presentation key, source and methodology, HTML, CSS, JS and the
+project's URL are never stored in a Story: they come from the Project each time.
+`@byline/article-body` does not depend on `@byline/data`; the block is
+structurally the prepared `DataProjectEmbedReference` (a stable ID plus
+article-facing text).
+
+**Writing is forgiving, publishing is not.** A block with no project, an empty
+heading or description, or a draft-only project saves and autosaves. Publishing
+the Story fails closed on the server (`embeddableDataProjects`,
+`apps/newsroom/src/data/embed.ts`) unless the project has a valid published
+public representation: a missing or deleted project, one never published, an
+unregistered presentation or an invalid binding blocks it, each with a message.
+A project whose publication state is **changed** (published, with unpublished
+edits) is embeddable: readers get the published version, never the draft. A
+published project that is `noindex` is still embeddable ("published" is not
+"search-indexable").
+
+**The Story picker** (`GET /api/byline/data/projects?search=` and
+`/projects/:id/choice`, signed-in, `overrideAccess: false`) returns at most 20
+small facts per project (title, deck, publication, presentation name, update
+date, public URL) ordered Published, Unpublished changes, Drafts, searched over
+title, deck and presentation name. It never returns bindings, settings, rows or
+release hashes.
+
+**Rendering.** `DataProjectView` (the standalone page) and
+`DataProjectEmbedView` (the embed) share `DataProjectPresentation`, the one
+renderer of a presentation: its stylesheet hook, `[data-data-root]` and its
+release paths. The embed draws a small "Data" kicker, the story's H2 and
+description, the presentation, and a compact "Source · Data updated · View full
+data project →" footer; it never repeats the page's H1, methodology or related
+coverage (those stay on `/data/<slug>/`). In the article the frame is
+`ArticleBlockFrame placement="wide"`, and `ArticleRenderHost.renderDataProject`
+is the host hook (like `renderTracker`): `@byline/ui` never imports Data, the
+registry or Payload. The public host (`apps/web/lib/data-project-embed-host.tsx`)
+resolves the project from the same local Snapshot v3 `data` section and release
+files as the Data page, prints the presentation's CSS once per page however many
+embeds use it, and requests nothing from the newsroom. In the newsroom the same
+presentation appears in the editor canvas and Live Preview through the private
+`/preview/data?embed=1` frame (published data when a published version exists,
+working data, labelled "Draft Data Project · not yet publishable", for a
+draft).
+
+**Client code is progressive.** Only an embed whose presentation declares a
+`client.ts` carries `data-data-client`; the article page imports the loader and
+that presentation's chunk only then, starts every embed on its own root with its
+own release map (`querySelectorAll`), and one embed failing never keeps another
+from starting. A Story with no such presentation downloads none.
+
+**Snapshot and cache.** `collectPublicSnapshot` collects the Data section before
+normalizing Story bodies (it needs only the public Story IDs, which the filtered
+rows already give) and resolves each `dataProject` block against it. Snapshot v3
+adds a cross-invariant: a public Story's `dataProject` block must name a project
+in the same snapshot's Data section (a v2 snapshot, which has no Data, cannot
+contain the block). A Story's route-cache key includes, for each project it
+embeds, the project's public facts, the exact release descriptors it binds and
+its presentation's descriptor, so publishing a new dataset release rebuilds
+exactly the Stories that show it, and an unrelated project or dataset changes
+none. A Story with no embed has the key it always had.
+
+**Lifecycle.** A project that a *published* Story embeds cannot be unpublished
+or deleted ("This project is used by 2 published stories (…). Remove it from
+those stories before unpublishing."); draft and trashed Stories do not count.
+If it is unpublished some other way, the snapshot refuses to project the Story
+instead of silently dropping the reader's content. The `repositoryTracker` block
+remains for compatibility; Repository Interactive is unchanged.
 
 ## Follow-ups
 
-- The `dataProject` article block (above).
 - Media-reference fields, through the prepared publication Media catalog.
 - Compiling the closed query to parameterized SQL for very large datasets.
 - The Builder presentation kind.

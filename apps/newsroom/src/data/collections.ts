@@ -16,6 +16,7 @@ import {
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig, type PayloadRequest } from "payload";
 import { atLeast, editorsOnly, newsroomUser, relationId, requestUser, signedIn } from "../access/user";
 import { dataPresentationDescriptor } from "./registry";
+import { projectInUseMessage, publishedStoriesEmbedding } from "./usage";
 import { advanceWorkingRevision } from "./revision";
 
 /**
@@ -243,7 +244,14 @@ export const DataProjects: CollectionConfig = {
   // Payload's own drafts: an unpublished configuration lives in the versions table and is previewable; Publish writes the main row.
   versions: { drafts: true, maxPerDoc: 50 },
   access: { read: signedIn, create: editorsOnly, update: editorsOnly, delete: editorsOnly, readVersions: signedIn },
-  hooks: { beforeChange: [guardProjectPublication] },
+  hooks: {
+    beforeChange: [guardProjectPublication],
+    // Never silently remove a reader's content: a project that published Stories show cannot be deleted.
+    beforeDelete: [async ({ id, req }) => {
+      const uses = await publishedStoriesEmbedding(req.payload, Number(id));
+      if (uses.length) throw new APIError(projectInUseMessage(uses, "deleting"), 409);
+    }]
+  },
   fields: [
     { name: "title", type: "text", required: true, maxLength: DATA_LIMITS.title },
     { name: "slug", label: "Web address", type: "text", required: true, unique: true, index: true, maxLength: 80 },

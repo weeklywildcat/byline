@@ -45,6 +45,11 @@ export function publicDataProject(slug: string): PublicDataProject | undefined {
   return publicDataProjects().find((project) => project.slug === slug);
 }
 
+/** A published Data Project by its stable ID (what a Story's Data Project block names). */
+export function publicDataProjectById(id: number | string): PublicDataProject | undefined {
+  return publicDataProjects().find((project) => String(project.id) === String(id));
+}
+
 /** A public project's presentation, resolved from its published releases only. Unresolvable projects fail the build. */
 export function resolvePublicDataProject(project: PublicDataProject): ResolvedDataProject {
   const registry = publicDataPresentationRegistry();

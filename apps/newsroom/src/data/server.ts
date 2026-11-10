@@ -24,6 +24,8 @@ import type { ScreenContext } from "../newsroom/screen-models";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
 import { DATA_LIMITS, datasetSchemaOf, PROJECT_SLUG, projectPublicationIssues, storedRelease } from "./collections";
 import { DataError } from "./errors";
+import { dataProjectChoice, dataUpdatedAtFor } from "./embed";
+import { projectInUseMessage, publishedStoriesEmbedding } from "./usage";
 import { dataPresentationDescriptor, describeServerDataPresentations } from "./registry";
 import { publishDatasetRelease, readDatasetRows } from "./releases";
 import { lockRecordRows, readWorkingRevision } from "./revision";
@@ -624,14 +626,62 @@ export async function publishProject(ctx: ScreenContext, id: number) {
 
 export async function unpublishProject(ctx: ScreenContext, id: number) {
   requireEditor(ctx, "unpublish Data projects");
+  // Never silently remove a reader's content: published Stories that place this project must drop it first.
+  const uses = await publishedStoriesEmbedding(ctx.req.payload, id);
+  if (uses.length) throw new DataError("project-in-use", projectInUseMessage(uses, "unpublishing"), 409);
   await ctx.req.payload.update({ collection: "data-projects", id, draft: false, data: { _status: "draft" } as never, ...asUser(ctx) });
   return projectDetail(ctx, id);
 }
 
 export async function deleteProject(ctx: ScreenContext, id: number) {
   requireEditor(ctx, "delete Data projects");
+  const uses = await publishedStoriesEmbedding(ctx.req.payload, id);
+  if (uses.length) throw new DataError("project-in-use", projectInUseMessage(uses, "deleting"), 409);
   await ctx.req.payload.delete({ collection: "data-projects", id, ...asUser(ctx) });
   return { deleted: true };
+}
+
+/* ---------------------------------------------- Story embeds (choices) */
+
+const CHOICE_LIMIT = 20;
+const CHOICE_ORDER = { published: 0, changed: 1, draft: 2 } as const;
+
+/**
+ * The Story editor's Data Project picker: a bounded, searchable list of small
+ * facts (never bindings, settings or rows). Any signed-in account whose
+ * Payload access reads projects may list them; drafts are included so a
+ * reporter can prepare a story before the project is published, and are
+ * labelled so they are never mistaken for what readers see. Search covers the
+ * title, the deck and the presentation's name.
+ */
+export async function dataProjectChoices(ctx: ScreenContext, search: string) {
+  const term = search.trim().slice(0, 100);
+  const lower = term.toLowerCase();
+  const presentationKeys = lower ? describeServerDataPresentations().filter((entry) => entry.name.toLowerCase().includes(lower)).map((entry) => entry.key) : [];
+  const latest = await ctx.req.payload.find({
+    collection: "data-projects", draft: true, sort: "-updatedAt", limit: CHOICE_LIMIT * 3,
+    ...(term ? { where: { or: [{ title: { like: term } }, { deck: { like: term } }, ...(presentationKeys.length ? [{ presentation: { in: presentationKeys } }] : [])] } } : {}),
+    ...asUser(ctx)
+  });
+  const ids = latest.docs.map((row) => row.id);
+  const main = ids.length ? await ctx.req.payload.find({ collection: "data-projects", draft: false, where: { id: { in: ids } }, pagination: false, select: { _status: true, updatedAt: true, slug: true, publishedAt: true, title: true, deck: true, presentation: true, presentationKind: true }, ...asUser(ctx) }) : { docs: [] };
+  const published = new Map(main.docs.map((row) => [row.id, row]));
+  const site = await publicSite(ctx);
+  const choices = await Promise.all(latest.docs.map(async (row) => {
+    const doc = row as unknown as ProjectDoc & { bindings: unknown };
+    const choice = dataProjectChoice(doc as never, published.get(row.id) as never, { site, dataUpdatedAt: null });
+    return { choice, bindings: doc.bindings };
+  }));
+  const ordered = choices.sort((a, b) => CHOICE_ORDER[a.choice.publication] - CHOICE_ORDER[b.choice.publication]).slice(0, CHOICE_LIMIT);
+  return { projects: await Promise.all(ordered.map(async ({ choice, bindings }) => ({ ...choice, dataUpdatedAt: await dataUpdatedAtFor(ctx.req.payload, bindings, ctx.req) }))) };
+}
+
+/** One project's picker facts, for a block already in a Story. 404 when it is gone or this account cannot read it. */
+export async function dataProjectChoiceById(ctx: ScreenContext, id: number) {
+  const { latest, main } = await projectById(ctx, id);
+  const site = await publicSite(ctx);
+  const dataUpdatedAt = await dataUpdatedAtFor(ctx.req.payload, (latest as unknown as { bindings: unknown }).bindings, ctx.req);
+  return { project: dataProjectChoice(latest as never, (main ?? undefined) as never, { site, dataUpdatedAt }) };
 }
 
 /** Published Stories for "Related coverage" (headlines only). */

@@ -138,9 +138,10 @@ export function validatePublicDataSection(value: unknown, options: PublicDataVal
 }
 
 /**
- * The article-embed contract prepared for the follow-up `dataProject` body
- * block: a stable Project reference plus article-facing text, never copied
- * rows. The same published Project and releases render the standalone page
- * and the embed.
+ * The article-embed contract the `dataProject` body block is structurally
+ * compatible with (docs/byline-data.md#story-embeds): a stable Project
+ * reference plus article-facing text, never copied rows. The same published
+ * Project and releases render the standalone page and the embed.
+ * `@byline/article-body` declares its own block and does not import this.
  */
 export type DataProjectEmbedReference = { project: number; title: string; description: string };

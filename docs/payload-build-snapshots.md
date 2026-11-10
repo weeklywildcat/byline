@@ -142,7 +142,10 @@ them under `out/_byline/media`.
 
 The envelope contains `schemaVersion`, `revision`, `generatedAt`,
 `publication`, `datasets`, `counts`, optional `frontPage` and (v3) `data`. The JSON Schema documents the wire
-format and `validatePublicBuildSnapshotV2` checks its runtime invariants.
+format and `validatePublicBuildSnapshotV2` checks its runtime invariants. In v3 a Story body's
+`dataProject` block must name a project in the same snapshot's `data` section
+([Story embeds](byline-data.md#story-embeds)); `collectPublicSnapshot` collects
+Data before it normalizes Story bodies, and a v2 snapshot cannot contain the block.
 
 | Dataset | Public facts |
 | --- | --- |
@@ -217,7 +220,7 @@ Media directories, and Playwright Chromium. Run
 An installed Chrome channel can be selected with
 `BYLINE_PARITY_CHROME_CHANNEL=chrome`.
 
-The gate publishes a Story with every registered block (the shared fixture),
+The gate publishes a Story with every registered block (the shared fixture; a `dataProject` block is covered by the Data embed integration and web tests, because it needs a published Data Project in the same snapshot),
 inline footnotes and Source references,
 plus people, Media, Pages, a Collection, a Correction, an Event and
 timezone-sensitive coverage. It clears only the completed pointer between

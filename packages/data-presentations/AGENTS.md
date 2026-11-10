@@ -44,6 +44,12 @@ Add `--client` only when the interaction genuinely needs script.
   `--rule`, `--accent`, `--font-ui`, `--font-serif`, `--font-headline`).
 - **One `<h1>`.** `DataProjectView` renders the project's title; a
   presentation starts at `<h2>`.
+- **It also lives inside Stories.** The same presentation renders in
+  `DataProjectEmbedView` under the story's own `<h2>`, possibly twice on one
+  page, in a wide frame (up to ~1040px, down to a phone). Never assume one
+  instance per page: no fixed ids, no `document.querySelector` outside the
+  `root` you are given, and `client.ts` must work on several roots at once.
+  Keep headings few: inside an embed they sit under the story's heading.
 - **Keys are permanent** once a project uses them. `fixture-` keys are
   reserved for test fixtures, which hosts refuse outside fixture builds.
 - **No SEO, routing or metadata** in a presentation: the route owns them.

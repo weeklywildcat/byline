@@ -6,6 +6,7 @@ import {
   blockLabel,
   blockEventIds,
   blockMediaIds,
+  blockDataProjectIds,
   blockPollIds,
   blockStoryIds,
   bodyMediaIds,
@@ -162,11 +163,11 @@ export function collectMediaUsageLabels(state: unknown, id: MediaId): string[] {
     .map((block) => blockLabel(block.type)))];
 }
 
-/** Every Story, Poll and Event a body names, for the host to resolve into public-safe references before normalizing. */
-export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[]; events: MediaId[] } {
+/** Every Story, Poll, Event and Data Project a body names, for the host to resolve into public-safe references before normalizing. */
+export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[]; events: MediaId[]; dataProjects: MediaId[] } {
   const blocks = storedBlocks(state);
   const unique = (ids: MediaId[]) => [...new Map(ids.map((id) => [mediaKey(id), id])).values()];
-  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)), events: unique(blocks.flatMap(blockEventIds)) };
+  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)), events: unique(blocks.flatMap(blockEventIds)), dataProjects: unique(blocks.flatMap(blockDataProjectIds)) };
 }
 
 /** A Payload Media document as the renderer's media record. `src` is the host's choice of URL. */
@@ -338,7 +339,9 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
       return event;
     },
     interactive: (key) => options.references?.interactive?.(key) === true,
-    tracker: (key) => options.references?.tracker?.(key) === true
+    tracker: (key) => options.references?.tracker?.(key) === true,
+    // Only the ID is kept: the body never carries the project's rows, bindings, releases or presentation.
+    dataProject: (id) => options.references?.dataProject?.(id) ?? null
   };
 
   const nodes: ArticleBodyNode[] = [];

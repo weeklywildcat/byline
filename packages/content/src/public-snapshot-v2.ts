@@ -151,7 +151,7 @@ export function validatePublicBuildSnapshotV2(value: unknown, options: SnapshotR
  * relationships, bodies, Media, Front Page). `beforeRedirects` lets a newer
  * version claim its own routes before redirect targets are checked.
  */
-export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "schemaVersion">, options: SnapshotRegistryOptions = {}, hooks: { beforeRedirects?: (claim: (path: string) => void, stories: ReadonlySet<number>) => void } = {}): void {
+export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "schemaVersion">, options: SnapshotRegistryOptions = {}, hooks: { beforeRedirects?: (claim: (path: string) => void, stories: ReadonlySet<number>) => void; dataProjects?: ReadonlySet<number> } = {}): void {
   const { publication, datasets: data } = snapshot;
   requireFact(publication.revision === snapshot.revision, "publication revision differs");
   try {
@@ -296,6 +296,8 @@ export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "sch
     }
     for (const node of row.body.nodes) {
       if (node.type === "repositoryInteractive" && options.interactive) requireFact(options.interactive(node.key), `Story ${row.id} uses unregistered interactive ${node.key}`);
+      // Defense in depth: a Data Project block must name a project this same snapshot publishes (v2 has no Data at all).
+      if (node.type === "dataProject") requireFact(typeof node.project === "number" && hooks.dataProjects?.has(node.project), `Story ${row.id} embeds Data Project ${String(node.project)}, which is not in this snapshot's Data section`);
       if (node.type === "repositoryTracker" && options.tracker) requireFact(options.tracker(node.key), `Story ${row.id} uses unregistered tracker ${node.key}`);
     }
   }

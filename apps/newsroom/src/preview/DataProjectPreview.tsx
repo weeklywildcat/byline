@@ -1,12 +1,12 @@
 import { type DataRelease, type ProjectBinding } from "@byline/data";
-import { DataProjectView, resolveDataProject, type PublishedDataInput, type WorkingDataInput } from "@byline/data-presentations";
+import { DataProjectPresentation, DataProjectView, dataProjectRootAttributes, resolveDataProject, type PublishedDataInput, type WorkingDataInput } from "@byline/data-presentations";
 import { createLocalReq, type Payload } from "payload";
 import { relationIds } from "../access/user";
 import { storedRelease } from "../data/collections";
 import { dataPresentationsForServer } from "../data/registry";
 import { loadCurrentRelease, workingRelease } from "../data/releases";
 import { loadPreviewPublication } from "./publication";
-import { DataPreviewAssets } from "./data-assets";
+import { DataPreviewAssets, EmbedLinkGuard } from "./data-assets";
 
 /**
  * The Data project preview, server-rendered with the SAME resolver and
@@ -15,7 +15,7 @@ import { DataPreviewAssets } from "./data-assets";
  * the signed-in account reads them and is never stored; published data is
  * exactly the immutable releases the public page uses.
  */
-export async function DataProjectPreview({ payload, user, projectId, source }: { payload: Payload; user: unknown; projectId: number; source: "working" | "published" }) {
+export async function DataProjectPreview({ payload, user, projectId, source, embed = false }: { payload: Payload; user: unknown; projectId: number; source: "working" | "published"; /** Only the presentation, for the Story editor and Live Preview to frame (the Story owns the heading). */ embed?: boolean }) {
   const req = await createLocalReq({ user: { ...(user as object), collection: "users" } as never }, payload);
   const asUser = { req, overrideAccess: false as const, depth: 0 };
   const project = await payload.findByID({ collection: "data-projects", id: projectId, draft: true, ...asUser }).catch(() => null);
@@ -56,6 +56,20 @@ export async function DataProjectPreview({ payload, user, projectId, source }: {
   if (source === "published" && input.project.bindings.length !== bindings.length) return <Message title="Nothing is published yet">Publish the datasets this project uses to preview exactly what readers will get.</Message>;
   const outcome = resolveDataProject(definition, input, { locale: publication.locale, timeZone: publication.timeZone });
   if (!outcome.ok) return <Message title="The preview can't be shown yet">{outcome.issues.join(" ")}</Message>;
+  if (embed) {
+    // The Story's own heading, description and notes surround this frame; it draws only the real presentation, and no link can navigate the Story editor away.
+    const key = outcome.resolved.definition.descriptor.key;
+    return (
+      <main className="byline-data-embed-preview" data-data-preview={source} data-data-embed-preview="">
+        <style>{"html,body{background:transparent!important;margin:0}.byline-data-embed-preview{padding:2px 1px 8px}"}</style>
+        <div className={`data-presentation-${key}`} {...dataProjectRootAttributes(outcome.resolved)}>
+          <DataProjectPresentation resolved={outcome.resolved} host={{ styles: () => null }} />
+        </div>
+        <DataPreviewAssets presentation={key} kind={outcome.resolved.definition.descriptor.kind} styles={outcome.resolved.definition.descriptor.styles} client={outcome.resolved.definition.descriptor.client} />
+        <EmbedLinkGuard />
+      </main>
+    );
+  }
   const related = relationIds(project.relatedStories).length
     ? (await payload.find({ collection: "stories", where: { id: { in: relationIds(project.relatedStories) } }, draft: false, pagination: false, select: { headline: true, _status: true }, ...asUser })).docs.filter((story) => story._status === "published")
     : [];

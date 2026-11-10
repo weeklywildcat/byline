@@ -22,5 +22,5 @@ export default async function DataPreviewPage({ searchParams }: { searchParams: 
   const params = await searchParams;
   const id = Number(params.project);
   if (!Number.isSafeInteger(id) || id <= 0) return <main style={{ padding: 24, fontFamily: "system-ui" }}>Choose a project to preview.</main>;
-  return <DataProjectPreview payload={payload} user={user} projectId={id} source={params.data === "published" ? "published" : "working"} />;
+  return <DataProjectPreview payload={payload} user={user} projectId={id} source={params.data === "published" ? "published" : "working"} embed={params.embed === "1"} />;
 }

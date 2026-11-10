@@ -1,13 +1,14 @@
 "use client";
 
 import { mediaCredit, type ArticleMediaAsset, type MediaId } from "@byline/article-body";
-import type { BylineEditorHost, PollChoice, StoryChoice } from "@byline/editor/client";
+import type { BylineEditorHost, DataProjectChoice, PollChoice, StoryChoice } from "@byline/editor/client";
 import { articleMediaFromPayload } from "@byline/editor/normalize";
 import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
 import { publicEventReference, publicPollReference, publicStoryReference } from "../../public/references";
 import { DEFAULT_MEDIA_ROUTE, type MediaLibraryAsset } from "@byline/newsroom-screens/media/media-library-model";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { DataProjectEmbedFrame } from "../../preview/DataProjectEmbedFrame";
 import { useMediaWorkspace } from "../media/MediaWorkspaceShell";
 
 /**
@@ -62,6 +63,7 @@ export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["regis
   const queryClient = useQueryClient();
   const { id: currentStoryId } = useDocumentInfo();
   const api = config.routes.api;
+  const admin = config.routes.admin;
   const custom = (config.admin?.custom ?? {}) as { newsroomTimeZone?: string; repositoryInteractives?: BylineEditorHost["interactives"]; repositoryTrackers?: BylineEditorHost["trackers"] };
   const timeZone = custom.newsroomTimeZone ?? "America/New_York";
   const role = typeof user?.role === "string" ? user.role : "staff";
@@ -81,6 +83,15 @@ export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["regis
       const found = await get(`/byline/stories/${String(currentStoryId)}/related-suggestions`);
       return ((found?.stories as StoryChoice[] | undefined) ?? []).filter((story) => String(story.id) !== String(currentStoryId));
     } : undefined,
+    // Byline Data: a bounded list of small facts per signed-in account (never the Data overview, a project's bindings or rows).
+    searchDataProjects: async (query) => ((await get("/byline/data/projects", { search: query.trim() })) as { projects?: DataProjectChoice[] } | null)?.projects ?? Promise.reject(new Error("Data Projects did not load.")),
+    loadDataProject: async (id: MediaId) => ((await get(`/byline/data/projects/${String(id)}/choice`)) as { project?: DataProjectChoice } | null)?.project ?? null,
+    dataProjectHref: (id: MediaId) => `${admin}/data?project=${String(id)}`,
+    dataWorkspaceHref: `${admin}/data`,
+    // The real presentation, in the private embed frame: published data when readers can see it, working data for a draft.
+    renderDataProject: (project: DataProjectChoice) => (
+      <DataProjectEmbedFrame projectId={project.id} source={project.publication === "draft" ? "working" : "published"} title={`${project.title}: ${project.presentation.name}`} version={project.dataUpdatedAt ?? project.publishedAt ?? undefined} />
+    ),
     // Published events only: a draft or trashed event is never offered (and never resolves).
     searchEvents: async (query) => {
       const found = await get("/events", { depth: 0, limit: 10, draft: "false", sort: "-startAt", "where[and][0][_status][equals]": "published", ...(query.trim() ? { "where[and][1][title][like]": query.trim() } : {}) });
@@ -135,5 +146,5 @@ export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["regis
     editArtDirection: async (id) => (await editArtDirection(Number(id))) !== null,
     registerInserter
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `get` closes over `api` only
-  }), [api, registerInserter, currentStoryId, custom.repositoryInteractives, custom.repositoryTrackers, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
+  }), [admin, api, registerInserter, currentStoryId, custom.repositoryInteractives, custom.repositoryTrackers, editArtDirection, editDetails, fetchers, href, pick, queryClient, role, timeZone]);
 }

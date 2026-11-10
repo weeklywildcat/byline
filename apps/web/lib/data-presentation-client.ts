@@ -17,3 +17,12 @@ export function startPublicDataPresentation(article: HTMLElement) {
   const kind = article.dataset.dataPresentationKind === "custom" ? "custom" : "template";
   return startDataPresentation(article, (key) => (kind === "template" ? templates[`../../../packages/data-presentations/src/templates/${key}/client.ts`] : custom[`../../../packages/data-presentations/src/presentations/${key}/client.ts`])?.());
 }
+
+/**
+ * Every Data Project embedded in a Story, each enhanced on its own root with
+ * its own releases. One embed failing never keeps another from starting.
+ */
+export async function startPublicDataEmbeds(elements: Iterable<HTMLElement>) {
+  return (await Promise.allSettled([...elements].map((element) => startPublicDataPresentation(element))))
+    .flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
+}

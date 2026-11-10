@@ -27,19 +27,19 @@ import {
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES, FIXTURE_TRACKER_KEY } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
-const refs = { story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
+const refs = { dataProject: (id: number | string) => (String(id) === "1" ? { id } : null), story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const paragraph = (text: string) => ({ type: "paragraph" as const, children: [{ type: "text" as const, text }] });
 const finalize = (block: ArticleBlock) => finalizeBlock(block, lookup, refs);
 const codes = (block: ArticleBlock) => finalize(block).issues.map((issue) => `${issue.effect}:${issue.code}`);
 
 describe("the final registry", () => {
-  it("has the 28 tools, grouped the way writers look for them", () => {
-    expect(ARTICLE_BLOCK_TYPES).toHaveLength(28);
+  it("has the 29 tools, grouped the way writers look for them", () => {
+    expect(ARTICLE_BLOCK_TYPES).toHaveLength(29);
     const groups = ARTICLE_BLOCK_FAMILIES.map((family) => [family.label, ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id).map((type) => ARTICLE_BLOCKS[type].label)]);
     expect(groups).toEqual([
       ["Media", ["Photo", "Photo Gallery", "Portrait + Text", "Video", "Audio", "Social Post"]],
       ["Explain", ["Reported Quote", "Pull Quote", "Key Facts", "Context", "Editor's Note", "Margin Note", "Expandable", "Document (PDF)"]],
-      ["Data & visual", ["Chart / Map", "Data Table", "Comparison", "Key Numbers", "Final Score", "Annotated Image", "Before / After"]],
+      ["Data & visual", ["Chart / Map", "Data Table", "Data Project", "Comparison", "Key Numbers", "Final Score", "Annotated Image", "Before / After"]],
       ["Structure & interact", ["Visual Chapter", "Timeline", "Related Coverage", "Event", "Poll", "Repository Interactive", "Repository Tracker"]]
     ]);
   });
@@ -61,6 +61,7 @@ describe("the final registry", () => {
     expect(find("interview")).toContain("audio");
     expect(find("youtube")).toContain("video");
     expect(find("read more")).toEqual(expect.arrayContaining(["relatedCoverage", "expandable"]));
+    for (const word of ["election", "dataset", "ranking", "visualization", "results"]) expect(find(word)).toContain("dataProject");
   });
 
   it("names every Media a block references, in one exhaustive place", () => {

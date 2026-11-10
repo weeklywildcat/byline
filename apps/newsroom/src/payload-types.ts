@@ -3712,6 +3712,18 @@ export interface BylineDataTableBlock {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "BylineDataProjectBlock".
+ */
+export interface BylineDataProjectBlock {
+  project: number | DataProject;
+  title: string;
+  description: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'dataProject';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "BylineComparisonBlock".
  */
 export interface BylineComparisonBlock {

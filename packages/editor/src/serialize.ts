@@ -110,6 +110,8 @@ export function blockFields(block: ArticleBlock): Json {
     case "repositoryInteractive":
     case "repositoryTracker":
       return { ...base, key: block.key, title: block.title, description: block.description };
+    case "dataProject":
+      return { ...base, project: block.project, title: block.title, description: block.description };
     case "event":
       return { ...base, event: block.event };
     case "socialPost":

@@ -148,6 +148,11 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const tracker = (key: string) => Object.hasOwn(trackerRegistry, key);
   // The Event block resolves from the published events dataset itself, so a body and the dataset can never disagree.
   const eventById = new Map(events.map((row) => [row.id, snapshotEventReference(row)]));
+  // Byline Data comes before the Story bodies: a body's Data Project block resolves against the very section the
+  // snapshot publishes (published Projects and the descriptors of exactly the releases they use, never row data).
+  // The related-Story coverage needs only which Stories are public, which the filtered rows already say.
+  const data = await collectDataSection(payload, { publicStories: new Set(rows.map((row) => row.id)) });
+  const dataProjectIds = new Set(data.projects.map((project) => project.id));
   const stories = rows.map((row): PublicStorySnapshot => {
     const { body, issues } = normalizePayloadStoryBody(row, {
       media: (id) => catalog.articleAsset(Number(id)),
@@ -158,6 +163,8 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
         },
         poll: (id) => polls.get(Number(id)),
         event: (id) => eventById.get(Number(id)) ?? null,
+        // Absent from the section (never published, draft-only, deleted, invalid) resolves to null: a blocking issue.
+        dataProject: (id) => (dataProjectIds.has(Number(id)) ? { id } : null),
         interactive,
         tracker
       }
@@ -166,8 +173,6 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     if (problems.length) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} cannot be projected without losing article content.`, problems);
     return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, liveSettings.get(row.id), updatesByStory.get(row.id) ?? [], catalog, publication) };
   });
-  // Byline Data: published Projects and the descriptors of exactly the releases they use (never row data).
-  const data = await collectDataSection(payload, { publicStories: new Set(stories.map((row) => row.id)) });
   const paths = new Set([
     ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),
     ...data.projects.map((row) => row.href),

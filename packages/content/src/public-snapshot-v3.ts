@@ -58,6 +58,7 @@ export function validatePublicBuildSnapshotV3(value: unknown, options: SnapshotV
   if (!result.success) throw new Error(`Invalid Byline build snapshot: ${result.error.issues.slice(0, 6).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
   const snapshot = value as PublicBuildSnapshotV3;
   validateSnapshotFacts(snapshot, options, {
+    dataProjects: new Set(snapshot.data.projects.map((project) => project.id)),
     beforeRedirects: (claim, stories) => {
       // The Data index is code-owned; a Page or redirect may never take it, nor any Project's route.
       claim(PUBLIC_DATA_ROUTE);

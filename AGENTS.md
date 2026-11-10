@@ -8,7 +8,7 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 - `apps/web/`: static Astro rendering, public routes, SEO, feeds, redirects, and build verification. See [its guide](apps/web/AGENTS.md).
 - `packages/content/` and `packages/article-body/`: public snapshot and semantic article contracts.
 - `packages/story-presentations/`: article presentation resolver, shared article host, and bespoke layouts. Read [its guide](packages/story-presentations/AGENTS.md) before custom story work.
-- `packages/data/` and `packages/data-presentations/`: the Byline Data contract (datasets, releases, bindings) and the presentation SDK with its templates. Read [Byline Data](docs/byline-data.md) and [its guide](packages/data-presentations/AGENTS.md) before Data work.
+- `packages/data/` and `packages/data-presentations/`: the Byline Data contract (datasets, releases, bindings) and the presentation SDK with its templates. Read [Byline Data](docs/byline-data.md), the [general Data guide](packages/data/AGENTS.md) (which path fits a request, how to add a Story block) and the [presentation guide](packages/data-presentations/AGENTS.md) before Data work.
 - `packages/newsroom-ui/` and `packages/newsroom-screens/`: private UI components and screens.
 - `packages/ui/`, `packages/design/`, and `packages/theme-weekly-wildcat/`: public UI, layout contracts, and the Weekly Wildcat theme.
 
@@ -21,7 +21,7 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 - Keep the homepage layout in code. Front Page placements choose stories for existing slots; they do not change the design.
 - Sports records are an archive. Keep historical routes and redirects; do not add live game, team, or roster management.
 - Keep poll votes in the newsroom's dedicated table. The public static site does not accept votes.
-- Byline Data: datasets are working data; only an editor's Publish makes an immutable, content-addressed release, and public pages render releases materialized before Astro runs. Private fields never enter a release. Newsroom users never enter code; presentations are repository code that declares what it reads.
+- Byline Data: datasets are working data; only an editor's Publish makes an immutable, content-addressed release, and public pages render releases materialized before Astro runs. Private fields never enter a release. Newsroom users never enter code; presentations are repository code that declares what it reads. A Story embeds a published Project by ID (the `dataProject` block) and never copies its data.
 
 ## Development
 

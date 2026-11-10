@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARTICLE_BLOCK_LIMITS as LIMITS,
+  blockDataProjectIds,
+  blockMediaIds,
+  bodyDataProjectIds,
   boundedParagraphs,
   chartDataProblem,
   chartModel,
@@ -263,5 +267,37 @@ describe("Event and Repository Tracker", () => {
     const forged = clone();
     forged.nodes.find((node) => node.type === "socialPost").url = "https://www.instagram.com/p/C0ffEeLunch1/?x=1";
     expect(errorsOf(forged).join()).toContain("not a canonical supported post address");
+  });
+});
+
+describe("Data Project", () => {
+  const published = (id: number | string) => (String(id) === "1" ? { id } : null);
+  const block = FIXTURE_BLOCKS.dataProject;
+  it("stores only the project relationship and the story's own heading and description", () => {
+    expect(Object.keys(block).sort()).toEqual(["description", "id", "project", "title", "type"]);
+    expect(finalizeBlock(block, lookup, { dataProject: published }).block).toEqual(block);
+    expect(blockDataProjectIds(block)).toEqual([1]);
+    expect(blockMediaIds(block)).toEqual([]);
+    expect(bodyDataProjectIds([{ type: "paragraph", children: [] }, block, { ...block, id: "again" }])).toEqual([1]);
+  });
+  it("lets drafting stay forgiving but fails closed at publication", () => {
+    const codes = (candidate: typeof block, refs = { dataProject: published }) => finalizeBlock(candidate, lookup, refs).issues.map((issue) => `${issue.effect}:${issue.code}`);
+    expect(codes({ ...block, project: null })).toEqual(["omitted:data-project-missing"]);
+    expect(codes({ ...block, project: 99 })).toEqual(["omitted:data-project-unavailable"]);
+    expect(codes(block, {} as never)).toEqual(["omitted:data-project-unavailable"]);
+    expect(codes({ ...block, title: "  " })).toEqual(["omitted:data-project-title"]);
+    expect(codes({ ...block, description: "" })).toEqual(["omitted:data-project-description"]);
+    expect(finalizeBlock({ ...block, project: 99 }, lookup, { dataProject: published }).issues.every((issue) => isBlockingIssue(issue))).toBe(true);
+  });
+  it("is closed and bounded at runtime", () => {
+    expect(validateArticleBody({ format: "byline-v1", version: 1, nodes: [block], media: {} }).ok).toBe(true);
+    const bad = (value: Record<string, unknown>) => validateArticleBody({ format: "byline-v1", version: 1, nodes: [{ ...block, ...value }], media: {} });
+    expect(bad({ extra: "no" })).toMatchObject({ ok: false });
+    expect(bad({ release: "a".repeat(64) })).toMatchObject({ ok: false });
+    expect(bad({ settings: {} })).toMatchObject({ ok: false });
+    expect(bad({ title: "x".repeat(LIMITS.dataProjectTitle + 1) })).toMatchObject({ ok: false });
+    expect(bad({ description: "x".repeat(LIMITS.dataProjectDescription + 1) })).toMatchObject({ ok: false });
+    expect(bad({ title: "" })).toMatchObject({ ok: false });
+    expect(bad({ project: null })).toMatchObject({ ok: false });
   });
 });

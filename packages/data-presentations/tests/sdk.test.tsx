@@ -9,6 +9,7 @@ import {
   defineDataPresentation,
   defineDataTemplate,
   describeDataPresentations,
+  DataProjectEmbedView,
   DataProjectView,
   field,
   fixtureDataPresentations,
@@ -192,5 +193,70 @@ describe("client enhancement", () => {
     let seen: Record<string, string> = {};
     await startDataPresentation(article, () => Promise.resolve({ default: (_root, context) => { seen = context.releases; } }));
     expect(seen).toEqual({});
+  });
+});
+
+describe("Story embeds", () => {
+  function resolved(key: string, kind: "template" | "custom", fields: Record<string, string>) {
+    const registry = dataPresentationRegistry({ fixtures: true });
+    const outcome = resolveDataProject(registry[key], { source: "published", project: project(key, kind, fields) as never, releases: new Map([[sha, makeRelease()]]) }, format);
+    if (!outcome.ok) throw new Error(outcome.issues.join(" "));
+    return outcome.resolved;
+  }
+  const embed = (key: string, kind: "template" | "custom", fields: Record<string, string>, blockId: string, title = "Where the sidewalk stands", description = "Milestones, funding and what is left.", frame = true) =>
+    renderToStaticMarkup(<DataProjectEmbedView resolved={resolved(key, kind, fields)} host={{ ...host, ...(frame ? { frameStyles: () => <style data-frame="" /> } : {}) }} blockId={blockId} title={title} description={description} source="City engineering department." href="/data/sidewalk/" />);
+
+  it("draws the story's own heading and description around the same presentation, without the page frame", () => {
+    const html = embed("fixture-sidewalk-project", "custom", { name: "name", status: "status", detail: "detail", date: "date" }, "blk-a");
+    expect(html).toContain('<h2 class="data-project-embed-title" id="blk-a-heading">Where the sidewalk stands</h2>');
+    expect(html).toContain("Milestones, funding and what is left.");
+    expect(html).toContain("2 of 4 phases done");
+    expect(html).toContain("Source: </span>City engineering department.");
+    expect(html).toContain('<a href="/data/sidewalk/">View full data project');
+    expect(html).toContain('aria-labelledby="blk-a-heading"');
+    expect(html).toContain('<style data-styles="fixture-sidewalk-project">');
+    // The standalone page's frame stays on /data/<slug>/.
+    expect(html).not.toContain("<h1");
+    expect(html).not.toContain("About this data");
+    expect(html).not.toContain("data-project-related");
+    expect(html).not.toContain("data-project-title");
+    expect(html).not.toContain("data-project-deck");
+    expect(html).not.toContain("PRIVATE-SENTINEL");
+  });
+
+  it("renders the built-in templates and the same presentation twice with unique ids", () => {
+    const table = embed("table", "template", { heading: "name" }, "blk-t");
+    expect(table).toMatch(/<th scope="row"[^>]*>Survey and design<\/th>/);
+    const once = embed("table", "template", { heading: "name" }, "blk-1");
+    const twice = embed("table", "template", { heading: "name" }, "blk-2");
+    expect(once).toContain('id="blk-1-heading"');
+    expect(twice).toContain('id="blk-2-heading"');
+    expect(once).toContain('data-data-presentation="table"');
+  });
+
+  it("enhances every embed independently with only its own root and releases", async () => {
+    document.body.innerHTML = [embed("table", "template", { heading: "name" }, "blk-1"), embed("fixture-sidewalk-project", "custom", { name: "name", status: "status" }, "blk-2"), embed("table", "template", { heading: "name" }, "blk-3")].join("");
+    const embeds = [...document.querySelectorAll<HTMLElement>("[data-data-embed]")];
+    expect(embeds).toHaveLength(3);
+    const roots: Element[] = [];
+    const stops = await Promise.all(embeds.map((element) => startDataPresentation(element, () => Promise.resolve({ default: (root, context) => { roots.push(root); expect(Object.keys(context.releases)).toHaveLength(1); return () => undefined; } }))));
+    expect(roots).toHaveLength(3);
+    expect(new Set(roots).size).toBe(3);
+    embeds.forEach((element, index) => expect(element.contains(roots[index])).toBe(true));
+    expect(stops.every((stop) => typeof stop === "function")).toBe(true);
+    // Real client code on two tables at once: searching one leaves the other alone.
+    document.body.innerHTML = [embed("table", "template", { heading: "name" }, "blk-1"), embed("table", "template", { heading: "name" }, "blk-2")].join("");
+    const [first, second] = [...document.querySelectorAll<HTMLElement>("[data-data-embed]")];
+    await Promise.all([first, second].map((element) => startDataPresentation(element, () => Promise.resolve({ default: tableClient }))));
+    const input = first.querySelector<HTMLInputElement>(".data-table-tools input")!;
+    input.value = "crossing";
+    input.dispatchEvent(new Event("input"));
+    expect([...first.querySelectorAll("tbody tr")].filter((row) => !(row as HTMLElement).hidden)).toHaveLength(1);
+    expect([...second.querySelectorAll("tbody tr")].filter((row) => !(row as HTMLElement).hidden)).toHaveLength(4);
+  });
+
+  it("prints the frame stylesheet only when the host offers it", () => {
+    expect(embed("table", "template", { heading: "name" }, "blk-1")).toContain("data-frame");
+    expect(embed("table", "template", { heading: "name" }, "blk-1", undefined, undefined, false)).not.toContain("data-frame");
   });
 });
