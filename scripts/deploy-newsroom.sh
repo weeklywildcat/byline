@@ -52,11 +52,31 @@ for service in "${required_services[@]}"; do
   grep -Fxq "$service" <<<"$compose_services" || fail "Compose project in $deploy_root is missing required service: $service"
 done
 
+# Reporting/transcription is optional in Byline, but when those services exist
+# they must deploy with the newsroom image/service contract. Leaving an old
+# reporting-worker or Whisper container running can strand new transcript jobs
+# in "Waiting to transcribe" or make the worker call an obsolete endpoint.
+optional_services=()
+has_reporting_worker=0
+has_whisper=0
+if grep -Fxq "reporting-worker" <<<"$compose_services"; then
+  has_reporting_worker=1
+  optional_services+=(reporting-worker)
+fi
+if grep -Fxq "whisper" <<<"$compose_services"; then
+  has_whisper=1
+  optional_services+=(whisper)
+fi
+
 commit="$(git rev-parse --short HEAD)"
 printf 'Deploying Byline %s using Compose project %s\n' "$commit" "$deploy_root"
 
-printf '\n[1/5] Building shared newsroom image once...\n'
+printf '\n[1/5] Building service images...\n'
 compose build newsroom
+if (( has_whisper )); then
+  printf 'Building transcription service...\n'
+  compose build whisper
+fi
 
 printf '\n[2/5] Running Payload migrations...\n'
 compose run --rm migrate
@@ -71,12 +91,20 @@ if ! compose run --rm newsroom-build; then
 fi
 
 printf '\n[5/5] Recreating newsroom services...\n'
-compose up -d --no-deps --force-recreate \
-  newsroom \
-  media-worker \
-  publication-worker \
-  scheduled-worker \
+services_to_recreate=(
+  newsroom
+  media-worker
+  publication-worker
+  scheduled-worker
   maintenance-worker
+)
+if (( has_reporting_worker )); then
+  services_to_recreate+=(reporting-worker)
+fi
+if (( has_whisper )); then
+  services_to_recreate+=(whisper)
+fi
+compose up -d --no-deps --force-recreate "${services_to_recreate[@]}"
 
 printf '\nByline %s deployed successfully.\n' "$commit"
-compose ps newsroom media-worker publication-worker scheduled-worker maintenance-worker
+compose ps "${services_to_recreate[@]}"
