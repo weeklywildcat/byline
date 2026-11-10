@@ -133,7 +133,12 @@ export function fasterWhisperProvider(config: {
       };
 
       const start = async () => read(await request("POST"));
-      let job = await start();
+      const lookup = async () => read(await request("GET"), { allowMissing: true });
+      // On a Payload retry, ask for the existing job before re-uploading the
+      // recording. A retry only sends the audio again if the service forgot
+      // the job (restart/TTL) or a retryable terminal run must be restarted.
+      let job = await lookup();
+      if (!job || job.state === "cancelled" || (job.state === "failed" && job.retryable === true)) job = await start();
 
       try {
         while (job) {
@@ -149,7 +154,7 @@ export function fasterWhisperProvider(config: {
           if (job.state === "cancelled") throw new TemporaryTranscriptionError("The transcription service cancelled this run.");
 
           await wait(pollMs, combined);
-          const next = await read(await request("GET"), { allowMissing: true });
+          const next = await lookup();
           // The service was restarted and forgot its in-memory job. Re-submit
           // the same stable key and recording; this is recovery, not duplication.
           job = next ?? await start();
