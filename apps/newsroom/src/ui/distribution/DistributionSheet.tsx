@@ -116,7 +116,7 @@ export function DistributionSheet({ api, itemId, timeZone, userId, onClose, show
         <SheetHeader className="border-b pr-12">
           <SheetTitle className="flex flex-wrap items-center gap-2">{data ? <>{data.label}<DistributionStateBadge state={data.state} label={data.stateLabel} /></> : "Distribution"}</SheetTitle>
           <SheetDescription className="[overflow-wrap:anywhere]">
-            {data ? <>{showStory && admin ? <a className="underline-offset-2 hover:underline" href={`${admin}/collections/stories/${data.storyId}?tab=history`}>{data.story.headline}</a> : data.story.headline}{data.story.published ? null : <span className="text-destructive"> · Story unpublished</span>}</> : item.isError ? (item.error as Error).message : "Loading…"}
+            {data ? <>{showStory && admin ? <a className="underline-offset-2 hover:underline" href={`${admin}/collections/stories/${data.storyId}?view=history`}>{data.story.headline}</a> : data.story.headline}{data.story.published ? null : <span className="text-destructive"> · Story unpublished</span>}</> : item.isError ? (item.error as Error).message : "Loading…"}
           </SheetDescription>
         </SheetHeader>
         {copyError ? <div className="flex flex-wrap items-center gap-2 border-b p-3" role="alert">

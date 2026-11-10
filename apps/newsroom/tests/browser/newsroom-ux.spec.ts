@@ -106,7 +106,7 @@ test("moves a Story to Trash from the shadcn publication menu", async ({ page, c
     slug: `trash-${Date.now()}`,
   });
   await signIn(context, baseURL!, token);
-  await page.goto(`/admin/collections/stories/${id}`);
+  await page.goto(`/admin/collections/stories/${id}?view=write`);
   await expect(page.getByRole("textbox", { name: "Headline" })).toHaveValue("Trash action fixture");
 
   await page.getByRole("button", { name: "More story actions" }).click();

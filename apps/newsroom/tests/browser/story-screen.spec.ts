@@ -1,268 +1,324 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createStory, lexical, login, paragraph, signIn } from "./helpers";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { body, createStory, lexical, login, paragraph, readDraft, signIn, waitForSaved } from "./helpers";
 
 /**
- * The reporter-first Story screen (docs/story-screen.md): opening a Story
- * opens the Story; Reporting is a labelled, always-visible way in; History is
- * secondary; Review is contextual; Plan is gone; Story Context is a rail when
- * the article has room and the same content in a Sheet when it does not.
+ * The Story screen's two workspaces (docs/story-screen.md): Plan and Write,
+ * as tabs under the Story header. Plan holds the brief, Reporting, To do and
+ * Activity; Write is the article. Review, History and a Transcript are
+ * focused views with a way back. Moving between any of them never remounts
+ * the editor and never changes the Story's stage.
  */
 
-let storyId = 0;
 let token = "";
-const headers = (baseURL: string) => ({ Authorization: `JWT ${token}`, Origin: baseURL });
+let staffToken = "";
+let sectionId = 0;
+let personId = 0;
+let pitchId = 0;
+let draftId = 0;
+let transcriptId = 0;
+const stamp = Date.now();
+const headers = (baseURL: string, who = token) => ({ Authorization: `JWT ${who}`, Origin: baseURL });
 
-test.beforeAll(async ({ request, baseURL }) => {
-  token = await login(request, baseURL!, "EDITOR");
-  const { docs } = await (await request.get("/api/sections?depth=0&limit=1", { headers: headers(baseURL!) })).json();
-  storyId = await createStory(request, baseURL!, token, {
-    headline: `Canteen could return next semester ${Date.now()}`,
-    section: docs[0]?.id,
-    body: lexical([paragraph("The canteen closed in May after the district ended its contract.")])
-  });
+async function seedReporting(request: APIRequestContext, baseURL: string, storyId: number) {
   const appointment = await request.post(`/api/byline/stories/${storyId}/appointments`, {
-    headers: headers(baseURL!),
+    headers: headers(baseURL),
     data: { title: "Principal Smith interview", kind: "interview", status: "confirmed", scheduleMode: "unscheduled" }
   });
   expect(appointment.ok(), await appointment.text()).toBeTruthy();
-});
-
-async function open(page: Page, search = "") {
-  await page.goto(`/admin/collections/stories/${storyId}${search}`);
-  await expect(page.locator("[data-story-view]")).toBeVisible({ timeout: 60_000 });
+  const imported = await request.post(`/api/byline/stories/${storyId}/reporting/transcripts`, {
+    headers: headers(baseURL),
+    multipart: {
+      file: { name: `principal-${stamp}.txt`, mimeType: "text/plain", buffer: Buffer.from("Principal Smith: The district wants bids by March.\n\nPrincipal Smith: Students deserve a hot lunch.") },
+      _payload: JSON.stringify({ clientKey: `plan-write-${stamp}` })
+    }
+  });
+  expect(imported.ok(), await imported.text()).toBeTruthy();
+  transcriptId = (await imported.json()).transcriptId;
+  const quote = await request.post(`/api/byline/reporting/transcripts/${transcriptId}/selections`, { headers: headers(baseURL), data: { segmentIds: ["s1"], kind: "quote" } });
+  expect(quote.ok(), await quote.text()).toBeTruthy();
+  const verified = await request.post(`/api/byline/reporting/selections/${(await quote.json()).id}/verify`, { headers: headers(baseURL), data: { verified: true } });
+  expect(verified.ok(), await verified.text()).toBeTruthy();
 }
+
+test.beforeAll(async ({ request, baseURL }) => {
+  token = await login(request, baseURL!, "EDITOR");
+  staffToken = await login(request, baseURL!, "STAFF");
+  sectionId = (await (await request.get("/api/sections?depth=0&limit=1", { headers: headers(baseURL!) })).json()).docs[0]?.id;
+  personId = (await (await request.get("/api/people?depth=0&limit=1", { headers: headers(baseURL!) })).json()).docs[0]?.id;
+  pitchId = await createStory(request, baseURL!, token, { headline: `A new pitch ${stamp}`, section: sectionId });
+  draftId = await createStory(request, baseURL!, token, {
+    headline: `Canteen could return next semester ${stamp}`,
+    section: sectionId,
+    ...(personId ? { contributors: [personId] } : {}),
+    body: lexical([paragraph("The canteen closed in May after the district ended its contract.")])
+  });
+  await seedReporting(request, baseURL!, draftId);
+});
 
 test.beforeEach(async ({ context, baseURL }) => {
   await signIn(context, baseURL!, token);
 });
 
-test("opens the Story itself, with Reporting visible and no tab bar or Plan", async ({ page }) => {
-  await open(page);
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
-  await expect(page.getByRole("tablist")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeVisible();
-  // One quiet header: Reporting, the lifecycle action and a single menu. Preview, Field Mode, Story context and the publication actions live in it.
-  for (const name of ["Preview", "Field Mode", "Story context", "Publication actions"]) await expect(page.getByRole("button", { name })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^(More story|Publication) actions$/ })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /^Plan$/ })).toHaveCount(0);
-  await expect(page.getByText("Add them in Plan")).toHaveCount(0);
-  // Review is not navigation: no Review button for a Story nobody submitted.
-  await expect(page.getByRole("button", { name: /Review submitted version/ })).toHaveCount(0);
-  // History is secondary: only in the overflow menu.
-  await expect(page.getByRole("button", { name: "View history" })).toHaveCount(0);
-  await page.getByRole("button", { name: "More story actions" }).click();
-  await expect(page.getByRole("menuitem", { name: "View history" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Preview" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: /Move to trash/ })).toBeVisible();
-  // Story mode is a property of the Story beside Section and Story type, not a bar above the headline.
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("group", { name: "Story mode" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Live", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
+async function open(page: Page, id: number, search = "") {
+  await page.goto(`/admin/collections/stories/${id}${search}`);
+  await expect(page.locator("[data-story-view]")).toBeVisible({ timeout: 60_000 });
+}
+const tabs = (page: Page) => page.getByRole("tablist", { name: "Story workspace" });
+const tab = (page: Page, name: "Plan" | "Write") => tabs(page).getByRole("tab", { name, exact: true });
+const editor = (page: Page) => page.locator("[data-story-article] [contenteditable=true]").first();
+
+test("a new Pitch opens Plan, with its brief first, under exactly two tabs", async ({ page }) => {
+  await open(page, pitchId);
+  await expect(tabs(page).getByRole("tab")).toHaveText(["Plan", "Write"]);
+  await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
+  await expect(page).not.toHaveURL(/view=/);
+  const brief = page.locator("#plan-brief");
+  await expect(brief.getByRole("heading", { name: "Story brief", level: 2 })).toBeVisible();
+  for (const name of ["Reporting", "To do", "Activity"]) await expect(page.getByRole("heading", { name, level: 2, exact: true })).toBeVisible();
+  // No other permanent tabs, and no Reporting button: Reporting is part of Plan.
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await expect(page.locator("[data-story-header]").getByRole("button", { name: "Reporting", exact: true })).toHaveCount(0);
+  // The assignment is edited in place and is a planning record: it survives a reload without saving the Story.
+  await brief.getByRole("button", { name: /Add angle and assignment/ }).click();
+  await brief.getByRole("textbox", { name: "Angle and assignment" }).fill("Why did the canteen close, and can it come back? Talk to the principal and the district.");
+  await brief.getByRole("button", { name: "Save" }).click();
+  await expect(brief.locator("[data-story-brief-text]")).toContainText("Why did the canteen close");
+  await expect(brief.locator("[data-story-deliverables]")).toHaveText(/Article/);
+  await page.reload();
+  await expect(page.locator("#plan-brief [data-story-brief-text]")).toContainText("Why did the canteen close", { timeout: 60_000 });
+  // Switching tabs never moves the Story through its lifecycle.
+  await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "pitch");
+  await tab(page, "Write").click();
+  await tab(page, "Plan").click();
+  await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "pitch");
 });
 
-test("Reporting is a focused mode with Back to story, Back/Forward, and Sources added there", async ({ page }) => {
-  await open(page);
-  await page.getByRole("button", { name: "Reporting", exact: true }).click();
-  await expect(page).toHaveURL(/[?&]view=reporting/);
-  await expect(page.getByRole("heading", { name: "Reporting", level: 1 })).toBeVisible();
-  await expect(page.getByRole("tablist")).toHaveCount(0);
-  // Sources are created in Reporting, never "in Plan".
-  // Beside the notebook when Reporting is wide enough, otherwise in its Sheet.
-  const toggle = page.getByRole("button", { name: "Sources & appointments" });
+test("Plan's Reporting holds the notebook; interviews show in To do; a source is added there", async ({ page }) => {
+  await open(page, draftId, "?view=plan");
+  const reporting = page.locator("#plan-reporting");
+  await expect(reporting.getByText("Principal Smith interview").first()).toBeVisible();
+  await expect(page.locator("#plan-todo").getByText("Principal Smith interview")).toBeVisible();
+  await expect(reporting.locator("[data-plan-quotes]")).toContainText("Students deserve a hot lunch");
+  const toggle = reporting.getByRole("button", { name: "Sources & appointments" });
   if (await toggle.isVisible()) await toggle.click();
   const rail = page.locator("aside[aria-label='Sources and appointments'], [role=dialog]:has-text('Sources & appointments')").first();
   await rail.getByRole("button", { name: "Add source" }).click();
   const dialog = page.getByRole("dialog", { name: /source/i });
-  await dialog.getByRole("textbox", { name: "Label" }).fill("District food services");
+  await dialog.getByRole("textbox", { name: "Label" }).fill(`District food services ${stamp}`);
   await dialog.getByRole("button", { name: /Add source|Save/ }).click();
-  await expect(rail.getByText("District food services")).toBeVisible();
+  await expect(rail.getByText(`District food services ${stamp}`)).toBeVisible();
+  await page.keyboard.press("Escape");
+  // Jump links move between Plan's sections without a second tab bar.
+  await page.getByRole("navigation", { name: "Plan sections" }).getByRole("button", { name: /^To do/ }).click();
+  await expect(page.locator("#plan-todo-title")).toBeFocused();
+});
+
+test("a transcript opens from Plan as a focused view, with Back to Plan and browser Back/Forward", async ({ page }) => {
+  await open(page, draftId, "?view=plan");
+  await page.locator("#plan-reporting").getByRole("button", { name: "Open transcript" }).first().click();
+  await expect(page).toHaveURL(new RegExp(`[?&]transcript=${transcriptId}`));
+  await expect(page.getByRole("heading", { name: "Transcript", level: 1 })).toBeVisible();
+  await expect(page.getByRole("tablist")).toBeHidden();
   await page.goBack();
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
+  await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
   await page.goForward();
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "reporting");
-  await page.getByRole("button", { name: "Back to story" }).click();
-  await expect(page).not.toHaveURL(/view=/);
+  await expect(page.getByRole("heading", { name: "Transcript", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Back to Plan" }).click();
+  await expect(page).toHaveURL(/view=plan&section=reporting/);
+  await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
 });
 
-test("legacy and deep links land where they mean", async ({ page, request, baseURL }) => {
-  await open(page, "?tab=reporting");
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "reporting");
-  await open(page, "?tab=plan");
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
-  const { appointments } = await (await request.get(`/api/byline/stories/${storyId}/workspace`, { headers: headers(baseURL!) })).json();
-  await open(page, `?appointment=${appointments[0].id}`);
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "reporting");
-  await expect(page.getByRole("dialog", { name: /appointment/i })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await open(page, "?view=history");
-  await expect(page.getByRole("heading", { name: "History", level: 1 })).toBeVisible();
+test("switching Write → Plan → Write keeps the same editor, its unsaved words and its undo history", async ({ page, request, baseURL }) => {
+  await open(page, draftId, "?view=write");
+  await expect(tab(page, "Write")).toHaveAttribute("aria-selected", "true");
+  const handle = await editor(page).elementHandle();
+  await body(page).getByText("The canteen closed in May").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Bids are due in March.");
+  // Leave before autosave has run.
+  await tab(page, "Plan").click();
+  await expect(page.locator("[data-story-article]")).toBeHidden();
+  await expect(page).toHaveURL(/view=plan/);
+  await page.goBack();
+  await expect(tab(page, "Write")).toHaveAttribute("aria-selected", "true");
+  await expect(editor(page)).toContainText("Bids are due in March.");
+  // The same DOM node: never remounted.
+  expect(await handle!.evaluate((node) => node.isConnected && node === document.querySelector("[data-story-article] [contenteditable=true]"))).toBe(true);
+  // Undo still knows what was typed before leaving.
+  await body(page).getByText("Bids are due in March.").click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(editor(page)).not.toContainText("Bids are due in March.");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(editor(page)).toContainText("Bids are due in March.");
+  await waitForSaved(page);
+  expect(JSON.stringify((await readDraft(request, baseURL!, token, draftId)).body)).toContain("Bids are due in March.");
 });
 
-test("Story Context is a rail when there is room and the same content in a Sheet when not", async ({ page }) => {
+test("Reporting reference sits beside the article when there is room, inserts only a verified quote, and is a Sheet when narrow", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1000 });
-  await open(page);
-  const rail = page.locator("[data-story-context-rail]");
-  await expect(rail).toBeVisible();
-  await expect(rail.getByRole("heading", { name: "Angle" })).toBeVisible();
-  await expect(rail.getByRole("heading", { name: "Reporting" })).toBeVisible();
-  // The article keeps its 760px reading measure beside the rail.
-  const column = await page.locator("[data-story-article] textarea[aria-label='Headline']").boundingBox();
-  expect(column!.width).toBeGreaterThanOrEqual(700);
+  await open(page, draftId, "?view=write");
+  const toggle = page.locator("[data-reporting-reference-toggle]");
+  await toggle.click();
+  const pane = page.locator("[data-reporting-reference=pane]");
+  await expect(pane).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  // The article keeps a comfortable measure beside it.
+  expect((await page.locator("[data-story-article] textarea[aria-label='Headline']").boundingBox())!.width).toBeGreaterThanOrEqual(600);
+  const quote = pane.locator("[data-saved-quote][data-state=verified]").filter({ hasText: "Students deserve a hot lunch" });
+  await quote.getByRole("button", { name: "Insert quote" }).click();
+  await expect(body(page).locator(":scope > .byline-block-reportedQuote")).toHaveCount(1);
+  await pane.getByRole("button", { name: "Close reporting reference" }).click();
+  await expect(pane).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+  // Undo the insertion so later runs start from the same article.
+  await body(page).click();
+  await page.keyboard.press("ControlOrMeta+z");
 
-  await page.setViewportSize({ width: 1100, height: 900 });
-  await expect(rail).toHaveCount(0);
-  await page.getByRole("button", { name: "More story actions" }).click();
-  await page.getByRole("menuitem", { name: "Story context" }).click();
-  const sheet = page.getByRole("dialog", { name: "Story context" });
-  await expect(sheet.getByRole("heading", { name: "Angle" })).toBeVisible();
-  await page.keyboard.press("Escape");
-
-  // A phone keeps Reporting discoverable and labelled.
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await toggle.click();
+  const sheet = page.getByRole("dialog", { name: "Reporting reference" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("Students deserve a hot lunch")).toBeVisible();
+  await sheet.getByRole("button", { name: "Back to article" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(toggle).toBeFocused();
 });
 
-test("the Angle is edited inline and saved", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1000 });
-  await open(page);
-  const rail = page.locator("[data-story-context-rail]");
-  await rail.getByRole("button", { name: /Add|Edit/ }).first().click();
-  await rail.getByRole("textbox", { name: "Angle" }).fill("Why the canteen closed and whether it can return.");
-  await rail.getByRole("button", { name: "Save" }).click();
-  await expect(rail.getByText("Why the canteen closed and whether it can return.")).toBeVisible();
-  // The Angle is a Byline record, not a document field: it persists without saving the Story.
-  await page.reload();
-  await expect(page.locator("[data-story-context-rail]").getByText("Why the canteen closed and whether it can return.")).toBeVisible({ timeout: 60_000 });
+test("the tabs work from the keyboard and follow the WAI-ARIA tabs pattern", async ({ page }) => {
+  await open(page, draftId, "?view=write");
+  await tab(page, "Write").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(tab(page, "Plan")).toBeFocused();
+  await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/view=plan/);
+  await page.keyboard.press("ArrowRight");
+  await expect(tab(page, "Write")).toHaveAttribute("aria-selected", "true");
+  const panel = page.getByRole("tabpanel", { name: "Write" });
+  await expect(panel).toBeVisible();
+  expect(await tab(page, "Write").getAttribute("aria-controls")).toBe(await panel.getAttribute("id"));
+  const ring = await tab(page, "Write").evaluate((el) => { const s = getComputedStyle(el); return `${s.outlineStyle}|${s.boxShadow}`; });
+  expect(ring).not.toBe("none|none");
 });
 
-test("Reporting capture saves notes, note edits and links in place, never reloading the Story", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await open(page, "?view=reporting");
-  // A marker that only survives if the document is never reloaded or submitted.
-  await page.evaluate(() => { (window as unknown as { __noReload: boolean }).__noReload = true; });
-  const stillHere = () => page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload === true);
-  const notebook = page.locator("[data-story-view=reporting]");
-
-  await notebook.getByRole("button", { name: "Capture" }).click();
-  await page.getByRole("menuitem", { name: "Note" }).click();
-  const composer = page.locator("[data-note-composer]");
-  await expect(composer).toHaveAttribute("role", "group");
-  await composer.getByRole("textbox", { name: "Note" }).fill("Cafeteria manager says");
-  // Enter is a newline in a note; it must not submit anything.
-  await composer.getByRole("textbox", { name: "Note" }).press("Enter");
-  await composer.getByRole("textbox", { name: "Note" }).pressSequentially("the district wants bids by March.");
-  await composer.getByRole("button", { name: "Save note" }).click();
-  await expect(notebook.getByText(/the district wants bids by March\./)).toBeVisible();
-  expect(await stillHere()).toBe(true);
-
-  // Editing a note inline, saved with ⌘/Ctrl+Enter.
-  await notebook.locator("[data-material=note]").filter({ hasText: "bids by March" }).getByRole("button", { name: "Edit" }).click();
-  const editor = notebook.getByRole("group", { name: "Edit note" }).getByRole("textbox", { name: "Note" });
-  await editor.fill("Cafeteria manager: district wants bids by April.");
-  await editor.press("ControlOrMeta+Enter");
-  await expect(notebook.getByText("Cafeteria manager: district wants bids by April.")).toBeVisible();
-  expect(await stillHere()).toBe(true);
-
-  // A link, added with Enter in its single-line field.
-  await notebook.getByRole("button", { name: "Capture" }).click();
-  await page.getByRole("menuitem", { name: "Add link" }).click();
-  const link = notebook.getByRole("textbox", { name: "Link address" });
-  await link.fill("https://www.example.org/district-food-contract");
-  await link.press("Enter");
-  await expect(notebook.getByText(/example\.org/).first()).toBeVisible();
-  expect(await stillHere()).toBe(true);
-  await expect(page).toHaveURL(/view=reporting/);
-});
-
-test("Legacy Story view is off by default and puts the Story back under Write / Plan / Production / History tabs", async ({ page }) => {
-  await open(page);
-  await expect(page.getByRole("tablist")).toHaveCount(0);
-
-  const setLegacy = async (on: boolean) => {
-    // By keyboard: the Next dev badge sits over the avatar in the compact rail.
-    await page.getByRole("button", { name: /^Account:/ }).focus();
-    await page.keyboard.press("Enter");
-    const item = page.getByRole("menuitemcheckbox", { name: "Legacy Story view" });
-    await expect(item).toHaveAttribute("aria-checked", on ? "false" : "true");
-    await item.click();
-  };
-
-  try {
-    await setLegacy(true);
-    const tabs = page.getByRole("tablist");
-    await expect(tabs.getByRole("tab")).toHaveText(["Write", "Plan", "Production", "History"]);
-    await expect(tabs.getByRole("tab", { name: "Write" })).toHaveAttribute("aria-selected", "true");
-    // Same header and lifecycle; only the arrangement differs.
-    await expect(page.getByRole("button", { name: "Reporting", exact: true })).toBeVisible();
-    const editor = page.locator("[data-story-article] [contenteditable=true]").first();
-    const handle = await editor.elementHandle();
-
-    await tabs.getByRole("tab", { name: "Plan" }).click();
-    await expect(page.locator("[data-story-article]")).toBeHidden();
-    await expect(page.getByRole("tabpanel")).toContainText("Brief");
-    await tabs.getByRole("tab", { name: "Production" }).click();
-    await expect(page.getByRole("tabpanel")).toContainText("Media & Production");
-    await tabs.getByRole("tab", { name: "Write" }).click();
-    await expect(editor).toBeVisible();
-    // The editor was only hidden, never remounted.
-    expect(await handle!.evaluate((node) => node.isConnected)).toBe(true);
-
-    // History is a tab here: the overflow menu and an old link land on it.
-    await page.getByRole("button", { name: "More story actions" }).first().click();
-    await page.getByRole("menuitem", { name: "View history" }).click();
-    await expect(tabs.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
-
-    // The choice is the account's: it survives a reload, and `?tab=` still picks the tab.
-    await open(page, "?tab=production");
-    await expect(page.getByRole("tab", { name: "Production" })).toHaveAttribute("aria-selected", "true");
-  } finally {
-    await setLegacy(false);
+test("old links land where they meant: Reporting and Production in Plan, Live in Write, History and Review focused", async ({ page }) => {
+  for (const [search, expected] of [["?view=reporting", "plan"], ["?tab=reporting", "plan"], ["?tab=plan", "plan"], ["?tab=production", "plan"], ["?tab=write", "write"], ["?tab=live", "write"], ["?tab=history", "history"], ["?view=history", "history"], ["?view=review", "review"]] as const) {
+    await open(page, draftId, search);
+    await expect(page.locator("[data-story-view]"), search).toHaveAttribute("data-story-view", expected);
   }
-  await expect(page.getByRole("tablist")).toHaveCount(0);
+  await open(page, draftId, "?view=reporting");
+  await expect(page.locator("#plan-reporting-title")).toBeInViewport();
+  await open(page, draftId, "?view=history");
+  await expect(page.getByRole("heading", { name: "History", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: /^Back to (Plan|Write)$/ }).click();
+  await expect(page.getByRole("tablist", { name: "Story workspace" })).toBeVisible();
 });
 
-test("the top bar's breadcrumb is Stories › this Story, and a focused mode adds its name and a way back", async ({ page }) => {
-  await open(page);
+test("Standard and Live are a Write setting, and switching tabs leaves the mode alone", async ({ page }) => {
+  await open(page, draftId, "?view=write");
+  const mode = page.getByRole("group", { name: "Story mode" });
+  await mode.getByRole("button", { name: "Live", exact: true }).click();
+  // Live coverage has its own setup; this Story isn't published, so set it up for later.
+  await page.getByRole("dialog", { name: "Set up live coverage" }).getByRole("button", { name: "Set up for later" }).click();
+  await expect(page.locator("[data-story-mode=live]")).toBeVisible();
+  await tab(page, "Plan").click();
+  await tab(page, "Write").click();
+  await expect(page.locator("[data-story-mode=live]")).toBeVisible();
+  await mode.getByRole("button", { name: "Standard", exact: true }).click();
+  await expect(page.locator("[data-story-mode=standard]")).toBeVisible();
+});
+
+test("submitting for review, requesting changes, and publishing keep their lifecycle and permissions", async ({ page, request, baseURL }) => {
+  const id = await createStory(request, baseURL!, token, {
+    headline: `Review round trip ${stamp}`,
+    section: sectionId,
+    ...(personId ? { contributors: [personId] } : {}),
+    body: lexical([paragraph("Students lined up for twenty minutes on Monday.")])
+  });
+  await request.post(`/api/byline/stories/${id}/workflow`, { headers: headers(baseURL!), data: { status: "writing" } });
+  await open(page, id, "?view=plan");
+  // The header and its one primary action are the same over Plan and Write.
+  await expect(page.locator("[data-primary-action]")).toHaveText(/Submit for review/);
+  await page.locator("[data-primary-action]").click();
+  const status = page.locator("[data-story-status]");
+  const failed = page.locator("[data-routing-failure]");
+  await expect(status.or(failed).first()).toBeVisible();
+  test.skip(await failed.isVisible(), "No reviewer is routable in this fixture's newsroom roles.");
+  await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "review");
+  // Review is a labelled way in, never a tab.
+  const review = page.locator("[data-primary-action]").filter({ hasText: "Review submitted version" });
+  if (await review.count()) await review.click();
+  else await status.click();
+  await expect(page).toHaveURL(/view=review/);
+  // Below the rail width, Review's decisions are in its Sheet.
+  const panel = page.locator("[data-story-mode=review]").getByRole("button", { name: "Review", exact: true });
+  if (await panel.isVisible()) await panel.click();
+  // A queue step is claimed before deciding.
+  const take = page.getByRole("button", { name: "Take this review" });
+  if (await take.isVisible()) await take.click();
+  const requestChanges = page.locator("[data-decision=request-changes]");
+  await expect(requestChanges).toBeVisible();
+  await requestChanges.click();
+  await page.getByRole("dialog", { name: "Request changes" }).getByRole("textbox", { name: "What should change?" }).fill("Add the district's response.");
+  await page.getByRole("dialog", { name: "Request changes" }).getByRole("button", { name: "Request changes" }).click();
+  // A decision returns to the workspace the reviewer came from.
+  await expect(page.getByRole("tablist", { name: "Story workspace" })).toBeVisible();
+  await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "drafting");
+  await expect(status).toHaveText(/Changes requested/);
+  await expect(page.locator("[data-open-feedback]")).toBeVisible();
+
+  // Publishing is still Payload's publish with its access rules: staff are refused, an editor publishes.
+  const refused = await request.patch(`/api/stories/${id}?draft=false`, { headers: headers(baseURL!, staffToken), data: { _status: "published" } });
+  expect(refused.ok()).toBe(false);
+  await tab(page, "Write").click();
+  await page.getByRole("button", { name: "More story actions" }).click();
+  await page.getByRole("menuitem", { name: "Publish now, without review" }).click();
+  await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "published");
+  // Editing a published story: open it again, change the words, and Publish changes becomes available.
+  await expect(page.getByRole("button", { name: "Publish changes", exact: true })).toBeDisabled();
+  await open(page, id, "?view=write");
+  await expect(page.getByRole("button", { name: "Publish changes", exact: true })).toBeDisabled();
+  await body(page).getByText("Students lined up").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" The line moved faster on Tuesday.");
+  // The edit reaches the draft (autosave), not the published story.
+  await expect.poll(async () => JSON.stringify((await readDraft(request, baseURL!, token, id)).body), { timeout: 30_000 }).toContain("faster on Tuesday");
+  await expect(page.getByRole("button", { name: "Publish changes", exact: true })).toBeEnabled();
+});
+
+test("a Pitch can be moved to Trash from either workspace", async ({ page, request, baseURL }) => {
+  const id = await createStory(request, baseURL!, token, { headline: `Pitch to trash ${stamp}`, section: sectionId });
+  await open(page, id);
+  await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "More story actions" }).click();
+  await page.getByRole("menuitem", { name: /Move to trash/ }).click();
+  await page.getByRole("alertdialog", { name: "Move this story to Trash?" }).getByRole("button", { name: "Move to Trash" }).click();
+  await expect(page).toHaveURL(/\/admin\/stories/);
+  const trashed = await request.get(`/api/stories/${id}?depth=0&draft=true&trash=true`, { headers: headers(baseURL!) });
+  expect((await trashed.json()).deletedAt).toBeTruthy();
+});
+
+test("the breadcrumb is Stories › this Story, and a focused view adds its name and a way back", async ({ page }) => {
+  await open(page, draftId, "?view=write");
   const crumbs = page.getByRole("navigation", { name: "breadcrumb" });
   await expect(crumbs.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/admin/stories");
   await expect(crumbs.getByRole("listitem").last()).toContainText("Canteen could return next semester");
-  await page.getByRole("button", { name: "Reporting", exact: true }).click();
-  await expect(crumbs.getByRole("listitem").last()).toHaveText("Reporting");
+  await page.getByRole("button", { name: "More story actions" }).click();
+  await page.getByRole("menuitem", { name: "View history" }).click();
+  await expect(crumbs.getByRole("listitem").last()).toHaveText("History");
   await crumbs.getByRole("button", { name: /Canteen could return next semester/ }).click();
-  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "story");
-  await expect(page).not.toHaveURL(/view=reporting/);
+  await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "write");
 });
 
 test("right-clicking the stage offers the same moves as the header, and the stage badge is colored", async ({ page }) => {
-  await open(page);
+  await open(page, pitchId);
   const stage = page.locator("[data-story-phase]");
   await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
-  // Color is a second cue: the badge has a tint, never the plain secondary gray.
   const tint = await stage.locator("[data-phase-badge]").evaluate((node) => getComputedStyle(node).backgroundColor);
   const neutral = await page.locator("body").evaluate((node) => getComputedStyle(node).backgroundColor);
   expect(tint).not.toBe(neutral);
   await stage.click({ button: "right" });
   await expect(page.getByRole("menuitem", { name: "Accept pitch" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Put on hold" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Drop story" })).toBeVisible();
   await page.keyboard.press("Escape");
-  // The header button and the overflow menu are still the keyboard way to the same moves.
   await expect(page.locator("[data-primary-action]")).toHaveText(/Accept pitch/);
-});
-
-test("an editor can right-click the stage and jump straight to any stage, with Undo", async ({ page, request, baseURL }) => {
-  // Start from a Pitch whatever an earlier run left behind.
-  await request.post(`/api/byline/stories/${storyId}/workflow`, { headers: headers(baseURL!), data: { status: "pitch" } });
-  await open(page);
-  const stage = page.locator("[data-story-phase]");
-  await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
-  await stage.click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Move to stage" }).click();
-  // Pitch to Drafting in one move, skipping Reporting.
-  await page.getByRole("menuitemradio", { name: "Drafting" }).click();
-  await expect(stage.locator("[data-phase-badge=drafting]")).toBeVisible();
-  await expect(page.getByText(/Moved to Drafting/)).toBeVisible();
-  await page.getByRole("button", { name: "Undo" }).click();
-  await expect(stage.locator("[data-phase-badge=pitch]")).toBeVisible();
 });

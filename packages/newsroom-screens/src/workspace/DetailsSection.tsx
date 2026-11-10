@@ -121,7 +121,7 @@ export function DetailsSection() {
  * The editor, deadline and publication target as editable rows (editors only; everyone else reads them).
  * The Story screen's details panel uses these in place of the old Plan tab's Details card.
  */
-export function PlanningProperties() {
+export function PlanningProperties({ compact = false }: { compact?: boolean } = {}) {
   const { data, timezone, now, caps, reload, client } = useWorkspace();
   const { story } = data;
   const people = peopleOptions(data.people);
@@ -132,14 +132,14 @@ export function PlanningProperties() {
   const editor = story.editor ? people.find((person) => Number(person.id) === story.editor!.id) ?? { id: story.editor.id, kind: "user" as const, name: story.editor.name } : null;
   return <>
     <FieldGroup className="gap-2">
-      <Property label="Editor">
+      <Property compact={compact} label="Editor">
         {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} hints={hints} /> : story.editor?.name || "None"}
       </Property>
-      <Property label="Story deadline">
+      <Property compact={compact} label="Story deadline">
         {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
         {overdue ? <span className="ml-2 text-xs text-warning">Overdue</span> : null}
       </Property>
-      <Property label="Publication target">
+      <Property compact={compact} label="Publication target">
         {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
       </Property>
     </FieldGroup>
@@ -199,7 +199,11 @@ function FormatProperties() {
 }
 
 /** A story fact as a native horizontal Field: a muted label column, then the value or its control. */
-function Property({ label, children }: { label: string; children: React.ReactNode }) {
+function Property({ label, children, compact = false }: { label: string; children: React.ReactNode; compact?: boolean }) {
+  if (compact) return <Field orientation="horizontal" aria-label={label} className="min-h-8 items-center! gap-2">
+    <FieldTitle className="w-28 flex-none! font-normal text-muted-foreground">{label}</FieldTitle>
+    <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>
+  </Field>;
   return <Field orientation="responsive" aria-label={label} className="min-h-7 @md/field-group:items-center!">
     <FieldTitle className="font-normal text-muted-foreground @md/field-group:w-36 @md/field-group:flex-none!">{label}</FieldTitle>
     <FieldContent className="min-w-0 text-sm [overflow-wrap:anywhere]">{children}</FieldContent>

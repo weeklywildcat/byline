@@ -278,7 +278,7 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-lg" className="-mr-2 size-11" aria-label="More for this story" />}><MoreVertical /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-56">
-              <DropdownMenuItem className="min-h-11 text-base" render={<a href={`${storyHref}${coverage.mode === "live" ? "?tab=live" : ""}`} />}>Open full story</DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11 text-base" render={<a href={`${storyHref}${coverage.mode === "live" ? "?view=write" : ""}`} />}>Open full story</DropdownMenuItem>
               {data.canControl ? <DropdownMenuSeparator /> : null}
               {data.canControl && coverage.mode === "standard" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("setup")}>Set up live coverage</DropdownMenuItem> : null}
               {data.canControl && coverage.mode === "live" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("manage")}>Manage direct publishers</DropdownMenuItem> : null}

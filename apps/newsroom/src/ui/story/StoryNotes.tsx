@@ -17,7 +17,12 @@ import { getJson, patchJson, postJson } from "./api";
 import { formatDay, SectionHeading } from "./parts";
 import type { StoryScreenContext } from "./StoryScreen";
 
-export function StoryNotes({ context }: { context: StoryScreenContext }) {
+/**
+ * Story notes: the private discussion on the whole Story, open until someone
+ * resolves them, so they double as its outstanding questions. `plain` is
+ * Plan's quiet presentation; History keeps the bordered one.
+ */
+export function StoryNotes({ context, plain = false }: { context: StoryScreenContext; plain?: boolean }) {
   const id = Number(context.storyId);
   const endpoint = `/byline/stories/${id}/notes`;
   const cache = useQueryClient();
@@ -55,8 +60,7 @@ export function StoryNotes({ context }: { context: StoryScreenContext }) {
     }
   }
 
-  return <section id="story-notes" className="grid gap-2 rounded-lg border p-3" aria-label="Story notes">
-    <SectionHeading action={<Dialog open={creating} onOpenChange={(open) => { if (!busy) { setCreating(open); setError(""); } }}>
+  const addNote = <Dialog open={creating} onOpenChange={(open) => { if (!busy) { setCreating(open); setError(""); } }}>
       <DialogTrigger render={<Button type="button" size="sm" variant="outline" />}>Add note</DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto">
         <DialogHeader><DialogTitle>Add a story note</DialogTitle><DialogDescription>Only the newsroom team for this story can read it. Notes apply to the story as a whole.</DialogDescription></DialogHeader>
@@ -66,8 +70,13 @@ export function StoryNotes({ context }: { context: StoryScreenContext }) {
           <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !text.trim()}>Add note</Button></DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>}>Story notes {query.data ? <Badge variant="secondary">{query.data.summary.openCount} open</Badge> : null}</SectionHeading>
-    <p className="text-xs text-muted-foreground">Private discussion for the whole story.</p>
+    </Dialog>;
+  return <section id={plain ? "plan-story-notes" : "story-notes"} className={plain ? "grid scroll-mt-24 gap-2" : "grid gap-2 rounded-lg border p-3"} aria-label={plain ? undefined : "Story notes"} aria-labelledby={plain ? "plan-story-notes-title" : undefined}>
+    {plain ? <div className="flex min-h-7 items-center justify-between gap-2">
+      <h3 id="plan-story-notes-title" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Questions and notes {query.data?.summary.openCount ? <span className="ml-1 font-normal normal-case tabular-nums">{query.data.summary.openCount} open</span> : null}</h3>
+      {addNote}
+    </div> : <SectionHeading action={addNote}>Story notes {query.data ? <Badge variant="secondary">{query.data.summary.openCount} open</Badge> : null}</SectionHeading>}
+    <p className="text-xs text-muted-foreground">Private discussion for the whole story. Resolve a note when its question is answered.</p>
     <div className="flex gap-1">
       <Button type="button" size="xs" variant={resolved ? "ghost" : "secondary"} aria-pressed={!resolved} onClick={() => { setResolved(false); setPage(1); }}>Open</Button>
       <Button type="button" size="xs" variant={resolved ? "secondary" : "ghost"} aria-pressed={resolved} onClick={() => { setResolved(true); setPage(1); }}>Resolved</Button>

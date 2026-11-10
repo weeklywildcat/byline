@@ -21,7 +21,7 @@ import { PlanningProperties } from "@byline/newsroom-screens/workspace/DetailsSe
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronLeft, Ellipsis, Eye, History, List, NotebookPen, PanelRight, SlidersHorizontal, Smartphone } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, Ellipsis, Eye, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
@@ -41,7 +41,6 @@ import { blockingLines } from "./publication-readiness-model";
 import { StoryMediaReadinessNotice, useStoryMediaReadiness } from "./publication-readiness";
 import { PresentationStatus, useStoryPresentationResolution, useStoryPreview } from "./StoryPreviewControl";
 import type { StoryScreenContext } from "./StoryScreen";
-import type { StoryView } from "./story-view";
 import { StoryURL, useStoryURL } from "./StoryURL";
 
 function SettingSelect<T extends string>({ label, options, value, onChange, disabled }: {
@@ -78,22 +77,21 @@ export function peopleLine(names: string[]): string {
 
 export type HeaderProps = {
   context: StoryScreenContext;
-  view: StoryView;
-  onView: (view: StoryView) => void;
-  /** Shown when Story Context is a Sheet (narrow screens). */
-  onOpenContext?: () => void;
+  /** Opens a focused view: Review (the submitted version and its pipeline) or History. */
+  onOpen: (view: "review" | "history") => void;
 };
 
 type Transition = "accept-pitch" | "start-drafting" | "put-on-hold" | "drop" | "resume";
 
 /**
  * The Story header (docs/story-screen.md#header) answers, at a glance: what
- * phase is this Story in, who writes it, when is it due, what happens next,
- * has it saved, can I preview or publish. Exactly one lifecycle action is
- * primary; everything occasional is in the overflow menu or Story details.
- * Payload still owns the form, autosave, versions and the publish submit.
+ * phase is this Story in, who writes it, when is it due, what happens next
+ * and whose move it is, has it saved, can I preview or publish. It is the
+ * same over Plan and Write. Exactly one lifecycle action is primary;
+ * everything occasional is in the overflow menu or Story details. Payload
+ * still owns the form, autosave, versions and the publish submit.
  */
-export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProps) {
+export function StoryHeader({ context, onOpen }: HeaderProps) {
   const workspace = useOptionalWorkspace();
   const workspaceQueries = useQueryClient();
   const planned = workspace?.data.story;
@@ -261,12 +259,12 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
   // Exactly one primary lifecycle action for this reader, now.
   const busy = actions.submit.isPending || actions.lifecycle.isPending;
   let primary: { label: string; run: () => void } | null = null;
-  if (!context.readOnly && id != null && view === "story" && !hasPublishedDoc) {
+  if (!context.readOnly && id != null && !hasPublishedDoc) {
     const canSubmit = Boolean(reviewState?.viewer.canSubmit);
     if (phase === "pitch" && storyEditor) primary = { label: "Accept pitch", run: () => move("accept-pitch", "Pitch accepted. It's in Reporting.") };
     else if (phase === "reporting" && manages) primary = { label: "Start drafting", run: () => move("start-drafting", "Moved to Drafting.") };
     else if ((phase === "drafting" || (phase === "ready" && stale)) && canSubmit) primary = { label: reviewState!.viewer.submitLabel, run: () => void submitForReview() };
-    else if (phase === "review" && reviewState?.viewer.canReview) primary = { label: "Review submitted version", run: () => onView("review") };
+    else if (phase === "review" && reviewState?.viewer.canReview) primary = { label: "Review submitted version", run: () => onOpen("review") };
   }
   // Hold and Drop (or Resume): shared by the overflow menu and the right-click menu on the stage.
   const sidelineActions: Array<{ key: string; label: string; run: () => void; destructive?: boolean }> = storyEditor && !context.readOnly && !hasPublishedDoc
@@ -313,7 +311,7 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
           <ContextMenu>
             <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title={canMove ? "Right-click to move this story" : undefined} />}>
               <PhaseBadge phase={phase} />
-              {statusLine ? <span className={changesRequested ? "text-sm font-medium text-destructive" : "text-sm text-muted-foreground"} data-story-status="">{statusLine}</span> : null}
+              {statusLine && !run ? <span className="text-sm text-muted-foreground" data-story-status="">{statusLine}</span> : null}
               {liveCoverage?.desk?.mode === "live" && liveCoverage.desk.status !== "off" ? <LiveBadge desk={liveCoverage.desk} timeZone={context.timeZone} /> : null}
             </ContextMenuTrigger>
             {canMove ? <ContextMenuContent className="w-56" side="bottom" align="start">
@@ -340,6 +338,14 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
               </> : null}
             </ContextMenuContent> : null}
           </ContextMenu>
+          {/* Whose move it is in review, and the way into Review for anyone on the Story: a labelled link, never a hidden menu item. */}
+          {statusLine && run ? (
+            <Button type="button" variant="link" size="sm" className={changesRequested ? "h-auto p-0 font-medium text-destructive" : "h-auto p-0 font-normal text-muted-foreground"} onClick={() => onOpen("review")} data-story-status="" aria-label={`${statusLine}. Open review`}>
+              {statusLine}
+            </Button>
+          ) : run && !primary ? (
+            <Button type="button" variant="link" size="sm" className="h-auto p-0 font-normal text-muted-foreground" onClick={() => onOpen("review")} data-story-review-link="">Review</Button>
+          ) : null}
           {writers.length ? (
             <div className="flex min-w-0 items-center gap-2 text-sm" data-story-writers="">
               <PeopleAvatars people={writers.map((writer) => ({ name: writer.name, avatarUrl: writer.avatarUrl ?? null }))} />
@@ -355,13 +361,6 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
             {saving ? <Spinner className="size-3" /> : saveLabel === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveLabel}
           </span>
-          {/* Reporting is always visible and labeled: a reporter should see at once that it exists. */}
-          {id != null && view === "story" ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => onView("reporting")} data-open-reporting="">
-              <NotebookPen data-icon="inline-start" aria-hidden="true" />
-              Reporting
-            </Button>
-          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button ref={menuTrigger} type="button" variant="outline" size="icon-sm" aria-label="More story actions" />}>
               <Ellipsis aria-hidden="true" />
@@ -369,9 +368,8 @@ export function StoryHeader({ context, view, onView, onOpenContext }: HeaderProp
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuGroup>
                 {preview.available ? <DropdownMenuItem onClick={preview.toggle} data-story-preview=""><Eye aria-hidden="true" />{preview.previewing ? "Close preview" : "Preview"}</DropdownMenuItem> : null}
-                {onOpenContext ? <DropdownMenuItem onClick={onOpenContext} data-story-context-toggle=""><PanelRight aria-hidden="true" />Story context</DropdownMenuItem> : null}
                 <DropdownMenuItem onClick={() => setDetailsOpen(true)}><SlidersHorizontal aria-hidden="true" />Story details{publicationProblems && canEditPublication ? <Badge variant="destructive" className="ml-auto">{publicationProblems}</Badge> : null}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onView("history")}><History aria-hidden="true" />View history</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onOpen("history")}><History aria-hidden="true" />View history</DropdownMenuItem>
                 {liveCoverage && id != null ? <DropdownMenuItem render={<ShellLink href={liveCoverage.fieldHref} />}><Smartphone aria-hidden="true" />Open in Field Mode</DropdownMenuItem> : null}
               </DropdownMenuGroup>
               {sidelineActions.length ? <>
@@ -560,14 +558,14 @@ function StageOverride({ context, phase, onChanged }: { context: StoryScreenCont
   );
 }
 
-/** The header of a focused Story mode (Reporting, Review, History): a way back and what this is, never a tab bar. */
-export function FocusedHeader({ title, storyTitle, onBack, actions }: { title: string; storyTitle: string; onBack: () => void; actions?: ReactNode }) {
+/** The header of a focused Story view (Review, History, a Transcript): a way back and what this is, never a tab bar. */
+export function FocusedHeader({ title, storyTitle, onBack, actions, backLabel = "Back to story" }: { title: string; storyTitle: string; onBack: () => void; actions?: ReactNode; backLabel?: string }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3" data-focused-header="">
       <div className="flex min-w-0 flex-col gap-1">
         <Button type="button" variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
           <ChevronLeft data-icon="inline-start" aria-hidden="true" />
-          Back to story
+          {backLabel}
         </Button>
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         <p className="truncate text-sm text-muted-foreground">{storyTitle || "Untitled story"}</p>

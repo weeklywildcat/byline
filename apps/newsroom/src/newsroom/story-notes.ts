@@ -23,7 +23,7 @@ export async function storyNoteSummary(ctx: ScreenContext, id: number): Promise<
     payload.count({ collection: "story-notes", where: { and: [story, { resolved: { not_equals: true } }] }, ...read(ctx) }),
     payload.count({ collection: "story-notes", where: { and: [story, { resolved: { equals: true } }] }, ...read(ctx) })
   ]);
-  return { kind: "story", available: true, canView: true, openCount: open.totalDocs, resolvedCount: resolved.totalDocs, editUrl: `${ctx.admin}/collections/stories/${id}?tab=plan#story-notes` };
+  return { kind: "story", available: true, canView: true, openCount: open.totalDocs, resolvedCount: resolved.totalDocs, editUrl: `${ctx.admin}/collections/stories/${id}?view=plan&section=activity` };
 }
 
 export async function storyNotes(ctx: ScreenContext, id: number, resolved: boolean, page: number) {

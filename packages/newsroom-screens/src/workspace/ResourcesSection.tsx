@@ -85,7 +85,11 @@ function ResourceRow({ resource, canManage, onEdit, onRemove }: { resource: Stor
   </ContextMenu>;
 }
 
-export function ResourcesSection() {
+/**
+ * The Story's links. `plain` is the Plan workspace's quiet list (a heading and
+ * rows, no Card); the default is the Story Workspace page's Card.
+ */
+export function ResourcesSection({ plain = false, title = "Files & Links", headingLevel = 2 }: { plain?: boolean; title?: string; headingLevel?: 2 | 3 } = {}) {
   const { storyId, client, data, caps, reload, sectionError, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const dialog = useDialogTarget<StoryResource>("[data-ws-add=link]");
@@ -113,16 +117,29 @@ export function ResourcesSection() {
   });
 
   const add = canManage ? <AddButton data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</AddButton> : null;
+  const rows = <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource)} />)}</ItemGroup>;
+  const editor = <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />;
+  if (plain) {
+    const Heading = headingLevel === 3 ? "h3" : "h2";
+    return <section aria-labelledby="ws-files-title" id="ws-files" className="flex flex-col gap-1.5">
+      <div className="flex min-h-7 items-center justify-between gap-2">
+        <Heading id="ws-files-title" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</Heading>
+        {canManage ? <Button type="button" variant="ghost" size="xs" data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</Button> : null}
+      </div>
+      {failed ? <SectionFailed what="links" onRetry={() => void reload()} /> : data.resources.length ? <div className="-mx-2.5">{rows}</div> : <p className="text-sm text-muted-foreground">No links yet.{canManage ? " Link the working draft, notes and research." : ""}</p>}
+      {editor}
+    </section>;
+  }
   return <Card size="sm" role="region" aria-labelledby="ws-files-title" id="ws-files" className="order-1 lg:order-none">
     <CardHeader>
-      <CardTitle id="ws-files-title" role="heading" aria-level={2}>Files &amp; Links</CardTitle>
+      <CardTitle id="ws-files-title" role="heading" aria-level={headingLevel}>{title}</CardTitle>
       {data.resources.length && add ? <CardAction>{add}</CardAction> : null}
     </CardHeader>
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="links" onRetry={() => void reload()} /></div> : data.resources.length
-        ? <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource)} />)}</ItemGroup>
+        ? rows
         : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No files or links yet.</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
     </CardContent>
-    <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />
+    {editor}
   </Card>;
 }

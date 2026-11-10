@@ -77,13 +77,14 @@ function marked(text: string, ranges: Array<[number, number]>, current: [number,
  * and a selection becomes a highlight or a quote snapshot. The Source and its
  * ground rules travel beside it (a panel on wide screens, a Sheet on narrow).
  */
-export function TranscriptView(props: { context: StoryScreenContext; transcriptId: number; onBack: () => void }) {
+/** `hideBack` when the host already shows the way back (the Story's focused Transcript view). */
+export function TranscriptView(props: { context: StoryScreenContext; transcriptId: number; onBack: () => void; hideBack?: boolean }) {
   // The measured element exists from the first render (useElementWidth measures on mount), loading or not.
   const [frameRef, width] = useElementWidth<HTMLDivElement>();
   return <div ref={frameRef} className="min-w-0" data-transcript-frame=""><TranscriptBody {...props} width={width} /></div>;
 }
 
-function TranscriptBody({ context, transcriptId, onBack, width }: { context: StoryScreenContext; transcriptId: number; onBack: () => void; width: number }) {
+function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false }: { context: StoryScreenContext; transcriptId: number; onBack: () => void; width: number; hideBack?: boolean }) {
   const cache = useQueryClient();
   const storyId = Number(context.storyId);
   const detailQuery = useQuery({
@@ -146,8 +147,8 @@ function TranscriptBody({ context, transcriptId, onBack, width }: { context: Sto
     onError: (error: Error) => toast.error(error.message)
   });
 
-  if (detailQuery.isError) return <div className="grid gap-3"><BackButton onBack={onBack} /><InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
-  if (!detail) return <div className="grid gap-3"><BackButton onBack={onBack} /><p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
+  if (detailQuery.isError) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
+  if (!detail) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
 
   const contextPanel = <TranscriptContext context={context} detail={detail} seek={seek} refresh={refresh} />;
   const stream = (
@@ -200,7 +201,7 @@ function TranscriptBody({ context, transcriptId, onBack, width }: { context: Sto
   return (
     <div className="flex min-w-0 flex-col gap-3" data-transcript-view="">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <BackButton onBack={onBack} />
+        {hideBack ? null : <BackButton onBack={onBack} />}
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-medium">{detail.file.filename}</h2>
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

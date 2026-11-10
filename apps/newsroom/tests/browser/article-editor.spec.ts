@@ -51,7 +51,8 @@ test.beforeEach(async ({ context, baseURL }) => {
 });
 
 async function openStory(page: Page) {
-  await page.goto(`/admin/collections/stories/${storyId}`);
+  // Write, explicitly: an address that names no workspace reopens the one this account last used.
+  await page.goto(`/admin/collections/stories/${storyId}?view=write`);
   await expect(body(page)).toBeVisible({ timeout: 60_000 });
   await expect(body(page)).toHaveAttribute("contenteditable", "true");
 }
@@ -275,28 +276,27 @@ test("moves and removes whole blocks as document edits, with Undo", async ({ pag
   await waitForSaved(page);
 });
 
-test("keeps the editor mounted through Reporting and back, and saves edits made just before leaving", async ({ page, request, baseURL }) => {
+test("keeps the editor mounted through Plan and back, and saves edits made just before leaving", async ({ page, request, baseURL }) => {
   await openStory(page);
-  // The Story is the Story: no tab bar, Reporting is a labelled header button.
-  await expect(page.getByRole("tablist")).toHaveCount(0);
-  const reporting = page.getByRole("button", { name: "Reporting", exact: true });
-  await expect(reporting).toBeVisible();
+  // Plan and Write are the Story's two workspaces; the article is Write.
+  const tabs = page.getByRole("tablist", { name: "Story workspace" });
+  await tabs.getByRole("tab", { name: "Write", exact: true }).click();
   const caption = block(page, "photo").getByRole("textbox", { name: "Caption" });
   await caption.click();
   // The end of the caption, not of the visual line clicked (a long caption wraps).
   await caption.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(element.value.length, element.value.length));
   await page.keyboard.type(" (Mode test.)");
   // Leave while the edit is still unsaved (autosave has not run yet).
-  await reporting.click();
-  await expect(page).toHaveURL(/[?&]view=reporting/);
-  await expect(page.getByRole("heading", { name: "Reporting", level: 1 })).toBeVisible();
+  await tabs.getByRole("tab", { name: "Plan", exact: true }).click();
+  await expect(page).toHaveURL(/[?&]view=plan/);
+  await expect(page.getByRole("heading", { name: "Reporting", level: 2, exact: true })).toBeVisible();
   await expect(page.locator("[data-story-article]")).toBeHidden();
-  await page.getByRole("button", { name: "Back to story" }).click();
-  await expect(page).not.toHaveURL(/view=/);
+  await tabs.getByRole("tab", { name: "Write", exact: true }).click();
+  await expect(page).toHaveURL(/[?&]view=write/);
   await expect(caption).toHaveValue(/\(Mode test\.\)$/);
-  // Browser Back/Forward move between the Story and Reporting with the same editor.
+  // Browser Back/Forward move between the workspaces with the same editor.
   await page.goBack();
-  await expect(page).toHaveURL(/[?&]view=reporting/);
+  await expect(page).toHaveURL(/[?&]view=plan/);
   await page.goForward();
   await expect(caption).toHaveValue(/\(Mode test\.\)$/);
   await caption.click();
@@ -339,7 +339,7 @@ test("is read-only while another user holds the story", async ({ page, browser, 
   const other = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   await signIn(other, baseURL!, adminToken);
   const second = await other.newPage();
-  await second.goto(`${baseURL}/admin/collections/stories/${storyId}`);
+  await second.goto(`${baseURL}/admin/collections/stories/${storyId}?view=write`);
   // Payload's lock dialog; not the story's own Preview button, which also says "view".
   await second.getByRole("button", { name: "View read-only" }).click({ timeout: 30_000 });
   await expect(second.getByText("Someone else is editing this story.")).toBeVisible();

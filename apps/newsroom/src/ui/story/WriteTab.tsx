@@ -9,12 +9,11 @@ import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { parseYouTubeVideoId } from "@byline/core";
 import { BylineEditorHostProvider, type StoryBlockInserter } from "@byline/editor/client";
-import { ReportingSheet } from "../reporting/ReportingSheet";
 import type { SelectionView } from "../reporting/api";
 import { RenderFields } from "@payloadcms/ui";
 import { Plus } from "lucide-react";
 import type { ClientField, SanitizedFieldPermissions } from "payload";
-import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { STORY_FORMAT_OPTIONS } from "../../domain/vocabulary";
 
 import { LiveCoverageSection } from "../live/LiveCoverageSection";
@@ -120,6 +119,13 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const registerInserter = useCallback((next: StoryBlockInserter | null) => { inserter.current = next; }, []);
   const host = useNewsroomEditorHost(registerInserter);
   const insertQuote = useCallback((quote: SelectionView) => inserter.current?.("reportedQuote", { text: quote.text, attribution: quote.attribution, reportingSelection: quote.id }) ?? false, []);
+  // Reporting reference (beside the article or in its Sheet) inserts a verified quote through this.
+  const quoteInserter = context.quoteInserter;
+  useEffect(() => {
+    if (!quoteInserter) return undefined;
+    quoteInserter.current = insertQuote;
+    return () => { if (quoteInserter.current === insertQuote) quoteInserter.current = null; };
+  }, [insertQuote, quoteInserter]);
 
   return (
     <BylineEditorHostProvider host={host}>
@@ -240,9 +246,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
 
           {legacy ? null : (
             <section aria-label="Story body" className="byline-story-body">
-              {context.readOnly || !Number.isSafeInteger(Number(context.storyId)) ? null : (
-                <div className="mx-auto mb-1 flex w-full max-w-[760px] justify-end px-4 md:px-0"><ReportingSheet context={context} insert={insertQuote} /></div>
-              )}
               <ArticleCanvas>
                 <PayloadField paths={paths} name="body" readOnly={readOnly} />
               </ArticleCanvas>
