@@ -1,1 +1,4 @@
 tests/fixtures/story-media/document.pdf binary
+
+# Payload schema snapshots written next to each migration; generated, collapse in PR diffs.
+apps/newsroom/src/migrations/*.json linguist-generated=true
