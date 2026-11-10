@@ -69,6 +69,38 @@ export function navigationFor(role: Role): NavItem[] {
   return NAVIGATION.filter(allowed(role));
 }
 
+export const REVIEW_WORKFLOWS_PATH = "/review-workflows";
+
+const PRIMARY_KEYS = ["home", "stories", "calendar"] as const;
+type PrimaryKey = (typeof PRIMARY_KEYS)[number];
+
+export function primaryNavigationFor(role: Role): NavItem[] {
+  const items = navigationFor(role);
+  return PRIMARY_KEYS.flatMap((key) => items.filter((item) => item.key === key));
+}
+
+type PrimaryLocation = { key: PrimaryKey | null; parent?: { label: string; path: string } };
+
+/** Only canonical Byline views get adaptive navigation. The numeric Story edit
+ * route is the one native Payload document surface that hosts a Byline screen. */
+export function primaryLocationFor(pathname: string, adminRoute: string): PrimaryLocation | null {
+  const admin = adminRoute.replace(/\/$/, "");
+  const pathnameOnly = pathname.split(/[?#]/)[0];
+  if (!pathnameOnly?.startsWith("/") || (admin && pathnameOnly !== admin && !pathnameOnly.startsWith(`${admin}/`))) return null;
+  const path = stripAdmin(pathname, adminRoute);
+  const destination = NAVIGATION.find((item) => item.path === path);
+  const primary = PRIMARY_KEYS.find((key) => key === destination?.key);
+  if (primary) return { key: primary };
+  if (storyIdFromPath(pathname, adminRoute) !== null) {
+    return { key: "stories", parent: { label: "Stories", path: STORIES_PATH } };
+  }
+  if (path === REVIEW_WORKFLOWS_PATH) return { key: null, parent: { label: "People", path: "/people" } };
+  if (destination || path === "/profile" || path === "/site" || path === SYSTEM_ADMINISTRATION_PATH) {
+    return { key: null, parent: { label: "Home", path: "" } };
+  }
+  return null;
+}
+
 /**
  * The navigation entry a path belongs to, if any. Home matches only itself;
  * a story's Story screen belongs to Stories.
@@ -77,7 +109,7 @@ export function activeNavKey(items: readonly Pick<NavItem, "key" | "path" | "exa
   if (storyIdFromPath(pathname, adminRoute) !== null && items.some((item) => item.key === "stories")) return "stories";
   const path = stripAdmin(pathname, adminRoute);
   // Review workflows are part of the team's operations, beside People and Roles.
-  if (path === "/review-workflows" && items.some((item) => item.key === "people")) return "people";
+  if (path === REVIEW_WORKFLOWS_PATH && items.some((item) => item.key === "people")) return "people";
   const match = items
     .filter((item) => (item.path === "" || item.exact ? path === item.path : path === item.path || path.startsWith(`${item.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0];
@@ -163,7 +195,7 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   if (nav) return [{ label: nav.label }];
   if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Stories", path: STORIES_PATH }, { label: "Story" }];
   if (path === "/site") return [{ label: "Site" }];
-  if (path === "/review-workflows") return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
+  if (path === REVIEW_WORKFLOWS_PATH) return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
   if (path === "/content-health") return [{ label: "Content Health" }];
   if (/^\/collections\/pages\/\d+$/.test(path)) return [{ label: "Site", path: "/site?tab=pages" }, { label: "Page" }];
   if (path === SYSTEM_ADMINISTRATION_PATH) return [{ label: "System administration" }];

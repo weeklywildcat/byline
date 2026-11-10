@@ -6,8 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { ChevronsUpDown, Keyboard, LogOut, Smartphone, UserRound, Wrench } from "lucide-react";
-import { useState } from "react";
-import { ShellLink, useShellNavigation } from "./navigation";
+import { ShellLink } from "./navigation";
+import { useSignOut } from "./sign-out";
 import { useBylineShortcuts } from "./shortcuts";
 
 export type ShellUser = { name: string; subtitle: string; avatarUrl: string | null; profileHref?: string | null };
@@ -51,18 +51,8 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
   const account = useNewsroomAccount();
   const { admin } = useNewsroomRoutes();
   const { isMobile, state } = useSidebar();
-  const [signingOut, setSigningOut] = useState(false);
-  const { runGuarded } = useShellNavigation();
+  const { signingOut, signOut } = useSignOut(logoutUrl, loginHref);
   const { openHelp } = useBylineShortcuts();
-
-  async function signOut() {
-    setSigningOut(true);
-    try {
-      await fetch(logoutUrl, { method: "POST", credentials: "include" });
-    } finally {
-      window.location.assign(loginHref);
-    }
-  }
 
   return (
     <SidebarMenu>
@@ -93,7 +83,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
                 <DropdownMenuSeparator />
               </>
             ) : null}
-            <DropdownMenuItem onClick={() => runGuarded(() => void signOut())} disabled={signingOut}><LogOut aria-hidden="true" />{signingOut ? "Signing out…" : "Sign out"}</DropdownMenuItem>
+            <DropdownMenuItem onClick={signOut} disabled={signingOut}><LogOut aria-hidden="true" />{signingOut ? "Signing out…" : "Sign out"}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

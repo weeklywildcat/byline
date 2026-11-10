@@ -140,7 +140,7 @@ export function useLeaveGuard(read: LeaveGuard) {
   }, [setLeaveGuard]);
 }
 
-const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>) => event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+export const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>) => event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
 /**
  * A Next `Link` for shell navigation. A plain click with unsaved work open
