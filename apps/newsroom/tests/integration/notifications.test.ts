@@ -296,6 +296,12 @@ describe("future reminders", () => {
         waitUntil: new Date("2099-11-14T19:00:00.000Z")
       });
       expect(queue.mock.calls[3][0]).toMatchObject({ input: { reminderTarget: "story", recordId: 84, expectedAt: "2099-11-15" } });
+
+      req.context = { bylineSuppressNotifications: true };
+      await scheduleTaskDueReminder(req, { id: 85, due: "2099-11-16T20:00:00.000Z", state: "open" });
+      req.context = { bylineImport: true };
+      await scheduleAppointmentReminder(req, { id: 86, startAt: "2099-11-16T20:00:00.000Z", scheduleMode: "exact", status: "planned" });
+      expect(queue).toHaveBeenCalledTimes(4);
     } finally {
       queue.mockRestore();
     }
@@ -313,8 +319,9 @@ describe("future reminders", () => {
     await clear();
 
     const req = await reqAs("editor");
-    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(1);
-    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(0);
+    const dayBefore = new Date("2026-11-11T17:00:00.000Z");
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due }, dayBefore)).toBe(1);
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due }, dayBefore)).toBe(0);
     const [deadline] = await received("bob", "dueDigest");
     expect(deadline).toMatchObject({ detail: "Verify final figures" });
     expect((deadline.data as { reminder?: unknown }).reminder).toEqual({ type: "deadline", target: "task", when: "tomorrow" });
@@ -322,15 +329,22 @@ describe("future reminders", () => {
 
     await payload.update({ collection: "tasks", id: task.id, data: { due: "2026-11-13T20:00:00.000Z" }, ...editor });
     await clear();
-    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(0);
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due }, dayBefore)).toBe(0);
 
     const startAt = "2026-11-12T21:00:00.000Z";
     const interview = await appointment("editor", "Interview the mayor", [accounts.bob.id], { scheduleMode: "exact", startAt, endAt: "2026-11-12T21:30:00.000Z" });
     await clear();
-    expect(await sendReminder(req, { reminderTarget: "appointment", recordId: interview.id, expectedAt: startAt })).toBe(1);
+    expect(await sendReminder(req, { reminderTarget: "appointment", recordId: interview.id, expectedAt: startAt }, new Date("2026-11-12T20:00:00.000Z"))).toBe(1);
     const [appointmentReminder] = await received("bob", "appointments");
     expect((appointmentReminder.data as { reminder?: unknown }).reminder).toEqual({ type: "appointment", target: "appointment", when: "in 1 hour" });
     expect((await call("get", "/byline/notifications", "bob")).body.items[0].text).toBe("“Interview the mayor” starts in 1 hour");
+
+    await clear();
+    expect(await sendReminder(req, { reminderTarget: "appointment", recordId: interview.id, expectedAt: startAt }, new Date("2026-11-12T20:30:00.000Z"))).toBe(1);
+    expect(((await received("bob", "appointments"))[0].data as { reminder?: unknown }).reminder).toEqual({ type: "appointment", target: "appointment", when: "in 30 minutes" });
+
+    await clear();
+    expect(await sendReminder(req, { reminderTarget: "appointment", recordId: interview.id, expectedAt: startAt }, new Date("2026-11-12T21:05:00.000Z"))).toBe(0);
   });
 });
 
