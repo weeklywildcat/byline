@@ -31,6 +31,7 @@ export type StoryBoardProps = {
 };
 
 const DRAG_TYPE = "byline-story";
+const PUBLISHED_STATUS: PlanningWorkflowStatus = { id: "published", label: "Published", group: "derived", selectable: false };
 
 /** A story can be dragged only if the viewer may move stories and WordPress has not published it. */
 const isMovable = (story: PlanningStory, canMoveStories: boolean) => canMoveStories && !story.publicationState.isPublished;
@@ -311,7 +312,18 @@ export function StoryBoard(props: StoryBoardProps) {
   byId.current = new Map(stories.map((story) => [story.id, story]));
   const mainStatuses = useMemo(() => boardWorkflowStatuses(statuses), [statuses]);
   const sidelined = useMemo(() => statuses.filter((status) => status.group === "sidelined"), [statuses]);
-  const columns = useMemo(() => new Map([...mainStatuses, ...sidelined].map((status) => [status.id, stories.filter((story) => story.workflow.id === status.id)])), [mainStatuses, sidelined, stories]);
+  // Published is a derived, read-only destination, never a workflow move target.
+  // Only add it when visible stories require it; a Published-only filter should
+  // show that column immediately, not a row of empty workflow columns.
+  const publishedStories = useMemo(() => stories.filter((story) => story.publicationState.isPublished), [stories]);
+  const publishedOnly = publishedStories.length > 0 && publishedStories.length === stories.length;
+  const visibleMain = publishedOnly ? [] : mainStatuses;
+  const visibleSidelined = publishedOnly ? [] : sidelined;
+  const publishedStatus = statuses.find((status) => status.id === "published") ?? PUBLISHED_STATUS;
+  const columns = useMemo(() => new Map([
+    ...[...mainStatuses, ...sidelined].map((status): [string, PlanningStory[]] => [status.id, stories.filter((story) => !story.publicationState.isPublished && story.workflow.id === status.id)]),
+    ["published", publishedStories] as [string, PlanningStory[]]
+  ]), [mainStatuses, sidelined, publishedStories, stories]);
   const fitToWindow = layout !== "stacked";
   const top = useBoardTop(fitToWindow ? frame : null);
 
@@ -382,19 +394,21 @@ export function StoryBoard(props: StoryBoardProps) {
 
   if (layout === "stacked") {
     return boardRoot(<div className="flex flex-col gap-4.5">
-      {[...mainStatuses, ...sidelined].map((status) => <StackedSection key={status.id} {...items} status={status} stories={storiesIn(status)} dragActive={dragActive} />)}
+      {[...visibleMain, ...visibleSidelined, ...(publishedStories.length ? [publishedStatus] : [])].map((status) => <StackedSection key={status.id} {...items} status={status} stories={storiesIn(status)} dragActive={dragActive} />)}
     </div>);
   }
 
   return boardRoot(<div ref={setFrame} data-board-frame="" style={{ "--board-top": `${top}px` } as CSSProperties}
     className="flex flex-col gap-2 sm:h-[calc(100dvh-var(--board-top)-1.5rem)] sm:min-h-[420px]">
     <div ref={setScroller} data-board-scroller="" className="relative flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto max-sm:items-start max-sm:pb-2 sm:snap-none">
-      {mainStatuses.map(stage)}
-      {layout === "lanes" && sidelined.length ? <><div aria-hidden="true" data-board-divider="" className="my-1 w-px shrink-0 bg-border" />{sidelined.map(stage)}</> : null}
+      {visibleMain.map(stage)}
+      {layout === "lanes" && visibleMain.length && (visibleSidelined.length || publishedStories.length) ? <div aria-hidden="true" data-board-divider="" className="my-1 w-px shrink-0 bg-border" /> : null}
+      {layout === "lanes" ? visibleSidelined.map(stage) : null}
+      {publishedStories.length ? stage(publishedStatus) : null}
     </div>
-    {layout === "dense" && sidelined.length ? <div className="flex shrink-0 flex-wrap items-center gap-2" data-board-sidelined="">
+    {layout === "dense" && visibleSidelined.length ? <div className="flex shrink-0 flex-wrap items-center gap-2" data-board-sidelined="">
       <span className="text-xs font-medium text-muted-foreground">Sidelined</span>
-      {sidelined.map((status) => <SidelinedChip key={status.id} {...items} status={status} stories={storiesIn(status)} />)}
+      {visibleSidelined.map((status) => <SidelinedChip key={status.id} {...items} status={status} stories={storiesIn(status)} />)}
     </div> : null}
   </div>);
 }

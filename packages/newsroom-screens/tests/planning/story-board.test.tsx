@@ -273,6 +273,28 @@ describe("Dense column widths", () => {
   });
 });
 
+describe("Published on the board", () => {
+  const published = story(6, "published", {
+    title: "Already on the site",
+    publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false }
+  });
+
+  it.each(["lanes", "dense", "stacked"] as const)("shows a read-only Published destination in %s", async (layout) => {
+    await mount(layout, { stories: [...stories, published] });
+    const destination = $("[data-status='published']")!;
+    expect(destination).not.toBeNull();
+    expect(destination.textContent).toContain("Published");
+    expect(destination.querySelector("[data-story-id='6']")?.textContent).toContain("Already on the site");
+    expect($("[data-story-id='6']")?.getAttribute("draggable")).not.toBe("true");
+  });
+
+  it.each(["lanes", "dense", "stacked"] as const)("shows only Published when a filter returns only published stories in %s", async (layout) => {
+    await mount(layout, { stories: [published] });
+    expect($$("[data-status]").map((element) => element.dataset.status)).toEqual(["published"]);
+    expect(visibleStoryIds()).toEqual([6]);
+  });
+});
+
 describe("Lifecycle board (Payload)", () => {
   const phases = (editor: boolean) => PHASE_STATUSES.filter((status) => status.group !== "derived").map((status) => ({ ...status, selectable: editor || (status.id !== "review" && status.id !== "ready") })) as unknown as StoryBoardProps["statuses"];
   const phase = (id: string) => PHASE_STATUSES.find((status) => status.id === id)! as unknown as PlanningStory["workflow"];

@@ -146,4 +146,35 @@ describe("the Stories workspace", () => {
     await mount({ initialFilters: { workflow: "editing" } });
     expect($("[aria-label='Story view: Custom view']")).not.toBeNull();
   });
+
+  it("shows a temporary Published destination on Board instead of changing to List", async () => {
+    const published = {
+      ...loaded("published", 3),
+      workflow: { id: "published", label: "Published", group: "derived" as const, selectable: false },
+      publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false }
+    };
+    fetchers.getPlanning = vi.fn(async () => ({ ...response, stories: [...response.stories, published], workflowStatuses: [...response.workflowStatuses, published.workflow] })) as never;
+    await mount();
+    expect($("[data-status='published']")).toBeNull();
+
+    await click($$("button").find((button) => button.textContent?.includes("More filters")));
+    await click($("#story-filter-published"));
+
+    expect($("[data-status='published'] [data-story-id='3']")).not.toBeNull();
+    expect($("[data-board-layout-picker]")).not.toBeNull();
+    expect(window.location.search).toContain("view=board");
+    expect($("[aria-label='Remove filter: Showing published']")).not.toBeNull();
+  });
+
+  it("honors an explicit Published filter without requiring the temporary toggle", async () => {
+    const published = {
+      ...loaded("published", 3),
+      workflow: { id: "published", label: "Published", group: "derived" as const, selectable: false },
+      publicationState: { id: "published", label: "Published", isPublished: true, isScheduled: false }
+    };
+    fetchers.getPlanning = vi.fn(async () => ({ ...response, stories: [...response.stories, published], workflowStatuses: [...response.workflowStatuses, published.workflow] })) as never;
+    await mount({ initialFilters: { publicationState: "published" } });
+    expect($$("[data-status]").map((element) => element.dataset.status)).toEqual(["published"]);
+    expect($("[data-story-id='3']")).not.toBeNull();
+  });
 });
