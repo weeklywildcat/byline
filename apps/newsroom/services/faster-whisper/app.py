@@ -25,12 +25,17 @@ from typing import Any
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from faster_whisper import WhisperModel
+from faster_whisper import BatchedInferencePipeline, WhisperModel
 
 app = FastAPI(title="Byline transcription")
 TOKEN = os.environ.get("BYLINE_TRANSCRIPTION_TOKEN", "").strip()
 JOB_TTL_SECONDS = max(300, int(os.environ.get("WHISPER_JOB_TTL_SECONDS", str(6 * 60 * 60))))
 MAX_WORKERS = max(1, int(os.environ.get("WHISPER_MAX_WORKERS", "1")))
+DEVICE = os.environ.get("WHISPER_DEVICE", "auto").strip() or "auto"
+COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default").strip() or "default"
+CPU_THREADS = max(0, int(os.environ.get("WHISPER_CPU_THREADS", "0")))
+BATCH_SIZE = max(1, int(os.environ.get("WHISPER_BATCH_SIZE", "1")))
+WORD_TIMESTAMPS_DEFAULT = os.environ.get("WHISPER_WORD_TIMESTAMPS", "0").strip().lower() in {"1", "true", "yes", "on"}
 JOB_KEY = re.compile(r"^[A-Za-z0-9._:-]{1,160}$")
 EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="byline-whisper")
 JOBS: dict[str, dict[str, Any]] = {}
@@ -41,9 +46,15 @@ JOBS_LOCK = Lock()
 def load(model: str) -> WhisperModel:
     return WhisperModel(
         model,
-        device=os.environ.get("WHISPER_DEVICE", "auto"),
-        compute_type=os.environ.get("WHISPER_COMPUTE_TYPE", "default"),
+        device=DEVICE,
+        compute_type=COMPUTE_TYPE,
+        cpu_threads=CPU_THREADS,
     )
+
+
+@lru_cache(maxsize=2)
+def load_batched(model: str) -> BatchedInferencePipeline:
+    return BatchedInferencePipeline(model=load(model))
 
 
 def authorize(authorization: str | None) -> None:
@@ -123,6 +134,7 @@ def _run_job(job: dict[str, Any]) -> None:
         _set_job(job, state="loading-model", message="Loading Whisper model", progress=None)
         try:
             model = load(model_name)
+            transcriber = load_batched(model_name) if BATCH_SIZE > 1 else model
         except Exception as error:
             _set_job(
                 job,
@@ -139,12 +151,21 @@ def _run_job(job: dict[str, Any]) -> None:
 
         _set_job(job, state="transcribing", message="Transcribing audio", progress=0.0, processed=0.0)
         try:
-            segments, info = model.transcribe(
-                path,
-                language=language or None,
-                vad_filter=vad,
-                word_timestamps=word_timestamps,
-            )
+            if BATCH_SIZE > 1:
+                segments, info = transcriber.transcribe(
+                    path,
+                    language=language or None,
+                    vad_filter=vad,
+                    word_timestamps=word_timestamps,
+                    batch_size=BATCH_SIZE,
+                )
+            else:
+                segments, info = transcriber.transcribe(
+                    path,
+                    language=language or None,
+                    vad_filter=vad,
+                    word_timestamps=word_timestamps,
+                )
             duration = float(info.duration) if getattr(info, "duration", None) else None
             _set_job(job, duration=duration)
             rows: list[dict[str, Any]] = []
@@ -206,6 +227,11 @@ async def health():
         "active": sum(state in {"loading-model", "transcribing"} for state in states),
         "queued": states.count("queued"),
         "workers": MAX_WORKERS,
+        "device": DEVICE,
+        "compute_type": COMPUTE_TYPE,
+        "cpu_threads": CPU_THREADS or None,
+        "batch_size": BATCH_SIZE,
+        "word_timestamps": WORD_TIMESTAMPS_DEFAULT,
     }
 
 
@@ -216,7 +242,7 @@ async def start_job(
     model: str | None = Form(None),
     language: str | None = Form(None),
     vad: bool = Form(True),
-    word_timestamps: bool = Form(True),
+    word_timestamps: bool = Form(WORD_TIMESTAMPS_DEFAULT),
     authorization: str | None = Header(None),
 ):
     authorize(authorization)
