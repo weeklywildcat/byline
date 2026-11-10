@@ -51,6 +51,76 @@ const newRun = () => ({
   completedAt: null
 });
 
+function jobTranscriptId(input: unknown): number | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = (input as Record<string, unknown>).transcriptId;
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Repair transcript rows whose Payload job disappeared or became terminal.
+ *
+ * A container restart/deploy can expose an old queued/processing transcript
+ * whose previous Payload job has already completed, errored permanently, or
+ * otherwise vanished. The transcript is still the source of truth that work
+ * is wanted, so the reporting worker re-queues only rows that have no live
+ * Payload job. Calling this repeatedly is idempotent at the Payload-job level;
+ * Whisper is independently idempotent by the transcript run token.
+ */
+export async function recoverQueuedTranscriptions(payload: Payload): Promise<{ active: number; pending: number; recovered: number }> {
+  const [active, jobs] = await Promise.all([
+    payload.find({
+      collection: "reporting-transcripts",
+      where: {
+        and: [
+          { origin: { equals: "machine" } },
+          { state: { in: ["queued", "processing"] } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true,
+      select: { id: true }
+    }),
+    payload.find({
+      collection: "payload-jobs",
+      where: {
+        and: [
+          { taskSlug: { equals: TRANSCRIBE_TASK } },
+          { queue: { equals: REPORTING_QUEUE } },
+          { completedAt: { exists: false } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true,
+      select: { input: true, hasError: true }
+    })
+  ]);
+
+  const pendingIds = new Set(
+    jobs.docs
+      .filter((job) => job.hasError !== true)
+      .map((job) => jobTranscriptId(job.input))
+      .filter((id): id is number => id !== null)
+  );
+
+  let recovered = 0;
+  for (const transcript of active.docs) {
+    if (pendingIds.has(transcript.id)) continue;
+    await (payload.jobs as unknown as Jobs).queue({
+      task: TRANSCRIBE_TASK,
+      queue: REPORTING_QUEUE,
+      input: { transcriptId: transcript.id },
+      overrideAccess: true
+    });
+    pendingIds.add(transcript.id);
+    recovered++;
+  }
+  return { active: active.docs.length, pending: pendingIds.size, recovered };
+}
+
 /**
  * Creates (or re-queues) the transcript for a recording. The transcript
  * inherits the recording's story, source, appointment, confidentiality and
