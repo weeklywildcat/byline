@@ -66,7 +66,50 @@ export function useAnyCoarsePointer(): boolean {
   return useMediaQuery("(any-pointer: coarse)");
 }
 
-/** Whether any attached input can provide precise hover, including a trackpad or mouse on a touch-first device. */
+let observedFineHover = false;
+const fineHoverListeners = new Set<() => void>();
+let stopFineHoverObservation: (() => void) | null = null;
+
+function startFineHoverObservation() {
+  if (stopFineHoverObservation || typeof window === "undefined") return;
+  const observe = (event: PointerEvent) => {
+    // Safari exposes Apple Pencil hover as pen pointer movement even though
+    // its interaction media queries may still report that nothing can hover.
+    // buttons === 0 keeps ordinary Pencil contact from teaching the app that
+    // a hover-capable pointer exists.
+    if (observedFineHover || event.buttons !== 0 || (event.pointerType !== "pen" && event.pointerType !== "mouse")) return;
+    observedFineHover = true;
+    fineHoverListeners.forEach((listener) => listener());
+  };
+  window.addEventListener("pointermove", observe, { capture: true, passive: true });
+  stopFineHoverObservation = () => window.removeEventListener("pointermove", observe, { capture: true });
+}
+
+function subscribeFineHoverObservation(onChange: () => void) {
+  fineHoverListeners.add(onChange);
+  startFineHoverObservation();
+  return () => {
+    fineHoverListeners.delete(onChange);
+    if (!fineHoverListeners.size && stopFineHoverObservation) {
+      stopFineHoverObservation();
+      stopFineHoverObservation = null;
+    }
+  };
+}
+
+function useObservedFineHover(): boolean {
+  return useSyncExternalStore(subscribeFineHoverObservation, () => observedFineHover, () => false);
+}
+
+/**
+ * Whether a precise hover-capable input is available.
+ *
+ * Media queries cover mouse/trackpad hybrid devices. The observed-pointer
+ * fallback also covers Apple Pencil hover in Safari, which dispatches pen
+ * hover pointer events without consistently matching `any-hover: hover`.
+ */
 export function useFineHoverPointer(): boolean {
-  return useMediaQuery("(any-hover: hover) and (any-pointer: fine)");
+  const mediaHover = useMediaQuery("(any-hover: hover) and (any-pointer: fine)");
+  const observedHover = useObservedFineHover();
+  return mediaHover || observedHover;
 }
