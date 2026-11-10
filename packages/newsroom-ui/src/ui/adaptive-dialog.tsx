@@ -55,11 +55,14 @@ export function DialogHeader({ className, ...props }: ComponentProps<typeof Dial
   return <Dialog.DialogHeader className={cn(touch && "pr-10", className)} {...props} />;
 }
 
-export function DialogFooter({ className, ...props }: ComponentProps<typeof Dialog.DialogFooter>) {
+export function DialogFooter({ className, showCloseButton = false, children, ...props }: ComponentProps<typeof Dialog.DialogFooter>) {
   const touch = useContext(TouchSurface);
-  if (!touch) return <Dialog.DialogFooter className={className} {...props} />;
+  if (!touch) return <Dialog.DialogFooter className={className} showCloseButton={showCloseButton} {...props}>{children}</Dialog.DialogFooter>;
   return <Drawer.DrawerFooter
     className={cn("sticky bottom-0 z-10 -mx-4 -mb-4 shrink-0 border-t bg-popover px-4 pb-4 pt-3", className)}
     {...props}
-  />;
+  >
+    {children}
+    {showCloseButton ? <Drawer.DrawerClose render={<Button type="button" variant="outline" />}>Close</Drawer.DrawerClose> : null}
+  </Drawer.DrawerFooter>;
 }
