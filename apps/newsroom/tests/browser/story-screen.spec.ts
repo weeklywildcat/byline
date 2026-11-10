@@ -145,6 +145,17 @@ test("Plan's Reporting holds the notebook; interviews show in To do; a source is
   await expect(page.locator("#plan-todo-title")).toBeFocused();
 });
 
+test("Cancel discards an unfinished story note instead of reopening stale text", async ({ page }) => {
+  await open(page, pitchId, "?view=plan");
+  const notes = page.locator("#plan-story-notes");
+  await notes.getByRole("button", { name: "Add note" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add a story note" });
+  await dialog.getByRole("textbox", { name: "Note text" }).fill("Discard this unfinished note");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await notes.getByRole("button", { name: "Add note" }).click();
+  await expect(page.getByRole("dialog", { name: "Add a story note" }).getByRole("textbox", { name: "Note text" })).toBeEmpty();
+});
+
 test("a transcript opens from Plan as a focused view, with Back to Plan and browser Back/Forward", async ({ page }) => {
   await open(page, draftId, "?view=plan");
   await page.locator("#plan-reporting").getByRole("button", { name: "Open transcript" }).first().click();
