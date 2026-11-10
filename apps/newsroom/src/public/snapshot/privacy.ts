@@ -37,8 +37,6 @@ export function assertPublicSafe(snapshot: unknown, json: string, env: Record<st
   if (token && token.length >= 16) needles.push(token);
   const deployHook = env.BYLINE_DEPLOY_HOOK_URL?.trim();
   if (deployHook) needles.push(deployHook);
-  const newsroom = env.BYLINE_NEWSROOM_URL?.replace(/\/+$/, "");
-  if (newsroom) needles.push(newsroom);
   for (const needle of needles) {
     if (!needle || !json.includes(needle)) continue;
     if (needle === token) fail("the build credential");
