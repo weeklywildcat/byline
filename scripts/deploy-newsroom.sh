@@ -56,16 +56,13 @@ done
 # they must deploy with the newsroom image/service contract. Leaving an old
 # reporting-worker or Whisper container running can strand new transcript jobs
 # in "Waiting to transcribe" or make the worker call an obsolete endpoint.
-optional_services=()
 has_reporting_worker=0
 has_whisper=0
 if grep -Fxq "reporting-worker" <<<"$compose_services"; then
   has_reporting_worker=1
-  optional_services+=(reporting-worker)
 fi
 if grep -Fxq "whisper" <<<"$compose_services"; then
   has_whisper=1
-  optional_services+=(whisper)
 fi
 
 commit="$(git rev-parse --short HEAD)"
