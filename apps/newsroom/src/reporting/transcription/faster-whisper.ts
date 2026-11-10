@@ -84,7 +84,7 @@ export function fasterWhisperProvider(config: {
 }): TranscriptionProvider {
   const doFetch = config.fetchImpl ?? fetch;
   const pollMs = Math.max(10, config.pollIntervalMs ?? defaultPollMs);
-  const auth = config.token ? { Authorization: `Bearer ${config.token}` } : {};
+  const auth: Record<string, string> = config.token ? { Authorization: `Bearer ${config.token}` } : {};
 
   return {
     id: "faster-whisper",
