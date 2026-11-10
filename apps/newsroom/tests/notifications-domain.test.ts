@@ -62,12 +62,13 @@ describe("notification text", () => {
     })).toBe("“Verify figures” is due tomorrow");
     expect(describeNotification({
       kind: "appointments", actor: null, story: "Budget vote", detail: "Interview the mayor",
-      reminder: { type: "appointment", target: "appointment", when: "in 1 hour" }
-    })).toBe("“Interview the mayor” starts in 1 hour");
+      reminder: { type: "appointment", target: "appointment", when: "in 37 minutes" }
+    })).toBe("“Interview the mayor” starts in 37 minutes");
   });
 
   it("normalizes reminder metadata before it becomes notification copy", () => {
     expect(reminderFacts({ reminder: { type: "deadline", target: "story", when: "tomorrow" } })).toEqual({ type: "deadline", target: "story", when: "tomorrow" });
+    expect(reminderFacts({ reminder: { type: "appointment", target: "appointment", when: "in 37 minutes" } })).toEqual({ type: "appointment", target: "appointment", when: "in 37 minutes" });
     expect(reminderFacts({ reminder: { type: "deadline", target: "story", when: "<script>" } })).toBeNull();
     expect(reminderFacts("nope")).toBeNull();
   });
