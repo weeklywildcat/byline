@@ -225,7 +225,13 @@ export async function updateDataset(ctx: ScreenContext, id: number, input: { tit
 
 export async function deleteDataset(ctx: ScreenContext, id: number) {
   requireEditor(ctx, "delete datasets");
-  await ctx.req.payload.delete({ collection: "data-datasets", id, ...asUser(ctx) });
+  await inTransaction(ctx, async () => {
+    const db = await drizzleFor(ctx.req.payload, ctx.req);
+    // Project publication locks the same dataset row before validating its
+    // bindings, so deletion cannot slip between its validation and publish.
+    await db.execute(sql`select id from data_datasets where id = ${id} for update`);
+    await ctx.req.payload.delete({ collection: "data-datasets", id, ...asUser(ctx) });
+  });
   return { deleted: true };
 }
 
