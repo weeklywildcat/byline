@@ -19,6 +19,8 @@
     "@astrojs/react": "6.0.5",
     "@byline/content": "0.1.0",
     "@byline/core": "0.1.0",
+    "@byline/data": "0.1.0",
+    "@byline/data-presentations": "0.1.0",
     "@byline/design": "0.1.0",
     "@byline/story-presentations": "0.1.0",
     "@byline/theme-contract": "0.1.0",

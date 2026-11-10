@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { ARTICLE_BLOCK_TYPES, type ArticleBody, type ArticleBodyNode } from "@byline/article-body";
 import { FIXTURE_FIRST_PHASE_BODY as FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
-import { validatePublicationMediaManifest, largestNaturalImage, publicationManifestBlobs, validatePublicBuildSnapshotV2, type PublicBuildSnapshotV2 } from "@byline/content";
+import { validatePublicationMediaManifest, largestNaturalImage, publicationManifestBlobs, validatePublicBuildSnapshotV3 as validatePublicBuildSnapshotV2, type PublicBuildSnapshotV3 as PublicBuildSnapshotV2 } from "@byline/content";
 import { commitTransaction, createLocalReq, getPayload, initTransaction, killTransaction, type Payload, type PayloadRequest } from "payload";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -604,7 +604,7 @@ describe("build-only API and the static build's acquisition", () => {
     const discovery = await get("/snapshot");
     expect(discovery.status).toBe(200);
     const pointer = await discovery.json();
-    expect(pointer).toMatchObject({ schemaVersion: 2, revision: await rev(), url: `${base}/snapshot/${pointer.digest}` });
+    expect(pointer).toMatchObject({ schemaVersion: 3, revision: await rev(), url: `${base}/snapshot/${pointer.digest}` });
     const artifact = Buffer.from(await (await get(`/snapshot/${pointer.digest}`)).arrayBuffer());
     expect(artifact.byteLength).toBe(pointer.bytes);
     expect(createHash("sha256").update(artifact).digest("hex")).toBe(pointer.digest);
@@ -619,7 +619,7 @@ describe("build-only API and the static build's acquisition", () => {
     for (const blob of blobs.slice(0, 3)) expect((await get(`/media/${blob.sha256}`)).status).toBe(200);
   });
 
-  it("ignores a completed schema 1 pointer and promotes v2 for the same content revision", async () => {
+  it("ignores a completed schema 1 pointer and promotes the current schema for the same content revision", async () => {
     const state = await readPublicationState(payload);
     const db = await drizzleFor(payload);
     const v1Filename = `snapshot-v1-r${state.currentRevision}-${"b".repeat(64)}.json`;
@@ -628,7 +628,7 @@ describe("build-only API and the static build's acquisition", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ code: "byline_snapshot_not_ready", reason: "unsupported-schema" });
     expect((await get(`/snapshot/${"b".repeat(64)}`)).status).toBe(404);
-    expect(await runPublicSnapshotPreparation(payload)).toMatchObject({ outcome: "ready", revision: state.currentRevision, pointer: { schemaVersion: 2 } });
+    expect(await runPublicSnapshotPreparation(payload)).toMatchObject({ outcome: "ready", revision: state.currentRevision, pointer: { schemaVersion: 3 } });
   });
 
   it("reports not-ready precisely and recovers directly into the same snapshot contract", async () => {

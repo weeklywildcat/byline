@@ -1,5 +1,5 @@
 import { publicPagePaths } from "../page-paths";
-import type { PublicBuildSnapshotV2, PublicCorrectionSnapshot } from "@byline/content";
+import type { PublicBuildSnapshotV3 as PublicBuildSnapshotV2, PublicCorrectionSnapshot } from "@byline/content";
 import { escapeHtml } from "@byline/content/story";
 import type { Payload } from "payload";
 import { relationId } from "../../access/user";

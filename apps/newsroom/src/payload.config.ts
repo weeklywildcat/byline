@@ -55,6 +55,8 @@ import { newsroomTimeZone } from "./domain/dates";
 import { newsroomEndpoints } from "./newsroom/endpoints";
 import { COLLECTIONS_VIEW_PATH, REVIEW_WORKFLOWS_PATH } from "./domain/navigation";
 import { preparePublicationMediaTask } from "./publication-media/task";
+import { DataDatasets, DataProjects, DataRecords } from "./data/collections";
+import { dataEndpoints } from "./data/endpoints";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -118,6 +120,9 @@ const collections: CollectionConfig[] = [
   ReviewWorkflows,
   ReviewRuns,
   ReviewComments,
+  DataDatasets,
+  DataRecords,
+  DataProjects,
   Users
 ];
 
@@ -156,7 +161,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...googleEndpoints],
+  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their

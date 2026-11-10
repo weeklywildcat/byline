@@ -2,7 +2,7 @@ import { Resolver } from "node:dns/promises";
 import { request as http } from "node:http";
 import { request as https } from "node:https";
 import { mediaCredit } from "@byline/article-body";
-import { normalizePublicRoute, stableDigest, type PublicBuildSnapshotV2, type PublicStorySnapshot } from "@byline/content";
+import { normalizePublicRoute, stableDigest, type PublicBuildSnapshot, type PublicStorySnapshot } from "@byline/content";
 import type { ContentHealthIssue } from "@byline/newsroom-screens/planning/planning-model";
 
 const definitions = {
@@ -81,7 +81,7 @@ async function externallyBroken(url: URL): Promise<boolean> {
   }
 }
 
-export async function scanPublishedStory(snapshot: PublicBuildSnapshotV2, story: PublicStorySnapshot, checkLink = externallyBroken): Promise<Finding[]> {
+export async function scanPublishedStory(snapshot: PublicBuildSnapshot, story: PublicStorySnapshot, checkLink = externallyBroken): Promise<Finding[]> {
   const issues: Finding[] = [];
   const add = (checkId: CheckId, identity: string, problem: string, detail: Partial<Finding> = {}) => {
     const definition = definitions[checkId];

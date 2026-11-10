@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, type PublicBuildSnapshotV2 } from "@byline/content";
+import { SUPPORTED_PUBLIC_SNAPSHOT_SCHEMA_VERSIONS, type PublicBuildSnapshot } from "@byline/content";
 import { parseNativeSnapshot, type NativeSnapshotPointer } from "./native-snapshot";
 
 /**
@@ -44,7 +44,7 @@ export type PayloadAcquisitionOptions = {
 
 export type AcquiredSnapshot = {
   mode: AcquisitionMode;
-  snapshot: PublicBuildSnapshotV2;
+  snapshot: PublicBuildSnapshot;
   bytes: Buffer;
   revision: number;
   digest: string;
@@ -95,7 +95,7 @@ async function json(response: Response, what: string): Promise<Record<string, un
 
 function validatePointer(value: Record<string, unknown>, base: URL): NativeSnapshotPointer {
   const pointer = value as NativeSnapshotPointer;
-  if (pointer.schemaVersion !== PUBLIC_SNAPSHOT_SCHEMA_VERSION) throw new BuildAcquisitionError("discovery advertised an unsupported snapshot schema.");
+  if (!(SUPPORTED_PUBLIC_SNAPSHOT_SCHEMA_VERSIONS as readonly number[]).includes(pointer.schemaVersion)) throw new BuildAcquisitionError("discovery advertised an unsupported snapshot schema.");
   if (!Number.isSafeInteger(pointer.revision) || pointer.revision < 0) throw new BuildAcquisitionError("discovery advertised an invalid revision.");
   if (typeof pointer.digest !== "string" || !/^[a-f0-9]{64}$/.test(pointer.digest)) throw new BuildAcquisitionError("discovery advertised an invalid digest.");
   if (!Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0) throw new BuildAcquisitionError("discovery advertised an invalid byte count.");
@@ -126,7 +126,7 @@ export async function acquirePayloadSnapshot(options: PayloadAcquisitionOptions)
   const get = async (url: string, what: string) => {
     requests++;
     try {
-      return await doFetch(url, { headers: { Authorization: `Bearer ${options.token}`, Accept: "application/json" }, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+      return await doFetch(url, { headers: { Authorization: `Bearer ${options.token}`, Accept: "application/json", "X-Byline-Snapshot-Versions": SUPPORTED_PUBLIC_SNAPSHOT_SCHEMA_VERSIONS.join(",") }, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
     } catch (error) {
       throw new BuildAcquisitionError(`the newsroom could not be reached for ${what} (${(error as Error).message}).`);
     }
@@ -156,6 +156,11 @@ export async function acquirePayloadSnapshot(options: PayloadAcquisitionOptions)
       const bytes = Buffer.from(await artifact.arrayBuffer());
       const snapshot = verify(bytes, pointer, "the advertised snapshot artifact");
       return { mode: "prepared-snapshot", snapshot, bytes, revision: snapshot.revision, digest: pointer.digest, requests, attempts: attempt, downloadMs: performance.now() - started };
+    }
+
+    if (discovery.status === 406) {
+      const body = await json(discovery, "discovery");
+      throw new BuildAcquisitionError(`the newsroom's snapshot schema is not one this build reads (${String(body.message ?? body.code ?? "406")}).`);
     }
 
     if (discovery.status === 503) {
