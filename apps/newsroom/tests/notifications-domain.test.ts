@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultNotificationPreferences, describeNotification, isNotificationKind, NOTIFICATION_KINDS, notificationEmail, relativeTime, resolveNotificationPreferences
+  defaultNotificationPreferences, describeNotification, isNotificationKind, NOTIFICATION_KINDS, notificationEmail, relativeTime, reminderFacts, resolveNotificationPreferences
 } from "../src/domain/notifications";
 
 describe("notification preferences", () => {
@@ -52,10 +52,24 @@ describe("notification text", () => {
     expect(describeNotification({ actor: null, story: null, detail: null, kind: "readyForReview" })).toBe("A story is ready for your review");
   });
 
-  it("counts the digest", () => {
+  it("counts the digest and gives future reminders action-first copy", () => {
     const item = { type: "task" as const, title: "Call", storyId: 1, when: "today" };
     expect(describeNotification({ kind: "dueDigest", actor: null, story: null, detail: null, items: [item] })).toBe("1 item is due today or overdue");
     expect(describeNotification({ kind: "dueDigest", actor: null, story: null, detail: null, items: [item, item] })).toBe("2 items are due today or overdue");
+    expect(describeNotification({
+      kind: "dueDigest", actor: null, story: "Budget vote", detail: "Verify figures",
+      reminder: { type: "deadline", target: "task", when: "tomorrow" }
+    })).toBe("“Verify figures” is due tomorrow");
+    expect(describeNotification({
+      kind: "appointments", actor: null, story: "Budget vote", detail: "Interview the mayor",
+      reminder: { type: "appointment", target: "appointment", when: "in 1 hour" }
+    })).toBe("“Interview the mayor” starts in 1 hour");
+  });
+
+  it("normalizes reminder metadata before it becomes notification copy", () => {
+    expect(reminderFacts({ reminder: { type: "deadline", target: "story", when: "tomorrow" } })).toEqual({ type: "deadline", target: "story", when: "tomorrow" });
+    expect(reminderFacts({ reminder: { type: "deadline", target: "story", when: "<script>" } })).toBeNull();
+    expect(reminderFacts("nope")).toBeNull();
   });
 });
 
@@ -67,13 +81,31 @@ describe("notification email", () => {
     expect(message.html).toContain("&lt;b&gt;Eve&lt;/b&gt;");
     expect(message.html).toContain("A &amp; B");
     expect(message.html).toContain('href="https://newsroom.example.test/admin/collections/stories/4?x=1&amp;y=2"');
+    expect(message.html).toContain('role="presentation"');
+    expect(message.html).toContain("background:#6f1d35");
+    expect(message.html).toContain(">BYLINE<");
+    expect(message.html).toContain("Open in Byline&nbsp;→");
     expect(message.html).not.toContain("<b>Eve");
   });
 
-  it("lists the digest items", () => {
+  it("lists digest items in both fallbacks and the styled card", () => {
     const message = notificationEmail({ kind: "dueDigest", actor: null, story: null, detail: null, items: [{ type: "task", title: "Overdue call", storyId: 3, when: "overdue" }, { type: "deadline", title: "Budget vote", storyId: 4, when: "today" }] }, "https://x.test/admin");
     expect(message.text).toContain("- Task: Overdue call (overdue)");
     expect(message.text).toContain("- Story deadline: Budget vote (today)");
+    expect(message.html).toContain("Overdue call");
+    expect(message.html).toContain("Task · overdue");
+    expect(message.html).toContain("Morning briefing");
+  });
+
+  it("styles a one-off reminder without pretending it is the morning digest", () => {
+    const message = notificationEmail({
+      kind: "appointments", actor: null, story: "Budget", detail: "Interview",
+      reminder: { type: "appointment", target: "appointment", when: "in 1 hour" }
+    }, "https://x.test/admin/collections/stories/4");
+    expect(message.subject).toBe("“Interview” starts in 1 hour");
+    expect(message.html).toContain(">Reminder<");
+    expect(message.html).not.toContain("Morning briefing");
+    expect(message.text).toContain("Open in Byline:");
   });
 });
 
