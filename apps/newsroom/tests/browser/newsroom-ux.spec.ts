@@ -520,6 +520,11 @@ for (const touch of [false, true]) {
       await expectTarget(command, touch);
       await command.fill("Open Stories");
       await expectTarget(page.getByRole("option", { name: "Open Stories" }), touch);
+
+      await page.goto("/admin/calendar");
+      await page.locator("[data-calendar-controls-trigger]").click();
+      const miniCalendar = page.getByRole("dialog", { name: "Calendar" });
+      await expectTarget(miniCalendar.locator("button[data-day]").first(), touch, { square: true });
     });
 
     test("edits Ground Rules and restores focus from the adaptive source form", async ({ page, context, request, baseURL }) => {

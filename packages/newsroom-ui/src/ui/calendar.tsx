@@ -73,7 +73,7 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative rounded-(--cell-radius)",
+          "relative rounded-(--cell-radius) any-pointer-coarse:flex any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11 any-pointer-coarse:items-center any-pointer-coarse:justify-center",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
