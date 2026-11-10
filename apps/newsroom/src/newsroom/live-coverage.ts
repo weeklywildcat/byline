@@ -337,9 +337,10 @@ async function validPublishers(ctx: ScreenContext, storyId: number, value: unkno
 /**
  * The published-only projection: only a published, untrashed story with live
  * or ended coverage, and only its published updates. Raw text, drafts, account
- * IDs and author names never leave. Photos are the prepared public renditions
- * (the same ones the static build materializes); when any is not yet prepared
- * the feed omits photos rather than failing, and the next build brings them.
+ * IDs and author names never leave. This read-only endpoint uses the same
+ * projection contract as the static build. Photos are prepared public
+ * renditions; if one is not ready yet, the endpoint omits photos while the
+ * snapshot pipeline waits and re-queues once preparation finishes.
  * Null when there is no coverage to show.
  */
 export async function publicLiveFeed(payload: Payload, storyId: number): Promise<LiveCoverage | null> {
