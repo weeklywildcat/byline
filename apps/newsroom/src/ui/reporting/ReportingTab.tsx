@@ -599,7 +599,7 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
   };
   return touch ? <Drawer open={open} onOpenChange={changeOpen}>
     <DrawerTrigger render={trigger}>{badge}</DrawerTrigger>
-    <DrawerContent>
+    <DrawerContent keyboardAware>
       <DrawerHeader><DrawerTitle>Edit ground rules</DrawerTitle><DrawerDescription>{source.label}</DrawerDescription></DrawerHeader>
       <div className="px-4 pb-2">{form}</div>
     </DrawerContent>

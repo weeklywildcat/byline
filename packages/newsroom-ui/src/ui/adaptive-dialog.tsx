@@ -24,7 +24,7 @@ export function DialogContent({ className, children, showCloseButton = true, ...
   if (!useContext(TouchSurface)) {
     return <Dialog.DialogContent className={className} showCloseButton={showCloseButton} {...props}>{children}</Dialog.DialogContent>;
   }
-  return <Drawer.DrawerContent {...props}>
+  return <Drawer.DrawerContent keyboardAware {...props}>
     <div className="relative flex min-h-0 flex-col gap-4 p-4">
       {children}
       {showCloseButton ? <Drawer.DrawerClose render={<Button type="button" variant="ghost" size="icon-sm" className="absolute top-1 right-2" aria-label="Close" />}><XIcon aria-hidden="true" /></Drawer.DrawerClose> : null}

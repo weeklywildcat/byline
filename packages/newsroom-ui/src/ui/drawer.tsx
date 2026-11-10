@@ -22,29 +22,35 @@ function DrawerClose({ ...props }: DrawerPrimitive.Close.Props) {
 function DrawerContent({
   className,
   children,
+  keyboardAware = false,
   ...props
-}: DrawerPrimitive.Popup.Props) {
+}: DrawerPrimitive.Popup.Props & { keyboardAware?: boolean }) {
+  const viewport = (
+    <DrawerPrimitive.Viewport data-slot="drawer-viewport" className={cn(
+      "fixed inset-0 z-50 flex items-end justify-center",
+      keyboardAware && "bottom-(--drawer-keyboard-inset)"
+    )}>
+      <DrawerPrimitive.Popup
+        data-slot="drawer-content"
+        className={cn(
+          "flex max-h-[85dvh] w-full max-w-xl flex-col rounded-t-xl border-t bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] text-sm text-popover-foreground shadow-lg outline-none [transform:translateY(var(--drawer-swipe-movement-y,0px))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-swiping:select-none data-swiping:duration-0 data-ending-style:[transform:translateY(100%)] data-starting-style:[transform:translateY(100%)] motion-reduce:transition-none",
+          keyboardAware && "max-h-[min(85dvh,100%)]",
+          className
+        )}
+        {...props}
+      >
+        <div aria-hidden="true" className="mx-auto mt-2.5 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-muted" />
+        <DrawerPrimitive.Content className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{children}</DrawerPrimitive.Content>
+      </DrawerPrimitive.Popup>
+    </DrawerPrimitive.Viewport>
+  )
   return (
     <DrawerPrimitive.Portal container={useAdminPortal()}>
-      <DrawerPrimitive.VirtualKeyboardProvider>
-        <DrawerPrimitive.Backdrop
-          data-slot="drawer-overlay"
-          className="fixed inset-0 z-50 min-h-dvh bg-black/20 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 motion-reduce:transition-none"
-        />
-        <DrawerPrimitive.Viewport data-slot="drawer-viewport" className="fixed inset-0 bottom-(--drawer-keyboard-inset) z-50 flex items-end justify-center">
-          <DrawerPrimitive.Popup
-            data-slot="drawer-content"
-            className={cn(
-              "flex max-h-[min(85dvh,100%)] w-full max-w-xl flex-col rounded-t-xl border-t bg-popover pb-[max(1rem,env(safe-area-inset-bottom))] text-sm text-popover-foreground shadow-lg outline-none [transform:translateY(var(--drawer-swipe-movement-y,0px))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-swiping:select-none data-swiping:duration-0 data-ending-style:[transform:translateY(100%)] data-starting-style:[transform:translateY(100%)] motion-reduce:transition-none",
-              className
-            )}
-            {...props}
-          >
-            <div aria-hidden="true" className="mx-auto mt-2.5 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-muted" />
-            <DrawerPrimitive.Content className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{children}</DrawerPrimitive.Content>
-          </DrawerPrimitive.Popup>
-        </DrawerPrimitive.Viewport>
-      </DrawerPrimitive.VirtualKeyboardProvider>
+      <DrawerPrimitive.Backdrop
+        data-slot="drawer-overlay"
+        className="fixed inset-0 z-50 min-h-dvh bg-black/20 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 motion-reduce:transition-none"
+      />
+      {keyboardAware ? <DrawerPrimitive.VirtualKeyboardProvider>{viewport}</DrawerPrimitive.VirtualKeyboardProvider> : viewport}
     </DrawerPrimitive.Portal>
   )
 }
