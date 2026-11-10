@@ -119,7 +119,7 @@ export function DateButton({ id, value, onChange, placeholder = "Any date", disa
       <CalendarDays aria-hidden="true" className="text-muted-foreground" />
       <span className={value ? "truncate" : "truncate text-muted-foreground"}>{formatWallTime(value, { withTime: false }) || placeholder}</span>
     </PopoverTrigger>
-    <PopoverContent className="w-auto gap-0 p-0" align="start">
+    <PopoverContent className="w-auto gap-0 p-0 any-pointer-coarse:max-h-(--available-height) any-pointer-coarse:overflow-y-auto" align="start">
       <Calendar mode="single" captionLayout="dropdown" {...calendarBounds(selected)} selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) { emit(dayFromDate(date)); change(false); } }} />
       {clearable && value ? <div className="border-t p-1.5"><Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => { emit(""); change(false); }}>Clear date</Button></div> : null}
     </PopoverContent>
@@ -206,7 +206,7 @@ export function DateTimeField({ label, value, onChange, timeZone, seconds = fals
         {complete ? <span className="truncate">{formatWallTime(value)}</span> : day ? <span className="truncate">{formatWallTime(day, { withTime: false })}<span className="text-muted-foreground"> · pick a time</span></span> : <span className="truncate text-muted-foreground">{placeholder}</span>}
         {shortZone && complete ? <span title={zone} className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{shortZone}</span> : null}
       </PopoverTrigger>
-      <PopoverContent className="w-auto gap-0 p-0" align="start">
+      <PopoverContent className="w-auto gap-0 p-0 any-pointer-coarse:max-h-(--available-height) any-pointer-coarse:overflow-y-auto" align="start">
         {prompt ? <p className="max-w-64 border-b px-3 py-2 text-xs text-muted-foreground">{prompt}</p> : null}
         <Calendar mode="single" captionLayout="dropdown" {...calendarBounds(selected)} selected={selected} defaultMonth={selected} onSelect={(date) => { if (date) choose(dayFromDate(date), COMPLETE_CLOCK.test(clock) ? clock : startClock); }} />
         <div className="grid gap-2 border-t p-3">
@@ -304,7 +304,7 @@ export function DateRangeButton({ from, to, onChange, today, presets = ["today",
       <CalendarRange aria-hidden="true" className="text-muted-foreground" />
       <span className={active ? "truncate" : "truncate text-muted-foreground"}>{rangeText(from, to, placeholder)}</span>
     </PopoverTrigger>
-    <PopoverContent className="w-auto gap-0 p-0" align="start">
+    <PopoverContent className="w-auto gap-0 p-0 any-pointer-coarse:max-h-(--available-height) any-pointer-coarse:overflow-y-auto" align="start">
       {today && presets.length ? <div className="flex flex-wrap gap-1 border-b p-2" role="group" aria-label="Quick ranges">
         {presets.map((preset) => {
           const range = presetRange(preset, today);

@@ -3,7 +3,7 @@
 import { publicationLocalMinute } from "@byline/content";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";

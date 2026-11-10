@@ -30,28 +30,30 @@ const tab = (page: Page, name: "Plan" | "Write") => page.getByRole("tablist", { 
 
 // Phone, a narrow iPad Split View window, iPad portrait, small laptop, iPad landscape, laptop.
 for (const [width, height] of [[390, 844], [600, 900], [820, 1180], [1024, 768], [1194, 834], [1440, 900]] as const) {
-  test(`Plan and Write fit at ${width}px with both tabs and the lifecycle action in reach`, async ({ page }, info) => {
-    await page.setViewportSize({ width, height });
-    for (const workspace of ["plan", "write"] as const) {
-      await page.goto(`/admin/collections/stories/${storyId}?view=${workspace}`);
-      await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", workspace, { timeout: 60_000 });
-      await expect(tab(page, "Plan")).toBeInViewport();
-      await expect(tab(page, "Write")).toBeInViewport();
-      await expect(page.locator("[data-primary-action]")).toBeInViewport();
-      await expect(page.getByRole("button", { name: "More story actions" })).toBeInViewport();
-      // Touch-sized tabs.
-      expect((await tab(page, "Plan").boundingBox())!.height).toBeGreaterThanOrEqual(36);
-      if (workspace === "write") {
-        const measure = (await page.locator("[data-story-article] textarea[aria-label='Headline']").boundingBox())!.width;
-        expect(measure).toBeGreaterThanOrEqual(Math.min(width - 72, 440));
-        await expect(page.locator("[data-reporting-reference-toggle]")).toBeInViewport();
+  const touch = width !== 1024 && width !== 1440;
+  test.describe(`Story workspace at ${width}px`, () => {
+    test.use({ viewport: { width, height }, hasTouch: touch });
+    test(`Plan and Write fit at ${width}px with both tabs and the lifecycle action in reach`, async ({ page }, info) => {
+      for (const workspace of ["plan", "write"] as const) {
+        await page.goto(`/admin/collections/stories/${storyId}?view=${workspace}`);
+        await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", workspace, { timeout: 60_000 });
+        await expect(tab(page, "Plan")).toBeInViewport();
+        await expect(tab(page, "Write")).toBeInViewport();
+        await expect(page.locator("[data-primary-action]")).toBeInViewport();
+        await expect(page.getByRole("button", { name: "More story actions" })).toBeInViewport();
+        expect((await tab(page, "Plan").boundingBox())!.height).toBeGreaterThanOrEqual(touch ? 44 : 36);
+        if (workspace === "write") {
+          const measure = (await page.locator("[data-story-article] textarea[aria-label='Headline']").boundingBox())!.width;
+          expect(measure).toBeGreaterThanOrEqual(Math.min(width - 72, 440));
+          await expect(page.locator("[data-reporting-reference-toggle]")).toBeInViewport();
+        }
+        expect(await overflow(page)).toBeLessThanOrEqual(0);
+        await info.attach(`${workspace}-${width}`, { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
       }
+      await page.goto(`/admin/collections/stories/${storyId}?view=history`);
+      await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "history", { timeout: 60_000 });
       expect(await overflow(page)).toBeLessThanOrEqual(0);
-      await info.attach(`${workspace}-${width}`, { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
-    }
-    await page.goto(`/admin/collections/stories/${storyId}?view=history`);
-    await expect(page.locator("[data-story-view]")).toHaveAttribute("data-story-view", "history", { timeout: 60_000 });
-    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    });
   });
 }
 

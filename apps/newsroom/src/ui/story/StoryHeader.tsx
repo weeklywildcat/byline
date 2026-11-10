@@ -2,6 +2,7 @@
 
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
@@ -298,23 +299,24 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       setJumping(false);
     }
   }
+  const canHover = useFineHoverPointer();
   const canMove = Boolean(primary) || sidelineActions.length > 0 || canJump;
   const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc);
   const statusLine = changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
+  const phaseContent = <>
+    <PhaseBadge phase={phase} />
+    {statusLine && !run ? <span className="text-sm text-muted-foreground" data-story-status="">{statusLine}</span> : null}
+    {liveCoverage?.desk?.mode === "live" && liveCoverage.desk.status !== "off" ? <LiveBadge desk={liveCoverage.desk} timeZone={context.timeZone} /> : null}
+  </>;
 
   return (
     <header className="flex flex-col gap-2 border-b border-border pb-3" data-story-header="">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-[1_1_18rem] flex-wrap items-center gap-x-4 gap-y-1.5">
           <StorySwitchButton />
-          {/* Right-click the stage to move the Story: the same actions as the header button and the overflow menu. */}
-          <ContextMenu>
-            <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title={canMove ? "Right-click to move this story" : undefined} />}>
-              <PhaseBadge phase={phase} />
-              {statusLine && !run ? <span className="text-sm text-muted-foreground" data-story-status="">{statusLine}</span> : null}
-              {liveCoverage?.desk?.mode === "live" && liveCoverage.desk.status !== "off" ? <LiveBadge desk={liveCoverage.desk} timeZone={context.timeZone} /> : null}
-            </ContextMenuTrigger>
-            {canMove ? <ContextMenuContent className="w-56" side="bottom" align="start">
+          {canHover && canMove ? <ContextMenu>
+            <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title="Right-click to move this story" />}>{phaseContent}</ContextMenuTrigger>
+            <ContextMenuContent className="w-56" side="bottom" align="start">
               <ContextMenuGroup>
                 <ContextMenuLabel>{PHASE_LABELS[phase]}</ContextMenuLabel>
                 {primary ? <ContextMenuItem disabled={busy} onClick={primary.run} data-stage-menu-primary=""><ArrowRight aria-hidden="true" />{primary.label}</ContextMenuItem> : null}
@@ -336,8 +338,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
                   </ContextMenuSubContent>
                 </ContextMenuSub>
               </> : null}
-            </ContextMenuContent> : null}
-          </ContextMenu>
+            </ContextMenuContent>
+          </ContextMenu> : <div className="flex items-center gap-2" data-story-phase={phase}>{phaseContent}</div>}
           {/* Whose move it is in review, and the way into Review for anyone on the Story: a labelled link, never a hidden menu item. */}
           {statusLine && run ? (
             <Button type="button" variant="link" size="sm" className={changesRequested ? "h-auto p-0 font-medium text-destructive" : "h-auto p-0 font-normal text-muted-foreground"} onClick={() => onOpen("review")} data-story-status="" aria-label={`${statusLine}. Open review`}>

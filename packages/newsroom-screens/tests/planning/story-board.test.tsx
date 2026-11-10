@@ -334,3 +334,33 @@ describe("Lifecycle board (Payload)", () => {
     expect(options).not.toContain("Ready");
   });
 });
+
+it("on coarse pointers exposes a drag handle and flat move actions in each Board layout", async () => {
+  vi.mocked(window.matchMedia).mockImplementation((query) => ({
+    matches: query === "(any-pointer: coarse)",
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => true
+  }));
+  for (const layout of ["lanes", "dense", "stacked"] as const) {
+    onMoveStory.mockClear();
+    await mount(layout);
+    const card = $("[data-story-id='1']")!;
+    expect(card.querySelector("[aria-label='Drag Canteen could return']")).not.toBeNull();
+    expect(card.dataset.slot).not.toBe("context-menu-trigger");
+    await click(card.querySelector("[data-story-actions]"));
+    const drawer = $("[data-slot=drawer-content]")!;
+    expect(drawer.getAttribute("role")).toBe("dialog");
+    expect(drawer.querySelector("[role=menuitem]")).toBeNull();
+    const move = drawer.querySelector("[aria-label='Move to']")!;
+    expect(move.querySelector("[aria-current=true]")?.textContent).toBe("Pitch");
+    await click(Array.from(move.querySelectorAll("button")).find((button) => button.textContent === "Reporting") ?? null);
+    expect(onMoveStory).toHaveBeenLastCalledWith(stories[0], "reporting");
+    await act(async () => { root?.unmount(); });
+    root = null;
+  }
+});

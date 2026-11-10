@@ -53,7 +53,7 @@ export function CreateMenu({ compact = false }: { compact?: boolean }) {
       <SidebarMenuItem>
         {collapsed && (more.length || compact) ? (
           <DropdownMenu>
-            <DropdownMenuTrigger render={<SidebarMenuButton type="button" tooltip={compact ? { children: "Create", hidden: false } : "Create"} aria-label="Create" className={cn(primary, compact && "px-2.5 md:px-2")} />}>
+            <DropdownMenuTrigger render={<SidebarMenuButton type="button" tooltip={compact ? { children: "Create", hidden: false } : "Create"} aria-label="Create" className={cn(primary, compact && "px-2.5 md:px-2 any-pointer-coarse:justify-center")} />}>
               <Plus aria-hidden="true" />
               <span className={cn(compact && "sr-only")}>Create</span>
             </DropdownMenuTrigger>

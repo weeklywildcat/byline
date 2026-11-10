@@ -2,7 +2,7 @@
 
 import { peopleKeys } from "@byline/newsroom-screens/people/people-query";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";

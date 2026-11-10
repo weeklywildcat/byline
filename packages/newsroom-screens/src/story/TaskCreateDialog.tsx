@@ -5,7 +5,7 @@ import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { AssigneePicker, DatePicker } from "../editorial/pickers";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@byline/newsroom-ui/ui/combobox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";

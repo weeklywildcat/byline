@@ -1,9 +1,11 @@
-import { ArrowRightLeft, ArrowUpRight, FilePen, FileText, MoreHorizontal, PanelRightOpen } from "lucide-react";
-import { Button } from "@byline/newsroom-ui/ui/button";
+import { ArrowRightLeft, Check, ArrowUpRight, FilePen, FileText, MoreHorizontal, PanelRightOpen } from "lucide-react";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { useAnyCoarsePointer, useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { useRef, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 
 export type StoryActionsMenuProps = {
@@ -45,6 +47,19 @@ export function storyDestinations(story: Pick<PlanningStory, "id" | "editUrl" | 
   };
 }
 
+function destinationActions(story: PlanningStory, workspaceUrl: StoryActionsMenuProps["workspaceUrl"]) {
+  const { open, edit, preview } = storyDestinations(story, workspaceUrl);
+  return [
+    { href: open, label: "Open story", Icon: FileText },
+    ...(edit ? [{ href: edit, label: "Edit article", Icon: FilePen }] : []),
+    ...(preview ? [{ href: preview, label: "Preview", Icon: ArrowUpRight, newTab: true }] : [])
+  ];
+}
+
+function destinationLink(href: string, newTab?: boolean) {
+  return <a href={href} target={newTab ? "_blank" : undefined} rel={newTab ? "noopener noreferrer" : undefined} />;
+}
+
 /** Published comes from the publication state; it is never a stage to move to or from. Participants cannot move a story either. */
 export const canMoveFromMenu = (story: PlanningStory, canMove: boolean) => canMove && story.canEditPlanning !== false && !story.publicationState.isPublished;
 
@@ -57,14 +72,40 @@ export function StoryActionsMenu({ story, statuses, canMove, disabled, onMove, w
   const title = story.title || "Untitled story";
   const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
-  const go = storyDestinations(story, workspaceUrl);
+  const destinations = destinationActions(story, workspaceUrl);
+  const touch = useAnyCoarsePointer();
+  const [open, setOpen] = useState(false);
+  const trigger = <Button type="button" variant="ghost" size={size} className={cn("shrink-0", className)} disabled={disabled} aria-label={`Actions for ${title}`} data-story-actions={story.id} />;
+  const triggerIcon = <MoreHorizontal aria-hidden="true" />;
+  if (touch) return <Drawer open={open} onOpenChange={setOpen}>
+    <DrawerTrigger render={trigger}>{triggerIcon}</DrawerTrigger>
+    <DrawerContent>
+      <DrawerHeader><DrawerTitle>Story actions</DrawerTitle><DrawerDescription>{title}</DrawerDescription></DrawerHeader>
+      <div className="flex flex-col px-4 pb-2">
+        {destinations.map(({ href, label, Icon, newTab }) => <a key={label} href={href} target={newTab ? "_blank" : undefined} rel={newTab ? "noopener noreferrer" : undefined}
+          className={buttonVariants({ variant: "ghost", className: "w-full justify-start" })} onClick={() => setOpen(false)}>
+          <Icon aria-hidden="true" />{label}{newTab ? <span className="sr-only"> (opens in a new tab)</span> : null}
+        </a>)}
+        {additionalActions?.map((action) => <DrawerClose key={action.id} render={<Button type="button" variant="ghost" className="w-full justify-start" />} onClick={action.run}>{action.label}</DrawerClose>)}
+        {movable && stages.length ? <section aria-label="Move to" className="mt-2 border-t pt-2">
+          <h3 className="px-2.5 py-1 text-sm font-medium">Move to</h3>
+          {stages.map((stage) => {
+            const current = stage.id === story.workflow.id;
+            return <DrawerClose key={stage.id} render={<Button type="button" variant="ghost" className="w-full justify-start" aria-current={current || undefined} />}
+              disabled={disabled} onClick={() => { if (!current) onMove(story, stage.id); }}>
+              {stage.label}{current ? <Check className="ml-auto" aria-hidden="true" /> : null}
+            </DrawerClose>;
+          })}
+        </section> : null}
+      </div>
+    </DrawerContent>
+  </Drawer>;
+
   return <DropdownMenu>
-    <DropdownMenuTrigger render={<Button variant="ghost" size={size} className={cn("shrink-0", className)} disabled={disabled} aria-label={`Actions for ${title}`} data-story-actions={story.id} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+    <DropdownMenuTrigger render={trigger}>{triggerIcon}</DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-52">
       <DropdownMenuGroup>
-        <DropdownMenuItem render={<a href={go.open} />}><FileText aria-hidden="true" />Open story</DropdownMenuItem>
-        {go.edit ? <DropdownMenuItem render={<a href={go.edit} />}><FilePen aria-hidden="true" />Edit article</DropdownMenuItem> : null}
-        {go.preview ? <DropdownMenuItem render={<a href={go.preview} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />Preview<span className="sr-only"> {"(opens in a new tab)"}</span></DropdownMenuItem> : null}
+        {destinations.map(({ href, label, Icon, newTab }) => <DropdownMenuItem key={label} render={destinationLink(href, newTab)}><Icon aria-hidden="true" />{label}{newTab ? <span className="sr-only"> (opens in a new tab)</span> : null}</DropdownMenuItem>)}
       </DropdownMenuGroup>
       {movable && stages.length ? <>
         <DropdownMenuSeparator />
@@ -97,12 +138,13 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
   const title = story.title || "Untitled story";
   const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
-  const go = storyDestinations(story, workspaceUrl);
+  const destinations = destinationActions(story, workspaceUrl);
   // macOS Control-click is a secondary click even though the browser reports
   // the pointer button as primary. Base UI correctly opens the context menu on
   // the contextmenu event, but WebKit/Chromium can still dispatch a follow-up
   // click to the element underneath. Keep a short-lived guard so that follow-up
   // click cannot open Story Peek or navigate a nested control.
+  const canHover = useFineHoverPointer();
   const secondaryPressUntil = useRef(0);
   const markSecondaryPress = () => { secondaryPressUntil.current = performance.now() + 750; };
   const suppressSecondaryActivation = (event: ReactMouseEvent<HTMLElement>) => {
@@ -112,6 +154,8 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
       secondaryPressUntil.current = 0;
     }
   };
+
+  if (!canHover) return children;
 
   return <ContextMenu>
     <ContextMenuTrigger
@@ -128,9 +172,7 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
         <ContextMenuLabel className="max-w-52 truncate">{title}</ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={disabled} onClick={() => onOpenStory(story.id)}><PanelRightOpen aria-hidden="true" />Quick view</ContextMenuItem>
-        <ContextMenuItem render={<a href={go.open} />}><FileText aria-hidden="true" />Open story</ContextMenuItem>
-        {go.edit ? <ContextMenuItem render={<a href={go.edit} />}><FilePen aria-hidden="true" />Edit article</ContextMenuItem> : null}
-        {go.preview ? <ContextMenuItem render={<a href={go.preview} target="_blank" rel="noopener noreferrer" />}><ArrowUpRight aria-hidden="true" />Preview<span className="sr-only"> {"(opens in a new tab)"}</span></ContextMenuItem> : null}
+        {destinations.map(({ href, label, Icon, newTab }) => <ContextMenuItem key={label} render={destinationLink(href, newTab)}><Icon aria-hidden="true" />{label}{newTab ? <span className="sr-only"> (opens in a new tab)</span> : null}</ContextMenuItem>)}
       </ContextMenuGroup>
       {movable && stages.length ? <>
         <ContextMenuSeparator />

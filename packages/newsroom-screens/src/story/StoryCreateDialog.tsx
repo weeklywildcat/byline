@@ -8,7 +8,7 @@ import { useWorkloadHints } from "../editorial/workload-hints";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";

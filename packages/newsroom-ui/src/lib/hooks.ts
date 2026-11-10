@@ -46,11 +46,12 @@ export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, 
  */
 export function useMediaQuery(query: string, serverValue = false): boolean {
   const subscribe = useCallback((onChange: () => void) => {
-    const media = window.matchMedia(query);
+    const media = window.matchMedia?.(query);
+    if (!media) return () => {};
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [query]);
-  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => serverValue);
+  return useSyncExternalStore(subscribe, () => window.matchMedia?.(query).matches ?? serverValue, () => serverValue);
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -59,4 +60,12 @@ const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 /** Whether the current viewport is below the shadcn Sidebar mobile breakpoint ("not mobile" while hydrating). */
 export function useIsMobile(): boolean {
   return useMediaQuery(MOBILE_QUERY);
+}
+
+export function useAnyCoarsePointer(): boolean {
+  return useMediaQuery("(any-pointer: coarse)");
+}
+
+export function useFineHoverPointer(): boolean {
+  return useMediaQuery("(hover: hover) and (pointer: fine)");
 }

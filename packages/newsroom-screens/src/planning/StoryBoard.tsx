@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, GripVertical } from "lucide-react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { draggable, dropTargetForElements, monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { autoScrollForElements, autoScrollWindowForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
@@ -59,18 +60,21 @@ const itemProps = (items: StageItems, story: PlanningStory): StoryItemProps => (
 });
 
 /** Pragmatic drag and drop owns the pointer drag. Its native drag image is the item itself; the source stays in place, subdued. */
-function useStoryDrag(element: HTMLElement | null, story: PlanningStory, movable: boolean): boolean {
+function useStoryDrag(element: HTMLElement | null, story: PlanningStory, movable: boolean) {
+  const touch = useAnyCoarsePointer();
+  const [handle, setHandle] = useState<HTMLSpanElement | null>(null);
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
-    if (!element || !movable) return undefined;
+    if (!element || !movable || (touch && !handle)) return undefined;
     return draggable({
       element,
+      dragHandle: touch ? handle ?? undefined : undefined,
       getInitialData: () => ({ type: DRAG_TYPE, storyId: story.id, workflowId: story.workflow.id }),
       onDragStart: () => setDragging(true),
       onDrop: () => setDragging(false)
     });
-  }, [element, movable, story.id, story.workflow.id]);
-  return dragging;
+  }, [element, handle, movable, story.id, story.workflow.id, touch]);
+  return { dragging, touch, setHandle };
 }
 
 /** The whole stage is the drop target, folded or not. It accepts any movable story that is not already in it. */
@@ -117,7 +121,13 @@ function StoryMeta({ story, timezone, now }: { story: PlanningStory; timezone: s
 /** The visible menu, shown on hover or focus (always on touch), so Move to stays reachable without right-click. */
 function CornerMenu({ story, statuses, canMoveStories, moving, onMoveStory, workspaceUrl }: StoryItemProps) {
   return <StoryActionsMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} size="icon-xs"
-    className="absolute top-1 right-1 bg-card opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-within/card:opacity-100 pointer-coarse:opacity-100 data-popup-open:opacity-100" />;
+    className="absolute top-1 right-1 bg-card opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-within/card:opacity-100 any-pointer-coarse:opacity-100 data-popup-open:opacity-100" />;
+}
+
+function StoryDragHandle({ ref }: { ref: (element: HTMLSpanElement | null) => void }) {
+  return <span ref={ref} aria-hidden="true" data-story-drag-handle="" className="absolute top-1 left-1 flex size-11 touch-none cursor-grab items-center justify-center text-muted-foreground">
+    <GripVertical className="size-4" aria-hidden="true" />
+  </span>;
 }
 
 /** Lanes and Stacked: a compact card, about 64px without signals. */
@@ -125,15 +135,16 @@ function BoardCard(props: StoryItemProps) {
   const { story, statuses, canMoveStories, moving, moved, timezone, now, workspaceUrl, onMoveStory, onOpenStory } = props;
   const [element, setElement] = useState<HTMLDivElement | null>(null);
   const movable = isMovable(story, canMoveStories);
-  const dragging = useStoryDrag(element, story, movable);
+  const { dragging, touch, setHandle } = useStoryDrag(element, story, movable);
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
     <Card ref={setElement} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
-      className={cn("relative shrink-0 gap-1 rounded-[10px] py-2 shadow-xs transition-colors duration-700", movable && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
+      className={cn("relative shrink-0 gap-1 rounded-[10px] py-2 shadow-xs transition-colors duration-700", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <CardContent className="flex flex-col gap-1 px-2.5">
-        <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="pr-5 text-[13px] leading-[1.35] line-clamp-2" data-story-title={story.id} /></StoryHoverCard>
+        <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("pr-5 text-[13px] leading-[1.35] line-clamp-2 any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
         <StoryMeta story={story} timezone={timezone} now={now} />
         <StoryAttentionSignals story={story} />
       </CardContent>
+      {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
     </Card>
   </StoryContextMenu>;
@@ -144,17 +155,18 @@ function DenseRow(props: StoryItemProps) {
   const { story, statuses, canMoveStories, moving, moved, timezone, now, workspaceUrl, onMoveStory, onOpenStory } = props;
   const [element, setElement] = useState<HTMLDivElement | null>(null);
   const movable = isMovable(story, canMoveStories);
-  const dragging = useStoryDrag(element, story, movable);
+  const { dragging, touch, setHandle } = useStoryDrag(element, story, movable);
   const names = writersOf(story).map((person) => person.name).join(", ");
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
     <div ref={setElement} role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
-      className={cn("group/card relative shrink-0 border-b border-border/60 bg-card px-2.5 py-[7px] transition-colors duration-700 hover:bg-muted/40", movable && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
-      <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="block w-full truncate pr-5 text-[13px] leading-[18px] font-medium" data-story-title={story.id} /></StoryHoverCard>
+      className={cn("group/card relative shrink-0 border-b border-border/60 bg-card px-2.5 py-[7px] transition-colors duration-700 hover:bg-muted/40", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
+      <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("block w-full truncate pr-5 text-[13px] leading-[18px] font-medium any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
       <div className="flex min-w-0 items-center gap-2 text-xs leading-4">
         <span className="min-w-0 flex-1 truncate text-muted-foreground" title={names || undefined}>{names || "Unassigned"}</span>
         {story.attention ? <StoryAttentionSignals story={story} limit={1} className="max-w-[55%] shrink flex-nowrap [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0" /> : <ProductionSummary story={story} maxSignals={1} empty={null} className="shrink-0 flex-nowrap gap-1 [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0 [&_button]:h-4" />}
         <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={"No deadline"} className="shrink-0 whitespace-nowrap" />
       </div>
+      {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
     </div>
   </StoryContextMenu>;

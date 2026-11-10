@@ -1,5 +1,5 @@
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@byline/newsroom-ui/ui/input-group";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

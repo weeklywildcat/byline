@@ -47,7 +47,7 @@ export function CalendarControls({ timezone, scheduleFeed, currentUserId, onDate
   return (
     <div className="flex min-h-0 flex-col" data-calendar-controls="">
       <SidebarGroup className="px-0 pt-0">
-        <SidebarGroupContent className="flex justify-center">
+        <SidebarGroupContent className="@container flex justify-center">
           <Calendar
             mode="single"
             captionLayout="dropdown"
@@ -63,7 +63,7 @@ export function CalendarControls({ timezone, scheduleFeed, currentUserId, onDate
               workspace.setDate(Temporal.PlainDate.from(day));
               onDatePicked?.();
             }}
-            className="bg-transparent [--cell-size:2.1rem]"
+            className="bg-transparent [--cell-size:2.1rem] any-pointer-coarse:p-0 any-pointer-coarse:[--cell-size:min(--spacing(11),100cqi/7)]"
             aria-label="Choose a date"
           />
         </SidebarGroupContent>

@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { FieldGroup } from "@byline/newsroom-ui/ui/field";
 
@@ -35,6 +35,7 @@ export type WorkspaceDialogProps = {
  */
 export function WorkspaceDialog({ open, onClose, finalFocus, title, description, submitLabel, pendingLabel = "Saving…", pending, dirty = false, error, onReload, onSubmit, secondary, modal = true, readOnly, children }: WorkspaceDialogProps) {
   const [discardOpen, setDiscardOpen] = useState(false);
+  const discardConfirmed = useRef(false);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!pending && !readOnly) onSubmit();
@@ -57,7 +58,7 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
 
   return <>
     <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
+      <DialogContent data-workspace-dialog="" finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
         <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
         <form onSubmit={submit} noValidate className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
           <FieldGroup className="no-scrollbar -mx-4 min-h-0 w-auto gap-4 overflow-y-auto px-4 pb-1">
@@ -72,7 +73,13 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
         </form>
       </DialogContent>
     </Dialog>
-    <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+    <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen} onOpenChangeComplete={(open) => {
+      // Finish closing the confirmation before the form restores focus to its opener.
+      if (!open && discardConfirmed.current) {
+        discardConfirmed.current = false;
+        onClose();
+      }
+    }}>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
@@ -80,7 +87,7 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Keep editing</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { setDiscardOpen(false); onClose(); }}>Discard changes</AlertDialogAction>
+          <AlertDialogAction variant="destructive" onClick={() => { discardConfirmed.current = true; setDiscardOpen(false); }}>Discard changes</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -112,10 +119,10 @@ export function RemoveControl({ label, pending, onStart, onConfirm, ...confirm }
 }
 
 
-/** Move keyboard focus to the first invalid control in the topmost Nova dialog. */
+/** Move keyboard focus to the first invalid control in the topmost Workspace Dialog or touch Drawer. */
 export function focusFirstInvalidField() {
   requestAnimationFrame(() => {
-    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dialog-content"]'));
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[data-workspace-dialog][data-open]'));
     const root = dialogs[dialogs.length - 1];
     const control = root?.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"] input, [data-invalid="true"] textarea, [data-invalid="true"] button, [data-invalid="true"] [role="combobox"]');
     control?.focus();
