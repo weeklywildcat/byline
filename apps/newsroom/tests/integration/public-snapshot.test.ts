@@ -10,6 +10,7 @@ import { commitTransaction, createLocalReq, getPayload, initTransaction, killTra
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { lexicalFromArticleBody } from "../../../../packages/editor/tests/lexical-fixture";
+import { plainTextToLexical } from "../../src/newsroom/live-text";
 import { readCurrentRevision, readPublicationState } from "../../src/db/publication-state";
 import { drizzleFor } from "../../src/publication-media/state";
 import { serveBuildMedia } from "../../src/publication-media/build-endpoint";
@@ -549,6 +550,50 @@ describe("the projection", () => {
     snap = await snapshot();
     const manifest = snap.datasets.media.find((entry) => entry.id === ids.photo)?.manifest;
     expect(manifest).toMatchObject({ focalPoint: { x: 30, y: 40 } });
+  });
+
+  it("re-queues a live update with a newly uploaded photo after that photo is prepared", async () => {
+    const story = await draftStory("Live photo coverage");
+    await publish(story);
+    const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: story } }, limit: 1, depth: 0, overrideAccess: true })).docs[0];
+    await payload.update({
+      collection: "story-plans",
+      id: plan.id,
+      data: { liveCoverage: { mode: "live", state: "live", startedAt: new Date().toISOString(), endedAt: null } },
+      overrideAccess: true,
+      context: { bylineSystem: true }
+    });
+
+    const photo = await upload(await image("snapshot-live-update.jpg", 1800, 1200));
+    const marker = "SENTINEL-LIVE-PHOTO touchdown";
+    const update = await payload.create({
+      collection: "live-updates",
+      data: { story, headline: "Touchdown", body: plainTextToLexical(marker), photo, state: "published", publishedAt: new Date().toISOString() } as never,
+      overrideAccess: true,
+      context: { bylineSystem: true }
+    });
+    const revision = await rev();
+    expect(await snapshotJobs()).toHaveLength(1);
+
+    const waiting = await runPublicSnapshotPreparation(payload);
+    expect(waiting).toMatchObject({ outcome: "not-ready", code: "media-not-ready" });
+    expect((waiting as { details: string[] }).details.join(" ")).toContain(`Media ${photo}`);
+
+    // Simulate the snapshot worker having consumed its waiting job. The media
+    // worker must put the current revision back on the publication queue when
+    // the rendition becomes ready, without inventing another public revision.
+    await clearJobs();
+    await runMedia();
+    expect(await rev()).toBe(revision);
+    expect(await snapshotJobs()).toHaveLength(1);
+    expect((await runPublicSnapshotPreparation(payload)).outcome).toBe("ready");
+
+    const ready = await snapshot();
+    const live = ready.datasets.stories.find((entry) => entry.id === story)?.live;
+    const projected = live?.updates.find((entry) => entry.id === update.id);
+    expect(projected?.html).toContain(marker);
+    expect(projected?.image?.src).toMatch(/^\/_byline\/media\//);
+    expect(ready.datasets.media.some((entry) => entry.id === photo)).toBe(true);
   });
 });
 

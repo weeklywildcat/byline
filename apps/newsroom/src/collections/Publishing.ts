@@ -158,8 +158,8 @@ const replacePinned: CollectionAfterChangeHook = async ({ doc, previousDoc, req 
 
 /**
  * Live coverage updates. A story with live coverage keeps its format; the
- * public projection (Phase 11) exposes only published updates on published
- * stories, through the same-origin Worker proxy.
+ * public projection exposes only published updates on published stories.
+ * Astro snapshots that projection into the article and its static live feed.
  */
 export const LiveUpdates: CollectionConfig = {
   slug: "live-updates",
