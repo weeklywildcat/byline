@@ -5,13 +5,14 @@ import { getNativeSnapshot } from "./native-snapshot";
 import type { ArchiveAuthor, ArchiveCategory, ArchiveGuestContributor, ArchiveMedia, ArchivePage, ArchivePost, ArchiveTag } from "./public-content";
 
 type NativeLiveCoverage = PublicBuildSnapshotV2["datasets"]["stories"][number]["live"];
+type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt">;
 
 /**
  * Archive pages and cards only need the coverage state. Keeping the full live
  * timeline here would make every update invalidate section/author/homepage
  * render inputs even though those surfaces only render the LIVE badge.
  */
-export function archiveLiveState(live: NativeLiveCoverage) {
+export function archiveLiveState(live: ArchiveLiveState | null) {
   return live ? { status: live.status, startedAt: live.startedAt, endedAt: live.endedAt, updates: [] } : undefined;
 }
 
