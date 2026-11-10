@@ -76,6 +76,8 @@ export type TranscriptDetail = {
   language: string | null;
   durationMs: number | null;
   failure: string | null;
+  progressPercent: number | null;
+  progressMessage: string | null;
   updatedAt: string;
   editedAt: string | null;
   segments: TranscriptSegment[];
@@ -166,6 +168,8 @@ export async function transcriptDetail(ctx: ScreenContext, id: number): Promise<
     language: row.language ?? null,
     durationMs: row.durationMs ?? file.durationMs ?? null,
     failure: row.failure ?? null,
+    progressPercent: typeof row.progressPercent === "number" ? row.progressPercent : null,
+    progressMessage: row.progressMessage ?? null,
     updatedAt: row.updatedAt,
     editedAt: row.editedAt ?? null,
     segments,
