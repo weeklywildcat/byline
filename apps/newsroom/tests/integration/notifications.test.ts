@@ -238,10 +238,12 @@ describe("email", () => {
       expect(row.emailState).toBe("pending");
       expect(await deliverNotification(payload, row.id)).toBe("sent");
       expect(send).toHaveBeenCalledTimes(1);
-      const message = send.mock.calls[0][0] as { to: string; subject: string; text: string };
+      const message = send.mock.calls[0][0] as { to: string; subject: string; text: string; html: string };
       expect(message.to).toBe("notify-alice@example.test");
       expect(message.subject).toContain("Fact-check the tally");
       expect(message.text).toContain(`https://newsroom.example.test/admin/collections/stories/${story.budget}`);
+      expect(message.html).toContain(">BYLINE<");
+      expect(message.html).toContain("Open in Byline&nbsp;→");
       expect((await received("alice"))[0].emailState).toBe("sent");
       // Delivering again is a no-op.
       expect(await deliverNotification(payload, row.id)).toBe("skipped");
