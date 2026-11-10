@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useRef, useState, type ReactElement
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
+import { useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
 import { decodeEntities } from "@byline/newsroom-ui/lib/text";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@byline/newsroom-ui/ui/hover-card";
 import { Separator } from "@byline/newsroom-ui/ui/separator";
@@ -75,7 +76,8 @@ export function StoryHoverCard(props: {
   children: ReactElement;
 }) {
   const context = useContext(StoryHoverContext);
-  if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
+  const canHover = useFineHoverPointer();
+  if (!canHover || !context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
   return <StoryHoverCardQuery {...props} context={context} />;
 }
 

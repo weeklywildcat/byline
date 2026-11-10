@@ -18,6 +18,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
@@ -564,6 +566,7 @@ function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onE
 /** Ground rules are recorded by a person, never inferred: a visible badge that is also the editor. */
 function GroundRulesEditor({ context, source, canEdit, refresh }: { context: StoryScreenContext; source: ReportingSource; canEdit: boolean; refresh: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
+  const touch = useAnyCoarsePointer();
   const [rule, setRule] = useState(source.groundRules);
   const [permission, setPermission] = useState(source.recordingPermission);
   const [note, setNote] = useState(source.groundRulesNote);
@@ -574,22 +577,34 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
   });
   const badge = <Badge variant={source.groundRules === "off-record" ? "destructive" : "outline"}>{groundRuleLabel(source.groundRules)}</Badge>;
   if (!canEdit) return badge;
-  return (
-    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) { setRule(source.groundRules); setPermission(source.recordingPermission); setNote(source.groundRulesNote); } }}>
-      <PopoverTrigger render={<button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50" />}>{badge}</PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); save.mutate(); }}>
-          <p className="text-sm font-medium">What did {source.label} agree to?</p>
-          <Select items={GROUND_RULE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))} value={rule} onValueChange={(next) => { if (next) setRule(next as typeof rule); }}>
-            <SelectTrigger aria-label="Ground rules" className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>{GROUND_RULE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-          </Select>
-          <label className="flex items-center gap-2 text-sm"><Checkbox checked={permission} onCheckedChange={(next) => setPermission(next === true)} />Recording permission confirmed</label>
-          <Input value={note} maxLength={600} placeholder="Note (optional)" aria-label="Ground rules note" onChange={(event) => setNote(event.target.value)} />
-          <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
-          <Button type="submit" size="sm" disabled={save.isPending}>Save</Button>
-        </form>
-      </PopoverContent>
-    </Popover>
-  );
+  const form = <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); save.mutate(); }}>
+    <p className="text-sm font-medium">What did {source.label} agree to?</p>
+    <Select items={GROUND_RULE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))} value={rule} onValueChange={(next) => { if (next) setRule(next as typeof rule); }}>
+      <SelectTrigger aria-label="Ground rules" className="w-full"><SelectValue /></SelectTrigger>
+      <SelectContent alignItemWithTrigger={false}>{GROUND_RULE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+    </Select>
+    <label className="flex items-center gap-2 text-sm any-pointer-coarse:min-h-11"><Checkbox checked={permission} onCheckedChange={(next) => setPermission(next === true)} />Recording permission confirmed</label>
+    <Input value={note} maxLength={600} placeholder="Note (optional)" aria-label="Ground rules note" onChange={(event) => setNote(event.target.value)} />
+    <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
+    <Button type="submit" size="sm" disabled={save.isPending}>Save</Button>
+  </form>;
+  const trigger = <button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11" />;
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setRule(source.groundRules);
+      setPermission(source.recordingPermission);
+      setNote(source.groundRulesNote);
+    }
+  };
+  return touch ? <Drawer open={open} onOpenChange={changeOpen}>
+    <DrawerTrigger render={trigger}>{badge}</DrawerTrigger>
+    <DrawerContent>
+      <DrawerHeader><DrawerTitle>Edit ground rules</DrawerTitle><DrawerDescription>{source.label}</DrawerDescription></DrawerHeader>
+      <div className="px-4 pb-2">{form}</div>
+    </DrawerContent>
+  </Drawer> : <Popover open={open} onOpenChange={changeOpen}>
+    <PopoverTrigger render={trigger}>{badge}</PopoverTrigger>
+    <PopoverContent align="start" className="w-72">{form}</PopoverContent>
+  </Popover>;
 }

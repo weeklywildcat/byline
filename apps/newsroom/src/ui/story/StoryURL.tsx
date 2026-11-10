@@ -2,7 +2,7 @@
 
 import { publicStoryPath, publicationLocalDateTime } from "@byline/content";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/dialog";
+import { DialogRoot as Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
 import { TextField } from "@byline/newsroom-ui/components/form-fields";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";

@@ -60,3 +60,11 @@ const MOBILE_QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 export function useIsMobile(): boolean {
   return useMediaQuery(MOBILE_QUERY);
 }
+
+export function useAnyCoarsePointer(): boolean {
+  return useMediaQuery("(any-pointer: coarse)");
+}
+
+export function useFineHoverPointer(): boolean {
+  return useMediaQuery("(hover: hover) and (pointer: fine)");
+}

@@ -6,6 +6,8 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { EMPTY_PLANNING_FILTERS, normalizePlanningFilters, type PlanningFilters, type PlanningPerson, type PlanningWorkflowStatus } from "../planning/planning-model";
@@ -73,9 +75,13 @@ export type StoryFiltersProps = {
  */
 export function StoryFilters({ filters, onChange, statuses, writers, editors, showPublished, today }: StoryFiltersProps) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const touch = useAnyCoarsePointer();
   const update = (patch: Partial<PlanningFilters>) => onChange(normalizePlanningFilters({ ...filters, ...patch }));
   const chips = [...moreFilterChips(filters), ...(showPublished?.value ? [{ key: "published", label: "Showing published", clear: {} as Partial<PlanningFilters> }] : [])];
   const workflowOptions: Option[] = [{ value: ALL, label: "All workflows" }, ...statuses.filter((status) => status.group !== "derived").map((status) => ({ value: status.id, label: status.label }))];
+
+  const moreTrigger = <Button type="button" variant="outline" className="shrink-0" />;
+  const moreLabel = <><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />More filters{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></>;
 
   return <div className="flex flex-col gap-2" role="search" aria-label={"Filter stories"}>
     <div className="flex flex-wrap items-center gap-1.5 @4xl/planning:flex-nowrap">
@@ -86,23 +92,34 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sh
       <OptionSelect label={"Workflow"} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="h-8 w-32 shrink-0" />
       <OptionSelect label={"Writer"} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, "Any writer")} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
       <OptionSelect label={"Editor"} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, "Any editor")} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
-      <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-        <PopoverTrigger render={<Button variant="outline" className="shrink-0" />}><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />More filters{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></PopoverTrigger>
+      {touch ? <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
+        <DrawerTrigger render={moreTrigger}>{moreLabel}</DrawerTrigger>
+        <DrawerContent>
+          <DrawerHeader><DrawerTitle>Filters</DrawerTitle></DrawerHeader>
+          <div className="px-4"><MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} /></div>
+          <DrawerFooter><DrawerClose render={<Button type="button" variant="outline" />}>Done</DrawerClose></DrawerFooter>
+        </DrawerContent>
+      </Drawer> : <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+        <PopoverTrigger render={moreTrigger}>{moreLabel}</PopoverTrigger>
         <PopoverContent align="start" className="w-80 gap-4">
-          <FieldGroup className="gap-3">
-            <Field><FieldLabel htmlFor="story-filter-publication">Publication</FieldLabel><OptionSelect id="story-filter-publication" label={"Publication"} value={filters.publicationState} options={PUBLICATION_STATES} onChange={(publicationState) => update({ publicationState })} className="w-full" /></Field>
-            <Field><FieldLabel htmlFor="story-filter-visual">Visual status</FieldLabel><OptionSelect id="story-filter-visual" label={"Visual status"} value={filters.visualStatus} options={VISUAL_STATUSES} onChange={(visualStatus) => update({ visualStatus })} className="w-full" /></Field>
-            <Field><FieldLabel htmlFor="story-filter-deadline">Deadline</FieldLabel><DateRangeButton id="story-filter-deadline" from={filters.deadlineFrom} to={filters.deadlineTo} today={today} presets={["today", "next7", "month"]} onChange={(deadlineFrom, deadlineTo) => update({ deadlineFrom, deadlineTo })} /></Field>
-            <Field><FieldLabel htmlFor="story-filter-planned">Planned publication</FieldLabel><DateRangeButton id="story-filter-planned" from={filters.plannedFrom} to={filters.plannedTo} today={today} presets={["today", "next7", "month"]} onChange={(plannedFrom, plannedTo) => update({ plannedFrom, plannedTo })} /></Field>
-            {showPublished ? <Field orientation="horizontal"><Checkbox id="story-filter-published" checked={showPublished.value} onCheckedChange={(checked) => showPublished.onChange(Boolean(checked))} /><FieldLabel htmlFor="story-filter-published" className="font-normal">Show finished published stories</FieldLabel></Field> : null}
-            {([["mine", "Mine"], ["unassigned", "Unassigned"], ["overdue", "Overdue"], ["needsReview", "Needs review"]] as const).map(([key, label]) => <Field key={key} orientation="horizontal"><Checkbox id={`story-filter-${key}`} checked={filters[key]} onCheckedChange={(checked) => update({ [key]: Boolean(checked) })} /><FieldLabel htmlFor={`story-filter-${key}`} className="font-normal">{label}</FieldLabel></Field>)}
-          </FieldGroup>
+          <MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} />
         </PopoverContent>
-      </Popover>
+      </Popover>}
       {hasActiveFilters(filters) ? <Button variant="ghost" className="shrink-0" onClick={() => onChange({ ...EMPTY_PLANNING_FILTERS })}>Clear</Button> : null}
     </div>
     {chips.length ? <ul className="flex flex-wrap items-center gap-1.5" aria-label={"Active filters"}>
-      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10" aria-label={`Remove filter: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
+      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10 any-pointer-coarse:relative any-pointer-coarse:after:absolute any-pointer-coarse:after:top-1/2 any-pointer-coarse:after:right-0 any-pointer-coarse:after:size-11 any-pointer-coarse:after:-translate-y-1/2" aria-label={`Remove filter: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
     </ul> : null}
   </div>;
+}
+
+function MoreFilterFields({ filters, update, showPublished, today }: Pick<StoryFiltersProps, "filters" | "showPublished" | "today"> & { update: (patch: Partial<PlanningFilters>) => void }) {
+  return <FieldGroup className="gap-3 any-pointer-coarse:[&_[data-slot=field][data-orientation=horizontal]]:min-h-11">
+    <Field><FieldLabel htmlFor="story-filter-publication">Publication</FieldLabel><OptionSelect id="story-filter-publication" label={"Publication"} value={filters.publicationState} options={PUBLICATION_STATES} onChange={(publicationState) => update({ publicationState })} className="w-full" /></Field>
+    <Field><FieldLabel htmlFor="story-filter-visual">Visual status</FieldLabel><OptionSelect id="story-filter-visual" label={"Visual status"} value={filters.visualStatus} options={VISUAL_STATUSES} onChange={(visualStatus) => update({ visualStatus })} className="w-full" /></Field>
+    <Field><FieldLabel htmlFor="story-filter-deadline">Deadline</FieldLabel><DateRangeButton id="story-filter-deadline" from={filters.deadlineFrom} to={filters.deadlineTo} today={today} presets={["today", "next7", "month"]} onChange={(deadlineFrom, deadlineTo) => update({ deadlineFrom, deadlineTo })} /></Field>
+    <Field><FieldLabel htmlFor="story-filter-planned">Planned publication</FieldLabel><DateRangeButton id="story-filter-planned" from={filters.plannedFrom} to={filters.plannedTo} today={today} presets={["today", "next7", "month"]} onChange={(plannedFrom, plannedTo) => update({ plannedFrom, plannedTo })} /></Field>
+    {showPublished ? <Field orientation="horizontal"><Checkbox id="story-filter-published" checked={showPublished.value} onCheckedChange={(checked) => showPublished.onChange(Boolean(checked))} /><FieldLabel htmlFor="story-filter-published" className="font-normal">Show finished published stories</FieldLabel></Field> : null}
+    {([["mine", "Mine"], ["unassigned", "Unassigned"], ["overdue", "Overdue"], ["needsReview", "Needs review"]] as const).map(([key, label]) => <Field key={key} orientation="horizontal"><Checkbox id={`story-filter-${key}`} checked={filters[key]} onCheckedChange={(checked) => update({ [key]: Boolean(checked) })} /><FieldLabel htmlFor={`story-filter-${key}`} className="font-normal">{label}</FieldLabel></Field>)}
+  </FieldGroup>;
 }
