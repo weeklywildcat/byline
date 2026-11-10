@@ -231,7 +231,7 @@ function PermalinkField({ item, run, busy, error, setError }: { item: Item; run:
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={id}>{item.destination.permalink === "required" ? `After it's posted` : "Link (optional)"}</FieldLabel>
       <InputGroup>
-        <InputGroupInput id={id} type="url" inputMode="url" autoComplete="off" placeholder={item.destination.placeholder} value={value} aria-invalid={error ? true : undefined} disabled={blocked || busy}
+        <InputGroupInput id={id} type="url" inputMode="url" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={item.destination.placeholder} value={value} aria-invalid={error ? true : undefined} disabled={blocked || busy}
           onChange={(event) => { setValue(event.target.value); if (error) setError(""); }} onKeyDown={onEnter(save)} />
         <InputGroupAddon align="inline-end">
           <InputGroupButton type="button" size="sm" variant="secondary" disabled={blocked || busy} onClick={save}><Link2 data-icon="inline-start" />Save link</InputGroupButton>

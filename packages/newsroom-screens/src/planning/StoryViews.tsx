@@ -136,7 +136,7 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
           else save.mutate({ name, filters, sort });
         }}>
           <FieldGroup className="gap-4">
-            <Field><FieldLabel htmlFor="saved-view-name">View name</FieldLabel><Input id="saved-view-name" name="name" required maxLength={SAVED_VIEW_NAME_MAX_LENGTH} autoFocus defaultValue={editing?.name ?? ""} placeholder={"e.g. Publishing this week"} disabled={save.isPending} /></Field>
+            <Field><FieldLabel htmlFor="saved-view-name">View name</FieldLabel><Input id="saved-view-name" name="name" required maxLength={SAVED_VIEW_NAME_MAX_LENGTH} defaultValue={editing?.name ?? ""} placeholder={"e.g. Publishing this week"} disabled={save.isPending} /></Field>
             {error ? <InlineAlert>{error}</InlineAlert> : null}
           </FieldGroup>
           <DialogFooter className="mt-4"><Button type="button" variant="outline" onClick={close} disabled={save.isPending}>Cancel</Button><Button type="submit" disabled={save.isPending}>{save.isPending ? <><Spinner data-icon="inline-start" />Saving…</> : editing ? "Rename" : "Save view"}</Button></DialogFooter>

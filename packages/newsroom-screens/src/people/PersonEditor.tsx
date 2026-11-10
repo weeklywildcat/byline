@@ -592,6 +592,11 @@ export function PersonEditor({
                   label="Public email"
                   optional
                   type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={draft.publicEmail}
                   onChange={(value) => update("publicEmail", value)}
                   error={errors.publicEmail}
@@ -685,6 +690,10 @@ export function PersonEditor({
                                   id={`${id}-url-${index}`}
                                   type="url"
                                   inputMode="url"
+                                  autoComplete="off"
+                                  autoCapitalize="none"
+                                  autoCorrect="off"
+                                  spellCheck={false}
                                   value={entry.url}
                                   onChange={(event) =>
                                     social(index, { url: event.target.value })

@@ -26,6 +26,8 @@
 @custom-variant data-active { &:where([data-state="active"]), &:where([data-active]:not([data-active="false"])) { @slot; } }
 @custom-variant data-horizontal { &:where([data-orientation="horizontal"]) { @slot; } }
 @custom-variant data-vertical { &:where([data-orientation="vertical"]) { @slot; } }
+/* A coarse-pointer hit area of at least 44x44 centred on a small control, without changing its layout or look. */
+@utility touch-hit { position: relative; @media (any-pointer: coarse) { &::after { content: ""; position: absolute; top: 50%; left: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); } } }
 @utility no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 @utility scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 
@@ -102,6 +104,11 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   --radius: 0.625rem;
+  /* The safe-area contract: viewport-fit=cover means interactive content must clear all four insets. Backgrounds may bleed. */
+  --byline-safe-top: env(safe-area-inset-top, 0px);
+  --byline-safe-right: env(safe-area-inset-right, 0px);
+  --byline-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --byline-safe-left: env(safe-area-inset-left, 0px);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 14px;

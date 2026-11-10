@@ -46,7 +46,7 @@ export function QuickCreateRelation({ context, kind, onCreated }: { context: Sto
     setOpen(next);
   }}>
     <DialogTrigger render={<Button type="button" size="sm" variant="ghost" />}>{guest ? "Create guest contributor" : "Create topic"}</DialogTrigger>
-    <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto">
+    <DialogContent className="max-h-full overflow-auto">
       <DialogHeader>
         <DialogTitle>{guest ? "Create guest contributor" : "Create topic"}</DialogTitle>
         <DialogDescription>{guest ? "This adds a public byline identity without creating a sign-in account." : "The new topic will be available to the whole newsroom."}</DialogDescription>

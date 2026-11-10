@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { SelectField, TextField } from "@byline/newsroom-ui/components/form-fields";
+import { SelectField, TextField, URL_INPUT } from "@byline/newsroom-ui/components/form-fields";
 import { ResourceIcon } from "./resource-icon";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
@@ -40,8 +40,8 @@ function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; re
   });
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={resource ? "Edit link" : "Add link"} description="A document, folder or page the team works from." submitLabel={resource ? "Save link" : "Add link"} pending={save.isPending} error={error}
     onSubmit={() => { setAttempted(true); setError(""); if (Object.keys(validateLink(draft)).length === 0) save.mutate({ ...draft, label: draft.label.trim(), url: draft.url.trim() }); }}>
-    <TextField label="Label" value={draft.label} onChange={(label) => patch({ label })} error={errors.label} maxLength={120} autoFocus placeholder="Interview notes" />
-    <TextField label="Link" type="url" value={draft.url} onChange={(url) => patch({ url })} error={errors.url} maxLength={2048} placeholder="https://…" />
+    <TextField label="Label" value={draft.label} onChange={(label) => patch({ label })} error={errors.label} maxLength={120} placeholder="Interview notes" />
+    <TextField label="Link" {...URL_INPUT} value={draft.url} onChange={(url) => patch({ url })} error={errors.url} maxLength={2048} placeholder="https://…" />
     <SelectField label="What is it?" value={draft.purpose} options={purposeOptions} onChange={(purpose) => patch({ purpose })} />
   </WorkspaceDialog>;
 }

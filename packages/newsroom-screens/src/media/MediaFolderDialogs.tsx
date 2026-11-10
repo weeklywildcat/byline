@@ -109,7 +109,7 @@ export function MediaFolderDialogs({ request, onClose, fetchers, folders, onCrea
             {named ? (
               <Field data-invalid={Boolean(error) || undefined}>
                 <FieldLabel htmlFor="media-folder-name">Name</FieldLabel>
-                <Input id="media-folder-name" value={name} maxLength={120} autoFocus onChange={(event) => setName(event.target.value)} aria-invalid={Boolean(error) || undefined} />
+                <Input id="media-folder-name" value={name} maxLength={120} onChange={(event) => setName(event.target.value)} aria-invalid={Boolean(error) || undefined} />
                 {error ? <FieldError>{error}</FieldError> : null}
               </Field>
             ) : (

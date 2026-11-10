@@ -24,7 +24,7 @@ import type { useBlockNode } from "./lexical";
  * (and on hover with a mouse) and is always reachable by keyboard and touch.
  */
 
-const COARSE = "(pointer: coarse), (max-width: 767px)";
+const COARSE = "(any-pointer: coarse), (max-width: 767px)";
 
 /** Touch or a narrow screen: secondary settings open in a Sheet, targets grow to 44px. */
 export function useCoarseLayout(): boolean {

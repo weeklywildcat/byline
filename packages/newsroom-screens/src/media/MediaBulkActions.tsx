@@ -117,7 +117,7 @@ function BulkField({ field, value, onChange }: { field: MediaBulkField; value: s
   return (
     <Field>
       <FieldLabel htmlFor={`media-bulk-${field}`}>{label}</FieldLabel>
-      <Input id={`media-bulk-${field}`} type={type ?? "text"} value={value} maxLength={MEDIA_FIELD_LIMITS[field]} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input id={`media-bulk-${field}`} type={type ?? "text"} {...(type === "url" ? { inputMode: "url" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : null)} value={value} maxLength={MEDIA_FIELD_LIMITS[field]} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
 }

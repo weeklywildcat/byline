@@ -360,6 +360,9 @@ export function AnnotatedImageEditor({ node, id, nodeKey }: BlockEditorProps) {
                   if (Math.abs(next.x - marker.x) > 0.2 || Math.abs(next.y - marker.y) > 0.2) edit(marker.id, { x: next.x, y: next.y });
                   else focusNote(index);
                 }}
+                // An interrupted touch or Pencil gesture never delivers pointerup; abandon the drag instead of sticking.
+                onPointerCancel={() => { if (drag?.id === marker.id) setDrag(null); }}
+                onLostPointerCapture={() => { if (drag?.id === marker.id) setDrag(null); }}
               >
                 {index + 1}
               </button>

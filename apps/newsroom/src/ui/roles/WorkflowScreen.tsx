@@ -452,7 +452,7 @@ function NewWorkflowDialog({ api, open, onOpenChange, onCreated }: { api: string
         <DialogHeader><DialogTitle>New review workflow</DialogTitle><DialogDescription>It starts with one step, the story’s editor. You’ll shape the steps and which stories it applies to next.</DialogDescription></DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <FieldGroup>
-            <Field><FieldLabel htmlFor={id}>Name</FieldLabel><Input id={id} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Sports review" /></Field>
+            <Field><FieldLabel htmlFor={id}>Name</FieldLabel><Input id={id} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required placeholder="Sports review" /></Field>
             {problems.length ? <FieldError errors={problems.map((message) => ({ message }))} /> : null}
           </FieldGroup>
           <DialogFooter>

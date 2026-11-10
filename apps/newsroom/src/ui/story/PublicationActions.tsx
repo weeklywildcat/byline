@@ -134,7 +134,7 @@ export function usePublicationActions({ context, page, scheduledAt, changedPath,
 
   const dialogs = <>
     <Dialog open={dialog === "schedule"} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
-      <DialogContent finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+      <DialogContent finalFocus={finalFocus} className="max-h-full overflow-auto">
         <DialogHeader><DialogTitle>{scheduledAt ? "Reschedule publication" : "Schedule publication"}</DialogTitle>
           <DialogDescription>Byline will publish the latest saved changes at this time if the document passes publication checks.</DialogDescription>
         </DialogHeader>

@@ -72,7 +72,7 @@ export function StoryCreateDialog({ open, onClose, onCreated, fetchers }: StoryC
         <FieldGroup className="gap-4">
           <Field data-invalid={missing || undefined}>
             <FieldLabel htmlFor="story-create-title">What's the story?</FieldLabel>
-            <Input id="story-create-title" name="title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} autoFocus disabled={busy} placeholder="Canteen could return next semester" aria-invalid={missing || undefined} />
+            <Input id="story-create-title" name="title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} disabled={busy} placeholder="Canteen could return next semester" aria-invalid={missing || undefined} />
           </Field>
           {hasDetails ? <Collapsible open={details} onOpenChange={setDetails}>
             <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2 w-fit" />}>{details ? "Hide details" : "Add details"}<ChevronDown data-icon="inline-end" aria-hidden="true" className={details ? "rotate-180" : undefined} /></CollapsibleTrigger>

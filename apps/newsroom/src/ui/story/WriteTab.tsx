@@ -219,6 +219,9 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                       onKeyDown={noSubmit}
                       type="url"
                       inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="Paste a YouTube link"
                       value={url}
                       onChange={(event) => videoUrl.setValue(event.target.value)}

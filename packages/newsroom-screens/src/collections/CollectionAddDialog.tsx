@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { TextField, SelectField } from "@byline/newsroom-ui/components/form-fields";
+import { TextField, SelectField, URL_INPUT } from "@byline/newsroom-ui/components/form-fields";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { WorkspaceDialog } from "../workspace/dialog-shell";
 import { useDebouncedValue } from "@byline/newsroom-ui/lib/hooks";
@@ -140,7 +140,6 @@ export function CollectionAddDialog({
                 value={title}
                 onChange={setTitle}
                 maxLength={kind === "interview" ? 240 : 160}
-                autoFocus
                 error={attempted && !title.trim() ? "Add a name." : undefined}
               />
               {kind === "resource" ? (
@@ -151,7 +150,7 @@ export function CollectionAddDialog({
                     options={Object.entries(resourceKinds).map(([value, label]) => ({ value: value as keyof typeof resourceKinds, label }))}
                     onChange={setResourceKind}
                   />
-                  <TextField label="Web address" type="url" value={url} onChange={setUrl} maxLength={2048} placeholder="https://…" optional={Boolean(file)} />
+                  <TextField label="Web address" {...URL_INPUT} value={url} onChange={setUrl} maxLength={2048} placeholder="https://…" optional={Boolean(file)} />
                   {host.media?.available() ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Button

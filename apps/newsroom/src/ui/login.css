@@ -1,14 +1,18 @@
 .byline-login {
   --font-sans: "Geist", system-ui, sans-serif;
   position: fixed;
-  inset: 0;
+  inset: var(--byline-vv-top, 0px) var(--byline-vv-right, 0px) var(--byline-vv-bottom, 0px) var(--byline-vv-left, 0px);
   isolation: isolate;
   overflow: auto;
+  overscroll-behavior: contain;
   display: grid;
   grid-template-rows: minmax(20px, 1fr) auto minmax(44px, 1fr);
   justify-items: center;
   background: #15171b;
-  padding-inline: 16px;
+  /* The photo bleeds to the screen edge; the card and credit clear the notch, corners and home indicator. */
+  padding-block-start: env(safe-area-inset-top, 0px);
+  padding-block-end: env(safe-area-inset-bottom, 0px);
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
   font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.5;

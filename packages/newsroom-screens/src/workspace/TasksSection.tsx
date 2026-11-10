@@ -32,7 +32,7 @@ function TaskItem({ task, timezone, now, busy, editable, people, canAssign, onTo
     <ContextMenuTrigger render={<Item size="sm" data-task-id={task.id} />}>
       <ItemMedia><Checkbox id={id} aria-label={`${done ? "Reopen" : "Complete"} ${task.title}`} checked={done} aria-disabled={busy || undefined} onCheckedChange={(checked) => { if (!busy) onToggle(task, checked ? "completed" : "open"); }} /></ItemMedia>
       <ItemContent>
-        <ItemTitle>{editable ? <button type="button" className={done ? "text-left text-muted-foreground line-through hover:underline" : "text-left hover:underline"} onClick={(event) => onEdit(task, event.currentTarget)}>{task.title}</button> : <span className={done ? "text-muted-foreground line-through" : undefined}>{task.title}</span>}</ItemTitle>
+        <ItemTitle>{editable ? <button type="button" className={done ? "touch-hit text-left text-muted-foreground line-through hover:underline" : "touch-hit text-left hover:underline"} onClick={(event) => onEdit(task, event.currentTarget)}>{task.title}</button> : <span className={done ? "text-muted-foreground line-through" : undefined}>{task.title}</span>}</ItemTitle>
         {editable && !done ? <TaskQuickFields task={task} timezone={timezone} now={now} people={people} canAssign={canAssign} disabled={busy} onUpdate={onUpdate} /> : meta ? <ItemDescription>{meta}</ItemDescription> : null}
       </ItemContent>
       {!editable && due ? <ItemActions><time className={`text-xs whitespace-nowrap ${overdue ? "text-warning" : "text-muted-foreground"}`} dateTime={task.dueAt || undefined}>{due}</time></ItemActions> : null}
@@ -91,7 +91,7 @@ export function TaskDialog({ open, task, onClose, finalFocus, wording = "task" }
   const dirty = task ? title.trim() !== task.title || (task.dueAt || null) !== dueAt || task.priority !== priority || (caps.assign && Number(task.assigneeId || task.assignee?.id || 0) !== Number(assignee?.id || 0)) : Boolean(title.trim() || dueAt || priority !== "normal");
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={wording === "checklist" ? (task ? "Edit checklist item" : "Add checklist item") : task ? "Edit task" : "Add task"} description={wording === "checklist" ? "Something small to confirm or check before the story runs." : "Work that has to happen before this story can run."} submitLabel={task ? `Save ${noun}` : `Add ${noun}`} pendingLabel={task ? "Saving…" : "Adding…"} pending={pending} dirty={dirty} error={error} onSubmit={() => { setAttempted(true); setError(""); if (title.trim()) task ? edit.mutate() : create.mutate(); }}>
-    <TextField label="What needs doing?" value={title} onChange={setTitle} maxLength={240} autoFocus error={attempted && !title.trim() ? "Add a title." : undefined} />
+    <TextField label="What needs doing?" value={title} onChange={setTitle} maxLength={240} error={attempted && !title.trim() ? "Add a title." : undefined} />
     <div className="grid gap-4 sm:grid-cols-2">
       {caps.assign ? <Field><FieldLabel htmlFor="ws-task-assignee">Assigned to</FieldLabel><AssigneePicker id="ws-task-assignee" people={people} value={assignee} onChange={setAssignee} disabled={pending} /></Field> : null}
       <Field><FieldLabel htmlFor="ws-task-due">Due</FieldLabel><DatePicker id="ws-task-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} disabled={pending} /></Field>

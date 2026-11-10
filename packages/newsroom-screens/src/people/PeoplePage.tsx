@@ -515,7 +515,6 @@ function NewPersonDialog({
               label="Name"
               value={input.name}
               maxLength={120}
-              autoFocus
               disabled={saving}
               onChange={(name) => setInput({ ...input, name })}
               hint="As it should appear on bylines."

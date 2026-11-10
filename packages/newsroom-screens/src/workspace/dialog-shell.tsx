@@ -58,7 +58,7 @@ export function WorkspaceDialog({ open, onClose, finalFocus, title, description,
 
   return <>
     <Dialog open={open} modal={modal} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <DialogContent data-workspace-dialog="" finalFocus={finalFocus} className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
+      <DialogContent data-workspace-dialog="" finalFocus={finalFocus} className="max-h-full grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg">
         <DialogHeader><DialogTitle>{title}</DialogTitle>{description ? <DialogDescription>{description}</DialogDescription> : null}</DialogHeader>
         <form onSubmit={submit} noValidate className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
           <FieldGroup className="no-scrollbar -mx-4 min-h-0 w-auto gap-4 overflow-y-auto px-4 pb-1">

@@ -35,7 +35,7 @@ export function ResponsiveSheet({ open, onOpenChange, title, description, childr
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-full overflow-y-auto sm:max-w-lg">
         <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
         {children}
         <DialogFooter>{footer}</DialogFooter>
