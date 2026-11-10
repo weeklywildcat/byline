@@ -156,8 +156,12 @@ running instead of starting a second transcription.
 
 The service reports **Waiting for transcription worker → Loading Whisper model
 → Transcribing audio (percent) → Transcript ready**. Byline persists that
-progress on the transcript; Reporting polls active work every five seconds and
-the focused transcript view does the same, so progress survives navigation.
+progress and the completed segment prefix on the private transcript. The
+Reporting feed polls the summary, and the focused transcript view polls the
+draft so reporters can read, search and seek while more passages arrive. Editing,
+quotes and highlights become available when the transcript is ready. If a run
+fails, its draft stays readable. An automatic retry retains that draft until
+Whisper supplies a prefix, and a fresh retry clears it.
 The service runs one Whisper job at a time by default
 (`WHISPER_MAX_WORKERS=1`) to avoid several CPU-heavy interviews competing on
 a newsroom server. CPU installs can tune `WHISPER_COMPUTE_TYPE=int8`,

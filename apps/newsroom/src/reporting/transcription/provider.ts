@@ -1,4 +1,4 @@
-import type { NormalizedTranscript } from "../../domain/transcript";
+import type { NormalizedTranscript, TranscriptSegment } from "../../domain/transcript";
 
 /**
  * The transcription provider boundary (docs/reporting.md#transcription).
@@ -28,6 +28,9 @@ export type TranscriptionProgress = {
   /** 0-100 when Whisper can measure it, otherwise null. */
   percent: number | null;
   message: string;
+  /** The complete provisional prefix, when available. */
+  segments?: TranscriptSegment[];
+  durationMs?: number | null;
 };
 
 export interface TranscriptionProvider {

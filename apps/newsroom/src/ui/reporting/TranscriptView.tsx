@@ -15,8 +15,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/ne
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, PanelRight, Pencil, Search } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
 import { activeSegmentAt, formatPosition, searchTranscript, type TranscriptSegment } from "../../domain/transcript";
@@ -34,6 +34,7 @@ import {
   type SelectionView,
   type TranscriptDetail
 } from "./api";
+import { ApiError } from "../story/api";
 import type { StoryScreenContext } from "../story/StoryScreen";
 
 /** Width of the transcript's own container above which the context panel sits beside it. Measured: a readable measure needs ~520px, the panel ~300px. */
@@ -81,7 +82,7 @@ function marked(text: string, ranges: Array<[number, number]>, current: [number,
 export function TranscriptView(props: { context: StoryScreenContext; transcriptId: number; onBack: () => void; hideBack?: boolean }) {
   // The measured element exists from the first render (useElementWidth measures on mount), loading or not.
   const [frameRef, width] = useElementWidth<HTMLDivElement>();
-  return <div ref={frameRef} className="min-w-0" data-transcript-frame=""><TranscriptBody {...props} width={width} /></div>;
+  return <div ref={frameRef} className="min-w-0" data-transcript-frame=""><TranscriptBody key={props.transcriptId} {...props} width={width} /></div>;
 }
 
 function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false }: { context: StoryScreenContext; transcriptId: number; onBack: () => void; width: number; hideBack?: boolean }) {
@@ -96,6 +97,10 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const detail = detailQuery.data;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const followingLatest = useRef(true);
+  const previousCount = useRef<number | null>(null);
+  const previousScrollTop = useRef(0);
+  const [hasNewPassages, setHasNewPassages] = useState(false);
   const [position, setPosition] = useState(0);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
@@ -106,10 +111,44 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const canEdit = detail?.canEdit === true && !context.readOnly;
   const wide = width >= SIDE_BY_SIDE;
 
+  const ready = detail?.state === "ready";
+  const transcribing = detail?.state === "queued" || detail?.state === "processing";
   const segments = detail?.segments ?? [];
+  const segmentCount = segments.length;
+  const lastEnd = segments.at(-1)?.endMs;
+  const active = ready || (lastEnd != null && position <= lastEnd) ? activeSegmentAt(segments, position) : null;
+
+  const loaded = detail !== undefined;
+  useLayoutEffect(() => {
+    if (!loaded) return;
+    const previous = previousCount.current;
+    previousCount.current = segmentCount;
+    const stream = streamRef.current;
+    if (!stream) {
+      followingLatest.current = true;
+      previousScrollTop.current = 0;
+      setHasNewPassages(false);
+      return;
+    }
+    if (previous === null) {
+      // An already long draft opens at the beginning, just like a ready transcript.
+      followingLatest.current = stream.scrollHeight - stream.clientHeight <= 48;
+      return;
+    }
+    if (segmentCount <= previous || (!transcribing && previous === 0)) return;
+    if (followingLatest.current) stream.scrollTop = stream.scrollHeight;
+    else setHasNewPassages(true);
+  }, [loaded, segmentCount, transcribing]);
+
+  const jumpToLatest = () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    followingLatest.current = true;
+    stream.scrollTop = stream.scrollHeight;
+    setHasNewPassages(false);
+  };
   const matches = useMemo(() => searchTranscript(segments, query), [segments, query]);
   const current = matches.length ? matches[Math.min(matchIndex, matches.length - 1)] : null;
-  const active = detail?.state === "ready" ? activeSegmentAt(segments, position) : null;
 
   const seek = useCallback((ms: number | null) => {
     const audio = audioRef.current;
@@ -119,14 +158,25 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   }, []);
 
   // A new search starts at its first result; stepping scrolls and seeks to it.
-  useEffect(() => setMatchIndex(0), [query]);
+  const changeQuery = (value: string) => {
+    setQuery(value);
+    setMatchIndex(0);
+  };
   const step = (direction: 1 | -1) => {
     if (!matches.length) return;
-    const next = (matchIndex + direction + matches.length) % matches.length;
+    const next = (Math.min(matchIndex, matches.length - 1) + direction + matches.length) % matches.length;
     setMatchIndex(next);
     const hit = matches[next];
     const segment = segments.find((entry) => entry.id === hit.segmentId);
-    streamRef.current?.querySelector(`[data-segment="${hit.segmentId}"]`)?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    const stream = streamRef.current;
+    const passage = stream?.querySelector(`[data-segment="${hit.segmentId}"]`);
+    if (stream && passage) {
+      followingLatest.current = false;
+      stream.scrollTo({
+        top: stream.scrollTop + passage.getBoundingClientRect().top - stream.getBoundingClientRect().top - stream.clientHeight / 2,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
+      });
+    }
     if (segment) seek(segment.startMs);
   };
 
@@ -147,19 +197,39 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
     onError: (error: Error) => toast.error(error.message)
   });
 
-  if (detailQuery.isError) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
+  const detailError = detailQuery.error;
+  const accessLost = detailError instanceof ApiError && detailError.status >= 400 && detailError.status < 500;
+  if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
   if (!detail) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
 
   const contextPanel = <TranscriptContext context={context} detail={detail} seek={seek} refresh={refresh} />;
+  const searchBar = (
+    <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1"><SearchBar query={query} onQuery={changeQuery} count={matches.length} index={current ? Math.min(matchIndex, matches.length - 1) : -1} onStep={step} /></div>
+      {hasNewPassages && segmentCount > 0 ? (
+        <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={jumpToLatest}><ChevronDown data-icon="inline-start" />Jump to latest</Button>
+      ) : null}
+    </div>
+  );
   const stream = (
     <div className="flex min-h-0 flex-1 flex-col">
       <TranscriptState detail={detail} onRetry={() => retry.mutate()} retrying={retry.isPending} canRetry={detail.transcription.available && detail.file.kind === "audio" && canEdit} />
-      {detail.state === "ready" ? (
+      {segmentCount > 0 ? (
         <div
           ref={streamRef}
-          className="flex-1 px-1 pb-24"
-          onMouseUp={() => setDraft(readSelection(streamRef.current))}
-          onKeyUp={() => setDraft(readSelection(streamRef.current))}
+          className="max-h-[45dvh] flex-1 overflow-y-auto px-1"
+          role="region"
+          aria-label="Transcript passages"
+          tabIndex={0}
+          onScroll={({ currentTarget }) => {
+            const top = currentTarget.scrollTop;
+            const nearBottom = currentTarget.scrollHeight - top - currentTarget.clientHeight <= 48;
+            followingLatest.current = nearBottom && top >= previousScrollTop.current;
+            previousScrollTop.current = top;
+            if (followingLatest.current) setHasNewPassages(false);
+          }}
+          onMouseUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
+          onKeyUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
         >
           {segments.map((segment) => (
             <Segment
@@ -170,8 +240,8 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
               isActive={active === segment.id}
               ranges={matches.filter((match) => match.segmentId === segment.id && match.start >= 0).map((match) => [match.start, match.end] as [number, number])}
               currentRange={current && current.segmentId === segment.id && current.start >= 0 ? [current.start, current.end] : null}
-              editing={editing === segment.id}
-              canEdit={canEdit}
+              editing={ready && editing === segment.id}
+              canEdit={ready && canEdit}
               onSeek={() => seek(segment.startMs)}
               onEdit={() => setEditing(segment.id)}
               onDone={() => setEditing(null)}
@@ -181,9 +251,15 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
               refresh={refresh}
             />
           ))}
+          {transcribing ? (
+            <p className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+              <LoaderCircle aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />
+              {detail.state === "queued" ? "More text will appear when transcription resumes." : "Transcribing the rest of the recording…"}
+            </p>
+          ) : null}
         </div>
       ) : null}
-      {draft ? (
+      {ready && draft ? (
         // A bar in the layout, docked under the transcript: it never covers the words being selected.
         <div role="toolbar" aria-label="Selected words" className="sticky bottom-[var(--byline-bottom-navigation-height,0px)] z-10 mt-2 flex flex-wrap items-center gap-2 border-t bg-background py-2">
           <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">“{draft.text}”</p>
@@ -206,6 +282,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           <h2 className="truncate text-base font-medium">{detail.file.filename}</h2>
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             <span className="font-medium tracking-wide uppercase" data-provenance={detail.origin}>{detail.origin === "manual" ? "Manual transcript" : "Machine transcript"}</span>
+            {!ready && segmentCount > 0 ? <Badge variant="secondary">{detail.state === "failed" ? "Incomplete draft" : "Draft transcript"}</Badge> : null}
             {detail.origin === "machine" && detail.model ? <span>{detail.model}</span> : null}
             {detail.language ? <span>{detail.language.toUpperCase()}</span> : null}
             {detail.durationMs ? <span>{formatPosition(detail.durationMs)}</span> : null}
@@ -220,7 +297,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           <ResizablePanel id="transcript" minSize={420} className="flex flex-col overflow-y-auto">
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-2">
               <Player detail={detail} audioRef={audioRef} onTime={setPosition} />
-              <SearchBar query={query} onQuery={setQuery} count={matches.length} index={current ? Math.min(matchIndex, matches.length - 1) : -1} onStep={step} />
+              {searchBar}
               {stream}
             </div>
           </ResizablePanel>
@@ -230,7 +307,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
       ) : (
         <div className="flex min-h-0 flex-col">
           <Player detail={detail} audioRef={audioRef} onTime={setPosition} />
-          <SearchBar query={query} onQuery={setQuery} count={matches.length} index={current ? Math.min(matchIndex, matches.length - 1) : -1} onStep={step} />
+          {searchBar}
           {stream}
         </div>
       )}
@@ -290,15 +367,17 @@ function TranscriptState({ detail, onRetry, retrying, canRetry }: { detail: Tran
   if (detail.state === "queued" || detail.state === "processing") {
     const percent = detail.progressPercent === null ? null : Math.round(detail.progressPercent);
     const label = detail.progressMessage ?? (detail.state === "queued" ? "Waiting to transcribe" : "Transcribing audio");
+    const hasDraft = detail.segments.length > 0;
     return (
-      <div className="grid gap-2 py-4" role="status" aria-live="polite">
+      <div className={hasDraft ? "grid gap-1 py-2" : "grid gap-2 py-4"}>
+        <span className="sr-only" role="status">{label}</span>
         <Progress value={percent} aria-label={percent === null ? label : `${label}, ${percent}% complete`}>
           <span className="text-sm">{label}{percent === null ? "…" : ` · ${percent}%`}</span>
         </Progress>
-        <p className="text-xs text-muted-foreground">
-          A long interview can take a while. You can leave this page; Byline keeps the job running and will tell you when it is ready.
+        {!hasDraft || detail.failure ? <p className="text-xs text-muted-foreground">
+          {!hasDraft ? "A long interview can take a while. You can leave this page; Byline keeps the job running and will tell you when it is ready." : ""}
           {detail.failure ? ` Last attempt: ${detail.failure} Byline will retry automatically.` : ""}
-        </p>
+        </p> : null}
       </div>
     );
   }
@@ -404,12 +483,12 @@ function TranscriptContext({ context, detail, seek, refresh }: { context: StoryS
         {detail.source && detail.source.currentGroundRules && detail.source.currentGroundRules !== groundRuleLabel(rules.rule) ? <p className="text-xs text-muted-foreground">The source's ground rules are now “{detail.source.currentGroundRules}”. This recording keeps what was agreed when it was made.</p> : null}
         <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Manual transcript" : `Machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
       </section>
-      <section aria-label="Saved quotes" className="grid gap-2">
+      {detail.state === "ready" ? <section aria-label="Saved quotes" className="grid gap-2">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this recording</h3>
         {detail.selections.length === 0 ? <p className="text-muted-foreground">Select words in the transcript to save a highlight or a quote.</p> : (
           <ul className="grid gap-3">{detail.selections.map((selection) => <li key={selection.id}><SelectionCard context={context} selection={selection} detail={detail} seek={seek} refresh={refresh} /></li>)}</ul>
         )}
-      </section>
+      </section> : null}
     </div>
   );
 }

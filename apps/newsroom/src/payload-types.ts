@@ -3391,6 +3391,7 @@ export interface TaskSendDueDigest {
 export interface TaskTranscribeReportingFile {
   input: {
     transcriptId: number;
+    runToken?: string | null;
   };
   output?: unknown;
 }

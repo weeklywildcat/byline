@@ -6,7 +6,7 @@ import { commitTransaction, initTransaction, killTransaction, type PayloadReques
  * a network retry, two reviewers deciding at once). Each runs inside
  * Payload's request transaction, so the lock and the writes commit together.
  */
-const LOCKABLE = new Set(["story_plans", "review_runs", "review_workflows", "newsroom_roles", "school_years", "users"]);
+const LOCKABLE = new Set(["story_plans", "review_runs", "review_workflows", "newsroom_roles", "school_years", "users", "reporting_transcripts"]);
 
 export async function lockRow(req: PayloadRequest, table: string, id: number | string): Promise<void> {
   if (!LOCKABLE.has(table)) throw new Error(`Refusing to lock ${table}.`);
