@@ -119,7 +119,7 @@ export function RemoveControl({ label, pending, onStart, onConfirm, ...confirm }
 }
 
 
-/** Move keyboard focus to the first invalid control in the topmost Nova dialog. */
+/** Move keyboard focus to the first invalid control in the topmost Workspace Dialog or touch Drawer. */
 export function focusFirstInvalidField() {
   requestAnimationFrame(() => {
     const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[data-workspace-dialog][data-open]'));
