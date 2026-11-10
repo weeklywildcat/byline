@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { StoryBrief, StoryRecentActivity, StoryToDo, useOpenWorkCount } from "@byline/newsroom-screens/story-context/StoryPlan";
 import { useOptionalWorkspace, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { Smartphone } from "lucide-react";
@@ -20,7 +20,8 @@ export const planSectionId = (section: PlanSection) => `plan-${section}`;
 /**
  * Plan (docs/story-screen.md#plan): the working space for preparing,
  * researching and coordinating the Story. Four sections in reading order,
- * each a heading and its content on the page, never a stack of Cards:
+ * each its own Card (the newsroom UI kit's shadcn Card), so a reporter can
+ * see at a glance where the brief ends and the reporting begins:
  *
  * - **Story brief**: the angle and assignment, who, by when, what is expected;
  * - **Reporting**: the Story's reporting notebook (the same one Field Mode feeds);
@@ -53,7 +54,7 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
   }, [location.section]);
 
   return (
-    <div ref={frame} className="@container/plan mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 md:px-8" data-plan-workspace="">
+    <div ref={frame} className="@container/plan mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-8" data-plan-workspace="">
       <nav aria-label="Plan sections" className="-mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm" data-plan-jump="">
         <span className="mr-1 text-xs text-muted-foreground max-sm:sr-only">Jump to</span>
         {PLAN_SECTIONS.map((section) => (
@@ -70,7 +71,6 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
         </WorkspaceGate>
       </PlanSectionFrame>
 
-      <Separator />
       <PlanSectionFrame
         section="reporting"
         description="Notes, recordings, transcripts, photos, documents and links for this story, newest first. Field Mode captures land here too."
@@ -86,16 +86,14 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
         <SavedQuotes context={context} />
       </PlanSectionFrame>
 
-      <Separator />
       <PlanSectionFrame section="todo" description="Tasks, interviews still to happen and the media this story needs.">
         <WorkspaceGate>
           <StoryToDo leadImage={leadImage} onOpenReporting={() => jump("reporting")} />
         </WorkspaceGate>
       </PlanSectionFrame>
 
-      <Separator />
       <PlanSectionFrame section="activity">
-        <div className="grid gap-8 @3xl/plan:grid-cols-2 @3xl/plan:gap-10">
+        <div className="grid gap-8 @min-[600px]/plan-card:grid-cols-2 @min-[600px]/plan-card:gap-8">
           <StoryNotes context={context} plain />
           <WorkspaceGate>
             <StoryRecentActivity onOpenHistory={() => go({ mode: "history" })} />
@@ -109,16 +107,16 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
 function PlanSectionFrame({ section, description, actions, children }: { section: PlanSection; description?: string; actions?: ReactNode; children: ReactNode }) {
   const id = planSectionId(section);
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="flex scroll-mt-24 flex-col gap-4" data-plan-section={section}>
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-col gap-1">
+    <Card id={id} role="region" aria-labelledby={`${id}-title`} className="scroll-mt-24 gap-5 overflow-visible [--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]" data-plan-section={section}>
+      <CardHeader>
+        <CardTitle>
           <h2 id={`${id}-title`} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none" data-plan-heading="">{SECTION_TITLES[section]}</h2>
-          {description ? <p className="max-w-prose text-sm text-muted-foreground">{description}</p> : null}
-        </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </div>
-      {children}
-    </section>
+        </CardTitle>
+        {description ? <CardDescription className="max-w-prose">{description}</CardDescription> : null}
+        {actions ? <CardAction className="flex flex-wrap items-center gap-2">{actions}</CardAction> : null}
+      </CardHeader>
+      <CardContent className="@container/plan-card flex min-w-0 flex-col gap-4">{children}</CardContent>
+    </Card>
   );
 }
 

@@ -40,7 +40,7 @@ Every older address still lands where it meant: `?view=reporting`, `?tab=reporti
 
 ## Plan {#plan}
 
-Four sections in reading order, each a heading and its content, separated by rules rather than Cards. **Jump to** links at the top move between them (and focus the section heading).
+Four sections in reading order, each in its own card (the UI kit's shadcn `Card`). **Jump to** links at the top move between them (and focus the section heading).
 
 - **Story brief.** The **Angle and assignment** (the plan's brief: the central question, what to find out, who to talk to, open questions), edited in place and saved as a planning record. Beside it: reporters, anyone else working on the Story (whoever has its media, tasks or interviews), the editor, deadline and publication target (editors change them here), section, and a schedule if there is one. Under it, what the Story is expected to deliver (its type and its media assignments: "Article · 2 photos · 1 graphic") and its background links.
 - **Reporting.** The Story's reporting notebook ([reporting](reporting.md)): search, capture (note, recording, file, photo, link, transcript import), Up next, the chronological material feed, sources with ground rules, appointments, and the Story's saved quotes with whether each is verified. **Open in Field Mode** is here, labelled. A transcript opens as its own focused view with **Back to Plan**; the transcript editor is never squeezed into a column.
