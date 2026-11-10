@@ -89,7 +89,7 @@ export function MediaDialog({ open, assignment, onClose, finalFocus }: MediaDial
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} modal={!picking} title={assignment ? "Edit assignment" : "Add assignment"} description={manage ? "Photo, graphics, video and audio work for this story." : "You can update the status, notes and files of your assignment."} submitLabel={assignment ? "Save assignment" : "Add assignment"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={assignment && manage ? <RemoveControl label="Remove assignment" title="Remove this assignment?" description="Files stay in the Media Library." confirmLabel="Remove" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
     {manage ? <>
-      <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} optional autoFocus placeholder={`${MEDIA_TYPE_LABELS[form.type]} for this story`} />
+      <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} optional placeholder={`${MEDIA_TYPE_LABELS[form.type]} for this story`} />
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField label="Type" value={form.type} options={typeOptions} onChange={(type) => patch({ type })} />
         <SelectField label="Status" value={form.status} options={statusOptions} onChange={(status) => patch({ status })} />

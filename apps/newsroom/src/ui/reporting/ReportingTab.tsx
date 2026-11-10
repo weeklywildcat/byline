@@ -1,5 +1,6 @@
 "use client";
 
+import { PHOTO_FILE_ACCEPT } from "@byline/core";
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
@@ -79,7 +80,15 @@ export function ReportingTab(props: ReportingProps) {
 function ReportingBody({ context, width, capture: captureIntent, appointmentId, transcriptId, onTranscript }: ReportingProps & { width: number }) {
   const storyId = Number(context.storyId);
   const cache = useQueryClient();
-  const query = useQuery({ queryKey: reportingKey(storyId), queryFn: () => loadReporting(context.api, storyId), refetchInterval: 20_000 });
+  const query = useQuery({
+    queryKey: reportingKey(storyId),
+    queryFn: () => loadReporting(context.api, storyId),
+    refetchInterval: (current) => {
+      const snapshot = current.state.data as ReportingData | undefined;
+      const transcribing = snapshot?.materials.some((item) => item.kind === "file" && item.transcript && (item.transcript.state === "queued" || item.transcript.state === "processing"));
+      return transcribing ? 5_000 : 20_000;
+    }
+  });
   const [filter, setFilter] = useState<MaterialFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search, 150);
@@ -182,7 +191,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   return (
     <div className="flex min-w-0 flex-col gap-4" data-reporting="">
       <input ref={fileInput} type="file" multiple hidden onChange={(event) => { onFiles("file", event.target.files); event.target.value = ""; }} aria-label="Upload a file" />
-      <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={(event) => { onFiles("photo", event.target.files); event.target.value = ""; }} aria-label="Upload a photo" />
+      <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} multiple hidden onChange={(event) => { onFiles("photo", event.target.files); event.target.value = ""; }} aria-label="Upload a photo" />
       <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) enqueue("transcript", file, file.name); pendingBound.current = null; event.target.value = ""; }} aria-label="Import a transcript" />
       <div className="grid gap-4" style={wide ? { gridTemplateColumns: "minmax(0, 1fr) 17.5rem" } : undefined}>
         <div className="flex min-w-0 flex-col gap-4">
@@ -195,7 +204,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
             {!wide ? <Button type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
           </div>
 
-          {bound?.label && panel ? <p className="text-sm text-muted-foreground" data-capture-context="">For <span className="font-medium text-foreground">{bound.label}</span> <button type="button" className="underline underline-offset-2" onClick={() => setBound(null)}>Clear</button></p> : null}
+          {bound?.label && panel ? <p className="text-sm text-muted-foreground" data-capture-context="">For <span className="font-medium text-foreground">{bound.label}</span> <button type="button" className="touch-hit underline underline-offset-2" onClick={() => setBound(null)}>Clear</button></p> : null}
           {panel === "note" ? <NoteComposer context={context} bound={bound} onDone={() => { setPanel(null); setBound(null); void refresh(); }} onCancel={() => { setPanel(null); setBound(null); }} /> : null}
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
@@ -320,7 +329,7 @@ function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenConte
     <InlineForm label="Add a link" className="grid gap-1.5" onSubmit={submit} onCancel={onCancel}>
       <InputGroup>
         <InputGroupAddon><Link2 aria-hidden="true" /></InputGroupAddon>
-        <InputGroupInput autoFocus type="url" value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
+        <InputGroupInput autoFocus type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
         <InputGroupAddon align="inline-end"><Button type="button" size="xs" disabled={!url.trim() || save.isPending} onClick={submit}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
       </InputGroup>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -388,7 +397,15 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
 
   const actions = (
     <>
-      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>{transcript.state === "ready" ? "Open transcript" : transcript.state === "failed" ? "Transcript failed" : "Transcribing…"}</Button> : null}
+      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>
+        {transcript.state === "ready"
+          ? "Open transcript"
+          : transcript.state === "failed"
+            ? "Transcript failed"
+            : transcript.progressPercent !== null
+              ? `${transcript.progressMessage ?? "Transcribing"} · ${Math.round(transcript.progressPercent)}%`
+              : transcript.progressMessage ?? "Transcribing…"}
+      </Button> : null}
       {file && !transcript && file.fileKind === "audio" && editable ? <>
         {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
         <Button type="button" size="xs" variant="outline" onClick={onImport}>Import transcript</Button>
@@ -481,7 +498,11 @@ function FileFacts({ file }: { file: ReportingFileMaterial }) {
     <p className="text-xs text-muted-foreground">
       {bits.join(" · ")}
       {transcript?.state === "ready" ? ` · ${transcript.origin === "manual" ? "Manual transcript" : "Transcript ready"}${transcript.quoteCount ? ` · ${transcript.verifiedCount} of ${transcript.quoteCount} quote${transcript.quoteCount === 1 ? "" : "s"} verified` : ""}` : ""}
-      {transcript && transcript.state !== "ready" ? ` · ${transcript.state === "failed" ? `Transcript failed: ${transcript.failure ?? "unknown error"}` : "Transcribing"}` : ""}
+      {transcript && transcript.state !== "ready"
+        ? ` · ${transcript.state === "failed"
+          ? `Transcript failed: ${transcript.failure ?? "unknown error"}`
+          : `${transcript.progressMessage ?? (transcript.state === "queued" ? "Waiting to transcribe" : "Transcribing")}${transcript.progressPercent !== null ? ` · ${Math.round(transcript.progressPercent)}%` : ""}${transcript.failure ? ` · Last attempt: ${transcript.failure}` : ""}`}`
+        : ""}
     </p>
   );
 }
@@ -492,7 +513,7 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
   const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
-  const name = onEdit ? <button type="button" className="text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
+  const name = onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
   if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
@@ -552,7 +573,7 @@ function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onE
   return (
     <Item size="xs" className="flex-col items-stretch gap-1 rounded-none px-0 py-2">
       <ItemContent>
-        <ItemTitle>{onEdit ? <button type="button" className="text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{source.label}</button> : source.label}</ItemTitle>
+        <ItemTitle>{onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{source.label}</button> : source.label}</ItemTitle>
         {source.role ? <ItemDescription>{source.role}</ItemDescription> : null}
       </ItemContent>
       <ItemActions className="flex-wrap">

@@ -288,11 +288,17 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
 
 function TranscriptState({ detail, onRetry, retrying, canRetry }: { detail: TranscriptDetail; onRetry: () => void; retrying: boolean; canRetry: boolean }) {
   if (detail.state === "queued" || detail.state === "processing") {
+    const percent = detail.progressPercent === null ? null : Math.round(detail.progressPercent);
+    const label = detail.progressMessage ?? (detail.state === "queued" ? "Waiting to transcribe" : "Transcribing audio");
     return (
-      <div className="grid gap-2 py-4" role="status">
-        {/* Transcription progress cannot be measured, so the bar is indeterminate. */}
-        <Progress value={null} aria-label="Transcribing"><span className="text-sm">{detail.state === "queued" ? "Waiting to transcribe…" : "Transcribing…"}</span></Progress>
-        <p className="text-xs text-muted-foreground">A long interview can take a while. You can leave this page; Byline will tell you when it is ready.{detail.failure ? ` Last attempt: ${detail.failure}` : ""}</p>
+      <div className="grid gap-2 py-4" role="status" aria-live="polite">
+        <Progress value={percent} aria-label={percent === null ? label : `${label}, ${percent}% complete`}>
+          <span className="text-sm">{label}{percent === null ? "…" : ` · ${percent}%`}</span>
+        </Progress>
+        <p className="text-xs text-muted-foreground">
+          A long interview can take a while. You can leave this page; Byline keeps the job running and will tell you when it is ready.
+          {detail.failure ? ` Last attempt: ${detail.failure} Byline will retry automatically.` : ""}
+        </p>
       </div>
     );
   }
@@ -330,7 +336,7 @@ function Segment({ segment, speakers, sourceName, isActive, ranges, currentRange
   });
   return (
     <div data-segment={segment.id} data-active={isActive ? "" : undefined} className={`group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 rounded-md px-2 py-2 ${isActive ? "bg-accent/60" : ""}`}>
-      <button type="button" onClick={onSeek} disabled={segment.startMs === null} aria-label={segment.startMs === null ? "No timestamp" : `Play from ${formatPosition(segment.startMs)}`} className="h-fit min-h-8 select-none text-left text-xs tabular-nums text-muted-foreground underline-offset-2 hover:underline focus-visible:underline disabled:no-underline">
+      <button type="button" onClick={onSeek} disabled={segment.startMs === null} aria-label={segment.startMs === null ? "No timestamp" : `Play from ${formatPosition(segment.startMs)}`} className="touch-hit h-fit min-h-8 select-none text-left text-xs tabular-nums text-muted-foreground underline-offset-2 hover:underline focus-visible:underline disabled:no-underline">
         {formatPosition(segment.startMs)}
       </button>
       <div className="min-w-0">
@@ -368,7 +374,7 @@ function SpeakerEditor({ segment, speakers, sourceName, canEdit, transcriptId, a
   if (!canEdit) return <span className="select-none text-sm font-medium">{label}</span>;
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<button type="button" className={`select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${segment.speaker ? "" : "text-muted-foreground"}`} aria-label={segment.speaker ? `Speaker: ${segment.speaker}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
+      <PopoverTrigger render={<button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${segment.speaker ? "" : "text-muted-foreground"}`} aria-label={segment.speaker ? `Speaker: ${segment.speaker}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
       <PopoverContent align="start" className="w-72">
         <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
           <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
@@ -431,7 +437,7 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
     <div className="grid gap-1.5 border-l-2 border-border pl-3" data-selection={selection.id} data-state={selection.state}>
       <p className="[overflow-wrap:anywhere]">“{selection.text}”</p>
       <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-        <button type="button" className="underline-offset-2 hover:underline focus-visible:underline" onClick={() => seek(selection.startMs)} aria-label={`Play from ${formatPosition(selection.startMs)}`}>{formatPosition(selection.startMs)}</button>
+        <button type="button" className="touch-hit underline-offset-2 hover:underline focus-visible:underline" onClick={() => seek(selection.startMs)} aria-label={`Play from ${formatPosition(selection.startMs)}`}>{formatPosition(selection.startMs)}</button>
         {selection.speaker ? <span>{selection.speaker}</span> : null}
         <StatusBadge tone={selection.state === "verified" ? "done" : "neutral"}>{selection.kind === "highlight" ? "Highlight" : selection.state === "verified" ? "Verified" : "Not verified"}</StatusBadge>
       </p>

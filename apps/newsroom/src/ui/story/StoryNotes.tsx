@@ -62,12 +62,12 @@ export function StoryNotes({ context, plain = false }: { context: StoryScreenCon
 
   const addNote = <Dialog open={creating} onOpenChange={(open) => { if (!busy) { setCreating(open); setError(""); } }}>
       <DialogTrigger render={<Button type="button" size="sm" variant="outline" />}>Add note</DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto">
+      <DialogContent className="max-h-full overflow-auto">
         <DialogHeader><DialogTitle>Add a story note</DialogTitle><DialogDescription>Only the newsroom team for this story can read it. Notes apply to the story as a whole.</DialogDescription></DialogHeader>
         <form className="grid gap-3" onSubmit={create}>
           <Textarea aria-label="Note text" required maxLength={4000} rows={4} value={text} onChange={(event) => setText(event.target.value)} />
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
-          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !text.trim()}>Add note</Button></DialogFooter>
+          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />} onClick={() => { setText(""); setError(""); }}>Cancel</DialogClose><Button type="submit" disabled={busy || !text.trim()}>Add note</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>;

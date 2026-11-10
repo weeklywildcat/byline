@@ -13,8 +13,10 @@ let token = "";
 let staffToken = "";
 let sectionId = 0;
 let personId = 0;
+let personName = "";
 let pitchId = 0;
 let draftId = 0;
+let assignmentId = 0;
 let transcriptId = 0;
 const stamp = Date.now();
 const headers = (baseURL: string, who = token) => ({ Authorization: `JWT ${who}`, Origin: baseURL });
@@ -44,8 +46,11 @@ test.beforeAll(async ({ request, baseURL }) => {
   token = await login(request, baseURL!, "EDITOR");
   staffToken = await login(request, baseURL!, "STAFF");
   sectionId = (await (await request.get("/api/sections?depth=0&limit=1", { headers: headers(baseURL!) })).json()).docs[0]?.id;
-  personId = (await (await request.get("/api/people?depth=0&limit=1", { headers: headers(baseURL!) })).json()).docs[0]?.id;
+  const person = (await (await request.get("/api/people?depth=0&limit=1", { headers: headers(baseURL!) })).json()).docs[0];
+  personId = person?.id;
+  personName = person?.name;
   pitchId = await createStory(request, baseURL!, token, { headline: `A new pitch ${stamp}`, section: sectionId });
+  assignmentId = await createStory(request, baseURL!, token, { headline: `Plan assignment editing ${stamp}`, section: sectionId });
   draftId = await createStory(request, baseURL!, token, {
     headline: `Canteen could return next semester ${stamp}`,
     section: sectionId,
@@ -93,6 +98,33 @@ test("a new Pitch opens Plan, with its brief first, under exactly two tabs", asy
   await expect(page.locator("[data-story-phase]")).toHaveAttribute("data-story-phase", "pitch");
 });
 
+test("Plan edits reporters and section in the same autosaving Story form as Write", async ({ page, request, baseURL }) => {
+  await open(page, assignmentId, "?view=plan");
+  const brief = page.locator("#plan-brief");
+  await brief.getByRole("button", { name: "Reporters: none" }).click();
+  await page.getByRole("option", { name: personName, exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(brief.getByRole("button", { name: `Reporters: ${personName}` })).toBeVisible();
+
+  await brief.getByRole("combobox", { name: "Section" }).click();
+  await page.getByRole("option", { name: "No section" }).click();
+  await expect(brief.getByRole("combobox", { name: "Section" })).toContainText("No section");
+
+  await tab(page, "Write").click();
+  await expect(page.locator("[data-story-article]").getByRole("button", { name: `Byline: ${personName}` })).toBeVisible();
+  await expect(page.locator("[data-story-article]").getByRole("combobox", { name: "Section" })).toContainText("No section");
+  await waitForSaved(page);
+  await expect.poll(async () => {
+    const draft = await readDraft(request, baseURL!, token, assignmentId);
+    return { contributors: draft.contributors, section: draft.section };
+  }).toEqual({ contributors: [personId], section: null });
+
+  await tab(page, "Plan").click();
+  await page.reload();
+  await expect(page.locator("#plan-brief").getByRole("button", { name: `Reporters: ${personName}` })).toBeVisible();
+  await expect(page.locator("#plan-brief").getByRole("combobox", { name: "Section" })).toContainText("No section");
+});
+
 test("Plan's Reporting holds the notebook; interviews show in To do; a source is added there", async ({ page }) => {
   await open(page, draftId, "?view=plan");
   const reporting = page.locator("#plan-reporting");
@@ -111,6 +143,17 @@ test("Plan's Reporting holds the notebook; interviews show in To do; a source is
   // Jump links move between Plan's sections without a second tab bar.
   await page.getByRole("navigation", { name: "Plan sections" }).getByRole("button", { name: /^To do/ }).click();
   await expect(page.locator("#plan-todo-title")).toBeFocused();
+});
+
+test("Cancel discards an unfinished story note instead of reopening stale text", async ({ page }) => {
+  await open(page, pitchId, "?view=plan");
+  const notes = page.locator("#plan-story-notes");
+  await notes.getByRole("button", { name: "Add note" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add a story note" });
+  await dialog.getByRole("textbox", { name: "Note text" }).fill("Discard this unfinished note");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await notes.getByRole("button", { name: "Add note" }).click();
+  await expect(page.getByRole("dialog", { name: "Add a story note" }).getByRole("textbox", { name: "Note text" })).toBeEmpty();
 });
 
 test("a transcript opens from Plan as a focused view, with Back to Plan and browser Back/Forward", async ({ page }) => {

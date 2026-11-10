@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { trackVisualViewport } from "@byline/newsroom-ui/lib/visual-viewport";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { GoogleRedirectLink, GoogleSignInButton, type GoogleSignIn } from "./GoogleSignInButton";
 
@@ -20,6 +21,12 @@ export function LoginForm({ google, googleFailed, endpoint, returnTo, forgotHref
   const [buttonFailed, setButtonFailed] = useState(false);
   const email = useRef<HTMLInputElement>(null);
   const googleError = useRef<HTMLParagraphElement>(null);
+
+  // The page is fixed; with the software keyboard open it follows the visible viewport so the fields and Sign in stay reachable.
+  useEffect(() => {
+    const page = email.current?.closest<HTMLElement>(".byline-login");
+    return page ? trackVisualViewport(page) : undefined;
+  }, []);
 
   useEffect(() => {
     if (googleFailed || buttonFailed) googleError.current?.focus();
@@ -74,7 +81,7 @@ export function LoginForm({ google, googleFailed, endpoint, returnTo, forgotHref
     <form className="byline-login-form" id="byline-password-form" aria-label="Email and password"
       hidden={!expanded} method="post" onSubmit={signIn}>
       <label htmlFor="byline-login-email">Email</label>
-      <Input id="byline-login-email" name="email" type="email" autoComplete="username" required ref={email} />
+      <Input id="byline-login-email" name="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required ref={email} />
       <label htmlFor="byline-login-password">Password</label>
       <Input id="byline-login-password" name="password" type="password" autoComplete="current-password" required />
       <p className="byline-login-error" role="alert">{error}</p>

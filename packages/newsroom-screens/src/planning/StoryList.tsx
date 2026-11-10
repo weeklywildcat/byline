@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { MouseEvent, ReactElement } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { anyPicture, PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { DatePicker } from "../editorial/pickers";
@@ -32,9 +32,17 @@ export type StoryListProps = {
   onMoveStory: (story: PlanningStory, status: string) => Promise<unknown> | void;
   onUpdateStory: (story: PlanningStory, changes: Record<string, unknown>, patch: Partial<PlanningStory>, label: string) => Promise<unknown> | void;
   onOpenStory: (storyId: number) => void;
-  /** Finished published stories the List left out, so it can say so. */
+  /** Used to distinguish a genuinely empty result from published work hidden by default. */
   hiddenPublished?: number;
 };
+
+/** A row's quiet space opens Peek, but controls, links, modifiers and text selection keep their own behavior. */
+function opensPeek(event: MouseEvent<HTMLElement>): boolean {
+  if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return false;
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest("button, a, input, select, textarea, label, [role=button], [role=link], [role=combobox], [role=checkbox], [contenteditable=true]")) return false;
+  return !window.getSelection()?.toString();
+}
 
 /** Below this width a seven-column table is unreadable, so the list becomes compact rows. */
 const TABLE_MIN_WIDTH = 820;
@@ -143,8 +151,7 @@ export function StoryList(props: StoryListProps) {
   const menu = (story: PlanningStory) => <StoryActionsMenu additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
   const context = (story: PlanningStory, child: ReactElement) => <StoryContextMenu key={story.id} additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>{child}</StoryContextMenu>;
 
-  const hidden = hiddenPublished > 0 ? <p className="px-1 text-xs text-muted-foreground">{hiddenPublished === 1 ? "1 published story with nothing left to do is hidden." : `${hiddenPublished} published stories with nothing left to do are hidden.`} {"Use More filters to show them."}</p> : null;
-  if (!stories.length) return <><Empty className="border"><EmptyHeader><EmptyTitle>No stories match</EmptyTitle><EmptyDescription>Try clearing a filter, or choose a different saved view.</EmptyDescription></EmptyHeader></Empty>{hidden}</>;
+  if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{hiddenPublished ? "No active stories in this view" : "No stories match"}</EmptyTitle><EmptyDescription>{hiddenPublished ? "Finished published stories are hidden. Use Show published above to see them." : "Try clearing a filter, or choose a different saved view."}</EmptyDescription></EmptyHeader></Empty>;
 
   const table = width === 0 || width >= TABLE_MIN_WIDTH;
   return <div className="flex flex-col gap-2"><div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
@@ -163,12 +170,7 @@ export function StoryList(props: StoryListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {stories.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => {
-            // Only bare row/cell space opens Peek. Descendants (including portal
-            // controls) keep their own interactions; the title is the keyboard route.
-            if (!event.defaultPrevented && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey &&
-              (event.target === event.currentTarget || (event.target instanceof HTMLTableCellElement && event.target.parentElement === event.currentTarget))) onOpenStory(story.id);
-          }}>
+          {stories.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
             <TableCell className="py-2 pl-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
             <TableCell className="py-2 [&_[data-slot=select-trigger]]:max-w-full [&_[data-slot=badge]]:max-w-full"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
             <TableCell className="py-2 whitespace-normal"><People story={story} /></TableCell>
@@ -181,7 +183,7 @@ export function StoryList(props: StoryListProps) {
         </TableBody>
       </Table>
       : <ItemGroup className="gap-0" aria-label={"Stories"}>
-        {stories.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="rounded-none border-0 border-b border-border/70 last:border-b-0" aria-busy={busy(story) || undefined}>
+        {stories.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="cursor-pointer rounded-none border-0 border-b border-border/70 hover:bg-muted/40 active:bg-muted/60 last:border-b-0" aria-busy={busy(story) || undefined} onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
           <ItemContent>
             <ItemTitle><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 font-semibold" /></StoryHoverCard></ItemTitle>
             <div className="text-sm"><People story={story} /></div>
@@ -195,5 +197,5 @@ export function StoryList(props: StoryListProps) {
           <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
         </Item>))}
       </ItemGroup>}
-  </div>{hidden}</div>;
+  </div></div>;
 }

@@ -220,7 +220,7 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
     return (
       <Field data-readonly={!editable || undefined}>
         <FieldLabel htmlFor={id}>{label}{options.needed ? <NeededBadge /> : null}</FieldLabel>
-        {options.multiline ? <Textarea {...common} rows={3} className="min-h-20" /> : <Input {...common} type={options.type ?? "text"} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />}
+        {options.multiline ? <Textarea {...common} rows={3} className="min-h-20" /> : <Input {...common} type={options.type ?? "text"} {...(options.type === "url" ? { inputMode: "url" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : null)} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />}
       </Field>
     );
   };

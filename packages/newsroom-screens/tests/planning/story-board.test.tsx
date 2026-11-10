@@ -350,8 +350,10 @@ it("on coarse pointers exposes a drag handle and flat move actions in each Board
     onMoveStory.mockClear();
     await mount(layout);
     const card = $("[data-story-id='1']")!;
-    expect(card.querySelector("[aria-label='Drag Canteen could return']")).not.toBeNull();
-    expect(card.dataset.slot).not.toBe("context-menu-trigger");
+    // The grip is pointer-only and decorative; Actions → Move to is the accessible way to move a Story.
+    expect(card.querySelector("[data-story-drag-handle]")?.getAttribute("aria-hidden")).toBe("true");
+    // Touch-and-hold is how iOS/iPadOS opens a contextual menu, so the context menu is mounted on touch as well.
+    expect(card.dataset.slot).toBe("context-menu-trigger");
     await click(card.querySelector("[data-story-actions]"));
     const drawer = $("[data-slot=drawer-content]")!;
     expect(drawer.getAttribute("role")).toBe("dialog");

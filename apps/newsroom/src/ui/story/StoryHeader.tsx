@@ -2,7 +2,6 @@
 
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
-import { useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
@@ -299,7 +298,6 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       setJumping(false);
     }
   }
-  const canHover = useFineHoverPointer();
   const canMove = Boolean(primary) || sidelineActions.length > 0 || canJump;
   const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc);
   const statusLine = changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
@@ -314,8 +312,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-[1_1_18rem] flex-wrap items-center gap-x-4 gap-y-1.5">
           <StorySwitchButton />
-          {canHover && canMove ? <ContextMenu>
-            <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title="Right-click to move this story" />}>{phaseContent}</ContextMenuTrigger>
+          {canMove ? <ContextMenu>
+            <ContextMenuTrigger render={<div className="flex items-center gap-2" data-story-phase={phase} title="Right-click or press and hold to move this story" />}>{phaseContent}</ContextMenuTrigger>
             <ContextMenuContent className="w-56" side="bottom" align="start">
               <ContextMenuGroup>
                 <ContextMenuLabel>{PHASE_LABELS[phase]}</ContextMenuLabel>
@@ -485,7 +483,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
 
       {/* Ordinary Story problems that stop a submission: a focused Dialog, never a routing alert. */}
       <Dialog open={problems.length > 0} onOpenChange={(open) => { if (!open) setProblems([]); }}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto">
+        <DialogContent className="max-h-full overflow-auto">
           <DialogHeader>
             <DialogTitle>Before sending this story</DialogTitle>
             <DialogDescription>Fix these, then submit it again.</DialogDescription>
@@ -496,7 +494,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       </Dialog>
 
       <AlertDialog open={confirmURL} onOpenChange={setConfirmURL}>
-        <AlertDialogContent finalFocus={publishTrigger} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+        <AlertDialogContent finalFocus={publishTrigger} className="max-h-full overflow-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Change the published URL?</AlertDialogTitle>
             <AlertDialogDescription>Byline will preserve the old address with a permanent redirect.</AlertDialogDescription>
@@ -513,7 +511,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       </AlertDialog>
 
       <Dialog open={readinessOpen} onOpenChange={setReadinessOpen}>
-        <DialogContent finalFocus={menuTrigger} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+        <DialogContent finalFocus={menuTrigger} className="max-h-full overflow-auto">
           <DialogHeader><DialogTitle>Publication checks</DialogTitle><DialogDescription>Fix blocking issues before publishing. Editorial advisories are optional.</DialogDescription></DialogHeader>
           {editorial.length ? <ul className="grid gap-2 text-sm">{editorial.map((line) => <li key={line.path} className={line.level === "error" ? "text-destructive" : "text-muted-foreground"}>{line.level === "warning" ? "Advisory: " : ""}{line.message}</li>)}</ul> : null}
           {bodyProblems.length ? <ul className="grid gap-2 text-sm text-destructive">{bodyProblems.map((line) => <li key={line.id}>{line.explanation}</li>)}</ul> : null}

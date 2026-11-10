@@ -4,6 +4,18 @@ import type { SchoolEvent } from "./headless";
 import { getNativeSnapshot } from "./native-snapshot";
 import type { ArchiveAuthor, ArchiveCategory, ArchiveGuestContributor, ArchiveMedia, ArchivePage, ArchivePost, ArchiveTag } from "./public-content";
 
+type NativeLiveCoverage = PublicBuildSnapshotV2["datasets"]["stories"][number]["live"];
+type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt"> & { updates?: unknown[] };
+
+/**
+ * Archive pages and cards only need the coverage state. Keeping the full live
+ * timeline here would make every update invalidate section/author/homepage
+ * render inputs even though those surfaces only render the LIVE badge.
+ */
+export function archiveLiveState(live: ArchiveLiveState | null) {
+  return live ? { status: live.status, startedAt: live.startedAt, endedAt: live.endedAt, updates: [] } : undefined;
+}
+
 /**
  * Transitional views for the existing Weekly Wildcat home, archives, cards and
  * directory. Canonical article rendering reads native Stories directly.
@@ -66,6 +78,7 @@ export function nativeArchiveViews({ datasets, publication }: PublicBuildSnapsho
       modified: local(story.modifiedAt), modified_gmt: publicationUtcDateTime(story.modifiedAt),
       status: "publish", type: "post", author: Number(primary ?? 0), featured_media: story.image ?? 0,
       categories: section.map(({ id }) => id), tags: topics.map(({ id }) => id), sticky: false, contributors, corrections: story.corrections,
+      live: archiveLiveState(story.live),
       byline: { presentation: story.presentation, immersiveAlignment: story.immersiveAlignment, format: story.format, video: story.videoMetadata },
       _embedded: { author: primary ? [authorsById.get(Number(primary))!] : [], "wp:featuredmedia": feature ? [feature] : [], "wp:term": [section, topics] }
     };

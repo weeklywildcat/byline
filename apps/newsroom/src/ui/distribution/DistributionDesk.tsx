@@ -138,7 +138,7 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
               {data.rows.map((row) => (
                 <TableRow key={row.id} className="cursor-pointer" onClick={() => setOpen(row.id)}>
                   <TableCell className="max-w-72 min-w-0 whitespace-normal sm:min-w-32">
-                    <button type="button" className="text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline" onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.story}</button>
+                    <button type="button" className="touch-hit text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline" onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.story}</button>
                     <span className="block text-xs text-muted-foreground">{[row.section, row.published ? null : "Unpublished"].filter(Boolean).join(" · ")}</span>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:hidden">
                       <span>{row.label}</span>

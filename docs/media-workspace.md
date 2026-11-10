@@ -260,7 +260,7 @@ first. Uploads continue in the background if the dialog closes.
 The upload size limit is 50 MB per file (`MEDIA_UPLOAD_MAX_BYTES`, set as
 Payload's own multipart limit; Payload's default of 20 MB is below a typical
 camera original). Larger files are refused before sending, and by the server
-with a 413. The accepted MIME types are unchanged (no video, no HEIC).
+with a 413. The accepted MIME types are unchanged (no video). HEIC/HEIF is accepted from iPhones and iPads and decoded to a JPEG on the way in (see [HEIC/HEIF photos](#heicheif-photos)).
 
 ## Measured
 
@@ -276,3 +276,33 @@ build materialization are in [publication-media.md](publication-media.md)), smar
 recognition, automatic classification, video storage. A backfill of the
 `library` preview for files imported before this migration (they show a
 file-type tile until regenerated; small images use their original).
+
+## HEIC/HEIF photos
+
+iPhone and iPad cameras write HEIC by default, and nobody should have to switch the
+camera to "Most Compatible". Media accepts `.heic`/`.heif` (`image/heic`, `image/heif`, or
+no type at all, which some pickers send) from every photo path: the Library upload, Reporting
+and Field Mode photos, and the article editor's media block. The accepted list is one constant,
+`PHOTO_FILE_ACCEPT` in `@byline/core` (`photo-formats.ts`); file inputs use it instead of
+`image/*` so Apple ProRAW cannot be chosen by accident.
+
+- **Where it happens:** `apps/newsroom/src/media/heic.ts`, called from Media's `beforeOperation`
+  hook, before Payload checks the type or makes the library preview. Everything after it (the
+  private preview, publication renditions, art direction) only ever sees a JPEG.
+- **Decoder:** sharp's prebuilt libvips reads the HEIF container (size, EXIF, ICC) but ships with
+  no HEVC decoder, so it cannot decode an iPhone photo. Pixels are decoded server-side by
+  [`libheif-js`](https://github.com/catdad-experiments/libheif-js) 1.23 (libheif + libde265
+  compiled to WebAssembly; actively maintained). **License: LGPL-3.0**, used unmodified as a
+  dependency of a private server (nothing is distributed). It needs no native build and no
+  system packages, so the Docker image is unchanged. The phone does no conversion.
+- **Fidelity:** full resolution, JPEG quality 95 with 4:4:4 chroma; EXIF (orientation reset to 1,
+  because libheif has applied the rotation) and the ICC profile are carried into the JPEG. The
+  file-name stem is kept (`IMG_0042.HEIC` becomes `IMG_0042.jpg`) and Field/Reporting photos
+  still record the **original** file's SHA-256 (`capture.originalHash`) and capture time. The
+  original HEIC bytes are not stored: Media keeps one file per asset, and retaining a second would
+  need a schema change.
+- **Limits:** the 50 MB upload limit still applies to the HEIC as sent; the same 268-megapixel
+  guard as publication processing applies before decoding. A file that cannot be decoded is a 422
+  with an actionable message.
+- **ProRAW/DNG** is not supported yet (a raw workflow of its own) and is refused with
+  "Apple ProRAW/DNG isn't supported yet. Export or share the photo as HEIC or JPEG."

@@ -12,6 +12,7 @@
  *   browsed by Work scope (`media-desk-model.ts`).
  */
 import { isMediaWorkScope, type MediaWorkScope } from "./media-desk-model";
+import { isHeifFile, isRawPhotoFile } from "@byline/core";
 
 /* --------------------------------------------------------------- assets */
 
@@ -488,6 +489,9 @@ export type UploadStatus = "queued" | "uploading" | "done" | "failed";
 
 /** Whether the Library accepts a file of this type (the server checks again). */
 export function acceptsFile(file: Pick<File, "type" | "name">, accepted: readonly string[]): boolean {
+  if (isRawPhotoFile(file)) return false;
+  // iOS and some desktop pickers hand over HEIC with no type, so the extension counts.
+  if (isHeifFile(file)) return accepted.some((entry) => entry === "image/heic" || entry === "image/heif");
   const type = file.type.toLowerCase();
   return Boolean(type) && accepted.includes(type);
 }

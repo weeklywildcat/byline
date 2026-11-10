@@ -29,7 +29,7 @@ export function Row({ onOpen, children, ...props }: { onOpen?: () => void; child
 /** `compact` leaves the story name out of the description, for rows already listed under their story. */
 export function TaskRow({ task, storyTitle, compact, dense = false, timezone, onOpen, onEdit, onComplete, onUpdate, people = [], canAssign = false, pending, now }: { task: EditorialTask; storyTitle?: string; compact?: boolean; dense?: boolean; timezone: string; onOpen?: () => void; onEdit?: () => void; onComplete: () => void; onUpdate?: TaskQuickUpdate; people?: ContributorEntry[]; canAssign?: boolean; pending?: boolean; now: Date }) {
   const overdue = dayDistance(task.dueAt, timezone, now) < 0;
-  const title = onOpen ? <button type="button" className={cn("text-left hover:underline", dense && "line-clamp-2")} onClick={onOpen}>{task.title}</button> : <span className={dense ? "line-clamp-2" : undefined}>{task.title}</span>;
+  const title = onOpen ? <button type="button" className={cn("touch-hit text-left hover:underline", dense && "line-clamp-2")} onClick={onOpen}>{task.title}</button> : <span className={dense ? "line-clamp-2" : undefined}>{task.title}</span>;
   const hoverableTitle = !compact && task.storyId && storyTitle ? <StoryHoverCard storyId={task.storyId} title={storyTitle}>{title}</StoryHoverCard> : title;
   return <Item size="sm" data-task-id={task.id} className={dense ? cn(denseRowClassName, "@container/work-row") : undefined}>
     <ItemMedia><Checkbox aria-label={`Complete ${task.title}${storyTitle ? ` — ${decodeEntities(storyTitle)}` : ""}`} checked={task.state === "completed"} aria-disabled={pending || undefined} onCheckedChange={(checked) => { if (checked && !pending) onComplete(); }} /></ItemMedia>

@@ -1,8 +1,11 @@
 // shadcn base-nova. Local change: overlays portal into the Byline UI root (../lib/portal.ts).
+"use client"
+
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "../lib/utils"
 import { useAdminPortal } from "../lib/portal"
+import { SAFE_AREA_PADDING, SAFE_AREA_PADDING_MD, VISUAL_VIEWPORT_INSET, useVisualViewportFit } from "../lib/visual-viewport"
 
 import { Button } from "./button"
 import { XIcon } from "lucide-react"
@@ -39,43 +42,66 @@ function DialogOverlay({
   )
 }
 
+/**
+ * The positioning and scroll container for a Dialog. It follows the visible
+ * viewport (software keyboard, pinch zoom) and keeps the popup inside the
+ * safe area; a popup taller than the space scrolls the viewport, so its close
+ * control and footer stay reachable.
+ */
+function DialogViewport({ className, bleed = false, ...props }: DialogPrimitive.Viewport.Props & { bleed?: boolean }) {
+  const fit = useVisualViewportFit()
+  return (
+    <DialogPrimitive.Viewport
+      ref={fit}
+      data-slot="dialog-viewport"
+      className={cn("fixed z-50 flex overflow-y-auto overscroll-contain outline-none", VISUAL_VIEWPORT_INSET, bleed ? SAFE_AREA_PADDING_MD : SAFE_AREA_PADDING, className)}
+      {...props}
+    />
+  )
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  fullBleed = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** A deliberate full-screen workspace below `md`: the popup fills the visible viewport and pads its own header, footer and content with the safe-area variables. From `md` up it is inset like any dialog. */
+  fullBleed?: boolean
 }) {
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Popup
-        data-slot="dialog-content"
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-2 right-2"
-                size="icon-sm"
+      <DialogViewport bleed={fullBleed}>
+        <DialogPrimitive.Popup
+          data-slot="dialog-content"
+          className={cn(
+            "relative m-auto grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              render={
+                <Button
+                  variant="ghost"
+                  className="absolute top-2 right-2"
+                  size="icon-sm"
+                />
+              }
+            >
+              <XIcon
               />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Popup>
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Popup>
+      </DialogViewport>
     </DialogPortal>
   )
 }
@@ -157,4 +183,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  DialogViewport,
 }

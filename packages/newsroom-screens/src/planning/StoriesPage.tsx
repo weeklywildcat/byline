@@ -154,6 +154,8 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
     showPublished,
     publicationState: filters.publicationState || (filters.workflow === "published" ? "published" : "")
   }), [filters.publicationState, filters.workflow, showPublished, stories]);
+  const hiddenPublished = stories.length - workingStories.length;
+  const visibleCount = view === "calendar" ? stories.length : workingStories.length;
 
   useEffect(() => {
     if (!data) return;
@@ -220,17 +222,21 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
           </div>
         </div>
         <StoryFilters today={siteDay(now, timezone)} filters={filters} onChange={changeFilters} showPublished={view === "board" || view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
+        {(view === "board" || view === "list") && hiddenPublished > 0 ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground" role="status" data-hidden-published="">
+          <span>{hiddenPublished} finished published {hiddenPublished === 1 ? "story is" : "stories are"} hidden from this view.</span>
+          <Button type="button" size="xs" variant="link" className="h-auto p-0 text-xs any-pointer-coarse:min-h-11" onClick={() => setShowPublished(true)}>Show published</Button>
+        </div> : null}
         {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
         {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
         {loading
           ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
           : <>
             <TabsContent value="board"><StoryBoard layout={boardLayout} stories={workingStories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
-            <TabsContent value="list"><StoryList stories={workingStories} hiddenPublished={stories.length - workingStories.length} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
+            <TabsContent value="list"><StoryList stories={workingStories} hiddenPublished={hiddenPublished} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>
             {renderCalendar ? <TabsContent value="calendar">{renderCalendar({ collectionId: filters.collectionId, stories, timezone, currentUserId: userId, workspaceUrl, onOpenStory: open })}</TabsContent> : null}
           </>}
       </Tabs>
-      <p role="status" aria-live="polite" className="sr-only">{loading ? "" : `${stories.length} ${stories.length === 1 ? "story" : "stories"} in this view.`}</p>
+      <p role="status" aria-live="polite" className="sr-only">{loading ? "" : `${visibleCount} ${visibleCount === 1 ? "story" : "stories"} shown in this view.`}</p>
     </div>
     {storyViews.dialogs}
   </div>;

@@ -27,7 +27,7 @@ function DrawerContent({
 }: DrawerPrimitive.Popup.Props & { keyboardAware?: boolean }) {
   const viewport = (
     <DrawerPrimitive.Viewport data-slot="drawer-viewport" className={cn(
-      "fixed inset-0 z-50 flex items-end justify-center",
+      "fixed inset-0 z-50 flex items-end justify-center pr-(--byline-safe-right) pl-(--byline-safe-left)",
       keyboardAware && "bottom-(--drawer-keyboard-inset)"
     )}>
       <DrawerPrimitive.Popup

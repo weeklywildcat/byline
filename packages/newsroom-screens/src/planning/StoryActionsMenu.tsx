@@ -3,7 +3,7 @@ import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
-import { useAnyCoarsePointer, useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
+import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
@@ -130,9 +130,12 @@ export type StoryContextMenuProps = StoryActionsMenuProps & {
 };
 
 /**
- * Pointer accelerator for Story List rows. It mirrors the visible three-dot
- * menu instead of replacing it, so touch and keyboard users keep the ordinary
- * action button while mouse/trackpad users can right-click anywhere on a row.
+ * Accelerator for Story rows and cards. It mirrors the visible three-dot menu
+ * instead of replacing it: the visible button stays the discoverable path, and
+ * this adds right-click, Control-click, touch-and-hold (Base UI's long press)
+ * and the keyboard context-menu key. It is mounted for every input, because
+ * long-press is how iOS/iPadOS users expect contextual menus to open; only
+ * hover previews are gated on a hover-capable pointer.
  */
 export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children, additionalActions }: StoryContextMenuProps) {
   const title = story.title || "Untitled story";
@@ -144,7 +147,6 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
   // the contextmenu event, but WebKit/Chromium can still dispatch a follow-up
   // click to the element underneath. Keep a short-lived guard so that follow-up
   // click cannot open Story Peek or navigate a nested control.
-  const canHover = useFineHoverPointer();
   const secondaryPressUntil = useRef(0);
   const markSecondaryPress = () => { secondaryPressUntil.current = performance.now() + 750; };
   const suppressSecondaryActivation = (event: ReactMouseEvent<HTMLElement>) => {
@@ -154,8 +156,6 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
       secondaryPressUntil.current = 0;
     }
   };
-
-  if (!canHover) return children;
 
   return <ContextMenu>
     <ContextMenuTrigger

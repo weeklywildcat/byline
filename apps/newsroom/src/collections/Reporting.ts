@@ -229,6 +229,13 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "searchText", type: "textarea", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "failure", type: "text", maxLength: 400, access: { update: systemWrite } },
     { name: "attempts", type: "number", defaultValue: 0, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    // One logical run keeps the same token across Payload retries, so Whisper can reattach instead of duplicating CPU work.
+    { name: "transcriptionRunToken", type: "text", maxLength: 64, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    // Persist lightweight progress so every newsroom screen can explain what the background worker is doing.
+    { name: "progressPercent", type: "number", min: 0, max: 100, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    { name: "progressMessage", type: "text", maxLength: 160, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    { name: "transcriptionStartedAt", type: "date", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    { name: "lastProgressAt", type: "date", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "completedAt", type: "date", access: { create: systemWrite, update: systemWrite } },
     createdByField,
     { name: "capturedAt", type: "date", admin: { readOnly: true } },

@@ -2,6 +2,7 @@ import { lexicalFromArticleBody } from "../../../../packages/editor/tests/lexica
 import { buildFolderTree, EMPTY_MEDIA_FILTERS, MEDIA_PAGE_SIZE, type MediaLibraryQuery } from "@byline/newsroom-screens/media/media-library-model";
 import { createLocalReq, getPayload, type Endpoint, type Payload, type PayloadRequest } from "payload";
 import { existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -453,6 +454,38 @@ describe("upload", () => {
     expect((await call("post", "/byline/media/upload", "photo", { data: { folderId: 999999 }, file: await photo(100, 100, "lost.jpg") })).status).toBe(400);
     // A file that lies about its type is caught by Payload's own content check.
     expect((await call("post", "/byline/media/upload", "photo", { data: {}, file: { data: text, mimetype: "image/jpeg", name: "fake.jpg", size: text.length } })).status).toBeGreaterThanOrEqual(400);
+  });
+});
+
+describe("iPhone HEIC/HEIF and ProRAW uploads", () => {
+  const heic = readFileSync(path.join(import.meta.dirname, "..", "fixtures", "iphone-sample.heic"));
+
+  it("decodes an HEVC HEIC from the Library upload to a full-size JPEG asset with its own preview", async () => {
+    const result = await call("post", "/byline/media/upload", "photo", { data: {}, file: { data: heic, mimetype: "image/heic", name: "IMG_0042.HEIC", size: heic.length } });
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ filename: "IMG_0042.jpg", mimeType: "image/jpeg", kind: "image", width: 640, height: 480 });
+    expect(result.body.previewUrl).toBeTruthy();
+    const stored = await payload.findByID({ collection: "media", id: result.body.id, depth: 0, overrideAccess: true });
+    expect(stored.mimeType).toBe("image/jpeg");
+    expect(existsSync(path.join(privateMediaDir(), stored.filename as string))).toBe(true);
+  });
+
+  it("takes HEIC that the browser sends without a type, and a .heif name", async () => {
+    expect((await call("post", "/byline/media/upload", "photo", { data: {}, file: { data: heic, mimetype: "", name: "IMG_0043.heif", size: heic.length } })).status).toBe(200);
+  });
+
+  it("refuses a corrupt HEIC and Apple ProRAW with specific messages", async () => {
+    const junk = Buffer.from("not really heic");
+    const corrupt = await call("post", "/byline/media/upload", "photo", { data: {}, file: { data: junk, mimetype: "image/heic", name: "bad.heic", size: junk.length } });
+    expect(corrupt.status).toBe(422);
+    const raw = await call("post", "/byline/media/upload", "photo", { data: {}, file: { data: junk, mimetype: "image/x-adobe-dng", name: "IMG_0001.DNG", size: junk.length } });
+    expect(raw.status).toBe(415);
+    expect(JSON.stringify(raw.body)).toContain("Apple ProRAW/DNG isn't supported yet. Export or share the photo as HEIC or JPEG.");
+  });
+
+  it("advertises HEIC to the upload dialog", async () => {
+    const navigator = await call("get", "/byline/media/navigator", "photo");
+    expect(JSON.stringify(navigator.body)).toContain("image/heic");
   });
 });
 

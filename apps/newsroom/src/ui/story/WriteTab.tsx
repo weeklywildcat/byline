@@ -20,11 +20,12 @@ import { LiveCoverageSection } from "../live/LiveCoverageSection";
 import { StoryModeControl } from "../live/LiveModeControl";
 import { ArticleCanvas } from "./ArticleCanvas";
 import { useNewsroomEditorHost } from "./editor-host";
-import { childField, relationIdOf, relationIdsOf, useStoryField } from "./form";
+import { childField, relationIdsOf, useStoryField } from "./form";
 import { LeadImage } from "./LeadImage";
 import { Property, SectionHeading } from "./parts";
 import { QuickCreateRelation } from "./QuickCreateRelation";
-import { MultiPicker, SinglePicker, useOptions } from "./RelationPickers";
+import { MultiPicker, useOptions } from "./RelationPickers";
+import { StoryBylineField, StorySectionField } from "./StoryAssignmentFields";
 import type { StoryScreenContext } from "./StoryScreen";
 import type { Id } from "./types";
 
@@ -95,8 +96,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const kicker = useStoryField<string>("kicker");
   const headline = useStoryField<string>("headline");
   const deck = useStoryField<string>("deck");
-  const contributors = useStoryField<Id[]>("contributors");
-  const section = useStoryField<Id | null>("section");
   const topics = useStoryField<Id[]>("topics");
   const contentFormat = useStoryField<string>("contentFormat");
   const format = useStoryField<string>("format");
@@ -105,8 +104,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   const [kickerOpen, setKickerOpen] = useState(false);
   const [reportingNoteOpen, setReportingNoteOpen] = useState(false);
 
-  const people = useOptions(context.api, "people", "name");
-  const sections = useOptions(context.api, "sections", "name");
   const topicOptions = useOptions(context.api, "topics", "name");
 
   const legacy = contentFormat.value === "legacy-html";
@@ -173,21 +170,11 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
 
             <FieldGroup className="gap-0.5 pt-1">
               <Property label="Byline">
-                <MultiPicker
-                  label="Byline"
-                  placeholder="Add contributors"
-                  options={people}
-                  value={relationIdsOf(contributors.value)}
-                  onChange={(ids) => contributors.setValue(ids)}
-                  disabled={readOnly}
-                  footer={!readOnly && (context.role === "editor" || context.role === "administrator")
-                    ? <QuickCreateRelation context={context} kind="guest" onCreated={(id) => contributors.setValue([...relationIdsOf(contributors.value), id])} />
-                    : null}
-                />
+                <StoryBylineField context={context} />
               </Property>
               <div id="byline-story-section">
                 <Property label="Section">
-                  <SinglePicker label="Section" placeholder="No section" options={sections} value={relationIdOf(section.value)} onChange={(id) => section.setValue(id)} disabled={readOnly} />
+                  <StorySectionField context={context} />
                 </Property>
               </div>
               <Property label="Topics">
@@ -219,6 +206,9 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                       onKeyDown={noSubmit}
                       type="url"
                       inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="Paste a YouTube link"
                       value={url}
                       onChange={(event) => videoUrl.setValue(event.target.value)}

@@ -96,7 +96,7 @@ export function SiteRecords({ group }: { group: SiteGroup }) {
       </div>
     </Item>)}</ItemGroup>
     <Dialog open={Boolean(editing) && impact === null} onOpenChange={(open) => { if (!open && !busy && impact === null) setEditing(null); }}>
-      <DialogContent finalFocus={() => trigger.current ?? add.current} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+      <DialogContent finalFocus={() => trigger.current ?? add.current} className="max-h-full overflow-auto">
         <DialogHeader><DialogTitle>{editing?.id ? "Edit" : "Add"} {singular[group]}</DialogTitle><DialogDescription>{redirects ? "Use paths on this site, starting with /." : "Set the name readers and the newsroom will see."}</DialogDescription></DialogHeader>
         {editing ? <form className="grid gap-2" onSubmit={save}>
           <label htmlFor={`${prefix}-title`}>{redirects ? "Old path" : pages ? "Title" : "Name"}</label><Input id={`${prefix}-title`} value={editing.title} required onChange={(event) => change({ title: event.target.value })} />

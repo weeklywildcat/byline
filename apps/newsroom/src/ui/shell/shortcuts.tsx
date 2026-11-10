@@ -71,7 +71,7 @@ function ShortcutsDialog({ open, onOpenChange, role, canCreateStory }: { open: b
   const groups = shortcutGroups(role, { canCreateStory, modifier });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-auto sm:max-w-lg">
+      <DialogContent className="max-h-full overflow-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>Single keys work when you are not typing in a field. To go somewhere, press G, then the letter.</DialogDescription>

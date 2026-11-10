@@ -22,7 +22,7 @@ export function StoryTitleButton({ story, onOpen, className, ...props }: { story
   // Spreading that after ours replaced it, so clicking a title the cursor had rested on did nothing.
   // Run it first, then always open Peek.
   const { onClick: injected, ...rest } = props as ComponentProps<"button">;
-  return <button type="button" className={cn("min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} {...rest} onClick={(event) => { injected?.(event); onOpen(story.id); }}>{decodeEntities(story.title) || "Untitled story"}</button>;
+  return <button type="button" className={cn("touch-hit min-w-0 text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline focus-visible:outline-none", className)} {...rest} onClick={(event) => { injected?.(event); onOpen(story.id); }}>{decodeEntities(story.title) || "Untitled story"}</button>;
 }
 
 /** "Due tomorrow", "2d overdue", or a quiet fallback. Overdue is the one warning. */
