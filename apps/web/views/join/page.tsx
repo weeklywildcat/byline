@@ -126,6 +126,22 @@ export default function JoinPage() {
         </div>
       </section>
 
+      <section className="about-section" aria-labelledby="join-meet-heading">
+        <h2 id="join-meet-heading">When we meet</h2>
+        <div className="about-section-body">
+          <div className="about-prose">
+            <p>
+              We hold Group Labs early in the week to work on stories together and learn new skills. Editorial meetings
+              are on Fridays, usually after school.
+            </p>
+            <p>
+              We also usually have open newsroom hours in the mornings and during lunch when the library is open. Stop
+              by to work on something, get help or see what we're doing.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="about-section" aria-labelledby="join-faq-heading">
         <h2 id="join-faq-heading">Questions</h2>
         <div className="about-section-body">
