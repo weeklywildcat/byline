@@ -24,7 +24,11 @@ A story uses the most specific active workflow whose Sections and formats match 
 
 ## Workload {#workload}
 
-`/admin/people?view=workload`: factual counts per person: active Stories, due this week, overdue, reviews waiting on them, open media assignments. Alphabetical, never ranked; no scores, no time tracking. The same counts appear as a quiet, secondary line when choosing someone for a role or on a Story ("2 active Stories · 1 review · 1 due this week"): the role-member dialog, and the writers and editor pickers in Story Peek, the Story Details and New story (editors only; one cached read of `/byline/workload` serves every picker). It is advisory: it never disables, hides, orders or colours anyone, and never blocks an assignment.
+`/admin/people?view=workload`: factual counts per person: active Stories, due this week, overdue, reviews waiting on them, open media assignments. Overdue counts are tinted red and work due this week amber.
+
+Each person also gets a **Load** level (`loadLevel` in `domain/workload.ts`): every active Story, review, media assignment and Story due this week is a point, and overdue Stories count twice. 0–1 is Light (green), 2–4 Steady (blue), 5–7 Busy (amber) and 8+ Stretched (red). Each badge shows its word as well as its colour, and the screen explains the levels. Load describes what is on someone's plate, never their output: the list stays alphabetical, nothing is ranked or ordered by load, and there is no time tracking.
+
+The same counts appear as a quiet, secondary line when choosing someone for a role or on a Story ("2 active Stories · 1 review · 1 due this week"): the role-member dialog, and the writers and editor pickers in Story Peek, the Story Details and New story (editors only; one cached read of `/byline/workload` serves every picker). Those pickers show no Load level or colour. Workload is advisory: it never disables, hides or orders anyone, and never blocks an assignment.
 
 ## School years {#school-years}
 
