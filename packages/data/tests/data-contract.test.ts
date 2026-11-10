@@ -66,6 +66,9 @@ describe("dataset schemas", () => {
     expect(fieldKeyFromLabel("Detail", ["name", "detail"])).toBe("detail_2");
     expect(fieldKeyFromLabel("Precincts reporting (%)", [])).toBe("precincts_reporting");
     expect(fieldKeyFromLabel("2026 total", [])).toBe("f_2026_total");
+    expect(fieldKeyFromLabel("__Score__ ", [])).toBe("score");
+    expect(fieldKeyFromLabel(`${"_ ".repeat(50_000)}!`, [])).toBe("field");
+    expect(fieldKeyFromLabel(`${"a".repeat(39)} b`, [])).toBe("a".repeat(39));
   });
 
   it("allows only value-preserving type changes and reports removed choices for a row check", () => {

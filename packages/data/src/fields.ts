@@ -126,9 +126,10 @@ export function fieldKeyFromLabel(label: string, taken: Iterable<string>): strin
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
+    .replace(/^_/, "")
     .replace(/^(\d)/, "f_$1")
-    .slice(0, 40) || "field";
+    .slice(0, 40)
+    .replace(/_$/, "") || "field";
   let key = base;
   for (let suffix = 2; used.has(key); suffix++) key = `${base}_${suffix}`.slice(0, 48);
   return key;
@@ -265,7 +266,7 @@ const US_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 
 function parseNumberText(text: string): number | null {
   const cleaned = text.replace(/[,\s]/g, "").replace(/^\((.*)\)$/, "-$1");
-  if (!/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(cleaned)) return null;
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(cleaned)) return null;
   const value = Number(cleaned);
   return Number.isFinite(value) ? value : null;
 }
