@@ -80,10 +80,9 @@ def _snapshot(job: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _set_job(key: str, **changes: Any) -> None:
+def _set_job(job: dict[str, Any], **changes: Any) -> None:
     with JOBS_LOCK:
-        job = JOBS.get(key)
-        if not job:
+        if JOBS.get(job["key"]) is not job:
             return
         job.update(changes)
         job["updated_at"] = time.time()
@@ -91,15 +90,14 @@ def _set_job(key: str, **changes: Any) -> None:
             job["finished_at"] = time.time()
 
 
-def _cancelled(key: str) -> bool:
+def _cancelled(job: dict[str, Any]) -> bool:
     with JOBS_LOCK:
-        job = JOBS.get(key)
-        return not job or bool(job["cancel"].is_set())
+        return JOBS.get(job["key"]) is not job or bool(job["cancel"].is_set())
 
 
-def _finish_cancelled(key: str) -> None:
+def _finish_cancelled(job: dict[str, Any]) -> None:
     _set_job(
-        key,
+        job,
         state="cancelled",
         message="Transcription cancelled",
         detail="The transcription was cancelled.",
@@ -107,28 +105,27 @@ def _finish_cancelled(key: str) -> None:
     )
 
 
-def _run_job(key: str) -> None:
+def _run_job(job: dict[str, Any]) -> None:
+    path = str(job["path"])
     with JOBS_LOCK:
-        job = JOBS.get(key)
-        if not job:
+        if JOBS.get(job["key"]) is not job:
             return
-        path = str(job["path"])
         model_name = str(job["model"])
         language = job.get("language")
         vad = bool(job["vad"])
         word_timestamps = bool(job["word_timestamps"])
 
     try:
-        if _cancelled(key):
-            _finish_cancelled(key)
+        if _cancelled(job):
+            _finish_cancelled(job)
             return
 
-        _set_job(key, state="loading-model", message="Loading Whisper model", progress=None)
+        _set_job(job, state="loading-model", message="Loading Whisper model", progress=None)
         try:
             model = load(model_name)
         except Exception as error:
             _set_job(
-                key,
+                job,
                 state="failed",
                 message="Whisper could not load the model",
                 detail=f"Could not load the transcription model ({type(error).__name__}).",
@@ -136,11 +133,11 @@ def _run_job(key: str) -> None:
             )
             return
 
-        if _cancelled(key):
-            _finish_cancelled(key)
+        if _cancelled(job):
+            _finish_cancelled(job)
             return
 
-        _set_job(key, state="transcribing", message="Transcribing audio", progress=0.0, processed=0.0)
+        _set_job(job, state="transcribing", message="Transcribing audio", progress=0.0, processed=0.0)
         try:
             segments, info = model.transcribe(
                 path,
@@ -149,18 +146,18 @@ def _run_job(key: str) -> None:
                 word_timestamps=word_timestamps,
             )
             duration = float(info.duration) if getattr(info, "duration", None) else None
-            _set_job(key, duration=duration)
+            _set_job(job, duration=duration)
             rows: list[dict[str, Any]] = []
             processed = 0.0
             for segment in segments:
-                if _cancelled(key):
-                    _finish_cancelled(key)
+                if _cancelled(job):
+                    _finish_cancelled(job)
                     return
                 processed = max(processed, float(segment.end or 0.0))
                 progress = min(0.99, processed / duration) if duration and duration > 0 else None
                 rows.append({"start": segment.start, "end": segment.end, "text": segment.text})
                 _set_job(
-                    key,
+                    job,
                     state="transcribing",
                     progress=progress,
                     processed=processed,
@@ -169,7 +166,7 @@ def _run_job(key: str) -> None:
                 )
         except Exception as error:
             _set_job(
-                key,
+                job,
                 state="failed",
                 message="Whisper could not read the recording",
                 detail=f"Could not decode audio ({type(error).__name__}).",
@@ -183,7 +180,7 @@ def _run_job(key: str) -> None:
             "segments": rows,
         }
         _set_job(
-            key,
+            job,
             state="ready",
             progress=1.0,
             processed=duration,
@@ -233,6 +230,10 @@ async def start_job(
         # by Payload's retry using the same logical key. Ready work is reused.
         if existing and (existing["state"] == "cancelled" or (existing["state"] == "failed" and existing.get("retryable") is True)):
             JOBS.pop(job_key, None)
+            try:
+                os.unlink(str(existing["path"]))
+            except FileNotFoundError:
+                pass
             existing = None
         if existing:
             return JSONResponse(_snapshot(existing), status_code=200 if existing["state"] == "ready" else 202)
@@ -284,7 +285,7 @@ async def start_job(
                 pass
             return JSONResponse(_snapshot(existing), status_code=200 if existing["state"] == "ready" else 202)
         JOBS[job_key] = job
-    EXECUTOR.submit(_run_job, job_key)
+    EXECUTOR.submit(_run_job, job)
     return JSONResponse(_snapshot(job), status_code=202)
 
 
