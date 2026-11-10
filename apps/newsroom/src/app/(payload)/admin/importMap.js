@@ -28,6 +28,7 @@ import { BylineCalendar as BylineCalendar_2d5b3538f05fbaa029503bd635bee9fa } fro
 import { BylineMedia as BylineMedia_580dc7f09651a0fb71a4ffa858cead70 } from '../../../components/BylineMedia'
 import { BylineCollections as BylineCollections_b62b2b78437513f3b21252878ffec260 } from '../../../components/BylineCollections'
 import { BylinePeople as BylinePeople_edff41521188bbb33777c751302cfe03 } from '../../../components/BylinePeople'
+import { BylineData as BylineData_584a65c5ebfc698336510e976e4d6bba } from '../../../components/BylineData'
 import { BylineWorkflows as BylineWorkflows_d245e27abd080edc2b02b2741f9d1522 } from '../../../components/BylineWorkflows'
 import { BylineProfile as BylineProfile_f370a8ad138a4aa17aed328f28cde22c } from '../../../components/BylineProfile'
 import { BylineContentHealth as BylineContentHealth_0d02e28469bc7e97b4989a1d5441b912 } from '../../../components/BylineContentHealth'
@@ -70,6 +71,7 @@ export const importMap = {
   "/components/BylineMedia#BylineMedia": BylineMedia_580dc7f09651a0fb71a4ffa858cead70,
   "/components/BylineCollections#BylineCollections": BylineCollections_b62b2b78437513f3b21252878ffec260,
   "/components/BylinePeople#BylinePeople": BylinePeople_edff41521188bbb33777c751302cfe03,
+  "/components/BylineData#BylineData": BylineData_584a65c5ebfc698336510e976e4d6bba,
   "/components/BylineWorkflows#BylineWorkflows": BylineWorkflows_d245e27abd080edc2b02b2741f9d1522,
   "/components/BylineProfile#BylineProfile": BylineProfile_f370a8ad138a4aa17aed328f28cde22c,
   "/components/BylineContentHealth#BylineContentHealth": BylineContentHealth_0d02e28469bc7e97b4989a1d5441b912,

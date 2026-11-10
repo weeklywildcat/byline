@@ -144,7 +144,7 @@ afterEach(async () => {
 
 describe("Collections in the newsroom", () => {
   it("is the destination after Media, named Collections, never Coverage", () => {
-    expect(NAVIGATION.filter((item) => !item.group).map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "people"]);
+    expect(NAVIGATION.filter((item) => !item.group).map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data", "people"]);
     // Editors' coordination desks follow in their own Publish group.
     expect(NAVIGATION.filter((item) => item.group === "publish").map((item) => item.key)).toEqual(["front-page", "distribution", "content-health"]);
     expect(NAVIGATION.find((item) => item.key === "collections")).toMatchObject({ label: "Collections", path: "/collections", exact: true });

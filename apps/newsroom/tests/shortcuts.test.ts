@@ -7,9 +7,9 @@ const key = (value: string, extra: Partial<{ metaKey: boolean; ctrlKey: boolean;
 describe("keyboard navigation", () => {
   it("offers a Go to letter for exactly the destinations a role's sidebar shows, with no letter used twice", () => {
     const staff = goShortcuts("staff").map((item) => item.label);
-    expect(staff).toEqual(["Home", "Stories", "Calendar", "Media", "Collections"]);
+    expect(staff).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "Data"]);
     const editor = goShortcuts("editor");
-    expect(editor.map((item) => item.label)).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "People", "Front Page", "Distribution", "Content Health"]);
+    expect(editor.map((item) => item.label)).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "Data", "People", "Front Page", "Distribution", "Content Health"]);
     expect(new Set(editor.map((item) => item.key)).size).toBe(editor.length);
     // Every destination in the navigation has a letter, so a new one cannot be left without.
     expect(NAVIGATION.filter((item) => !GO_KEYS[item.key]).map((item) => item.key)).toEqual([]);

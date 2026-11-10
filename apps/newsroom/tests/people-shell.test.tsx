@@ -38,9 +38,10 @@ const props = (role: string, enabled = true, searchParams: Record<string, string
 const child = (view: ReactElement) =>
   (view.props as { children: ReactElement }).children;
 describe("People custom-view authorization and navigation", () => {
-  it("places People after Collections only for editor+ and leaves global Create alone", () => {
+  it("places People after the workspaces (Collections, Data) only for editor+ and leaves global Create alone", () => {
     const main = NAVIGATION.filter((item) => !item.group);
-    expect(main.at(-2)?.key).toBe("collections");
+    expect(main.at(-3)?.key).toBe("collections");
+    expect(main.at(-2)?.key).toBe("data");
     expect(main.at(-1)?.key).toBe("people");
     expect(navigationFor("staff").some((item) => item.key === "people")).toBe(
       false,

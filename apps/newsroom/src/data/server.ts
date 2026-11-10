@@ -160,7 +160,7 @@ export type DatasetDetail = {
   records: number;
   usedBy: Array<{ id: number; title: string; publication: ProjectPublication }>;
   /** Other datasets a relationship field can link to. */
-  linkable: Array<{ key: string; title: string }>;
+  linkable: Array<{ id: number; key: string; title: string }>;
   capabilities: DataCapabilities;
   timeZone: string;
 };
@@ -187,7 +187,7 @@ export async function datasetDetail(ctx: ScreenContext, id: number): Promise<Dat
     publication: datasetPublication(workingRevision, release),
     records: counts.get(id) ?? 0,
     usedBy: projects.filter(({ latest }) => bindingsOf(latest.bindings).some((binding) => binding.dataset === doc.key)).map(({ latest, main }) => ({ id: latest.id, title: latest.title, publication: projectPublication(latest, main) })),
-    linkable: others.docs.map((row) => ({ key: row.key, title: row.title })),
+    linkable: others.docs.map((row) => ({ id: row.id, key: row.key, title: row.title })),
     capabilities: capabilities(ctx),
     timeZone: ctx.timeZone
   };
@@ -287,9 +287,12 @@ export async function createRows(ctx: ScreenContext, id: number, input: { rows?:
     const ceiling = next.docs[0]?.position ?? position + rows.length + 1;
     const step = (Number(ceiling) - position) / (rows.length + 1);
     const created: DataRow[] = [];
-    for (const entry of rows as Array<{ values?: unknown; included?: unknown }>) {
+    for (const entry of rows as Array<{ values?: unknown; included?: unknown; recordId?: unknown; position?: unknown }>) {
       position += step;
-      const doc = await ctx.req.payload.create({ collection: "data-records", data: { dataset: id, values: entry?.values ?? {}, included: entry?.included !== false, position } as never, ...asUser(ctx) });
+      // A row restored by Undo keeps its ID and place; the unique index refuses a duplicate.
+      const restored = typeof entry?.recordId === "string" && entry.recordId ? { recordId: entry.recordId } : {};
+      const at = typeof entry?.position === "number" && Number.isFinite(entry.position) ? entry.position : position;
+      const doc = await ctx.req.payload.create({ collection: "data-records", data: { dataset: id, values: entry?.values ?? {}, included: entry?.included !== false, position: at, ...restored } as never, ...asUser(ctx) });
       created.push(toRow(doc as never));
     }
     return { rows: created, workingRevision: await readWorkingRevision(ctx.req.payload, id, ctx.req) };

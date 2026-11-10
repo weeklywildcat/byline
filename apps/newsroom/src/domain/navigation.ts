@@ -39,6 +39,9 @@ export const COLLECTIONS_PATH = "/collections";
  */
 export const COLLECTIONS_VIEW_PATH = "/byline-collections";
 
+/** Byline Data's address below the admin route: a dataset or project is its query (`?dataset=`, `?project=`). */
+export const DATA_PATH = "/data";
+
 /**
  * Byline's newsroom navigation: the only primary navigation anyone sees.
  *
@@ -46,6 +49,7 @@ export const COLLECTIONS_VIEW_PATH = "/byline-collections";
  * never sent to a generic Payload collection screen. The order is Home,
  * Stories, Calendar, Media, Collections (reporting projects; public coverage
  * is only an optional presentation of a Collection, never a destination),
+ * Data (datasets newsroom staff keep, and the reader-facing projects built on them),
  * then the editor tools (People, Polls, Feedback…), each as its screen is ported
  * (docs/newsroom-os.md). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
@@ -58,6 +62,7 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "calendar", label: "Calendar", path: CALENDAR_PATH, minimumRole: "staff" },
   { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
   { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true },
+  { key: "data", label: "Data", path: DATA_PATH, minimumRole: "staff", exact: true },
   { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true },
   // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
   { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
@@ -175,6 +180,9 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-accounts", label: "Accounts", path: "/collections/users", minimumRole: "administrator" },
   { key: "raw-distribution", label: "Distribution items", path: "/collections/distribution-items", minimumRole: "administrator" },
   { key: "raw-distribution-settings", label: "Distribution settings", path: "/globals/distribution-settings", minimumRole: "administrator" },
+  { key: "raw-data-datasets", label: "Datasets", path: "/collections/data-datasets", minimumRole: "administrator" },
+  { key: "raw-data-records", label: "Data rows", path: "/collections/data-records", minimumRole: "administrator" },
+  { key: "raw-data-projects", label: "Data projects", path: "/collections/data-projects", minimumRole: "administrator" },
   { key: "raw-jobs", label: "Jobs", path: "/collections/payload-jobs", minimumRole: "administrator" }
 ];
 
@@ -231,6 +239,11 @@ export function isCalendarPath(pathname: string, adminRoute: string): boolean {
 /** Whether a path is the Collections screen (the list or an open Collection: that is its query). */
 export function isCollectionsPath(pathname: string, adminRoute: string): boolean {
   return stripAdmin(pathname, adminRoute) === COLLECTIONS_PATH;
+}
+
+/** Whether a path is the Data workspace (a dataset or project is its query). */
+export function isDataPath(pathname: string, adminRoute: string): boolean {
+  return stripAdmin(pathname, adminRoute) === DATA_PATH;
 }
 
 /** Whether a path is the Media screen (any view, folder or asset: those are its query). */

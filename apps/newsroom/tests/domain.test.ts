@@ -146,7 +146,7 @@ describe("navigation", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
       expect(navigationFor(role).every((item) => !item.path.startsWith("/collections/"))).toBe(true);
     }
-    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections"]);
+    expect(navigationFor("staff").map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data"]);
     // No generic Planning destination: each former Planning tab becomes its own screen.
     expect(NAVIGATION.map((item) => item.key)).not.toContain("planning");
   });

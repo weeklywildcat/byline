@@ -57,6 +57,7 @@ import { COLLECTIONS_VIEW_PATH, REVIEW_WORKFLOWS_PATH } from "./domain/navigatio
 import { preparePublicationMediaTask } from "./publication-media/task";
 import { DataDatasets, DataProjects, DataRecords } from "./data/collections";
 import { dataEndpoints } from "./data/endpoints";
+import { DATA_PATH } from "./domain/navigation";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -202,6 +203,8 @@ export default buildConfig({
         // (Payload refuses a custom view there); Payload's raw /collections/<slug> screens are untouched.
         collections: { Component: "/components/BylineCollections#BylineCollections", path: COLLECTIONS_VIEW_PATH, exact: true, meta: { title: "Collections" } },
         people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
+        // Byline Data: Datasets (the facts) and Projects (what readers see). Raw Data collections stay administrator fallback.
+        data: { Component: "/components/BylineData#BylineData", path: DATA_PATH, exact: true, meta: { title: "Data" } },
         reviewWorkflows: { Component: "/components/BylineWorkflows#BylineWorkflows", path: REVIEW_WORKFLOWS_PATH, exact: true, meta: { title: "Review workflows" } },
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },
