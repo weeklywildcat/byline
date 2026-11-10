@@ -23,23 +23,10 @@ import type { WorkspaceStatus } from "./workspace-types";
 
 type Changes = { status?: string; editorId?: number | null; deadline?: string | null; plannedPublishAt?: string | null };
 
-/**
- * The story's facts as a compact definition list, not a settings form. A
- * deadline, a planned publication date and a WordPress schedule are three
- * different things, and are labelled so.
- */
-export function DetailsSection() {
-  const { storyId, client, editorial, data, timezone, now, caps, reload, announce, sectionError, articleInForm } = useWorkspace();
+/** Saves the story's editor, deadline, publication target or stage, with the optimistic update and the conflict handling every host shares. */
+function usePlanningUpdate() {
+  const { storyId, editorial, data, announce } = useWorkspace();
   const cache = useWorkspaceCache();
-  const { story } = data;
-  const contributorsFailed = sectionError("contributors");
-  const people = peopleOptions(data.people);
-  const hints = useWorkloadHints(client.getWorkloadHints, caps.assign);
-  const statuses = data.statuses.filter((status) => status.selectable);
-  const wpState = story.publicationState;
-  const scheduled = wpState.isScheduled && wpState.scheduledAt ? ` · ${exactDate(wpState.scheduledAt, timezone)}` : wpState.isPublished && wpState.publishedAt ? ` · ${exactDate(wpState.publishedAt, timezone)}` : "";
-  const overdue = Boolean(story.deadline) && !wpState.isPublished && dateLabel(story.deadline, timezone, now).endsWith("overdue");
-
   const update = useMutation({
     mutationFn: ({ changes, revision }: { changes: Changes; revision: number }) => editorial.updateWorkflow(storyId, { ...changes, expectedRevision: revision }),
     onMutate: async ({ changes }) => {
@@ -64,6 +51,27 @@ export function DetailsSection() {
     onSettled: () => { void cache.invalidate(); }
   });
   const save = (changes: Changes) => update.mutate({ changes, revision: data.revision });
+  return { save, update };
+}
+
+/**
+ * The story's facts as a compact definition list, not a settings form. A
+ * deadline, a planned publication date and a WordPress schedule are three
+ * different things, and are labelled so.
+ */
+export function DetailsSection() {
+  const { storyId, client, editorial, data, timezone, now, caps, reload, announce, sectionError, articleInForm } = useWorkspace();
+  const cache = useWorkspaceCache();
+  const { story } = data;
+  const contributorsFailed = sectionError("contributors");
+  const people = peopleOptions(data.people);
+  const hints = useWorkloadHints(client.getWorkloadHints, caps.assign);
+  const statuses = data.statuses.filter((status) => status.selectable);
+  const wpState = story.publicationState;
+  const scheduled = wpState.isScheduled && wpState.scheduledAt ? ` · ${exactDate(wpState.scheduledAt, timezone)}` : wpState.isPublished && wpState.publishedAt ? ` · ${exactDate(wpState.publishedAt, timezone)}` : "";
+  const overdue = Boolean(story.deadline) && !wpState.isPublished && dateLabel(story.deadline, timezone, now).endsWith("overdue");
+
+  const { save, update } = usePlanningUpdate();
 
   const writers = useMutation({
     mutationFn: (value: ContributorEntry[]) => editorial.saveContributors(storyId, value),
@@ -107,6 +115,36 @@ export function DetailsSection() {
       {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
     </CardContent>
   </Card>;
+}
+
+/**
+ * The editor, deadline and publication target as editable rows (editors only; everyone else reads them).
+ * The Story screen's details panel uses these in place of the old Plan tab's Details card.
+ */
+export function PlanningProperties() {
+  const { data, timezone, now, caps, reload, client } = useWorkspace();
+  const { story } = data;
+  const people = peopleOptions(data.people);
+  const hints = useWorkloadHints(client.getWorkloadHints, caps.assign);
+  const { save, update } = usePlanningUpdate();
+  const busy = update.isPending;
+  const overdue = Boolean(story.deadline) && !story.publicationState.isPublished && dateLabel(story.deadline, timezone, now).endsWith("overdue");
+  const editor = story.editor ? people.find((person) => Number(person.id) === story.editor!.id) ?? { id: story.editor.id, kind: "user" as const, name: story.editor.name } : null;
+  return <>
+    <FieldGroup className="gap-2">
+      <Property label="Editor">
+        {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} hints={hints} /> : story.editor?.name || "None"}
+      </Property>
+      <Property label="Story deadline">
+        {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
+        {overdue ? <span className="ml-2 text-xs text-warning">Overdue</span> : null}
+      </Property>
+      <Property label="Publication target">
+        {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}
+      </Property>
+    </FieldGroup>
+    {update.isError && update.error && workspaceError(update.error).conflict ? <InlineAlert className="mt-3" onAction={() => void reload()} actionLabel="Reload">{workspaceError(update.error).message}</InlineAlert> : null}
+  </>;
 }
 
 /**
