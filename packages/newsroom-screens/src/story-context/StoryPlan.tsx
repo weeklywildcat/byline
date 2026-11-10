@@ -22,7 +22,8 @@ import { Angle, Checklist, ContextSection, MediaContext } from "./StoryContext";
  * same Story Workspace records and dialogs as Story Context. Nothing here is
  * a new record: the brief is the plan's brief, To do is the Story's tasks and
  * media assignments, interviews are its appointments, activity is its audit
- * trail. Quiet headings and rows, never Cards.
+ * trail. The host puts each section in its Card; inside one, quiet headings
+ * and rows (no Cards within Cards).
  */
 
 /** One fact in the brief: a fixed label column, then the value. */
@@ -84,7 +85,7 @@ export function StoryBrief({ writersHint }: StoryBriefProps) {
   const expected = useMemo(() => deliverables(data), [data]);
   const sections = sectionNames(data.sections);
   return (
-    <div className="grid gap-6 @3xl/plan:grid-cols-[minmax(0,1fr)_20rem] @3xl/plan:gap-10" data-story-brief="">
+    <div className="grid gap-6 @min-[720px]/plan-card:grid-cols-[minmax(0,1fr)_300px] @min-[720px]/plan-card:gap-8" data-story-brief="">
       <div className="flex min-w-0 flex-col gap-5">
         <Angle id="plan-angle" title="Angle and assignment" level={3} prominent prompt="The story's central question, what the reporter should find out, who to talk to, and anything still unresolved." />
         <ContextSection id="plan-deliverables" title="Expected" level={3}>
@@ -92,7 +93,7 @@ export function StoryBrief({ writersHint }: StoryBriefProps) {
         </ContextSection>
         <ResourcesSection plain title="Background and links" headingLevel={3} />
       </div>
-      <div className="flex min-w-0 flex-col gap-1 @3xl/plan:border-l @3xl/plan:border-border @3xl/plan:pl-6">
+      <div className="flex min-w-0 flex-col gap-1 self-start rounded-lg bg-muted/50 p-3 @min-[720px]/plan-card:p-4" data-story-brief-facts="">
         <h3 className="sr-only">Assignment</h3>
         <FieldGroup className="gap-1">
           <Fact label={writers.length === 1 ? "Reporter" : "Reporters"}>
@@ -126,7 +127,7 @@ export function StoryToDo({ leadImage, onOpenReporting }: { leadImage: { url: st
     .sort((a, b) => (a.startAt ?? a.windowStart ?? "9999").localeCompare(b.startAt ?? b.windowStart ?? "9999"));
   const waiting = data.sources.filter((source) => source.status !== "interviewed" && source.status !== "declined" && source.status !== "unavailable").length;
   return (
-    <div className="grid gap-6 @3xl/plan:grid-cols-2 @3xl/plan:gap-10" data-story-todo="">
+    <div className="grid gap-6 @min-[600px]/plan-card:grid-cols-2 @min-[600px]/plan-card:gap-8" data-story-todo="">
       <div className="flex min-w-0 flex-col gap-6">
         <Checklist id="plan-tasks" title="Tasks" level={3} />
         <ContextSection id="plan-interviews" title="Interviews and appointments" level={3}>

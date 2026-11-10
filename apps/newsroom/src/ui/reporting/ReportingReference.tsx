@@ -237,7 +237,7 @@ export function SavedQuotes({ context }: { context: StoryScreenContext }) {
   return (
     <section aria-labelledby="plan-quotes" className="flex flex-col gap-2" data-plan-quotes="">
       <h3 id="plan-quotes" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved quotes <span className="ml-1 font-normal normal-case tabular-nums">{verified} of {quotes.length} verified</span></h3>
-      <ul className="grid gap-3 @3xl/plan:grid-cols-2 @3xl/plan:gap-x-8">
+      <ul className="grid gap-3 @min-[600px]/plan-card:grid-cols-2 @min-[600px]/plan-card:gap-x-8">
         {quotes.map((quote) => (
           <li key={quote.id} className="grid gap-1 border-l-2 border-border pl-3" data-saved-quote={quote.id} data-state={quote.state}>
             <p className="text-sm [overflow-wrap:anywhere]">“{quote.text}”</p>
