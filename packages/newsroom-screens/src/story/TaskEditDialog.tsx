@@ -60,7 +60,7 @@ export function TaskEditDialog({
         }, { onSuccess: onClose });
       }}>
         <FieldGroup className="gap-4">
-          <Field><FieldLabel htmlFor="task-edit-title">Task</FieldLabel><Input id="task-edit-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} required autoFocus disabled={pending} /></Field>
+          <Field><FieldLabel htmlFor="task-edit-title">Task</FieldLabel><Input id="task-edit-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} required disabled={pending} /></Field>
           {canAssign ? <Field><FieldLabel htmlFor="task-edit-assignee">Assigned to</FieldLabel><AssigneePicker id="task-edit-assignee" people={people} value={assignee} onChange={setAssignee} disabled={pending} /></Field> : null}
           <Field><FieldLabel htmlFor="task-edit-due">Due</FieldLabel><DatePicker id="task-edit-due" label="Task due date" value={dueAt} timezone={timezone} onChange={setDueAt} disabled={pending} /></Field>
           <Field><FieldLabel htmlFor="task-edit-priority">Priority</FieldLabel><Select items={TASK_PRIORITY_OPTIONS} value={priority} disabled={pending} onValueChange={(value) => { if (value) setPriority(value as TaskPriority); }}><SelectTrigger id="task-edit-priority" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{TASK_PRIORITY_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>

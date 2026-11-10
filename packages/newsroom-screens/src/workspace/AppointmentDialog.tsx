@@ -97,7 +97,7 @@ export function AppointmentDialog({ open, appointment, initial, onClose, finalFo
 
   return <WorkspaceDialog open={open} onClose={onClose} finalFocus={finalFocus} title={appointment ? "Edit appointment" : "Add appointment"} description="Where and when someone has to be. Leave the schedule open until you know." submitLabel={appointment ? "Save appointment" : "Add appointment"} pending={pending} dirty={dirty} error={error?.message} onReload={error?.conflict ? () => void reloadAndClose() : undefined} onSubmit={submit}
     secondary={appointment ? <RemoveControl label="Delete appointment" title="Delete this appointment?" description="Marking it cancelled instead keeps a record." confirmLabel="Delete" pending={pending} onStart={() => setError(null)} onConfirm={() => remove.mutate()} /> : null}>
-    <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} autoFocus placeholder="Interview Mrs. Hamby" />
+    <TextField label="Title" value={form.title} onChange={(title) => patch({ title })} error={errors.title} maxLength={160} placeholder="Interview Mrs. Hamby" />
     <div className="grid gap-4 sm:grid-cols-2">
       <SelectField label="Type" value={form.kind} options={kindOptions} onChange={(kind) => patch({ kind })} />
       <SelectField label="Status" value={form.status} options={statusOptions} onChange={(status) => patch({ status })} />

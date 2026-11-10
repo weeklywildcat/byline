@@ -18,6 +18,7 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 - Keep credentials, private newsroom facts, and media originals out of public snapshots and artifacts.
 - Keep one shared article renderer and one presentation resolver. Standard and Immersive are the built-in modes; bespoke layouts and repository interactives live in the presentation package.
 - Keep the homepage layout in code. Front Page placements choose stories for existing slots; they do not change the design.
+- Apple platforms ([docs/apple-platforms.md](docs/apple-platforms.md)): use the `--byline-safe-*` variables for anything touching a screen edge, `touch-hit` for small raw controls, and `any-pointer: coarse` (never `pointer: coarse`) for touch sizing. Never sniff the user agent. Context menus mount for every input; only hover previews are hover-gated. Do not move the 768px or 1200px navigation breakpoints.
 - Sports records are an archive. Keep historical routes and redirects; do not add live game, team, or roster management.
 - Keep poll votes in the newsroom's dedicated table. The public static site does not accept votes.
 

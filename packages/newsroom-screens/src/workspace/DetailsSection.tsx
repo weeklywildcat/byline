@@ -181,7 +181,7 @@ function FormatProperties() {
     </Property>
     {settings.format === "video" ? <Property label="YouTube video">
       <div className="flex flex-col gap-2">
-        {caps.editArticle ? <Input type="url" inputMode="url" aria-label="YouTube video" placeholder="Paste a YouTube link" value={draft} disabled={save.isPending}
+        {caps.editArticle ? <Input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="YouTube video" placeholder="Paste a YouTube link" value={draft} disabled={save.isPending}
           aria-invalid={problem ? true : undefined} aria-describedby={problem ? "ws-video-problem" : undefined}
           onChange={(event) => setDraft(event.target.value)} onBlur={commitUrl}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitUrl(); } }} /> : null}

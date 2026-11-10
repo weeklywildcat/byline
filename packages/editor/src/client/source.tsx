@@ -97,7 +97,7 @@ export function BylineSource() {
               <FieldLabel htmlFor={ids.url}>Address</FieldLabel>
               <InputGroup>
                 <InputGroupAddon><Link2 /></InputGroupAddon>
-                <InputGroupInput ref={first} id={ids.url} inputMode="url" placeholder="https://" value={url} maxLength={LIMITS.webUrl} readOnly={!editable} aria-invalid={urlInvalid || undefined} onChange={(event) => write({ url: event.target.value.trim() })} />
+                <InputGroupInput ref={first} id={ids.url} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://" value={url} maxLength={LIMITS.webUrl} readOnly={!editable} aria-invalid={urlInvalid || undefined} onChange={(event) => write({ url: event.target.value.trim() })} />
               </InputGroup>
               {urlInvalid ? <FieldError>Use a web address that starts with https://.</FieldError> : <FieldDescription>A public page: a report, a statement, a dataset.</FieldDescription>}
             </Field>

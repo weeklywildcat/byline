@@ -79,12 +79,12 @@ export function StoryCorrections({ context }: { context: StoryScreenContext }) {
       </div>
     </Item>)}</ItemGroup>
     <Dialog open={Boolean(dialog)} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
-      <DialogContent finalFocus={() => trigger.current ?? addTrigger.current} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+      <DialogContent finalFocus={() => trigger.current ?? addTrigger.current} className="max-h-full overflow-auto">
         <DialogHeader><DialogTitle>{dialog?.id ? "Edit notice" : "Add a public notice"}</DialogTitle><DialogDescription>This notice appears with the published story at the time you specify.</DialogDescription></DialogHeader>
         {dialog ? <form className="grid gap-4" onSubmit={save}>
           <FieldGroup>
             <SelectField label="Notice type" value={dialog.draft.type} options={CORRECTION_TYPE_OPTIONS} onChange={(type) => update({ type })} />
-            <TextAreaField label="Public notice text" value={dialog.draft.text} onChange={(text) => update({ text })} maxLength={2000} rows={4} autoFocus />
+            <TextAreaField label="Public notice text" value={dialog.draft.text} onChange={(text) => update({ text })} maxLength={2000} rows={4} />
             <DateTimeField label="Correction date" value={dialog.draft.date} onChange={(date) => update({ date })} timeZone={context.timeZone} seconds clearable={false} hint="When the correction or update was made." />
             <DateTimeField label="Shown publicly from" optional value={dialog.draft.publishedAt} onChange={(publishedAt) => update({ publishedAt })} timeZone={context.timeZone} seconds hint="Leave blank to show it from the correction date." />
           </FieldGroup>

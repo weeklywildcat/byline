@@ -92,7 +92,8 @@ export function MediaArtDirectionDialog({ open, mediaId, fetchers, onClose, cont
       <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
         <DialogContent
           showCloseButton={false}
-          className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none md:h-[calc(100dvh-2rem)] md:w-[calc(100vw-2rem)] md:rounded-xl"
+          fullBleed
+          className="m-0 flex h-full max-h-full w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none md:rounded-xl"
           data-media-art-direction-dialog=""
         >
           {!image || !draft ? (
@@ -120,7 +121,7 @@ export function MediaArtDirectionDialog({ open, mediaId, fetchers, onClose, cont
 
 function LoadingState({ error, onClose, onRetry }: { error: string | null; onClose: () => void; onRetry: () => void }) {
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
+    <div className="flex flex-1 flex-col gap-4 p-4 max-md:pt-[max(1rem,var(--byline-safe-top))] max-md:pr-[max(1rem,var(--byline-safe-right))] max-md:pb-[max(1rem,var(--byline-safe-bottom))] max-md:pl-[max(1rem,var(--byline-safe-left))]">
       <DialogTitle>Crops and focal point</DialogTitle>
       {error ? (
         <>
@@ -187,7 +188,7 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={(event) => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 max-md:pt-[max(0.75rem,var(--byline-safe-top))] max-md:pr-[max(1rem,var(--byline-safe-right))] max-md:pl-[max(1rem,var(--byline-safe-left))]">
         <div className="min-w-0 flex-1">
           <DialogTitle className="truncate">Crops and focal point</DialogTitle>
           <DialogDescription className="truncate">{image.filename} · {width}×{height}. Saved on the photo, so every story that uses it gets them.</DialogDescription>
@@ -196,7 +197,7 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
       </header>
 
       {/* Narrow: one scrolling column, the cropper a fixed share of the screen. Wide: workspace beside the placements, each scrolling. */}
-      <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto max-md:pr-(--byline-safe-right) max-md:pl-(--byline-safe-left) lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:overflow-hidden">
         <section className="flex flex-col gap-3 p-3 md:p-4 lg:min-h-0" aria-label="Photo workspace">
           <Tabs value={tab} onValueChange={(value) => selectTab(value as Tab)}>
             <TabsList className="h-auto max-w-full flex-wrap justify-start" aria-label="Focal point and crop shapes">
@@ -263,7 +264,7 @@ function Editor({ image, draft, setDraft, dirty, fetchers, context, onCancel, on
         </aside>
       </div>
 
-      <footer className="flex flex-wrap items-center gap-2 border-t px-4 py-3">
+      <footer className="flex flex-wrap items-center gap-2 border-t px-4 py-3 max-md:pr-[max(1rem,var(--byline-safe-right))] max-md:pb-[max(0.75rem,var(--byline-safe-bottom))] max-md:pl-[max(1rem,var(--byline-safe-left))]">
         {error ? (
           <Alert variant="destructive" className="w-full">
             <CircleAlert aria-hidden="true" />
@@ -305,7 +306,11 @@ function FocalPicker({ image, focal, editable, onChange }: { image: MediaArtDire
         style={{ aspectRatio: `${image.width} / ${image.height}`, height: image.height >= image.width ? "100%" : undefined, width: image.width > image.height ? "100%" : undefined }}
         onPointerDown={(event) => { if (!editable) return; dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); place(event); }}
         onPointerMove={(event) => { if (dragging.current) place(event); }}
+        // A cancelled touch/Pencil gesture or lost capture (an incoming call, Pencil leaving range, a system gesture)
+        // never delivers pointerup, so each of these ends the drag.
         onPointerUp={() => { dragging.current = false; }}
+        onPointerCancel={() => { dragging.current = false; }}
+        onLostPointerCapture={() => { dragging.current = false; }}
         data-art-focal-frame=""
       >
         <img src={image.imageUrl} alt={image.alt} className="block size-full object-contain" draggable={false} />
@@ -319,7 +324,7 @@ function FocalPicker({ image, focal, editable, onChange }: { image: MediaArtDire
           aria-valuemax={100}
           aria-readonly={!editable}
           onKeyDown={keys}
-          className="absolute size-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary/40 shadow-[0_0_0_2px_rgb(0_0_0/0.5)] outline-none focus-visible:ring-4 focus-visible:ring-ring"
+          className="absolute size-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary/40 shadow-[0_0_0_2px_rgb(0_0_0/0.5)] outline-none before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] focus-visible:ring-4 focus-visible:ring-ring"
           style={{ left: `${focal.x}%`, top: `${focal.y}%` }}
           data-art-focal={`${focal.x},${focal.y}`}
         />

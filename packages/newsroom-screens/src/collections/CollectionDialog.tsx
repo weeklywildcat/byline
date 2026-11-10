@@ -68,7 +68,6 @@ export function CollectionDialog({
         value={name}
         onChange={setName}
         maxLength={240}
-        autoFocus
         error={attempted && !name.trim() ? "Give the Collection a name." : undefined}
       />
       <SelectField

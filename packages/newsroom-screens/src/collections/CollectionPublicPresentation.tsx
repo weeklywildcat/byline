@@ -4,7 +4,7 @@ import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { TextField, TextAreaField, SelectField } from "@byline/newsroom-ui/components/form-fields";
+import { TextField, TextAreaField, SelectField, IDENTIFIER_INPUT } from "@byline/newsroom-ui/components/form-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { describeEditorialError } from "../editorial/editorial-model";
 import { useCollectionHost } from "./collection-host";
@@ -127,7 +127,7 @@ export function CollectionPublicPresentation({ detail, actions }: { detail: Coll
             />
           </div>
           <TextField label="Public title" hint="What readers see; it can differ from the Collection’s name." value={draft.publicTitle} onChange={(publicTitle) => patch({ publicTitle })} maxLength={240} />
-          <TextField label="URL slug" hint={`/coverage/${draft.publicSlug || "your-slug"}/`} value={draft.publicSlug} onChange={(publicSlug) => patch({ publicSlug: slugify(publicSlug) || publicSlug.toLowerCase() })} maxLength={120} />
+          <TextField label="URL slug" {...IDENTIFIER_INPUT} hint={`/coverage/${draft.publicSlug || "your-slug"}/`} value={draft.publicSlug} onChange={(publicSlug) => patch({ publicSlug: slugify(publicSlug) || publicSlug.toLowerCase() })} maxLength={120} />
           <TextAreaField label="Short description" value={draft.publicDescription} onChange={(publicDescription) => patch({ publicDescription })} maxLength={320} />
           <TextAreaField label="Public overview" hint="Plain text. Separate paragraphs with a blank line." value={draft.publicOverview} onChange={(publicOverview) => patch({ publicOverview })} maxLength={10000} rows={6} />
           <Field>

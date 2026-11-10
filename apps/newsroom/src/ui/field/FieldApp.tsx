@@ -1,5 +1,7 @@
 "use client";
 
+import { PHOTO_FILE_ACCEPT } from "@byline/core";
+import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -70,10 +72,12 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
     window.scrollTo(0, 0);
   }, [admin]);
   const outbox = useOutbox(api, account || "anonymous");
+  // A locked phone pauses uploads: stay awake only while a capture is actually being sent, never for the whole live session.
+  useScreenWakeLock(outbox.online && outbox.items.some((item) => item.state === "sending"));
   if (!signedIn) return null;
   return (
     <AdminRoot className="byline-field" toaster={false}>
-      <div className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] text-foreground" data-field-shell="">
+      <div className="min-h-dvh bg-background pt-(--byline-safe-top) pr-[max(1rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1rem,var(--byline-safe-left))] text-foreground" data-field-shell="">
         <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
           {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
         </div>
@@ -428,7 +432,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           <Button type="button" variant="ghost" className={TAP} onClick={() => fileInput.current?.click()}><Paperclip data-icon="inline-start" />Attach</Button>
         </InputGroupAddon>
       </InputGroup>
-      <input ref={photoInput} type="file" accept="image/*" capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
       <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
 
       {live ? (

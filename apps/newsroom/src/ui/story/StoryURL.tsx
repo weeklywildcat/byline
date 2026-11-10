@@ -4,7 +4,7 @@ import { publicStoryPath, publicationLocalDateTime } from "@byline/content";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { DialogRoot as Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
-import { TextField } from "@byline/newsroom-ui/components/form-fields";
+import { TextField, IDENTIFIER_INPUT } from "@byline/newsroom-ui/components/form-fields";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type FormEvent } from "react";
@@ -87,14 +87,14 @@ export function StoryURL({ context, compact = false }: { context: StoryScreenCon
         setOpen(next);
       }}>
         <DialogTrigger render={<Button type="button" size="sm" variant="outline" />}>Edit URL</DialogTrigger>
-        <DialogContent finalFocus={() => sectionControl.current ?? true} className="max-h-[calc(100dvh-2rem)] overflow-auto">
+        <DialogContent finalFocus={() => sectionControl.current ?? true} className="max-h-full overflow-auto">
           <DialogHeader>
             <DialogTitle>Edit public URL</DialogTitle>
             <DialogDescription>{config.path ? "Changes to the address take effect when you publish the story." : "The story's section, slug and first publication date determine its address."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="grid gap-4">
             <FieldGroup>
-              <TextField label="Story slug" value={nextSlug} onChange={setNextSlug} maxLength={120} hint="Lowercase letters, numbers and hyphens." />
+              <TextField label="Story slug" {...IDENTIFIER_INPUT} value={nextSlug} onChange={setNextSlug} maxLength={120} hint="Lowercase letters, numbers and hyphens." />
               <Field>
                 <FieldLabel>Section</FieldLabel>
                 <p className="text-sm">{currentSection?.name ?? "None selected"}</p>

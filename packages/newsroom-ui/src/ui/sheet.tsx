@@ -1,8 +1,11 @@
 // shadcn base-nova. Local change: overlays portal into the Byline UI root (../lib/portal.ts).
+"use client"
+
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "../lib/utils"
 import { useAdminPortal } from "../lib/portal"
+import { useVisualViewportFit } from "../lib/visual-viewport"
 
 import { Button } from "./button"
 import { XIcon } from "lucide-react"
@@ -46,14 +49,18 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const fit = useVisualViewportFit()
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
+        ref={fit}
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
+          // The panel's background reaches the screen edge; its content clears the safe areas on the edges it touches.
+          // It follows the visible viewport so a software keyboard never leaves its footer underneath.
+          "fixed z-50 data-[side=left]:pt-(--byline-safe-top) data-[side=left]:pb-(--byline-safe-bottom) data-[side=left]:pl-(--byline-safe-left) data-[side=right]:pt-(--byline-safe-top) data-[side=right]:pb-(--byline-safe-bottom) data-[side=right]:pr-(--byline-safe-right) data-[side=top]:pt-(--byline-safe-top) data-[side=top]:pr-(--byline-safe-right) data-[side=top]:pl-(--byline-safe-left) data-[side=bottom]:pb-(--byline-safe-bottom) data-[side=bottom]:pr-(--byline-safe-right) data-[side=bottom]:pl-(--byline-safe-left) flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:right-[var(--byline-vv-right,0px)] data-[side=bottom]:left-[var(--byline-vv-left,0px)] data-[side=bottom]:bottom-[var(--byline-vv-bottom,0px)] data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:top-[var(--byline-vv-top,0px)] data-[side=left]:bottom-[var(--byline-vv-bottom,0px)] data-[side=left]:left-0 data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:top-[var(--byline-vv-top,0px)] data-[side=right]:bottom-[var(--byline-vv-bottom,0px)] data-[side=right]:right-0 data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:right-[var(--byline-vv-right,0px)] data-[side=top]:left-[var(--byline-vv-left,0px)] data-[side=top]:top-[var(--byline-vv-top,0px)] data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
           className
         )}
         {...props}
@@ -65,7 +72,7 @@ function SheetContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3"
+                className="absolute top-3 right-3 in-data-[side=left]:top-[calc(0.75rem+var(--byline-safe-top))] in-data-[side=right]:top-[calc(0.75rem+var(--byline-safe-top))] in-data-[side=top]:top-[calc(0.75rem+var(--byline-safe-top))] in-data-[side=right]:right-[calc(0.75rem+var(--byline-safe-right))] in-data-[side=top]:right-[calc(0.75rem+var(--byline-safe-right))] in-data-[side=bottom]:right-[calc(0.75rem+var(--byline-safe-right))]"
                 size="icon-sm"
               />
             }

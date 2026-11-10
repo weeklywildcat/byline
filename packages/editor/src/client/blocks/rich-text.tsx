@@ -255,7 +255,7 @@ export function RichFormatButtons({ field, readOnly, linkOpen, onLinkOpenChange 
           <FieldLabel htmlFor={id}>Address</FieldLabel>
           <InputGroup>
             <InputGroupAddon><Link2 /></InputGroupAddon>
-            <InputGroupInput id={id} value={href} placeholder="https://" inputMode="url" aria-invalid={href && !valid ? true : undefined} onChange={(event) => setHref(event.target.value)} onKeyDown={(event) => {
+            <InputGroupInput id={id} value={href} placeholder="https://" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={href && !valid ? true : undefined} onChange={(event) => setHref(event.target.value)} onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 apply();

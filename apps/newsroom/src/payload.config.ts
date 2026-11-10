@@ -15,6 +15,7 @@ import { nodemailerAdapter } from "@payloadcms/email-nodemailer";
 import nodemailer from "nodemailer";
 import { buildConfig, type CollectionConfig } from "payload";
 import sharp from "sharp";
+import { WEB_APP_ICON_BASE, WEB_APP_MANIFEST_PATH } from "./newsroom/web-app-manifest";
 import { atLeast, newsroomUser } from "./access/user";
 import { googleEndpoints } from "./auth/google-endpoints";
 import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
@@ -162,7 +163,18 @@ export default buildConfig({
     // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their
     // email address to a third party on each admin page. Byline shows initials and People portraits instead.
     avatar: "default",
-    meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
+    meta: {
+      titleSuffix: " · Byline",
+      robots: "noindex, nofollow",
+      // Add to Home Screen / Dock: the manifest, the Weekly Wildcat's existing icons and a stable app title.
+      // Deliberately no apple-mobile-web-app-status-bar-style: the page's own background decides the chrome.
+      manifest: WEB_APP_MANIFEST_PATH,
+      appleWebApp: { capable: true, title: "Byline" },
+      icons: [
+        { rel: "icon", type: "image/png", sizes: "32x32", url: `${WEB_APP_ICON_BASE}/favicon-32.png` },
+        { rel: "apple-touch-icon", type: "image/png", sizes: "180x180", url: `${WEB_APP_ICON_BASE}/apple-touch-icon.png` }
+      ]
+    },
     importMap: { baseDir: dirname },
     // Read by Byline's client screens: dates show in the newsroom's timezone, never the browser's.
     custom: {

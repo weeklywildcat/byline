@@ -263,7 +263,7 @@ export function ChartMapEditor({ node, id, nodeKey }: BlockEditorProps) {
                   <FieldLabel htmlFor={sourceUrlId}>Source address</FieldLabel>
                   <InputGroup>
                     <InputGroupAddon><Link2 /></InputGroupAddon>
-                    <InputGroupInput id={sourceUrlId} inputMode="url" placeholder="https://" value={fields.sourceUrl} readOnly={readOnly} aria-invalid={sourceUrlInvalid || undefined} onChange={(event) => set({ sourceUrl: event.target.value.trim() })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
+                    <InputGroupInput id={sourceUrlId} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://" value={fields.sourceUrl} readOnly={readOnly} aria-invalid={sourceUrlInvalid || undefined} onChange={(event) => set({ sourceUrl: event.target.value.trim() })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
                   </InputGroup>
                   {sourceUrlInvalid ? <FieldError>Use a web address that starts with https://.</FieldError> : null}
                 </Field>

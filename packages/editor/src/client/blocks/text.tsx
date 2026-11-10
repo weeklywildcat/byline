@@ -43,7 +43,7 @@ export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
               <FieldLabel htmlFor={urlId}>Source address</FieldLabel>
               <InputGroup>
                 <InputGroupAddon><Link2 /></InputGroupAddon>
-                <InputGroupInput id={urlId} inputMode="url" placeholder="https://" value={fields.sourceUrl} maxLength={LIMITS.webUrl} readOnly={readOnly} aria-invalid={invalid || undefined} onChange={(event) => set({ sourceUrl: event.target.value.trim() })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
+                <InputGroupInput id={urlId} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://" value={fields.sourceUrl} maxLength={LIMITS.webUrl} readOnly={readOnly} aria-invalid={invalid || undefined} onChange={(event) => set({ sourceUrl: event.target.value.trim() })} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
               </InputGroup>
               {invalid ? <FieldError>Use a web address that starts with https://.</FieldError> : null}
             </Field>

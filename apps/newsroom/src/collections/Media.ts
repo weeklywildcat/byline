@@ -3,6 +3,7 @@ import { artDirectionIntentsEqual, normalizeArtDirectionIntent, type ImageDimens
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type PayloadRequest } from "payload";
 import { atLeast, requestUser, signedIn } from "../access/user";
 import { legacyIdField } from "../fields/slug";
+import { normalizeHeifUpload, type UploadedFile } from "../media/heic";
 import { privateMediaDir } from "../publication-media/paths";
 import { queueOrRecordFailure } from "../publication-media/queue";
 
@@ -132,6 +133,19 @@ const stripNativeFocalEdits: CollectionBeforeOperationHook = ({ args, operation 
   return args;
 };
 
+/**
+ * HEIC/HEIF (the iPhone and iPad camera default) is decoded to a full-resolution JPEG before Payload checks
+ * the file's type or makes the library preview (media/heic.ts). Apple ProRAW/DNG is refused with its own message.
+ */
+const normalizeApplePhotos: CollectionBeforeOperationHook = async ({ args, operation }) => {
+  if (operation !== "create" && operation !== "update" && operation !== "updateByID") return args;
+  const req = args.req as PayloadRequest | undefined;
+  if (!req?.file) return args;
+  const { file, converted } = await normalizeHeifUpload(req.file as unknown as UploadedFile);
+  if (converted) req.file = file as unknown as PayloadRequest["file"];
+  return args;
+};
+
 /** Queues preparation for a new revision. A system write (the job itself) never queues another. */
 const queuePreparation: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
   if (req.context?.bylineMediaPreparation === true) return doc;
@@ -181,7 +195,7 @@ export const Media: CollectionConfig = {
   },
   hooks: {
     beforeDelete: [protectStoryMedia],
-    beforeOperation: [stripNativeFocalEdits],
+    beforeOperation: [stripNativeFocalEdits, normalizeApplePhotos],
     beforeChange: [
       ({ data, operation, req }) => {
         // The uploader is whoever uploads, never a value from the request (only the import keeps WordPress's).

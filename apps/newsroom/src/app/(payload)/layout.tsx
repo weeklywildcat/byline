@@ -6,10 +6,11 @@ import type { Viewport } from "next";
 import type { ServerFunctionClient } from "payload";
 import type React from "react";
 import { importMap } from "./admin/importMap.js";
+import { WEB_APP_BACKGROUND } from "../../newsroom/web-app-manifest";
 import "../../ui/newsroom.css";
 import "./custom.scss";
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: WEB_APP_BACKGROUND };
 
 const serverFunction: ServerFunctionClient = async function (args) {
   "use server";

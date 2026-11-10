@@ -349,7 +349,7 @@ function MemberDialog({ api, overview, role, existing, open, onOpenChange }: { a
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-full overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{existing ? `${existing.name} in ${role.name}` : `Add someone to ${role.name}`}</DialogTitle>
           <DialogDescription>{role.scopeKind === "none" ? "They’ll be routed reviews for every story this role handles." : "Choose what they cover."}</DialogDescription>
@@ -414,11 +414,11 @@ function NewRoleDialog({ api, open, onOpenChange, onCreated }: { api: string; op
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-full overflow-y-auto sm:max-w-md">
         <DialogHeader><DialogTitle>New role</DialogTitle><DialogDescription>A role is a job in the newsroom that reviews are routed to, like Copy Desk or Sports Editor.</DialogDescription></DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <FieldGroup>
-            <Field><FieldLabel htmlFor={ids.name}>Name</FieldLabel><Input id={ids.name} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Copy Desk" /></Field>
+            <Field><FieldLabel htmlFor={ids.name}>Name</FieldLabel><Input id={ids.name} value={name} maxLength={80} onChange={(event) => setName(event.target.value)} required placeholder="Copy Desk" /></Field>
             <Field><FieldLabel htmlFor={ids.description}>Description <span className="font-normal text-muted-foreground">Optional</span></FieldLabel><Textarea id={ids.description} value={description} maxLength={400} rows={2} onChange={(event) => setDescription(event.target.value)} /></Field>
             <FieldSet>
               <FieldLegend variant="label">What the role is scoped to</FieldLegend>

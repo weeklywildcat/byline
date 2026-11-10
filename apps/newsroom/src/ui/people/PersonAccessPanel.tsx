@@ -225,7 +225,7 @@ export function PersonAccessPanel({
           }
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md" showCloseButton={!busy}>
+        <DialogContent className="max-h-full overflow-y-auto sm:max-w-md" showCloseButton={!busy}>
           <DialogHeader>
             <DialogTitle>{access ? "Newsroom access" : "Give " + detail.person.name + " access"}</DialogTitle>
             <DialogDescription>
@@ -248,9 +248,12 @@ export function PersonAccessPanel({
                 <Input
                   id={id + "-email"}
                   type="email"
-                  autoComplete="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
-                  autoFocus
                   disabled={busy}
                   value={draft.email}
                   onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}

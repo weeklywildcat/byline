@@ -40,6 +40,9 @@ function PostAddressField({ initial, onUse, inputRef, submitLabel }: { initial: 
           id={id}
           type="url"
           inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="https://www.instagram.com/p/…"
           value={value}
           aria-invalid={showError || undefined}

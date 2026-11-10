@@ -351,7 +351,7 @@
 .byline-article-canvas .draggable-block-target-line { background: var(--byline-selection); left: 0; }
 
 /* Touch and narrow screens: no hover, no gutter; chrome in the flow, 44px targets, a sticky Add. */
-@media (pointer: coarse), (max-width: 767px) {
+@media (any-pointer: coarse), (max-width: 767px) {
   .byline-gutter-inserter { display: none; }
   .byline-block-chrome { display: none; margin: 0 0 10px; max-width: none; position: static; }
   .byline-block:is(.decorator-selected, :focus-within, [data-popup-held], :has([aria-haspopup][aria-expanded="true"])) .byline-block-chrome,

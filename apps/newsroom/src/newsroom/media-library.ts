@@ -29,6 +29,8 @@ import path from "node:path";
 import { sql } from "@payloadcms/db-postgres";
 import { APIError, commitTransaction, initTransaction, killTransaction, type Where } from "payload";
 import { atLeast, relationId, relationIds, sameId } from "../access/user";
+import { HEIF_MIME_TYPES } from "@byline/core";
+import { assertNotRawPhoto, isHeifUpload } from "../media/heic";
 import { AUDIO_MIME_TYPES, IMAGE_MIME_TYPES, LIBRARY_PREVIEW_SIZE, MEDIA_MIME_TYPES, MEDIA_UPLOAD_MAX_BYTES } from "../collections/Media";
 import { MEDIA_FOLDERS_SLUG } from "../collections/MediaFolders";
 import { addDays, localDay, localToInstant } from "../domain/dates";
@@ -225,7 +227,7 @@ export async function mediaNavigator(ctx: ScreenContext): Promise<MediaNavigator
   return {
     folders,
     counts: { all, recent, mine, "needs-metadata": needs, unfiled },
-    capabilities: { canUpload: true, canManageFolders: editor, canDelete: editor, acceptedMimeTypes: [...MEDIA_MIME_TYPES], maxUploadBytes: uploadLimit(ctx) },
+    capabilities: { canUpload: true, canManageFolders: editor, canDelete: editor, acceptedMimeTypes: [...MEDIA_MIME_TYPES, ...HEIF_MIME_TYPES], maxUploadBytes: uploadLimit(ctx) },
     uploaders
   };
 }
@@ -523,7 +525,9 @@ export async function deleteMedia(ctx: ScreenContext, id: number): Promise<void>
 export async function uploadMedia(ctx: ScreenContext, folderId: number | null): Promise<MediaLibraryAsset> {
   const file = ctx.req.file;
   if (!file) throw new APIError("Choose a file to upload.", 400);
-  if (!(MEDIA_MIME_TYPES as readonly string[]).includes(String(file.mimetype).toLowerCase())) throw new APIError("Media accepts JPEG, PNG, WebP, AVIF and GIF images, PDFs, and MP3, M4A or WAV audio.", 400);
+  assertNotRawPhoto(file);
+  // HEIC/HEIF is accepted here and decoded to JPEG by Media's own upload hook (media/heic.ts).
+  if (!(MEDIA_MIME_TYPES as readonly string[]).includes(String(file.mimetype).toLowerCase()) && !isHeifUpload(file)) throw new APIError("Media accepts JPEG, PNG, WebP, AVIF, GIF and HEIC images, PDFs, and MP3, M4A or WAV audio.", 400);
   const folder = await existingFolder(ctx, folderId);
   // Payload's own upload operation: its MIME check, the private library preview, storage and Media access.
   const created = await ctx.req.payload.create({ collection: "media", data: { folder }, file, ...asUser(ctx) });
