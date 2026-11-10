@@ -11,6 +11,9 @@ for (const width of [1440, 820, 390]) {
       const section = docs[0];
       const suffix = `${width}-${Date.now()}`;
       const title = `Newsroom UX ${suffix}`;
+      const personName = `Vivian Search Fixture ${suffix}`;
+      const person = await request.post("/api/people", { headers, data: { name: personName, slug: `vivian-search-${suffix}`, status: "active" } });
+      expect(person.ok(), await person.text()).toBeTruthy();
       const id = await createStory(request, baseURL!, token, { headline: title, slug: `ux-${suffix}`, section: section.id });
       await signIn(context, baseURL!, token);
       await page.goto(`/admin/collections/stories/${id}`);
@@ -67,12 +70,12 @@ for (const width of [1440, 820, 390]) {
 
       await page.keyboard.press("Control+k");
       const search = page.getByRole("combobox", { name: "Search the newsroom" });
-      await search.fill("Vivian Search");
-      await expect(page.getByRole("option", { name: /Vivian Search Fixture/ })).toBeVisible();
+      await search.fill(personName);
+      await expect(page.getByRole("option", { name: new RegExp(personName) })).toBeVisible();
       await search.press("Enter");
       await expect(page).toHaveURL(/\/admin\/people\?person=\d+/);
 
-      await expect(page.getByText("Vivian Search Fixture", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(personName, { exact: true }).first()).toBeVisible();
       await page.keyboard.press("Control+k");
       await search.fill("Open Site");
       await expect(page.getByRole("option", { name: "Open Site" })).toBeVisible();
@@ -127,7 +130,7 @@ test("keyboard command results open Stories, Collections and Media at their dest
   const token = await login(request, baseURL!, "ADMIN");
   const headers = { Authorization: `JWT ${token}`, Origin: baseURL! };
   const key = `command-${Date.now()}`;
-  const id = await createStory(request, baseURL!, token, { headline: "Unique desk story", slug: `story-${key}` });
+  const id = await createStory(request, baseURL!, token, { headline: "Unique desk story", slug: `story-${key}`, body: lexical([paragraph("Draft copy for the desk.")]) });
   const collection = await request.post("/api/byline/collections", { headers, data: { name: `Collection ${key}`, type: "event" } });
   expect(collection.ok()).toBeTruthy();
   const collectionId = (await collection.json()).id;

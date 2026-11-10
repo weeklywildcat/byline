@@ -120,25 +120,30 @@ test("New story is a title and Create pitch; details are optional, and staff don
 });
 
 for (const width of [1440, 1024, 820, 390]) {
-  test(`the Board, Peek and New story fit at ${width}px`, async ({ page, baseURL, request }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await as(page, "EDITOR", baseURL!, request);
-    const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(await overflow()).toBeLessThanOrEqual(0);
-    await page.getByRole("button", { name: "Patriot Games" }).first().click();
-    await expect(page.getByRole("dialog", { name: "Patriot Games" })).toBeVisible();
-    expect(await overflow()).toBeLessThanOrEqual(0);
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Patriot Games" })).toBeHidden();
-    // Narrow screens keep Create inside the navigation.
-    if (!(await page.getByRole("button", { name: "Create" }).first().isVisible())) await page.getByRole("button", { name: "Toggle navigation" }).click();
-    await page.getByRole("button", { name: "Create" }).first().click();
-    // Create is a menu on wide screens and opens New story directly on narrow ones.
-    const menuItem = page.getByRole("menuitem", { name: "Story" }).first();
-    await expect(menuItem.or(page.getByRole("dialog", { name: "New story" }))).toBeVisible();
-    if (await menuItem.isVisible()) await menuItem.click();
-    await page.getByRole("dialog", { name: "New story" }).getByRole("button", { name: "Add details" }).click();
-    await expect(page.getByRole("dialog", { name: "New story" }).getByRole("button", { name: "Create pitch" })).toBeInViewport();
-    expect(await overflow()).toBeLessThanOrEqual(0);
+  test.describe(`Story surfaces at ${width}px`, () => {
+    const touch = width <= 820;
+    test.use({ viewport: { width, height: 900 }, hasTouch: touch });
+
+    test("the Board, Peek and New story fit", async ({ page, baseURL, request }) => {
+      await as(page, "EDITOR", baseURL!, request);
+      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(await overflow()).toBeLessThanOrEqual(0);
+      await page.getByRole("button", { name: "Patriot Games" }).first().click();
+      await expect(page.getByRole("dialog", { name: "Patriot Games" })).toBeVisible();
+      expect(await overflow()).toBeLessThanOrEqual(0);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: "Patriot Games" })).toBeHidden();
+      await page.getByRole("button", { name: "Create" }).first().click();
+      if (width === 390) {
+        await page.getByRole("dialog", { name: "Create", exact: true }).getByRole("button", { name: "New story" }).click();
+      } else {
+        await page.getByRole("menuitem", { name: "Story" }).first().click();
+      }
+      const create = page.getByRole("dialog", { name: "New story" });
+      await expect(create).toHaveAttribute("data-slot", touch ? "drawer-content" : "dialog-content");
+      await create.getByRole("button", { name: "Add details" }).click();
+      await expect(create.getByRole("button", { name: "Create pitch" })).toBeInViewport();
+      expect(await overflow()).toBeLessThanOrEqual(0);
+    });
   });
 }
