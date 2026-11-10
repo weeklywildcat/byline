@@ -4,7 +4,7 @@ import type { SchoolEvent } from "./headless";
 import { getNativeSnapshot } from "./native-snapshot";
 import type { ArchiveAuthor, ArchiveCategory, ArchiveGuestContributor, ArchiveMedia, ArchivePage, ArchivePost, ArchiveTag } from "./public-content";
 
-type NativeLiveCoverage = PublicBuildSnapshotV2["datasets"]["stories"][number]["live"];
+type NativeLiveCoverage = PublicBuildSnapshot["datasets"]["stories"][number]["live"];
 type ArchiveLiveState = Pick<NonNullable<NativeLiveCoverage>, "status" | "startedAt" | "endedAt"> & { updates?: unknown[] };
 
 /**
