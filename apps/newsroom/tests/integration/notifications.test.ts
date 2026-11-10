@@ -1,7 +1,17 @@
 import { createLocalReq, getPayload, type Endpoint, type Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
-import { deliverNotification, dueItemsFor, sendDueDigests, withFailureNotice } from "../../src/newsroom/notifications";
+import {
+  deliverNotification,
+  dueItemsFor,
+  scheduleAppointmentReminder,
+  scheduleProductionDueReminder,
+  scheduleStoryDeadlineReminder,
+  scheduleTaskDueReminder,
+  sendDueDigests,
+  sendReminder,
+  withFailureNotice
+} from "../../src/newsroom/notifications";
 import type { User } from "../../src/payload-types";
 import { NOTIFICATION_PREFERENCES_KEY, defaultNotificationPreferences } from "../../src/domain/notifications";
 
@@ -260,6 +270,65 @@ describe("publishing failures", () => {
     expect(await received("chief", "publishingFailures")).toHaveLength(1);
     expect(await received("alice", "publishingFailures")).toHaveLength(0);
     expect((await received("chief"))[0]).toMatchObject({ detail: "Public snapshot preparation" });
+  });
+});
+
+describe("future reminders", () => {
+  it("queues one-time jobs with waitUntil for each supported newsroom deadline", async () => {
+    const req = await reqAs("editor");
+    const queue = vi.spyOn(payload.jobs, "queue").mockResolvedValue({ id: 999 } as never);
+    try {
+      await scheduleTaskDueReminder(req, { id: 81, due: "2099-11-12T20:00:00.000Z", state: "open" });
+      await scheduleProductionDueReminder(req, { id: 82, deadline: "2099-11-13T20:00:00.000Z", status: "needed" });
+      await scheduleAppointmentReminder(req, { id: 83, startAt: "2099-11-14T20:00:00.000Z", scheduleMode: "exact", status: "planned" });
+      await scheduleStoryDeadlineReminder(req, { id: 84, deadline: "2099-11-15", workflow: "writing" });
+      expect(queue).toHaveBeenCalledTimes(4);
+      expect(queue.mock.calls.map(([args]) => (args as { task?: string }).task)).toEqual(["send-due-digest", "send-due-digest", "send-due-digest", "send-due-digest"]);
+      expect(queue.mock.calls[0][0]).toMatchObject({
+        queue: "maintenance",
+        input: { reminderTarget: "task", recordId: 81, expectedAt: "2099-11-12T20:00:00.000Z" },
+        waitUntil: new Date("2099-11-11T20:00:00.000Z")
+      });
+      expect(queue.mock.calls[2][0]).toMatchObject({
+        input: { reminderTarget: "appointment", recordId: 83, expectedAt: "2099-11-14T20:00:00.000Z" },
+        waitUntil: new Date("2099-11-14T19:00:00.000Z")
+      });
+      expect(queue.mock.calls[3][0]).toMatchObject({ input: { reminderTarget: "story", recordId: 84, expectedAt: "2099-11-15" } });
+    } finally {
+      queue.mockRestore();
+    }
+  });
+
+  it("sends action-first reminders, dedupes retries and ignores stale work", async () => {
+    await clear();
+    const editor = await as("editor");
+    const due = "2026-11-12T20:00:00.000Z";
+    const task = await payload.create({
+      collection: "tasks",
+      data: { story: story.budget, title: "Verify final figures", assignees: [accounts.bob.id], due, priority: "normal" },
+      ...editor
+    });
+    await clear();
+
+    const req = await reqAs("editor");
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(1);
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(0);
+    const [deadline] = await received("bob", "dueDigest");
+    expect(deadline).toMatchObject({ detail: "Verify final figures" });
+    expect((deadline.data as { reminder?: unknown }).reminder).toEqual({ type: "deadline", target: "task", when: "tomorrow" });
+    expect((await call("get", "/byline/notifications", "bob")).body.items[0].text).toBe("“Verify final figures” is due tomorrow");
+
+    await payload.update({ collection: "tasks", id: task.id, data: { due: "2026-11-13T20:00:00.000Z" }, ...editor });
+    await clear();
+    expect(await sendReminder(req, { reminderTarget: "task", recordId: task.id, expectedAt: due })).toBe(0);
+
+    const startAt = "2026-11-12T21:00:00.000Z";
+    const interview = await appointment("editor", "Interview the mayor", [accounts.bob.id], { scheduleMode: "exact", startAt, endAt: "2026-11-12T21:30:00.000Z" });
+    await clear();
+    expect(await sendReminder(req, { reminderTarget: "appointment", recordId: interview.id, expectedAt: startAt })).toBe(1);
+    const [appointmentReminder] = await received("bob", "appointments");
+    expect((appointmentReminder.data as { reminder?: unknown }).reminder).toEqual({ type: "appointment", target: "appointment", when: "in 1 hour" });
+    expect((await call("get", "/byline/notifications", "bob")).body.items[0].text).toBe("“Interview the mayor” starts in 1 hour");
   });
 });
 
