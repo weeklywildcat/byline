@@ -138,10 +138,17 @@ try {
       },
     });
   }
+  const section = (
+    await payload.create({
+      collection: "sections",
+      data: { name: "Features", slug: "features" },
+    })
+  ).id;
   await payload.create({
     collection: "stories",
     data: {
       headline: "The newsroom behind the photographs",
+      section,
       contributors: [people["gibson-bell"], people["jordan-park"]],
       _status: "published",
     } as never,
@@ -150,6 +157,7 @@ try {
     collection: "stories",
     data: {
       headline: "A year of student voices",
+      section,
       contributors: [people["alex-morgan"], people["taylor-lee"]],
       _status: "published",
     } as never,

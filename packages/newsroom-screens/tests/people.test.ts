@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   peopleQuery,
   personInitials,
-  personSummary,
+  personFlags,
   validPersonSocialUrl,
   type PersonCapabilities,
   type PersonProfile,
@@ -58,12 +58,12 @@ describe("People screen contracts", () => {
   it("keeps sparse identities visible through initials and concise byline-only context", () => {
     expect(personInitials(" Alex Writer ")).toBe("AW");
     expect(personInitials("Cher")).toBe("C");
-    expect(personSummary(person)).toBe(
-      "Photographer · Guest contributor · No public profile",
-    );
+    expect(personFlags(person)).toEqual(["Guest contributor", "Byline only"]);
     // A list already filtered by status does not repeat it, and the usual case is left unsaid.
-    expect(personSummary({ ...person, status: "active", directoryVisible: true, hasProfilePage: true }, { showStatus: false })).toBe("Photographer");
-    expect(personSummary({ ...person, status: "active", directoryVisible: false, hasProfilePage: true }, { showStatus: false })).toBe("Photographer · Not in staff directory");
+    expect(personFlags({ ...person, status: "active", directoryVisible: true, hasProfilePage: true }, { showStatus: false })).toEqual([]);
+    expect(personFlags({ ...person, status: "active", directoryVisible: false, hasProfilePage: true }, { showStatus: false })).toEqual(["Not in staff directory"]);
+    // Guests and alumni are expected to be outside the directory.
+    expect(personFlags({ ...person, status: "alumni", directoryVisible: false, hasProfilePage: true }, { showStatus: false })).toEqual([]);
   });
   it("sends only changed public fields in self-service", () => {
     const draft = clonePerson(person);

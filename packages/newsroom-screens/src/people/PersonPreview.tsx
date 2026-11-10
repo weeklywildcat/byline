@@ -59,8 +59,8 @@ export function PersonPreview({
         <DialogHeader>
           <DialogTitle>Public profile preview</DialogTitle>
           <DialogDescription>
-            Your current unsaved draft. Payload is not yet the production
-            authority; saving here does not update weeklywildcat.com.
+            Your current draft, including unsaved changes, as readers will see
+            it after the next publication build.
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="directory" className="min-h-0 overflow-y-auto">

@@ -7,14 +7,31 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Button } from "@byline/newsroom-ui/ui/button";
+import { toast } from "sonner";
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@byline/newsroom-ui/ui/avatar";
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
-import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@byline/newsroom-ui/ui/breadcrumb";
+import { Button } from "@byline/newsroom-ui/ui/button";
+import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@byline/newsroom-ui/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -34,13 +51,17 @@ import {
 } from "@byline/newsroom-ui/components/form-fields";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
+  FieldSeparator,
   FieldSet,
+  FieldTitle,
 } from "@byline/newsroom-ui/ui/field";
+import { Input } from "@byline/newsroom-ui/ui/input";
 import {
   Item,
   ItemActions,
@@ -49,22 +70,21 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@byline/newsroom-ui/ui/item";
-import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Switch } from "@byline/newsroom-ui/ui/switch";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
-  ChevronDown,
   ChevronRight,
+  CircleAlert,
   Eye,
   ImagePlus,
   Plus,
-  X,
+  Trash2,
 } from "lucide-react";
 import type { PeopleApi } from "./people-api";
 import {
   PERSON_STATUSES,
-  personInitials,
   type PersonDetail,
   type PersonProfile,
   type PersonSocial,
@@ -77,6 +97,7 @@ import {
   type PersonWork,
 } from "./person-form";
 import { PersonPreview } from "./PersonPreview";
+import { PersonAvatar, inPlace } from "./PeoplePage";
 
 const SERVICES = [
   "Website",
@@ -87,10 +108,38 @@ const SERVICES = [
   "Bluesky",
   "YouTube",
 ];
+const MAX_LINKS = 8;
 const message = (error: unknown) =>
   typeof (error as { message?: unknown })?.message === "string"
     ? (error as { message: string }).message
     : "Byline couldn't save this profile. Try again.";
+
+/** A Card section with a real heading, as in the Story workspace. */
+function Section({
+  id,
+  title,
+  description,
+  children,
+  size,
+}: {
+  id: string;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  size?: "sm";
+}) {
+  return (
+    <Card size={size} role="region" aria-labelledby={id} className="min-w-0">
+      <CardHeader>
+        <CardTitle id={id} role="heading" aria-level={2}>
+          {title}
+        </CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
+      </CardHeader>
+      <CardContent className="min-w-0">{children}</CardContent>
+    </Card>
+  );
+}
 
 /** The one explicit-save editor, used for both People and My profile. */
 export function PersonEditor({
@@ -99,6 +148,7 @@ export function PersonEditor({
   self = false,
   media,
   onBack,
+  backHref,
   onNavigate,
   onSaved,
   onReload,
@@ -111,6 +161,8 @@ export function PersonEditor({
   self?: boolean;
   media: MediaPicker;
   onBack?: () => void;
+  /** The People list address, for the breadcrumb's real link. */
+  backHref?: string;
   onNavigate: (href: string) => void;
   onSaved: (detail: PersonDetail) => void;
   onReload: () => void;
@@ -129,11 +181,13 @@ export function PersonEditor({
   const [photoFailed, setPhotoFailed] = useState(false);
   const [notice, setNotice] = useState("");
   const busy = useRef(false);
+  const form = useRef<HTMLFormElement>(null);
   const id = useId();
   const caps = saved.capabilities;
   const patch = personPatch(draft, saved.person, caps);
   const dirty = Object.keys(patch).length > 1;
   const errors = attempted ? personErrors(draft) : {};
+  const locked = saving || !caps.editProfile;
   const update = <K extends keyof PersonProfile>(
     key: K,
     value: PersonProfile[K],
@@ -159,7 +213,15 @@ export function PersonEditor({
   async function save() {
     if (busy.current || !dirty || !caps.editProfile) return;
     setAttempted(true);
-    if (Object.keys(personErrors(draft)).length) return;
+    if (Object.keys(personErrors(draft)).length) {
+      // Errors can be far below the toolbar's Save button: take the editor there.
+      requestAnimationFrame(() =>
+        form.current
+          ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+          ?.focus(),
+      );
+      return;
+    }
     busy.current = true;
     setSaving(true);
     setError("");
@@ -171,6 +233,7 @@ export function PersonEditor({
       setConflict(false);
       setAttempted(false);
       setNotice("Profile saved in Byline.");
+      toast.success("Profile saved");
       onSaved(next);
     } catch (caught) {
       setError(message(caught));
@@ -227,62 +290,83 @@ export function PersonEditor({
     update("socials", next);
   }
 
-  return (
-    <div className="space-y-8" data-person-editor="">
-      {onBack ? (
-        <Button
-          type="button"
-          variant="ghost"
-          className="-ml-2 pointer-coarse:min-h-11"
-          onClick={onBack}
-        >
-          <ArrowLeft aria-hidden="true" />
-          Back to People
-        </Button>
-      ) : null}
-      <header className="flex flex-wrap items-start justify-between gap-5">
-        <div className="flex min-w-0 items-center gap-4">
-          <Avatar className="size-24 shrink-0" aria-hidden="true">
-            {draft.portrait?.url ? (
-              <AvatarImage
-                src={draft.portrait.url}
-                alt=""
-                onError={() => setPhotoFailed(true)}
-              />
-            ) : null}
-            <AvatarFallback className="text-xl">
-              {personInitials(draft.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 space-y-2">
-            <h1 className="break-words text-2xl font-semibold tracking-tight">
-              {self ? "My profile" : draft.name || "Unnamed person"}
-            </h1>
-            {self ? (
-              <p className="text-sm text-muted-foreground">
-                This is what readers see about you.
-              </p>
-            ) : draft.newsroomRole ? (
-              <p className="break-words text-sm text-muted-foreground">
-                {draft.newsroomRole}
-              </p>
-            ) : null}
-            <Badge variant="secondary">{PERSON_STATUSES[draft.status]}</Badge>
-          </div>
-        </div>
-        <div
-          className="flex flex-wrap items-center gap-2"
-          aria-label="Profile actions"
-        >
+  const subtitle = [draft.newsroomRole, draft.pronouns]
+    .filter(Boolean)
+    .join(" · ");
+  const advanced = caps.editEditorialIdentity ? (
+    <Collapsible>
+      <CollapsibleTrigger
+        render={
           <Button
             type="button"
-            variant="outline"
-            onClick={() => setPreview(true)}
-            className="pointer-coarse:min-h-11"
-          >
-            <Eye aria-hidden="true" />
-            Preview
-          </Button>
+            variant="ghost"
+            size="sm"
+            className="-ml-2 text-muted-foreground"
+          />
+        }
+      >
+        <ChevronRight
+          data-icon="inline-start"
+          className="transition-transform in-aria-expanded:rotate-90"
+          aria-hidden="true"
+        />
+        Advanced
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3">
+        <TextField
+          label="Slug"
+          value={draft.slug}
+          onChange={(value) => update("slug", value)}
+          disabled={saving}
+          hint="Sets the public /author/ address. Existing links need redirects; this screen doesn’t create them."
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  ) : null;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-6" data-person-editor="">
+      <div
+        className="sticky top-12 z-20 -mx-4 -mt-6 flex min-h-14 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5 lg:-mx-6 lg:px-6"
+        data-person-toolbar=""
+      >
+        {onBack ? (
+          <Breadcrumb className="min-w-0 flex-1" aria-label="Profile breadcrumb">
+            <BreadcrumbList className="flex-nowrap">
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  href={backHref}
+                  onClick={(event) => inPlace(event, onBack)}
+                >
+                  People
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="truncate">
+                  {saved.person.name || "Unnamed person"}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        ) : (
+          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            Your public profile
+          </p>
+        )}
+        <div
+          className="ml-auto flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Profile actions"
+        >
+          {dirty ? (
+            <Badge
+              variant="outline"
+              className="hidden border-amber-300 bg-amber-50 text-amber-900 sm:inline-flex dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            >
+              Unsaved changes
+            </Badge>
+          ) : null}
           {dirty ? (
             <Button
               type="button"
@@ -295,434 +379,537 @@ export function PersonEditor({
             </Button>
           ) : null}
           <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPreview(true)}
+            className="pointer-coarse:min-h-11"
+          >
+            <Eye data-icon="inline-start" aria-hidden="true" />
+            Preview
+          </Button>
+          <Button
             type="submit"
             form={`${id}-form`}
             disabled={!dirty || saving || picking || !caps.editProfile}
-            className="pointer-coarse:min-h-11"
+            className="min-w-16 pointer-coarse:min-h-11"
           >
+            {saving ? <Spinner data-icon="inline-start" /> : null}
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
+      </div>
+
+      <header className="flex min-w-0 items-center gap-4">
+        <PersonAvatar
+          person={draft}
+          className="size-16 shrink-0 text-lg sm:size-20 sm:text-xl"
+          onError={() => setPhotoFailed(true)}
+        />
+        <div className="grid min-w-0 gap-1.5">
+          <h1 className="break-words text-2xl font-semibold tracking-tight">
+            {self ? "My profile" : draft.name || "Unnamed person"}
+          </h1>
+          <p className="break-words text-sm text-muted-foreground">
+            {self
+              ? "This is what readers see about you."
+              : subtitle || "No newsroom role"}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="secondary">{PERSON_STATUSES[draft.status]}</Badge>
+            <Badge variant="outline" className="font-normal">
+              {draft.directoryVisible
+                ? "In staff directory"
+                : "Not in staff directory"}
+            </Badge>
+            <Badge variant="outline" className="font-normal">
+              {draft.hasProfilePage ? "Public profile page" : "Byline only"}
+            </Badge>
+          </div>
+        </div>
       </header>
-      <p className="text-sm text-muted-foreground">
-        Public profile changes appear on the website after the next publication build.
-      </p>
+
       {error ? (
-        <div className="space-y-2">
-          <FieldError>{error}</FieldError>
+        <Alert variant="destructive">
+          <CircleAlert aria-hidden="true" />
+          {conflict ? <AlertTitle>{error}</AlertTitle> : null}
+          <AlertDescription>
+            {conflict
+              ? "Your edits are still on this page. Copy anything you need, then reload."
+              : error}
+          </AlertDescription>
           {conflict ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" onClick={onReload}>
+            <AlertAction>
+              <Button type="button" variant="outline" size="xs" onClick={onReload}>
                 Reload newer profile
               </Button>
-              <p className="text-sm text-muted-foreground">
-                Keep this page open to copy your work before reloading.
-              </p>
-            </div>
+            </AlertAction>
           ) : null}
-        </div>
+        </Alert>
       ) : null}
       <p className="sr-only" role="status">
         {notice || (dirty ? "Unsaved profile changes" : "No unsaved changes")}
       </p>
+
       <form
         id={`${id}-form`}
+        ref={form}
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
           void save();
         }}
-        className="grid min-w-0 gap-10 min-[1180px]:grid-cols-[minmax(0,1fr)_240px]"
+        className="grid min-w-0 items-start gap-6 min-[1180px]:grid-cols-[minmax(0,1fr)_20rem] [&_input]:scroll-mt-32 [&_textarea]:scroll-mt-32"
       >
-        <div className="min-w-0 space-y-8">
-          <FieldSet disabled={saving || !caps.editProfile} className="min-w-0">
-            <FieldLegend>Public profile</FieldLegend>
-            <FieldGroup>
-              <Field>
-                <FieldLabel>Portrait</FieldLabel>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void choosePhoto()}
-                    disabled={picking || !media.available()}
-                    className="pointer-coarse:min-h-11"
-                  >
-                    <ImagePlus aria-hidden="true" />
-                    {draft.portrait ? "Change photo" : "Choose photo"}
-                  </Button>
-                  {draft.portrait ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => update("portrait", null)}
-                      className="pointer-coarse:min-h-11"
-                    >
-                      Remove photo
-                    </Button>
-                  ) : null}
-                </div>
-                <FieldDescription>
-                  Use a clear headshot. The circular preview above shows the
-                  crop.
-                </FieldDescription>
-                {draft.portrait?.unavailable || photoFailed ? (
-                  <p className="text-sm text-amber-800" role="status">
-                    This portrait is unavailable. Choose another photo or remove
-                    it.
-                  </p>
-                ) : null}
-              </Field>
-              <TextField
-                label="Name"
-                value={draft.name}
-                onChange={(value) => update("name", value)}
-                maxLength={120}
-                hint="This name appears on bylines."
-                error={errors.name}
-              />
-              {caps.editEditorialIdentity ? (
-                <TextField
-                  label="Newsroom role"
-                  value={draft.newsroomRole}
-                  onChange={(value) => update("newsroomRole", value)}
-                  maxLength={80}
-                  placeholder="Staff writer"
-                />
-              ) : (
+        <div className="grid min-w-0 gap-6">
+          <Section
+            id={`${id}-public`}
+            title="Public profile"
+            description="Shown with bylines, on the Staff page and on the author page. Changes reach the website after the next publication build."
+          >
+            <FieldSet disabled={locked} className="min-w-0">
+              <FieldLegend className="sr-only">Public profile</FieldLegend>
+              <FieldGroup>
                 <Field>
-                  <FieldLabel>Newsroom role</FieldLabel>
-                  <p className="text-sm">{draft.newsroomRole || "Not set"}</p>
-                  <FieldDescription>
-                    Your newsroom role and profile visibility are managed by an
-                    editor.
-                  </FieldDescription>
-                </Field>
-              )}
-              <TextField
-                label="Pronouns"
-                optional
-                value={draft.pronouns}
-                onChange={(value) => update("pronouns", value)}
-                maxLength={40}
-              />
-              <TextAreaField
-                label="Short bio"
-                optional
-                value={draft.shortBio}
-                onChange={(value) => update("shortBio", value)}
-                maxLength={400}
-                rows={3}
-                hint="One or two sentences shown with your byline/profile."
-              />
-              <TextAreaField
-                label="Full bio"
-                optional
-                value={draft.bio}
-                onChange={(value) => update("bio", value)}
-                maxLength={4000}
-                rows={7}
-                hint="Shown in the About section of your author profile."
-              />
-            </FieldGroup>
-          </FieldSet>
-          <Separator />
-          <FieldSet disabled={saving || !caps.editProfile} className="min-w-0">
-            <FieldLegend>Contact &amp; links</FieldLegend>
-            <FieldDescription>
-              Only add contact details you want readers to see. Your sign-in
-              email is never used here.
-            </FieldDescription>
-            <FieldGroup>
-              <TextField
-                label="Public email"
-                optional
-                type="email"
-                value={draft.publicEmail}
-                onChange={(value) => update("publicEmail", value)}
-                error={errors.publicEmail}
-              />
-              {draft.socials.map((entry, index) => (
-                <FieldSet
-                  key={index}
-                  className="min-w-0 gap-3"
-                  data-person-social=""
-                >
-                  <FieldLegend variant="label">Link {index + 1}</FieldLegend>
-                  <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                    <Field data-invalid={Boolean(errors[`label${index}`])}>
-                      <FieldLabel htmlFor={`${id}-service-${index}`}>
-                        Service or label
-                      </FieldLabel>
-                      <Combobox
-                        items={SERVICES}
-                        value={entry.label || null}
-                        inputValue={entry.label}
-                        onInputValueChange={(label) => social(index, { label })}
-                        onValueChange={(label) => {
-                          if (typeof label === "string")
-                            social(index, { label });
-                        }}
-                      >
-                        <ComboboxInput
-                          id={`${id}-service-${index}`}
-                          maxLength={40}
-                          aria-invalid={Boolean(errors[`label${index}`])}
-                          aria-describedby={
-                            errors[`label${index}`]
-                              ? `${id}-label-error-${index}`
-                              : undefined
-                          }
-                        />
-                        <ComboboxContent>
-                          <ComboboxList>
-                            {(label: string) => (
-                              <ComboboxItem key={label} value={label}>
-                                {label}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
-                      {errors[`label${index}`] ? (
-                        <FieldError id={`${id}-label-error-${index}`}>
-                          {errors[`label${index}`]}
-                        </FieldError>
-                      ) : null}
-                    </Field>
-                    <TextField
-                      label="URL"
-                      value={entry.url}
-                      onChange={(url) => social(index, { url })}
-                      placeholder="https://"
-                      error={errors[`url${index}`]}
-                    />
+                  <FieldTitle id={`${id}-portrait`}>Portrait</FieldTitle>
+                  <div
+                    className="flex flex-wrap items-center gap-4"
+                    role="group"
+                    aria-labelledby={`${id}-portrait`}
+                  >
+                    <div className="grid gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void choosePhoto()}
+                          disabled={picking || !media.available()}
+                          className="pointer-coarse:min-h-11"
+                        >
+                          {picking ? (
+                            <Spinner data-icon="inline-start" />
+                          ) : (
+                            <ImagePlus data-icon="inline-start" aria-hidden="true" />
+                          )}
+                          {draft.portrait ? "Change photo" : "Choose photo"}
+                        </Button>
+                        {draft.portrait ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => update("portrait", null)}
+                            className="pointer-coarse:min-h-11"
+                          >
+                            Remove photo
+                          </Button>
+                        ) : null}
+                      </div>
+                      <FieldDescription>
+                        A clear, front-facing headshot. The circle at the top of
+                        the page shows the crop.
+                      </FieldDescription>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
+                  {draft.portrait?.unavailable || photoFailed ? (
+                    <Alert role="status">
+                      <CircleAlert aria-hidden="true" />
+                      <AlertDescription>
+                        This portrait is unavailable. Choose another photo or
+                        remove it.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                </Field>
+                <FieldSeparator />
+                <div className="grid min-w-0 gap-x-4 gap-y-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  <TextField
+                    label="Name"
+                    value={draft.name}
+                    onChange={(value) => update("name", value)}
+                    maxLength={120}
+                    hint="As it appears on bylines."
+                    error={errors.name}
+                  />
+                  <TextField
+                    label="Pronouns"
+                    optional
+                    value={draft.pronouns}
+                    onChange={(value) => update("pronouns", value)}
+                    maxLength={40}
+                    placeholder="she/her"
+                  />
+                </div>
+                {caps.editEditorialIdentity ? (
+                  <TextField
+                    label="Newsroom role"
+                    value={draft.newsroomRole}
+                    onChange={(value) => update("newsroomRole", value)}
+                    maxLength={80}
+                    placeholder="Staff writer"
+                  />
+                ) : (
+                  <Field>
+                    <FieldTitle>Newsroom role</FieldTitle>
+                    <p className="text-sm">
+                      {draft.newsroomRole || "Not set"}
+                    </p>
+                    <FieldDescription>
+                      Your newsroom role and profile visibility are managed by
+                      an editor.
+                    </FieldDescription>
+                  </Field>
+                )}
+                <TextAreaField
+                  label="Short bio"
+                  optional
+                  value={draft.shortBio}
+                  onChange={(value) => update("shortBio", value)}
+                  maxLength={400}
+                  rows={3}
+                  hint="One or two sentences shown with bylines and on the Staff page."
+                />
+                <TextAreaField
+                  label="Full bio"
+                  optional
+                  value={draft.bio}
+                  onChange={(value) => update("bio", value)}
+                  maxLength={4000}
+                  rows={7}
+                  hint="The About section of the author page."
+                />
+              </FieldGroup>
+            </FieldSet>
+          </Section>
+
+          <Section
+            id={`${id}-contact`}
+            title="Contact & links"
+            description="Only what readers should see. The sign-in email is never used here."
+          >
+            <FieldSet disabled={locked} className="min-w-0">
+              <FieldLegend className="sr-only">Contact &amp; links</FieldLegend>
+              <FieldGroup>
+                <TextField
+                  label="Public email"
+                  optional
+                  type="email"
+                  value={draft.publicEmail}
+                  onChange={(value) => update("publicEmail", value)}
+                  error={errors.publicEmail}
+                  placeholder="name@example.com"
+                />
+                <FieldSet className="min-w-0 gap-3">
+                  <FieldLegend variant="label">Links</FieldLegend>
+                  <FieldDescription>
+                    Up to eight HTTPS links, in the order they appear on the
+                    profile. Pick a service or type your own label.
+                  </FieldDescription>
+                  {draft.socials.length ? (
+                    <div className="grid min-w-0 gap-2">
+                      <div
+                        className="hidden grid-cols-[10rem_minmax(0,1fr)_6.5rem] gap-2 text-xs font-medium text-muted-foreground sm:grid"
+                        aria-hidden="true"
+                      >
+                        <span>Service or label</span>
+                        <span>URL</span>
+                      </div>
+                      <ol className="grid min-w-0 gap-3 sm:gap-2">
+                        {draft.socials.map((entry, index) => {
+                          const name = entry.label || `link ${index + 1}`;
+                          const labelError = errors[`label${index}`];
+                          const urlError = errors[`url${index}`];
+                          return (
+                            <li
+                              key={index}
+                              className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_6.5rem]"
+                              data-person-social=""
+                            >
+                              <Field
+                                data-invalid={Boolean(labelError)}
+                                className="col-span-2 sm:col-span-1"
+                              >
+                                <FieldLabel
+                                  htmlFor={`${id}-service-${index}`}
+                                  className="sr-only"
+                                >
+                                  Service or label
+                                </FieldLabel>
+                                <Combobox
+                                  items={SERVICES}
+                                  value={entry.label || null}
+                                  inputValue={entry.label}
+                                  onInputValueChange={(label) =>
+                                    social(index, { label })
+                                  }
+                                  onValueChange={(label) => {
+                                    if (typeof label === "string")
+                                      social(index, { label });
+                                  }}
+                                >
+                                  <ComboboxInput
+                                    id={`${id}-service-${index}`}
+                                    maxLength={40}
+                                    placeholder="Service"
+                                    className="w-full"
+                                    disabled={locked}
+                                    aria-invalid={Boolean(labelError)}
+                                    aria-describedby={
+                                      labelError
+                                        ? `${id}-label-error-${index}`
+                                        : undefined
+                                    }
+                                  />
+                                  <ComboboxContent>
+                                    <ComboboxList>
+                                      {(label: string) => (
+                                        <ComboboxItem key={label} value={label}>
+                                          {label}
+                                        </ComboboxItem>
+                                      )}
+                                    </ComboboxList>
+                                  </ComboboxContent>
+                                </Combobox>
+                                {labelError ? (
+                                  <FieldError id={`${id}-label-error-${index}`}>
+                                    {labelError}
+                                  </FieldError>
+                                ) : null}
+                              </Field>
+                              <Field data-invalid={Boolean(urlError)}>
+                                <FieldLabel
+                                  htmlFor={`${id}-url-${index}`}
+                                  className="sr-only"
+                                >
+                                  URL
+                                </FieldLabel>
+                                <Input
+                                  id={`${id}-url-${index}`}
+                                  type="url"
+                                  inputMode="url"
+                                  value={entry.url}
+                                  onChange={(event) =>
+                                    social(index, { url: event.target.value })
+                                  }
+                                  placeholder="https://"
+                                  aria-invalid={Boolean(urlError)}
+                                  aria-describedby={
+                                    urlError
+                                      ? `${id}-url-error-${index}`
+                                      : undefined
+                                  }
+                                />
+                                {urlError ? (
+                                  <FieldError id={`${id}-url-error-${index}`}>
+                                    {urlError}
+                                  </FieldError>
+                                ) : null}
+                              </Field>
+                              <ButtonGroup aria-label={`Arrange ${name}`}>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  disabled={index === 0}
+                                  onClick={() => move(index, -1)}
+                                  aria-label={`Move ${name} up`}
+                                  className="pointer-coarse:size-11"
+                                >
+                                  <ArrowUp aria-hidden="true" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  disabled={index === draft.socials.length - 1}
+                                  onClick={() => move(index, 1)}
+                                  aria-label={`Move ${name} down`}
+                                  className="pointer-coarse:size-11"
+                                >
+                                  <ArrowDown aria-hidden="true" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    update(
+                                      "socials",
+                                      draft.socials.filter(
+                                        (_, at) => at !== index,
+                                      ),
+                                    )
+                                  }
+                                  aria-label={`Remove ${name}`}
+                                  className="text-muted-foreground hover:text-destructive pointer-coarse:size-11"
+                                >
+                                  <Trash2 aria-hidden="true" />
+                                </Button>
+                              </ButtonGroup>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ) : null}
+                  <div>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
+                      disabled={draft.socials.length >= MAX_LINKS}
                       onClick={() =>
-                        update(
-                          "socials",
-                          draft.socials.filter((_, at) => at !== index),
-                        )
+                        update("socials", [
+                          ...draft.socials,
+                          { label: "", url: "" },
+                        ])
                       }
-                      aria-label={`Remove ${
-                        entry.label || `link ${index + 1}`
-                      }`}
                       className="pointer-coarse:min-h-11"
                     >
-                      <X aria-hidden="true" />
-                      Remove
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={index === 0}
-                      onClick={() => move(index, -1)}
-                      aria-label={`Move ${
-                        entry.label || `link ${index + 1}`
-                      } up`}
-                      className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                    >
-                      <ArrowUp aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={index === draft.socials.length - 1}
-                      onClick={() => move(index, 1)}
-                      aria-label={`Move ${
-                        entry.label || `link ${index + 1}`
-                      } down`}
-                      className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                    >
-                      <ArrowDown aria-hidden="true" />
+                      <Plus data-icon="inline-start" aria-hidden="true" />
+                      Add link
                     </Button>
                   </div>
                 </FieldSet>
-              ))}
-              <div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={draft.socials.length >= 8}
-                  onClick={() =>
-                    update("socials", [
-                      ...draft.socials,
-                      { label: "", url: "" },
-                    ])
-                  }
-                  className="pointer-coarse:min-h-11"
-                >
-                  <Plus aria-hidden="true" />
-                  Add link
-                </Button>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Up to eight HTTPS links, in the order shown on your profile.
-                  Custom labels are welcome.
-                </p>
-              </div>
-            </FieldGroup>
-          </FieldSet>
-        </div>
-        <aside
-          className="min-w-0 space-y-7"
-          aria-label="Profile publication and account"
-        >
-          {caps.changeVisibility ? (
-            <FieldSet disabled={saving}>
-              <FieldLegend>Publication</FieldLegend>
-              <FieldGroup>
-                <SelectField
-                  label="Status"
-                  value={draft.status}
-                  options={Object.entries(PERSON_STATUSES).map(
-                    ([value, label]) => ({
-                      value: value as PersonProfile["status"],
-                      label,
-                    }),
-                  )}
-                  onChange={(value) => update("status", value)}
-                />
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id={`${id}-directory`}
-                    checked={draft.directoryVisible}
-                    onCheckedChange={(checked) =>
-                      update("directoryVisible", checked === true)
-                    }
-                  />
-                  <FieldLabel htmlFor={`${id}-directory`}>
-                    Show in staff directory
-                  </FieldLabel>
-                </Field>
-                <FieldDescription>
-                  A person can remain a valid byline without appearing in the
-                  Staff directory.
-                </FieldDescription>
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id={`${id}-profile`}
-                    checked={draft.hasProfilePage}
-                    onCheckedChange={(checked) =>
-                      update("hasProfilePage", checked === true)
-                    }
-                  />
-                  <FieldLabel htmlFor={`${id}-profile`}>
-                    Has a public profile page
-                  </FieldLabel>
-                </Field>
-                <FieldDescription>
-                  A one-off guest can be credited without an /author/ page.
-                  Changing status preserves these choices.
-                </FieldDescription>
               </FieldGroup>
             </FieldSet>
-          ) : (
-            <section className="space-y-2">
-              <h2 className="text-base font-medium">Publication</h2>
-              <p className="text-sm text-muted-foreground">
-                {draft.directoryVisible
-                  ? "In staff directory"
-                  : "Outside staff directory"}{" "}
-                · {draft.hasProfilePage ? "Public profile page" : "Byline only"}
-              </p>
-            </section>
-          )}
-          {accessPanel ? (
-            <>
-              <Separator />
-              {accessPanel}
-            </>
-          ) : null}
-          {caps.editEditorialIdentity ? (
-            <>
-              <Separator />
-              <Collapsible>
-                <CollapsibleTrigger
-                  render={
-                    <Button type="button" variant="ghost" className="-ml-2" />
-                  }
-                >
-                  <ChevronDown aria-hidden="true" />
-                  Advanced
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-3">
-                  <TextField
-                    label="Slug"
-                    value={draft.slug}
-                    onChange={(value) => update("slug", value)}
+          </Section>
+        </div>
+
+        <aside
+          className="grid min-w-0 gap-6"
+          aria-label="Profile publication and account"
+        >
+          <Section
+            id={`${id}-publication`}
+            title="Publication"
+            size="sm"
+            description="Where this person appears on the website."
+          >
+            {caps.changeVisibility ? (
+              <FieldSet disabled={saving} className="min-w-0">
+                <FieldLegend className="sr-only">Publication</FieldLegend>
+                <FieldGroup className="gap-5">
+                  <SelectField
+                    label="Status"
+                    value={draft.status}
                     disabled={saving}
-                    hint="Changing this will change the future public author URL. Existing links will need redirects; this screen does not create them."
+                    options={Object.entries(PERSON_STATUSES).map(
+                      ([value, label]) => ({
+                        value: value as PersonProfile["status"],
+                        label,
+                      }),
+                    )}
+                    onChange={(value) => update("status", value)}
+                    hint="Changing status keeps the choices below."
                   />
-                </CollapsibleContent>
-              </Collapsible>
-            </>
-          ) : null}
-          <p className="text-sm text-muted-foreground">
-            {saved.usage.total === 1
-              ? "Used on 1 accessible story"
-              : `Used on ${saved.usage.total} accessible stories`}
-            . Historical bylines stay when someone leaves the staff.
-          </p>
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor={`${id}-directory`}>
+                        Show in staff directory
+                      </FieldLabel>
+                      <FieldDescription id={`${id}-directory-help`}>
+                        Listed on the Staff page. Bylines work either way.
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id={`${id}-directory`}
+                      checked={draft.directoryVisible}
+                      disabled={saving}
+                      aria-describedby={`${id}-directory-help`}
+                      onCheckedChange={(checked) =>
+                        update("directoryVisible", checked === true)
+                      }
+                    />
+                  </Field>
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor={`${id}-profile`}>
+                        Has a public profile page
+                      </FieldLabel>
+                      <FieldDescription id={`${id}-profile-help`}>
+                        An /author/ page. Off credits them byline-only.
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id={`${id}-profile`}
+                      checked={draft.hasProfilePage}
+                      disabled={saving}
+                      aria-describedby={`${id}-profile-help`}
+                      onCheckedChange={(checked) =>
+                        update("hasProfilePage", checked === true)
+                      }
+                    />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+            ) : (
+              <dl className="grid gap-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Staff directory</dt>
+                  <dd>{draft.directoryVisible ? "Listed" : "Not listed"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Profile page</dt>
+                  <dd>{draft.hasProfilePage ? "Yes" : "Byline only"}</dd>
+                </div>
+              </dl>
+            )}
+            {advanced ? (
+              <>
+                <FieldSeparator className="my-3" />
+                {advanced}
+              </>
+            ) : null}
+          </Section>
+          {accessPanel}
+          <Section
+            id={`${id}-stories`}
+            title="Bylines"
+            size="sm"
+            description={`${saved.usage.total} accessible ${
+              saved.usage.total === 1 ? "story" : "stories"
+            }. Bylines stay when someone leaves the staff.`}
+          >
+            {saved.usage.stories.length ? (
+              <ItemGroup className="-mx-2 gap-0.5">
+                {saved.usage.stories.map((story) => (
+                  <div role="listitem" key={story.id}>
+                    <Item
+                      size="xs"
+                      className="flex-nowrap px-2"
+                      render={
+                        <a
+                          href={story.href}
+                          onClick={(event) =>
+                            inPlace(event, () => onNavigate(story.href))
+                          }
+                        />
+                      }
+                    >
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="block max-w-full truncate">
+                          {story.title}
+                        </ItemTitle>
+                        <ItemDescription>{story.state}</ItemDescription>
+                      </ItemContent>
+                      <ItemActions>
+                        <ChevronRight
+                          className="size-4 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Open story</span>
+                      </ItemActions>
+                    </Item>
+                  </div>
+                ))}
+              </ItemGroup>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No stories you can access credit this person yet.
+              </p>
+            )}
+          </Section>
         </aside>
       </form>
-      <Separator />
-      <section className="space-y-3" aria-labelledby={`${id}-stories`}>
-        <h2 id={`${id}-stories`} className="text-base font-medium">
-          Bylines{" "}
-          <span className="font-normal text-muted-foreground">
-            · {saved.usage.total} accessible{" "}
-            {saved.usage.total === 1 ? "story" : "stories"}
-          </span>
-        </h2>
-        {saved.usage.stories.length ? (
-          <ItemGroup className="gap-1">
-            {saved.usage.stories.map((story) => (
-              <Item
-                key={story.id}
-                size="sm"
-                className="flex-nowrap"
-                render={
-                  <a
-                    href={story.href}
-                    onClick={(event) => {
-                      if (
-                        event.button ||
-                        event.metaKey ||
-                        event.ctrlKey ||
-                        event.shiftKey ||
-                        event.altKey
-                      )
-                        return;
-                      event.preventDefault();
-                      onNavigate(story.href);
-                    }}
-                  />
-                }
-              >
-                <ItemContent className="min-w-0">
-                  <ItemTitle className="max-w-full">{story.title}</ItemTitle>
-                  <ItemDescription>{story.state}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <ChevronRight className="size-4" aria-hidden="true" />
-                  <span className="sr-only">Open story</span>
-                </ItemActions>
-              </Item>
-            ))}
-          </ItemGroup>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No stories you can access use this person yet.
-          </p>
-        )}
-      </section>
       {preview ? (
         <PersonPreview
           draft={draft}

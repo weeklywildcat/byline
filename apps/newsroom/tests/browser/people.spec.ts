@@ -12,6 +12,10 @@ async function login(page: Page, role = "editor") {
 }
 const row = (page: Page, name: string) =>
   page.locator("[data-person-row]").filter({ hasText: name });
+const backToPeople = (page: Page) =>
+  page
+    .getByRole("navigation", { name: "Profile breadcrumb" })
+    .getByRole("link", { name: "People", exact: true });
 const save = (page: Page) =>
   page.getByRole("button", { name: "Save", exact: true });
 async function changeBio(page: Page, value: string) {
@@ -51,24 +55,24 @@ test("People views, identity search, New guest and staff creation, and URL navig
     page.getByRole("tab", { name: "All", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
   await page
-    .getByRole("textbox", { name: "Search People" })
+    .getByRole("searchbox", { name: "Search People" })
     .fill("Photographer");
   await expect(row(page, "Jordan Park")).toBeVisible();
   await expect(page.locator("[data-person-row]")).toHaveCount(1);
-  await page.getByRole("textbox", { name: "Search People" }).fill("");
+  await page.getByRole("searchbox", { name: "Search People" }).fill("");
   await page
-    .getByRole("textbox", { name: "Search People" })
+    .getByRole("searchbox", { name: "Search People" })
     .pressSequentially("Gibson Bell");
   await expect(
-    page.getByRole("textbox", { name: "Search People" }),
+    page.getByRole("searchbox", { name: "Search People" }),
   ).toHaveValue("Gibson Bell");
   await expect(row(page, "Gibson Bell")).toBeVisible();
   await expect(page.locator("[data-person-row]")).toHaveCount(1);
   await page
-    .getByRole("textbox", { name: "Search People" })
+    .getByRole("searchbox", { name: "Search People" })
     .fill("Nobody here");
   await expect(page.getByText("No matching people")).toBeVisible();
-  await page.getByRole("textbox", { name: "Search People" }).fill("");
+  await page.getByRole("searchbox", { name: "Search People" }).fill("");
   await page.getByRole("button", { name: "New person", exact: true }).click();
   await page
     .getByRole("button", { name: "Create person", exact: true })
@@ -87,22 +91,22 @@ test("People views, identity search, New guest and staff creation, and URL navig
     page.getByRole("heading", { name: "One-off Photographer" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("checkbox", { name: "Show in staff directory" }),
+    page.getByRole("switch", { name: "Show in staff directory" }),
   ).not.toBeChecked();
   await expect(
-    page.getByRole("checkbox", { name: "Has a public profile page" }),
+    page.getByRole("switch", { name: "Has a public profile page" }),
   ).not.toBeChecked();
-  await page.getByRole("button", { name: "Back to People" }).click();
+  await backToPeople(page).click();
   await page.getByRole("button", { name: "New person", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("New Staff Writer");
   await page
     .getByRole("button", { name: "Create person", exact: true })
     .click();
   await expect(
-    page.getByRole("checkbox", { name: "Show in staff directory" }),
+    page.getByRole("switch", { name: "Show in staff directory" }),
   ).toBeChecked();
   await expect(
-    page.getByRole("checkbox", { name: "Has a public profile page" }),
+    page.getByRole("switch", { name: "Has a public profile page" }),
   ).toBeChecked();
   await page.goBack();
   await expect(
@@ -172,7 +176,7 @@ test("editor saves, cancels, chooses/removes portraits, edits social links and p
   await expect(save(page)).toBeDisabled();
 });
 
-test("dirty state protects Back, Forward, Back to People, sidebar, account-menu navigation and closing a tab", async ({
+test("dirty state protects Back, Forward, the People breadcrumb, sidebar, account-menu navigation and closing a tab", async ({
   page,
 }) => {
   await login(page);
@@ -181,13 +185,13 @@ test("dirty state protects Back, Forward, Back to People, sidebar, account-menu 
   await changeBio(page, "Draft that must not disappear");
   await page.goBack();
   await expect(
-    page.getByRole("dialog", { name: "Discard unsaved changes?" }),
+    page.getByRole("alertdialog", { name: "Discard unsaved changes?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
   await expect(page.getByLabel(/^Short bio/)).toHaveValue(
     "Draft that must not disappear",
   );
-  await page.getByRole("button", { name: "Back to People" }).click();
+  await backToPeople(page).click();
   await page
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
@@ -200,7 +204,7 @@ test("dirty state protects Back, Forward, Back to People, sidebar, account-menu 
     page.getByRole("heading", { name: "People", exact: true }),
   ).toBeVisible();
   await row(page, "Gibson Bell").click(); // make a forward destination, then traverse backwards between two Person entries
-  await page.getByRole("button", { name: "Back to People" }).click();
+  await backToPeople(page).click();
   await row(page, "Alex Morgan").click();
   await page.goBack();
   await page.goBack(); // Gibson editor, with a forward list entry
@@ -208,7 +212,7 @@ test("dirty state protects Back, Forward, Back to People, sidebar, account-menu 
   await changeBio(page, "Forward-protected draft");
   await page.goForward();
   await expect(
-    page.getByRole("dialog", { name: "Discard unsaved changes?" }),
+    page.getByRole("alertdialog", { name: "Discard unsaved changes?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Keep editing", exact: true }).click();
   await page
@@ -282,7 +286,7 @@ test("staff My profile uses the same editor without editorial or account control
       .getByRole("link", { name: "People", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("checkbox", { name: "Show in staff directory" }),
+    page.getByRole("switch", { name: "Show in staff directory" }),
   ).toHaveCount(0);
   await expect(page.getByLabel(/^Newsroom role/)).toHaveCount(0);
   await expect(
@@ -335,7 +339,8 @@ test("administrators manage newsroom access from the Person instead of a separat
   await page.getByRole("button", { name: "Enable access", exact: true }).click();
   await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Back to People" }).click();
+  await backToPeople(page).click();
+  await page.getByRole("tab", { name: "Guests", exact: true }).click();
   await row(page, "Jordan Park").click();
   await expect(page.getByRole("button", { name: "Give newsroom access", exact: true })).toBeVisible();
 });

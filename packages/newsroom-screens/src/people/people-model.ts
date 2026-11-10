@@ -139,20 +139,22 @@ export function personInitials(name: string): string {
 }
 
 /**
- * One quiet line for a People row: the role, the status when the list mixes
- * statuses, and only what is unusual (a staff member left out of the directory,
- * someone with no public profile). A row that says "Current staff · In staff
- * directory · Public profile" about everyone says nothing about anyone.
+ * The badges beside a person's name in the People list: the status when the
+ * list mixes statuses, and only what is unusual (a staff member left out of the
+ * directory, someone credited byline-only). Flags that are true of everyone
+ * ("Current staff", "In staff directory") say nothing about anyone.
  */
-export function personSummary(person: PersonRow, { showStatus = true }: { showStatus?: boolean } = {}): string {
+export function personFlags(
+  person: Pick<PersonRow, "status" | "directoryVisible" | "hasProfilePage">,
+  { showStatus = true }: { showStatus?: boolean } = {},
+): string[] {
   return [
-    person.newsroomRole,
     showStatus ? PERSON_STATUSES[person.status] : "",
-    person.status === "active" && !person.directoryVisible ? "Not in staff directory" : "",
-    person.hasProfilePage ? "" : "No public profile",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    person.status === "active" && !person.directoryVisible
+      ? "Not in staff directory"
+      : "",
+    person.hasProfilePage ? "" : "Byline only",
+  ].filter(Boolean);
 }
 
 /** Canonical links are HTTPS URLs, never bare handles, credentials or script protocols. */
