@@ -1,3 +1,4 @@
+import { stableDigest } from "@byline/content";
 import { nativeStory } from "./native-snapshot";
 import { createArticleLiveView, createLiveFeed, formatLiveTime as formatTime } from "@byline/ui/live-feed";
 import { getPublicationConfig } from "@/lib/publication";
@@ -27,4 +28,13 @@ export function buildArticleLiveView(post: ArchivePost) {
 export function buildLiveFeed(post: ArchivePost) {
   const view = buildArticleLiveView(post);
   return view ? createLiveFeed(view) : null;
+}
+
+/**
+ * Astro incremental-build identity for the permanent static feed. Unrelated
+ * Story metadata cannot invalidate it; a public live-feed change always does.
+ */
+export function liveFeedCacheKey(post: ArchivePost) {
+  const feed = buildLiveFeed(post);
+  return feed ? stableDigest(feed) : null;
 }
