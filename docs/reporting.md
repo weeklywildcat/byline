@@ -154,13 +154,17 @@ configured". The uploader is notified when a transcript is ready.
 
 ## Screens
 
-- **Plan → Reporting**: search, `+ Capture` (Note, Record, Upload file, Upload
-  photo, Add link, Import transcript), Up next, a single Material feed with
+- **Plan → Reporting**: search, `+ Capture` (Note, Record or upload interview,
+  Upload file, Upload photo, Add link, Import transcript), Up next, a single Material feed with
   view filters (All, Audio, Documents, Photos, Notes), and Sources and
   Appointments (a rail at ≥880px of the section, otherwise a Sheet), then the
   Story's saved quotes and whether each is verified. Capturing from
   a Source or Appointment pre-binds it. Ground rules are edited from the
-  Source's badge.
+  Source's badge. The interview panel records in the browser or uploads an
+  existing audio file (MP3, M4A, WAV, AAC, Ogg, WebM, checked by
+  `recordingUploadProblem` before sending); either becomes the same private
+  recording with the bound Source and Appointment, and queues for
+  transcription like any other.
 - **Transcript** (`?transcript=<id>`, a focused view with Back to Plan): pinned audio, timestamps
   that seek, the active passage following playback, an `InputGroup` search
   with next/previous and a count, in-place speaker and text edits, and a

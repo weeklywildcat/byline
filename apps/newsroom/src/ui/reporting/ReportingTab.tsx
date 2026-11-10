@@ -130,6 +130,13 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
     pendingBound.current = null;
   };
 
+  /** A recorded or uploaded interview: the same private file, carrying the bound Source or Appointment. */
+  const keepRecording = (recording: Recording) => {
+    enqueue("file", recording.blob, recording.filename, recording.durationMs ? { durationMs: recording.durationMs } : {});
+    setPanel(null);
+    setBound(null);
+  };
+
   const capture = (from?: Bound) => ({
     note: () => { setBound(from ?? null); setPanel("note"); },
     record: () => { setBound(from ?? null); setPanel("record"); },
@@ -191,10 +198,10 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
             <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
-              <p className="text-sm font-medium">Record an interview</p>
-              <p className="text-xs text-muted-foreground">Saved as a private recording on this story{bound?.label ? `, for ${bound.label}` : ""}. {transcription.available ? transcription.message : "Transcription is not configured; you can import a transcript later."}</p>
+              <p className="text-sm font-medium">Record or upload an interview</p>
+              <p className="text-xs text-muted-foreground">Record here or upload an audio file you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Saved as a private recording on this story{bound?.label ? `, for ${bound.label}` : ""}. {transcription.available ? transcription.message : "Transcription is not configured; you can import a transcript later."}</p>
               <div className="flex flex-wrap items-center gap-3">
-                <RecorderPanel onRecorded={(recording: Recording) => { enqueue("file", recording.blob, recording.filename, { durationMs: recording.durationMs }); setPanel(null); setBound(null); }} />
+                <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} />
                 <Button type="button" variant="ghost" size="sm" onClick={() => { setPanel(null); setBound(null); }}>Cancel</Button>
               </div>
             </div>
@@ -253,7 +260,7 @@ function CaptureMenu({ capture }: { capture: CaptureActions }) {
       <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Capture</DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
         <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.record}><Mic />Record interview or audio</DropdownMenuItem>
+        <DropdownMenuItem onClick={capture.record}><Mic />Record or upload interview</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.file}><Upload />Upload file</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.photo}><ImageIcon />Upload photo</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.link}><Link2 />Add link</DropdownMenuItem>

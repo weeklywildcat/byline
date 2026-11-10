@@ -387,6 +387,11 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     if (session.assignments.length > 1) { setChoosing(file); return; }
     void sendPhoto(file, session.assignments[0]?.id ?? null);
   };
+  /** A recording made here or uploaded from the phone: the same private, outboxed file. */
+  const keepRecording = (result: Recording) => {
+    setRecording(false);
+    void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, ...(result.durationMs ? { durationMs: result.durationMs } : {}), context }));
+  };
   const saveNote = async () => {
     if (!text.trim()) return;
     await queue(newItem({ key: newClientKey(), storyId, kind: "note", text: text.trim(), context }));
@@ -450,9 +455,9 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle>Record</DrawerTitle>
-            <DrawerDescription>{session.appointment?.source ? `Filed with ${session.appointment.title} (${session.appointment.source}). ` : ""}Saved privately to this story. Keep this screen open while recording.</DrawerDescription>
+            <DrawerDescription>{session.appointment?.source ? `Filed with ${session.appointment.title} (${session.appointment.source}). ` : ""}Record now, or upload a recording from this phone. Saved privately to this story. Keep this screen open while recording.</DrawerDescription>
           </DrawerHeader>
-          <div className="px-4 pb-2"><RecorderPanel large label="Start recording" onRecorded={(result: Recording) => { setRecording(false); void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, durationMs: result.durationMs, context })); }} /></div>
+          <div className="px-4 pb-2"><RecorderPanel large label="Start recording" onRecorded={keepRecording} onUploaded={keepRecording} /></div>
         </DrawerContent>
       </Drawer>
 

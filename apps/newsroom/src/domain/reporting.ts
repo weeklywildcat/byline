@@ -146,6 +146,35 @@ export function reportingFileKind(mimeType: string): ReportingFileKind {
   return "other";
 }
 
+/** The type an uploaded interview recording is sent as when the browser reports none, by extension (all in the list above). */
+const RECORDING_EXTENSION_TYPES: Record<string, string> = { mp3: "audio/mpeg", m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", wav: "audio/wav", webm: "audio/webm", ogg: "audio/ogg", oga: "audio/ogg" };
+
+/** The file picker filter for "Upload a recording": audio, plus the extensions for pickers that only match by name. */
+export const RECORDING_ACCEPT = ["audio/*", "video/webm", ...Object.keys(RECORDING_EXTENSION_TYPES).map((extension) => `.${extension}`)].join(",");
+
+/**
+ * The type to upload a chosen file as, if it is a recording the collection
+ * keeps: the browser's own type, or, when the browser reports none (common
+ * for .m4a), the type its extension implies. `null` when it isn't one.
+ */
+export function recordingMimeType(name: string, type: string): string | null {
+  const mime = type.toLowerCase().split(";")[0].trim();
+  if ((REPORTING_FILE_MIME_TYPES as readonly string[]).includes(mime)) return reportingFileKind(mime) === "audio" ? mime : null;
+  if (mime !== "" && mime !== "application/octet-stream") return null;
+  return RECORDING_EXTENSION_TYPES[name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ""] ?? null;
+}
+
+/**
+ * Why a chosen file can't be uploaded as an interview recording, or `null`
+ * when it can. Checked in the browser so the reporter hears it before a long
+ * upload; the collection's own MIME list still decides on the server.
+ */
+export function recordingUploadProblem(name: string, type: string, bytes: number): string | null {
+  if (!recordingMimeType(name, type)) return "That isn't a recording Byline can keep. Use MP3, M4A, WAV, AAC, Ogg or WebM audio.";
+  if (bytes > REPORTING_LIMITS.fileBytes) return `That recording is larger than ${Math.round(REPORTING_LIMITS.fileBytes / 1_048_576)} MB.`;
+  return null;
+}
+
 /* ---------------------------------------------------------------- capture */
 
 /** What the person did. Never a storage choice. */

@@ -54,7 +54,7 @@ Routing (`routeCapture`, docs/reporting.md):
 | text + Publish now / Send to desk / Send to live desk | a Live Update (published, or a draft for the desk) |
 | a photo chosen while writing a live update | Media, attached to that update (one asset) |
 | a photo otherwise | Media for the Story, linked to the person's open assignment when unambiguous (a Drawer asks when there are several) |
-| Record (from an appointment) | a private Reporting File with the Story, appointment and source |
+| Record or upload a recording (from an appointment) | a private Reporting File with the Story, appointment and source |
 | Attach | a private Reporting File |
 
 Photos record the uploader, Story, assignment, original file hash, the EXIF

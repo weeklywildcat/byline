@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { materialDayGroups, materialMatchesFilter, quoteUse, routeCapture, sortMaterial, type StoryMaterialItem } from "../src/domain/reporting";
+import { materialDayGroups, materialMatchesFilter, quoteUse, recordingMimeType, recordingUploadProblem, REPORTING_LIMITS, routeCapture, sortMaterial, type StoryMaterialItem } from "../src/domain/reporting";
 import {
   activeSegmentAt,
   editSegment,
@@ -28,6 +28,33 @@ describe("capture routing", () => {
     expect(routeCapture({ intent: "file", mimeType: "image/png", publicMedia: true })).toBe("media");
     expect(routeCapture({ intent: "link" })).toBe("resource");
     expect(routeCapture({ intent: "transcript" })).toBe("reporting-transcript");
+  });
+});
+
+describe("uploaded recordings", () => {
+  it("accepts the audio the collection keeps, by type or by extension when the browser reports none", () => {
+    expect(recordingUploadProblem("interview.mp3", "audio/mpeg", 4_000_000)).toBeNull();
+    expect(recordingUploadProblem("Voice Memo.m4a", "audio/x-m4a", 4_000_000)).toBeNull();
+    expect(recordingUploadProblem("call.webm", "audio/webm;codecs=opus", 4_000_000)).toBeNull();
+    expect(recordingUploadProblem("phone.m4a", "", 4_000_000)).toBeNull();
+    expect(recordingUploadProblem("phone.WAV", "application/octet-stream", 4_000_000)).toBeNull();
+  });
+
+  it("sends a typeless file with the type its extension implies, so the server's MIME list accepts it", () => {
+    expect(recordingMimeType("phone.m4a", "")).toBe("audio/mp4");
+    expect(recordingMimeType("phone.WAV", "application/octet-stream")).toBe("audio/wav");
+    expect(recordingMimeType("call.webm", "audio/webm;codecs=opus")).toBe("audio/webm");
+    expect(recordingMimeType("Voice Memo.m4a", "audio/x-m4a")).toBe("audio/x-m4a");
+    // A reported type wins over the name: a PDF renamed .mp3 is still a PDF.
+    expect(recordingMimeType("notes.mp3", "application/pdf")).toBeNull();
+    expect(recordingMimeType("photo.jpg", "image/jpeg")).toBeNull();
+  });
+
+  it("explains what it refuses before the upload starts", () => {
+    expect(recordingUploadProblem("notes.pdf", "application/pdf", 1000)).toMatch(/MP3, M4A/);
+    expect(recordingUploadProblem("take.flac", "audio/flac", 1000)).toMatch(/MP3, M4A/);
+    expect(recordingUploadProblem("mystery", "", 1000)).toMatch(/MP3, M4A/);
+    expect(recordingUploadProblem("long.mp3", "audio/mpeg", REPORTING_LIMITS.fileBytes + 1)).toMatch(/larger than 300 MB/);
   });
 });
 
