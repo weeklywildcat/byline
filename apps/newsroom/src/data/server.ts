@@ -567,36 +567,52 @@ const projectFields = (doc: ProjectDoc): Record<string, unknown> => Object.fromE
 /** Saves a draft (Payload versions): the public page changes only on Publish. */
 export async function updateProject(ctx: ScreenContext, id: number, input: Record<string, unknown>) {
   requireEditor(ctx, "change Data projects");
-  const { latest } = await projectById(ctx, id);
-  if (typeof input.expectedUpdatedAt !== "string" || Date.parse(input.expectedUpdatedAt) !== Date.parse(latest.updatedAt)) {
-    throw new DataError("project-changed", "Someone else changed this project. Reload to see their change.", 409);
-  }
-  // A draft save writes the whole project (the latest draft plus this change), so no earlier draft edit is lost.
-  const data: Record<string, unknown> = projectFields(latest);
-  for (const key of PROJECT_FIELDS) if (key in input) data[key] = input[key];
-  for (const key of Object.keys(input)) if (key !== "expectedUpdatedAt" && !(PROJECT_FIELDS as readonly string[]).includes(key)) throw new APIError(`Unknown project field "${key}".`, 400);
-  if (typeof data.slug === "string" && data.slug !== latest.slug) {
-    if (!PROJECT_SLUG.test(data.slug)) throw new APIError("The web address uses lowercase letters, numbers and hyphens.", 400);
-    const clash = await ctx.req.payload.find({ collection: "data-projects", draft: true, where: { and: [{ slug: { equals: data.slug } }, { id: { not_equals: id } }] }, limit: 1, select: {}, ...asUser(ctx) });
-    if (clash.docs.length) throw new APIError("Another project uses that web address.", 409);
-  }
-  if (typeof data.presentation === "string" && data.presentation !== latest.presentation) {
-    const descriptor = dataPresentationDescriptor(data.presentation);
-    if (!descriptor) throw new APIError("That presentation isn't available.", 400);
-    data.presentationKind = descriptor.kind;
-    data.settings = normalizeSettings(descriptor, {}).settings;
-    data.bindings = (Array.isArray(data.bindings) ? data.bindings : bindingsOf(latest.bindings)).filter((binding) => descriptor.slots.some((slot) => slot.key === (binding as ProjectBinding).slot));
-  }
-  if (Array.isArray(data.relatedStories)) data.relatedStories = data.relatedStories.map(Number).filter((value) => Number.isSafeInteger(value) && value > 0);
-  await ctx.req.payload.update({ collection: "data-projects", id, draft: true, data: { ...data, _status: "draft" } as never, ...asUser(ctx) });
+  await inTransaction(ctx, async () => {
+    const db = await drizzleFor(ctx.req.payload, ctx.req);
+    // The optimistic timestamp check and the full-draft write are one
+    // compare-and-write operation. A second editor waits here, then rereads.
+    await db.execute(sql`select id from data_projects where id = ${id} for update`);
+    const { latest } = await projectById(ctx, id);
+    if (typeof input.expectedUpdatedAt !== "string" || Date.parse(input.expectedUpdatedAt) !== Date.parse(latest.updatedAt)) {
+      throw new DataError("project-changed", "Someone else changed this project. Reload to see their change.", 409);
+    }
+    const data: Record<string, unknown> = projectFields(latest);
+    for (const key of PROJECT_FIELDS) if (key in input) data[key] = input[key];
+    for (const key of Object.keys(input)) if (key !== "expectedUpdatedAt" && !(PROJECT_FIELDS as readonly string[]).includes(key)) throw new APIError(`Unknown project field "${key}".`, 400);
+    if (typeof data.slug === "string" && data.slug !== latest.slug) {
+      if (!PROJECT_SLUG.test(data.slug)) throw new APIError("The web address uses lowercase letters, numbers and hyphens.", 400);
+      const clash = await ctx.req.payload.find({ collection: "data-projects", draft: true, where: { and: [{ slug: { equals: data.slug } }, { id: { not_equals: id } }] }, limit: 1, select: {}, ...asUser(ctx) });
+      if (clash.docs.length) throw new APIError("Another project uses that web address.", 409);
+    }
+    if (typeof data.presentation === "string" && data.presentation !== latest.presentation) {
+      const descriptor = dataPresentationDescriptor(data.presentation);
+      if (!descriptor) throw new APIError("That presentation isn't available.", 400);
+      data.presentationKind = descriptor.kind;
+      data.settings = normalizeSettings(descriptor, {}).settings;
+      data.bindings = (Array.isArray(data.bindings) ? data.bindings : bindingsOf(latest.bindings)).filter((binding) => descriptor.slots.some((slot) => slot.key === (binding as ProjectBinding).slot));
+    }
+    if (Array.isArray(data.relatedStories)) data.relatedStories = data.relatedStories.map(Number).filter((value) => Number.isSafeInteger(value) && value > 0);
+    await ctx.req.payload.update({ collection: "data-projects", id, draft: true, data: { ...data, _status: "draft" } as never, ...asUser(ctx) });
+  });
   return projectDetail(ctx, id);
 }
 
 /** Publishes the latest draft: validated against the presentation and the datasets' published releases (collections.ts). */
 export async function publishProject(ctx: ScreenContext, id: number) {
   requireEditor(ctx, "publish Data projects");
-  const { latest } = await projectById(ctx, id);
-  await ctx.req.payload.update({ collection: "data-projects", id, draft: false, data: { ...projectFields(latest), _status: "published" } as never, ...asUser(ctx) });
+  await inTransaction(ctx, async () => {
+    const db = await drizzleFor(ctx.req.payload, ctx.req);
+    // Draft saves and Publish serialize on the project row.
+    await db.execute(sql`select id from data_projects where id = ${id} for update`);
+    const { latest } = await projectById(ctx, id);
+    // Dataset release promotion takes the same dataset locks. Lock in ID order
+    // so a project with multiple bindings cannot deadlock another publisher.
+    const datasetKeys = [...new Set(bindingsOf(latest.bindings).map((binding) => binding.dataset))];
+    if (datasetKeys.length) {
+      await db.execute(sql`select id from data_datasets where key in (${sql.join(datasetKeys.map((key) => sql`${key}`), sql`, `)}) order by id for update`);
+    }
+    await ctx.req.payload.update({ collection: "data-projects", id, draft: false, data: { ...projectFields(latest), _status: "published" } as never, ...asUser(ctx) });
+  });
   return projectDetail(ctx, id);
 }
 
