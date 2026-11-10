@@ -103,6 +103,11 @@ const CONVERTIBLE: Partial<Record<FieldType, FieldType[]>> = {
   url: ["text"]
 };
 
+/** The types an existing field may change to (itself included): value-preserving paths only. */
+export function allowedTypeChanges(type: FieldType): FieldType[] {
+  return [type, ...(CONVERTIBLE[type] ?? [])];
+}
+
 /**
  * What a schema edit may do to an existing schema: relabel, reorder, add,
  * remove (which retires the key), toggle required/visibility, adjust options

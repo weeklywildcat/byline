@@ -27,7 +27,7 @@ import {
   type FieldDefinition
 } from "../src";
 import { evaluateQuery, validateQuery } from "../src/query";
-import { datasetToCsv, defuseSpreadsheetFormula, guessColumnMapping, parseDelimited, previewImport, CsvError } from "../src/csv";
+import { datasetToCsv, defuseSpreadsheetFormula, guessColumnMapping, inferFieldsFromTable, parseDelimited, previewImport, CsvError } from "../src/csv";
 import { formatDataValue } from "../src/format";
 
 const f = <T extends FieldDefinition["type"]>(key: string, label: string, type: T, extra: Partial<FieldDefinition> = {}): FieldDefinition =>
@@ -264,6 +264,15 @@ describe("CSV", () => {
     expect(preview.rows[0]).toEqual({ name: "North", status: "done", cost: "5.00" });
     expect(preview.issues.map((issue) => `${issue.row}:${issue.column}`)).toEqual(["3:Status", "3:Cost"]);
     expect(preview.ignored).toEqual(["Extra"]);
+  });
+
+  it("infers typed fields from a pasted table", () => {
+    const [header, ...rows] = parseDelimited("Band\tScore\tReporting\tBudget\tFinal\tDate\tDivision\nNorth\t92\t45%\t$1,200\tyes\t2026-10-04\tA\nSouth\t88.5\t100%\t$900.50\tno\t2026-10-11\tA\nEast\t71\t12%\t$80\tno\t2026-10-18\tB\nWest\t79\t3%\t$50\tyes\t2026-10-25\tB");
+    const fields = inferFieldsFromTable(header, rows);
+    expect(fields.map((entry) => `${entry.key}:${entry.type}`)).toEqual(["band:text", "score:number", "reporting:percentage", "budget:currency", "final:boolean", "date:date", "division:select"]);
+    const division = fields[6];
+    expect(division.type === "select" && division.options.choices).toEqual([{ value: "a", label: "A" }, { value: "b", label: "B" }]);
+    expect(validateDatasetSchema({ fields, retiredKeys: [] }).ok).toBe(true);
   });
 
   it("defuses spreadsheet formulas on export", () => {
