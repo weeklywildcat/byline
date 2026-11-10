@@ -66,6 +66,7 @@ export function useAnyCoarsePointer(): boolean {
   return useMediaQuery("(any-pointer: coarse)");
 }
 
+/** Whether any attached input can provide precise hover, including a trackpad or mouse on a touch-first device. */
 export function useFineHoverPointer(): boolean {
-  return useMediaQuery("(hover: hover) and (pointer: fine)");
+  return useMediaQuery("(any-hover: hover) and (any-pointer: fine)");
 }
