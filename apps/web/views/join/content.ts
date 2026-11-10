@@ -39,7 +39,7 @@ export const FAQ = [
   {
     question: "How much time does it take?",
     answer:
-      "Meetings are flexible and hybrid, both in person and online. You can start with a small piece of work and take on more as you get comfortable."
+      "It depends on what you take on. You can start with a small piece of work and take on more as you get comfortable. Our meetings and open newsroom hours give you time to work with other staff, but you do not need to come to every session."
   },
   {
     question: "Can I join if I am busy with other activities?",
