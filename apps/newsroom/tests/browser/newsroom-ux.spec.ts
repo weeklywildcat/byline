@@ -480,7 +480,9 @@ for (const touch of [false, true]) {
       const actions = card.getByRole("button", { name: `Actions for ${headline}` });
       const preview = page.locator("[data-slot=story-hover-preview]");
       if (touch) {
-        const handle = card.getByRole("img", { name: `Drag ${headline}` });
+        // The grip is pointer-only and decorative (aria-hidden); the accessible way to move a Story is Actions → Move to.
+        const handle = card.locator("[data-story-drag-handle]");
+        await expect(handle).toHaveAttribute("aria-hidden", "true");
         await expectTarget(handle, touch, { square: true });
         await expect(handle).toHaveCSS("touch-action", "none");
         await expect(card).toHaveCSS("touch-action", "auto");
@@ -494,7 +496,7 @@ for (const touch of [false, true]) {
       } else {
         await title.hover();
         await expect(preview).toBeVisible();
-        await expect(card.getByRole("img", { name: `Drag ${headline}` })).toHaveCount(0);
+        await expect(card.locator("[data-story-drag-handle]")).toHaveCount(0);
         await actions.hover();
       }
 
