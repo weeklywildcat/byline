@@ -62,10 +62,12 @@ export function isNotificationKind(value: unknown): value is NotificationKind {
 
 export type DigestItem = { type: "task" | "production" | "appointment" | "deadline"; title: string; storyId: number | null; when: string };
 
+export type ReminderWhen = "today" | "tomorrow" | "in 1 hour" | `in ${number} minutes`;
+
 export type ReminderFacts = {
   type: "deadline" | "appointment";
   target: "story" | "task" | "production" | "appointment";
-  when: "tomorrow" | "in 1 hour";
+  when: ReminderWhen;
 };
 
 export type NotificationFacts = {
@@ -79,7 +81,11 @@ export type NotificationFacts = {
 
 const REMINDER_TYPES = new Set<ReminderFacts["type"]>(["deadline", "appointment"]);
 const REMINDER_TARGETS = new Set<ReminderFacts["target"]>(["story", "task", "production", "appointment"]);
-const REMINDER_WHEN = new Set<ReminderFacts["when"]>(["tomorrow", "in 1 hour"]);
+const STATIC_REMINDER_WHEN = new Set<ReminderFacts["when"]>(["today", "tomorrow", "in 1 hour"]);
+
+function isReminderWhen(value: unknown): value is ReminderWhen {
+  return typeof value === "string" && (STATIC_REMINDER_WHEN.has(value as ReminderWhen) || /^in [1-9]\d{0,2} minutes$/.test(value));
+}
 
 /** Stored notification JSON is private but still normalized before it becomes copy or HTML. */
 export function reminderFacts(value: unknown): ReminderFacts | null {
@@ -87,8 +93,8 @@ export function reminderFacts(value: unknown): ReminderFacts | null {
   const candidate = (value as { reminder?: unknown }).reminder;
   if (!candidate || typeof candidate !== "object") return null;
   const { type, target, when } = candidate as Record<string, unknown>;
-  if (!REMINDER_TYPES.has(type as ReminderFacts["type"]) || !REMINDER_TARGETS.has(target as ReminderFacts["target"]) || !REMINDER_WHEN.has(when as ReminderFacts["when"])) return null;
-  return { type: type as ReminderFacts["type"], target: target as ReminderFacts["target"], when: when as ReminderFacts["when"] };
+  if (!REMINDER_TYPES.has(type as ReminderFacts["type"]) || !REMINDER_TARGETS.has(target as ReminderFacts["target"]) || !isReminderWhen(when)) return null;
+  return { type: type as ReminderFacts["type"], target: target as ReminderFacts["target"], when };
 }
 
 const who = (facts: NotificationFacts) => facts.actor ?? "Someone";
@@ -108,7 +114,7 @@ export function describeNotification(facts: NotificationFacts): string {
     case "highPriorityTasks":
       return `${who(facts)} gave you a high-priority task${facts.detail ? `: ${facts.detail}` : ""}`;
     case "appointments":
-      if (facts.reminder?.type === "appointment") return `${facts.detail ? `“${facts.detail}”` : "Your appointment"} starts in 1 hour`;
+      if (facts.reminder?.type === "appointment") return `${facts.detail ? `“${facts.detail}”` : "Your appointment"} starts ${facts.reminder.when}`;
       return `${who(facts)} assigned you an appointment${facts.detail ? `: ${facts.detail}` : ""}`;
     case "publishingFailures":
       return `${facts.detail ?? "Publishing"} failed`;
@@ -129,7 +135,7 @@ export function describeNotification(facts: NotificationFacts): string {
     case "dueDigest": {
       if (facts.reminder?.type === "deadline") {
         const subject = facts.detail ? `“${facts.detail}”` : facts.story ? `“${facts.story}”` : "Your work";
-        return `${subject} is due tomorrow`;
+        return `${subject} is due ${facts.reminder.when}`;
       }
       const count = facts.items?.length ?? 0;
       return count === 1 ? "1 item is due today or overdue" : `${count} items are due today or overdue`;
