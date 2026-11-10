@@ -90,7 +90,8 @@ export function resolveDataProject(definition: DataPresentationDefinition | unde
         project: { id: project.id, title: project.title, deck: project.deck, href: `/data/${project.slug}/`, settings, dataUpdatedAt, source: input.source },
         data,
         model,
-        format
+        format,
+        releasePaths
       }
     }
   };
