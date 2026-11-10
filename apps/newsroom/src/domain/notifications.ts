@@ -3,8 +3,8 @@
  * hear about it, and how each one reads. Pure; the Payload side is
  * `newsroom/notifications.ts`.
  *
- * Ports the WordPress kinds and defaults (`includes/editorial/notifications.php`):
- * the same eight notifications, each on by default. A notification carries
+ * Carries forward the WordPress notification defaults and adds Payload-native
+ * newsroom workflows. Every known notification is on by default. A notification carries
  * only stable references (story, actor, a short detail); the headline and the
  * actor's name are resolved when it is shown or sent, so a renamed story never
  * leaves a stale title behind and nothing private is copied into the message.
