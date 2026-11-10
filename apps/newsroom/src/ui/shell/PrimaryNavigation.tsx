@@ -1,13 +1,11 @@
 "use client";
 
 import { primaryNavigationFor, type primaryLocationFor } from "../../domain/navigation";
-import type { Role } from "../../domain/vocabulary";
 import { NAV_ICONS } from "./nav-items";
+import { MoreNavigation, type MoreAccount } from "./MoreNavigation";
 import { ShellLink } from "./navigation";
 
-export function PrimaryNavigation({ admin, role, active }: {
-  admin: string;
-  role: Role;
+export function PrimaryNavigation({ admin, role, active, ...account }: MoreAccount & {
   active: NonNullable<ReturnType<typeof primaryLocationFor>>["key"];
 }) {
   return (
@@ -19,13 +17,14 @@ export function PrimaryNavigation({ admin, role, active }: {
             key={key}
             href={`${admin}${path}` || "/"}
             aria-current={active === key ? "page" : undefined}
-            className="byline-primary-link text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-primary focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring"
+            className="byline-primary-link text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring"
           >
             <Icon className="size-5 shrink-0" aria-hidden="true" />
             {label}
           </ShellLink>
         );
       })}
+      <MoreNavigation admin={admin} role={role} {...account} />
     </nav>
   );
 }

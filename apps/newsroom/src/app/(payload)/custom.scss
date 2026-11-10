@@ -148,8 +148,15 @@
     margin-inline: auto;
   }
 
-  .byline-primary-link[aria-current="page"] {
+  .byline-more-trigger {
+    border: 0;
+  }
+
+  .byline-primary-navigation:not(:has(.byline-more-trigger[aria-expanded="true"])) .byline-primary-link[aria-current="page"],
+  .byline-more-trigger[aria-expanded="true"] {
     --byline-primary-indicator: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
   }
 
   .byline-primary-link {

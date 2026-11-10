@@ -1,8 +1,9 @@
 import type { ServerProps } from "payload";
+import { cache } from "react";
 import { relationId } from "../../access/user";
 
 /** The account's byline person, read as the user: their newsroom title and portrait, when there is one. */
-export async function linkedPerson(payload: ServerProps["payload"], user: ServerProps["user"], id: number | string | null): Promise<{ newsroomRole: string; avatarUrl: string | null; exists: boolean }> {
+export const linkedPerson = cache(async function (payload: ServerProps["payload"], user: ServerProps["user"], id: number | string | null): Promise<{ newsroomRole: string; avatarUrl: string | null; exists: boolean }> {
   if (id === null) return { newsroomRole: "", avatarUrl: null, exists: false };
   try {
     const person = await payload.findByID({ collection: "people", id, depth: 1, overrideAccess: false, user, select: { newsroomRole: true, portrait: true } });
@@ -12,4 +13,4 @@ export async function linkedPerson(payload: ServerProps["payload"], user: Server
   } catch {
     return { newsroomRole: "", avatarUrl: null, exists: false };
   }
-}
+});

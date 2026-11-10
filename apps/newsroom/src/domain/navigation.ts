@@ -69,19 +69,17 @@ export function navigationFor(role: Role): NavItem[] {
   return NAVIGATION.filter(allowed(role));
 }
 
-export const MORE_PATH = "/more";
 export const REVIEW_WORKFLOWS_PATH = "/review-workflows";
 
 const PRIMARY_KEYS = ["home", "stories", "calendar"] as const;
-const MORE_DESTINATION = { key: "more", label: "More", path: MORE_PATH, minimumRole: "staff" } as const;
-type PrimaryKey = (typeof PRIMARY_KEYS)[number] | typeof MORE_DESTINATION.key;
+type PrimaryKey = (typeof PRIMARY_KEYS)[number];
 
 export function primaryNavigationFor(role: Role): NavItem[] {
   const items = navigationFor(role);
-  return [...PRIMARY_KEYS.flatMap((key) => items.filter((item) => item.key === key)), MORE_DESTINATION];
+  return PRIMARY_KEYS.flatMap((key) => items.filter((item) => item.key === key));
 }
 
-type PrimaryLocation = { key: PrimaryKey; parent?: { label: string; path: string } };
+type PrimaryLocation = { key: PrimaryKey | null; parent?: { label: string; path: string } };
 
 /** Only canonical Byline views get adaptive navigation. The numeric Story edit
  * route is the one native Payload document surface that hosts a Byline screen. */
@@ -96,10 +94,9 @@ export function primaryLocationFor(pathname: string, adminRoute: string): Primar
   if (storyIdFromPath(pathname, adminRoute) !== null) {
     return { key: "stories", parent: { label: "Stories", path: STORIES_PATH } };
   }
-  if (path === MORE_PATH) return { key: "more" };
-  if (path === REVIEW_WORKFLOWS_PATH) return { key: "more", parent: { label: "People", path: "/people" } };
+  if (path === REVIEW_WORKFLOWS_PATH) return { key: null, parent: { label: "People", path: "/people" } };
   if (destination || path === "/profile" || path === "/site" || path === SYSTEM_ADMINISTRATION_PATH) {
-    return { key: "more", parent: { label: MORE_DESTINATION.label, path: MORE_PATH } };
+    return { key: null, parent: { label: "Home", path: "" } };
   }
   return null;
 }
@@ -197,7 +194,6 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   const nav = NAVIGATION.find((item) => item.path === path);
   if (nav) return [{ label: nav.label }];
   if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Stories", path: STORIES_PATH }, { label: "Story" }];
-  if (path === MORE_PATH) return [{ label: MORE_DESTINATION.label }];
   if (path === "/site") return [{ label: "Site" }];
   if (path === REVIEW_WORKFLOWS_PATH) return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
   if (path === "/content-health") return [{ label: "Content Health" }];

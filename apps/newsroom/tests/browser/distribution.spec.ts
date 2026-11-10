@@ -193,8 +193,13 @@ for (const width of [1440, 820, 390]) {
     await page.goto("/admin/distribution");
     await expect(page.getByRole("heading", { name: "Distribution", exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("tab", { name: /Needs attention/ })).toHaveAttribute("aria-selected", "true");
-    const navigation = width >= 1200 ? { name: "Byline", destination: "Distribution" } : { name: "Primary navigation", destination: "More" };
-    await expect(page.getByRole("navigation", { name: navigation.name, exact: true }).getByRole("link", { name: navigation.destination, exact: true })).toHaveAttribute("aria-current", "page");
+    if (width >= 1200) {
+      await expect(page.getByRole("navigation", { name: "Byline", exact: true }).getByRole("link", { name: "Distribution", exact: true })).toHaveAttribute("aria-current", "page");
+    } else {
+      const navigation = page.getByRole("navigation", { name: "Primary navigation", exact: true });
+      await expect(navigation.getByRole("button", { name: "More", exact: true })).toHaveAttribute("aria-expanded", "false");
+      await expect(navigation.locator('[aria-current="page"]')).toHaveCount(0);
+    }
     const search = page.getByRole("searchbox", { name: "Search Stories" });
     await search.fill(headline);
     await expect(page).toHaveURL(/q=Greenhouse\+operations/);

@@ -231,9 +231,9 @@ describe("slugs and links", () => {
 });
 
 describe("adaptive primary navigation", () => {
-  it("projects the same four destinations for newsroom roles without changing desktop destinations", () => {
+  it("projects the three primary links for newsroom roles without changing desktop destinations", () => {
     for (const role of ["staff", "editor", "administrator"] as const) {
-      expect(primaryNavigationFor(role).map(({ path }) => path)).toEqual(["", "/stories", "/calendar", "/more"]);
+      expect(primaryNavigationFor(role).map(({ path }) => path)).toEqual(["", "/stories", "/calendar"]);
       expect(navigationFor(role).some(({ key }) => key === "more")).toBe(false);
     }
   });
@@ -244,15 +244,14 @@ describe("adaptive primary navigation", () => {
     expect(primaryLocationFor("/desk/stories?needs_review=1", admin)).toEqual({ key: "stories" });
     expect(primaryLocationFor("/desk/collections/stories/42/?tab=reporting", admin)).toEqual({ key: "stories", parent: { label: "Stories", path: "/stories" } });
     expect(primaryLocationFor("/desk/calendar#today", admin)).toEqual({ key: "calendar" });
-    expect(primaryLocationFor("/desk/more", admin)).toEqual({ key: "more" });
-    expect(primaryLocationFor("/desk/review-workflows", admin)).toEqual({ key: "more", parent: { label: "People", path: "/people" } });
+    expect(primaryLocationFor("/desk/review-workflows", admin)).toEqual({ key: null, parent: { label: "People", path: "/people" } });
     for (const view of ["media?asset=2", "collections?collection=1", "people?person=2", "front-page", "distribution", "content-health", "profile", "site", "system"]) {
-      expect(primaryLocationFor(`/desk/${view}`, admin)).toEqual({ key: "more", parent: { label: "More", path: "/more" } });
+      expect(primaryLocationFor(`/desk/${view}`, admin)).toEqual({ key: null, parent: { label: "Home", path: "" } });
     }
   });
 
   it("excludes authentication, Field Mode, previews, raw administration and paths outside the configured prefix", () => {
-    for (const path of ["", "/desk/login", "/desk/field", "/desk/account", "/preview/story", "/desk/collections/stories", "/desk/collections/stories/create", "/desk/collections/stories/1/versions", "/desk/collections/media/1", "/desk/collections/pages/1", "/desk/globals/distribution-settings", "/desk/media/file", "/desk-extra", "/admin", "/stories"]) {
+    for (const path of ["", "/desk/login", "/desk/more", "/desk/field", "/desk/account", "/preview/story", "/desk/collections/stories", "/desk/collections/stories/create", "/desk/collections/stories/1/versions", "/desk/collections/media/1", "/desk/collections/pages/1", "/desk/globals/distribution-settings", "/desk/media/file", "/desk-extra", "/admin", "/stories"]) {
       expect(primaryLocationFor(path, "/desk")).toBeNull();
     }
   });
