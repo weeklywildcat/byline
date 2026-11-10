@@ -25,7 +25,7 @@ export function DialogContent({ className, children, showCloseButton = true, ...
     return <Dialog.DialogContent className={className} showCloseButton={showCloseButton} {...props}>{children}</Dialog.DialogContent>;
   }
   return <Drawer.DrawerContent keyboardAware {...props}>
-    <div className="relative flex min-h-0 flex-col gap-4 p-4">
+    <div className={cn("relative flex min-h-0 flex-1 flex-col gap-4 p-4", className, "w-full max-w-none sm:max-w-none")}>
       {children}
       {showCloseButton ? <Drawer.DrawerClose render={<Button type="button" variant="ghost" size="icon-sm" className="absolute top-1 right-2" aria-label="Close" />}><XIcon aria-hidden="true" /></Drawer.DrawerClose> : null}
     </div>
@@ -55,4 +55,11 @@ export function DialogHeader({ className, ...props }: ComponentProps<typeof Dial
   return <Dialog.DialogHeader className={cn(touch && "pr-10", className)} {...props} />;
 }
 
-export { DialogFooter } from "./dialog";
+export function DialogFooter({ className, ...props }: ComponentProps<typeof Dialog.DialogFooter>) {
+  const touch = useContext(TouchSurface);
+  if (!touch) return <Dialog.DialogFooter className={className} {...props} />;
+  return <Drawer.DrawerFooter
+    className={cn("sticky bottom-0 z-10 -mx-4 -mb-4 shrink-0 border-t bg-popover px-4 pb-4 pt-3", className)}
+    {...props}
+  />;
+}
