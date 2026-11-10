@@ -150,6 +150,9 @@ export default buildConfig({
   endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
+    // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their
+    // email address to a third party on each admin page. Byline shows initials and People portraits instead.
+    avatar: "default",
     meta: { titleSuffix: " · Byline", robots: "noindex, nofollow" },
     importMap: { baseDir: dirname },
     // Read by Byline's client screens: dates show in the newsroom's timezone, never the browser's.

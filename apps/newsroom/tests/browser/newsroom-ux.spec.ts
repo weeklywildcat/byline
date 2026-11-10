@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createStory, fixturePdf, login, signIn, waitForSaved } from "./helpers";
+import { createStory, fixturePdf, login, pickDateTime, signIn, waitForSaved } from "./helpers";
 
 for (const width of [1440, 820, 390]) {
   test.describe(`newsroom workflows at ${width}px`, () => {
@@ -28,7 +28,7 @@ for (const width of [1440, 820, 390]) {
       await page.keyboard.press("Escape");
       await expect(edit).toBeFocused();
       await edit.click();
-      await dialog.getByLabel(/First publication/).fill("2026-11-07T23:30");
+      await pickDateTime(page, dialog, /First publication/, "2026-11-07T23:30");
       await dialog.getByRole("button", { name: "Apply to draft" }).click();
       await closeDetails();
       await waitForSaved(page);

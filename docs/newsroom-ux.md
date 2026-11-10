@@ -124,6 +124,26 @@ Permanent deletion is administrator-only. Readiness reports fields, body
 validation and publication Media issues; warnings are advisory. Content Health
 is independent published-content maintenance.
 
+## Dates, times and keyboard
+
+Staff never meet the browser's native date controls. `@byline/newsroom-ui/components/date-fields`
+is the one calendar-popover set: `DateField` and `DateButton` for a day,
+`DateRangeButton` for a filter's first and last day (with quick ranges when the
+newsroom's `today` is known), and `DateTimeField` for a day and time, which
+shows the newsroom timezone and offers common clock times. Values are the same
+wall-clock strings the native inputs produced (`YYYY-MM-DD`,
+`YYYY-MM-DDTHH:mm[:ss]`); a picker never converts a timezone, so the newsroom's
+rules above still apply. A control that is disabled for a reason the reader can
+fix says so through `DisabledReason` (a tooltip on a focusable wrapper), never
+silently.
+
+Keyboard navigation lives in the shell (`ui/shell/shortcuts-model.ts`,
+`shortcuts.tsx`): `?` lists the keys, `/` opens Search, `c` starts a story and
+`g` then a letter goes to a destination, through the same guarded navigation as
+a click. Single keys act only when nothing is being typed into and no menu or
+dialog is open. Every navigation destination needs a `GO_KEYS` letter (a test
+enforces it), and the help dialog is built from the same table.
+
 ## Operations
 
 Video stories get their YouTube facts (title, thumbnail, duration, upload date)

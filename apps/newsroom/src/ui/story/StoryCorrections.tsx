@@ -4,12 +4,15 @@ import { wordpressLocalDateTime } from "@byline/content";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
-import { Input } from "@byline/newsroom-ui/ui/input";
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
+import { SelectField, TextAreaField } from "@byline/newsroom-ui/components/form-fields";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { FieldGroup } from "@byline/newsroom-ui/ui/field";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
-import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { CORRECTION_TYPE_OPTIONS } from "../../domain/vocabulary";
 import type { StoryCorrections as Response } from "../../newsroom/story-corrections";
@@ -27,7 +30,6 @@ export function StoryCorrections({ context }: { context: StoryScreenContext }) {
   const [deleting, setDeleting] = useState<Row | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const fields = useId();
   const addTrigger = useRef<HTMLButtonElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const label = (type: Row["type"]) => CORRECTION_TYPE_OPTIONS.find((item) => item.value === type)?.label;
@@ -64,7 +66,7 @@ export function StoryCorrections({ context }: { context: StoryScreenContext }) {
 
   return <section className="grid gap-3 border-t border-border pt-4" aria-label="Corrections and updates">
     <SectionHeading action={<Button ref={addTrigger} type="button" size="sm" variant="outline" onClick={() => edit()}>Add notice</Button>}>Corrections &amp; updates</SectionHeading>
-    {corrections.isError ? <p role="alert" className="text-sm text-destructive">The notices could not be loaded. <Button type="button" size="xs" variant="outline" onClick={() => void corrections.refetch()}>Retry</Button></p> : corrections.isPending ? <p role="status" className="text-sm">Loading notices…</p> : !corrections.data.corrections.length ? <p className="text-sm text-muted-foreground">No public notices have been recorded.</p> : null}
+    {corrections.isError ? <InlineAlert title="The notices could not be loaded." onAction={() => void corrections.refetch()} actionLabel="Retry" /> : corrections.isPending ? <div role="status" aria-label="Loading notices" className="grid gap-2"><Skeleton className="h-14 w-full" /></div> : !corrections.data.corrections.length ? <Empty className="border border-dashed py-6"><EmptyHeader><EmptyTitle>No public notices yet</EmptyTitle><EmptyDescription>Add a correction, clarification or update and it appears with the published story.</EmptyDescription></EmptyHeader></Empty> : null}
     <ItemGroup>{corrections.data?.corrections.map((row) => <Item key={row.id} variant="outline" className="items-start">
       <ItemContent className="min-w-0">
         <ItemTitle>{label(row.type)}</ItemTitle>
@@ -79,19 +81,15 @@ export function StoryCorrections({ context }: { context: StoryScreenContext }) {
     <Dialog open={Boolean(dialog)} onOpenChange={(open) => { if (!open && !busy) setDialog(null); }}>
       <DialogContent finalFocus={() => trigger.current ?? addTrigger.current} className="max-h-[calc(100dvh-2rem)] overflow-auto">
         <DialogHeader><DialogTitle>{dialog?.id ? "Edit notice" : "Add a public notice"}</DialogTitle><DialogDescription>This notice appears with the published story at the time you specify.</DialogDescription></DialogHeader>
-        {dialog ? <form className="grid gap-3" onSubmit={save}>
-          <Select items={CORRECTION_TYPE_OPTIONS} value={dialog.draft.type} onValueChange={(type) => { if (type) update({ type }); }}>
-            <SelectTrigger aria-label="Notice type"><SelectValue /></SelectTrigger>
-            <SelectContent>{CORRECTION_TYPE_OPTIONS.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
-          </Select>
-          <label htmlFor={`${fields}-text`}>Public notice text</label>
-          <Textarea id={`${fields}-text`} rows={4} required maxLength={2000} value={dialog.draft.text} onChange={(event) => update({ text: event.target.value })} />
-          <label htmlFor={`${fields}-date`}>Correction date ({context.timeZone})</label>
-          <Input id={`${fields}-date`} type="datetime-local" step={1} required value={dialog.draft.date} onChange={(event) => update({ date: event.target.value })} />
-          <label htmlFor={`${fields}-from`}>Shown publicly from (optional)</label>
-          <Input id={`${fields}-from`} type="datetime-local" step={1} value={dialog.draft.publishedAt} onChange={(event) => update({ publishedAt: event.target.value })} />
+        {dialog ? <form className="grid gap-4" onSubmit={save}>
+          <FieldGroup>
+            <SelectField label="Notice type" value={dialog.draft.type} options={CORRECTION_TYPE_OPTIONS} onChange={(type) => update({ type })} />
+            <TextAreaField label="Public notice text" value={dialog.draft.text} onChange={(text) => update({ text })} maxLength={2000} rows={4} autoFocus />
+            <DateTimeField label="Correction date" value={dialog.draft.date} onChange={(date) => update({ date })} timeZone={context.timeZone} seconds clearable={false} hint="When the correction or update was made." />
+            <DateTimeField label="Shown publicly from" optional value={dialog.draft.publishedAt} onChange={(publishedAt) => update({ publishedAt })} timeZone={context.timeZone} seconds hint="Leave blank to show it from the correction date." />
+          </FieldGroup>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy}>Save notice</Button></DialogFooter>
+          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !dialog.draft.text.trim() || !dialog.draft.date}>Save notice</Button></DialogFooter>
         </form> : null}
       </DialogContent>
     </Dialog>

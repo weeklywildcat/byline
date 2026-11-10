@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactElement } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
 import { toast } from "sonner";
+import { DateRangeButton } from "@byline/newsroom-ui/components/date-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { DatePicker, valueSelectTriggerClass } from "../editorial/pickers";
@@ -226,13 +227,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
       <Select items={typeItems} value={filters.type || ANY} onValueChange={(value) => set("type", !value || value === ANY ? "" : value as MediaDeskFilters["type"])}><SelectTrigger aria-label={"Type"} className="w-32"><SelectValue /></SelectTrigger><SelectContent>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       <Select items={statusItems} value={filters.status || ANY} onValueChange={(value) => set("status", !value || value === ANY ? "" : value as MediaDeskFilters["status"])}><SelectTrigger aria-label={"Status"} className="w-36"><SelectValue /></SelectTrigger><SelectContent>{statusItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       <Select items={assigneeFilterItems} value={filters.assigneeId || ANY} onValueChange={(value) => set("assigneeId", !value || value === ANY ? "" : String(value))}><SelectTrigger aria-label={"Assignee"} className="w-40"><SelectValue /></SelectTrigger><SelectContent>{assigneeFilterItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-      <Popover>
-        <PopoverTrigger render={<Button variant="outline" />}>{"Due date"}{filters.dueFrom || filters.dueTo ? <Badge variant="secondary" className="ml-1">1</Badge> : null}</PopoverTrigger>
-        <PopoverContent align="start" className="w-72 gap-2">
-          <label className="grid gap-1 text-sm">{"Due from"}<Input type="date" value={filters.dueFrom} onChange={(event) => set("dueFrom", event.target.value)} /></label>
-          <label className="grid gap-1 text-sm">{"Due to"}<Input type="date" value={filters.dueTo} onChange={(event) => set("dueTo", event.target.value)} /></label>
-        </PopoverContent>
-      </Popover>
+      <DateRangeButton aria-label="Due date" className="w-auto justify-start font-normal" placeholder="Due date" today={day} presets={["today", "next7", "month"]} from={filters.dueFrom} to={filters.dueTo} onChange={(dueFrom, dueTo) => setFilters({ ...filters, dueFrom, dueTo })} />
       {active ? <Button variant="ghost" onClick={() => setFilters(EMPTY_MEDIA_DESK_FILTERS)}>{"Clear"}</Button> : null}
     </div>
 

@@ -5,7 +5,9 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
-import { Input } from "@byline/newsroom-ui/ui/input";
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
+import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { useDocumentInfo, useForm } from "@payloadcms/ui";
 import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
@@ -35,7 +37,7 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
   const [error, setError] = useState("");
   const [confirmPath, setConfirmPath] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const field = useId();
+  const pathId = useId();
   const { navigate } = useShellNavigation();
   const kind = page ? "page" : "story";
   const collection = page ? "pages" : "stories";
@@ -107,7 +109,7 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
 
   function onSchedule(event: FormEvent) {
     event.preventDefault();
-    if (!busy) void schedule(time);
+    if (!busy && time && (!changedPath || confirmPath)) void schedule(time);
   }
 
   return <>
@@ -135,13 +137,15 @@ export function PublicationActions({ context, page, scheduledAt, changedPath, sa
           <DialogDescription>Byline will publish the latest saved changes at this time if the document passes publication checks.</DialogDescription>
         </DialogHeader>
         <form className="grid gap-4" onSubmit={onSchedule}>
-          <div className="grid gap-1"><label htmlFor={field}>Publish at ({context.timeZone})</label><Input id={field} type="datetime-local" required value={time} onChange={(e) => setTime(e.target.value)} /></div>
-          {changedPath ? <label className="flex items-start gap-2 text-sm [overflow-wrap:anywhere]">
-            <input type="checkbox" checked={confirmPath} onChange={(event) => setConfirmPath(event.target.checked)} required />
-            <span>Publish at {changedPath.next}. Preserve {changedPath.old} with a permanent redirect.</span>
-          </label> : null}
+          <FieldGroup>
+            <DateTimeField label="Publish at" value={time} onChange={setTime} timeZone={context.timeZone} />
+            {changedPath ? <Field orientation="horizontal">
+              <Checkbox id={pathId} checked={confirmPath} onCheckedChange={(checked) => setConfirmPath(checked === true)} />
+              <FieldLabel htmlFor={pathId} className="font-normal [overflow-wrap:anywhere]">Publish at {changedPath.next}. Preserve {changedPath.old} with a permanent redirect.</FieldLabel>
+            </Field> : null}
+          </FieldGroup>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !canSchedule}>{busy ? "Saving…" : "Save schedule"}</Button></DialogFooter>
+          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !canSchedule || !time || (Boolean(changedPath) && !confirmPath)}>{busy ? "Saving…" : "Save schedule"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

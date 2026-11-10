@@ -3,9 +3,11 @@
 import { publicStoryPath, wordpressLocalDateTime } from "@byline/content";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@byline/newsroom-ui/ui/dialog";
-import { Input } from "@byline/newsroom-ui/ui/input";
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
+import { TextField } from "@byline/newsroom-ui/components/form-fields";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { useQuery } from "@tanstack/react-query";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { localToInstant } from "../../domain/dates";
 import { isSlug, slugify } from "../../domain/slug";
@@ -38,8 +40,6 @@ export function StoryURL({ context, compact = false }: { context: StoryScreenCon
   const [nextSlug, setNextSlug] = useState("");
   const [wallTime, setWallTime] = useState("");
   const [error, setError] = useState("");
-  const slugId = useId();
-  const dateId = useId();
   const sectionControl = useRef<HTMLElement | null>(null);
   const editDate = context.role === "editor" || context.role === "administrator";
   if (!config) return result.isError ? <p role="status" className="text-sm text-muted-foreground">The public URL could not be loaded.</p> : null;
@@ -93,23 +93,22 @@ export function StoryURL({ context, compact = false }: { context: StoryScreenCon
             <DialogDescription>{config.path ? "Changes to the address take effect when you publish the story." : "The story's section, slug and first publication date determine its address."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="grid gap-4">
-            <div className="grid gap-1"><label htmlFor={slugId}>Story slug</label><Input id={slugId} value={nextSlug} onChange={(event) => setNextSlug(event.target.value)} maxLength={120} required /></div>
-            <div className="grid gap-1">
-              <p>Section: {currentSection?.name ?? "None selected"}</p>
-              {compact ? (
-                <p className="text-xs text-muted-foreground">Change the Section in the story properties above the article.</p>
-              ) : (
-                <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => {
-                  sectionControl.current = document.querySelector<HTMLElement>("#byline-story-section button");
-                  setOpen(false);
-                }}>Go to Section field</Button>
-              )}
-            </div>
-            {editDate ? <div className="grid gap-1">
-              <label htmlFor={dateId}>First publication ({config.timezone})</label>
-              <Input id={dateId} type="datetime-local" step={1} value={wallTime} onChange={(event) => setWallTime(event.target.value)} />
-              {!config.path && !date.value ? <p className="text-xs text-muted-foreground">Leave blank to use the actual time of first publication. For a migrated story, enter its original time.</p> : null}
-            </div> : null}
+            <FieldGroup>
+              <TextField label="Story slug" value={nextSlug} onChange={setNextSlug} maxLength={120} hint="Lowercase letters, numbers and hyphens." />
+              <Field>
+                <FieldLabel>Section</FieldLabel>
+                <p className="text-sm">{currentSection?.name ?? "None selected"}</p>
+                {compact ? (
+                  <FieldDescription>Change the Section in the story properties above the article.</FieldDescription>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => {
+                    sectionControl.current = document.querySelector<HTMLElement>("#byline-story-section button");
+                    setOpen(false);
+                  }}>Go to Section field</Button>
+                )}
+              </Field>
+              {editDate ? <DateTimeField label="First publication" value={wallTime} onChange={setWallTime} timeZone={config.timezone} seconds optional={!date.value} hint={!config.path && !date.value ? "Leave blank to use the actual time of first publication. For a migrated story, enter its original time." : undefined} /> : null}
+            </FieldGroup>
             {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
             <DialogFooter>
               <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

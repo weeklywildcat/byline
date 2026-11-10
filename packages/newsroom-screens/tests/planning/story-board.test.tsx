@@ -81,6 +81,15 @@ describe("Lanes (the default)", () => {
     expect(order).toEqual(["pitch", "assigned", "reporting", "writing", "editing", "ready", "on-hold", "dropped"]);
   });
 
+  it("keeps its screen-reader text inside the scroller, so the page never gains a horizontal scrollbar", async () => {
+    await mount("lanes");
+    // An absolutely positioned `sr-only` label is placed against the nearest positioned ancestor;
+    // when that is outside the scroller, every off-screen column widens the whole document.
+    const scroller = $("[data-board-scroller]")!;
+    expect(scroller.classList.contains("relative")).toBe(true);
+    expect(scroller.querySelectorAll(".sr-only").length).toBeGreaterThan(0);
+  });
+
   it("folds an empty stage into a rail that is still a drop target", async () => {
     await mount("lanes");
     const rail = $("[data-status='assigned']")!;

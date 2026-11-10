@@ -1,6 +1,7 @@
 "use client";
 
 import { useMediaAsset } from "@byline/newsroom-screens/media/media-query";
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -178,7 +179,7 @@ function SheetBody({ item, timeZone, userId, run, busy, linkError, setLinkError,
       <Separator />
       <FieldGroup className="gap-4">
         <OwnerField item={item} userId={userId} run={run} />
-        {pending ? <TimeField label={`Planned for (${timeZone})`} value={item.plannedForLocal} disabled={!can.edit} onCommit={(value) => run({ plannedFor: value || null })} /> : null}
+        {pending ? <TimeField label="Planned for" timeZone={timeZone} value={item.plannedForLocal} disabled={!can.edit} onCommit={(value) => run({ plannedFor: value || null })} /> : null}
         <NoteField item={item} run={run} />
       </FieldGroup>
 
@@ -207,14 +208,10 @@ function StateActions({ item, timeZone, run, busy, readyBlocked }: { item: Item;
       {buttons.length ? <div className="flex flex-wrap gap-2">{buttons}</div> : null}
       {item.state === "scheduled" && item.scheduledFor ? <p className="text-sm">Scheduled on {item.label} for {formatDay(item.scheduledFor, timeZone)}.</p> : null}
       {scheduling ? (
-        <Field>
-          <FieldLabel htmlFor={`schedule-${item.id}`}>Scheduled on {item.label} for</FieldLabel>
-          <div className="flex flex-wrap gap-2">
-            <Input id={`schedule-${item.id}`} type="datetime-local" className="w-auto" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} onKeyDown={onEnter(() => undefined)} />
-            <Button type="button" size="sm" disabled={busy || !scheduleAt} onClick={() => run({ scheduledFor: scheduleAt, state: "scheduled" }, () => { setScheduling(false); toast.success("Recorded as scheduled."); })}>Save</Button>
-          </div>
-          <FieldDescription>Byline records the time. Schedule it on {item.label} first.</FieldDescription>
-        </Field>
+        <div className="grid gap-2">
+          <DateTimeField label={`Scheduled on ${item.label} for`} value={scheduleAt} onChange={setScheduleAt} timeZone={timeZone} clearable={false} hint={`Byline records the time. Schedule it on ${item.label} first.`} />
+          <Button type="button" size="sm" className="w-fit" disabled={busy || !scheduleAt} onClick={() => run({ scheduledFor: scheduleAt, state: "scheduled" }, () => { setScheduling(false); toast.success("Recorded as scheduled."); })}>Save</Button>
+        </div>
       ) : null}
     </>
   );
@@ -362,17 +359,11 @@ function OwnerField({ item, userId, run }: { item: Item; userId: number; run: (p
   );
 }
 
-function TimeField({ label, value, disabled, onCommit }: { label: string; value: string; disabled: boolean; onCommit: (value: string) => void }) {
-  const id = useId();
+function TimeField({ label, timeZone, value, disabled, onCommit }: { label: string; timeZone: string; value: string; disabled: boolean; onCommit: (value: string) => void }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
-  const commit = () => { if (draft !== value) onCommit(draft); };
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input id={id} type="datetime-local" className="w-full sm:w-64" value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={onEnter(commit)} />
-    </Field>
-  );
+  // A pick is a draft: it is recorded once, when the calendar closes.
+  return <DateTimeField label={label} value={draft} timeZone={timeZone} disabled={disabled} optional onChange={setDraft} onClose={(next) => { if (next !== value) onCommit(next); }} />;
 }
 
 function NoteField({ item, run }: { item: Item; run: (patch: DistributionPatch) => void }) {

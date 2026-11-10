@@ -385,7 +385,7 @@ export function StoryBoard(props: StoryBoardProps) {
 
   return boardRoot(<div ref={setFrame} data-board-frame="" style={{ "--board-top": `${top}px` } as CSSProperties}
     className="flex flex-col gap-2 sm:h-[calc(100dvh-var(--board-top)-1.5rem)] sm:min-h-[420px]">
-    <div ref={setScroller} data-board-scroller="" className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto max-sm:items-start max-sm:pb-2 sm:snap-none">
+    <div ref={setScroller} data-board-scroller="" className="relative flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto max-sm:items-start max-sm:pb-2 sm:snap-none">
       {mainStatuses.map(stage)}
       {layout === "lanes" && sidelined.length ? <><div aria-hidden="true" data-board-divider="" className="my-1 w-px shrink-0 bg-border" />{sidelined.map(stage)}</> : null}
     </div>

@@ -10,6 +10,7 @@ import { BylineCreateProvider } from "./create";
 import { ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
 import { ShellNavigationProvider } from "./navigation";
 import { BylineSearchProvider } from "./search";
+import { BylineShortcutsProvider } from "./shortcuts";
 import { StorySwitcherProvider } from "./StorySwitcher";
 import { CalendarWorkspaceShell } from "../calendar/CalendarWorkspaceShell";
 import { StoriesWorkspaceShell } from "../stories/StoriesWorkspaceShell";
@@ -52,13 +53,15 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
               <CollectionsWorkspaceShell>
                 <BylineCreateProvider>
                   <BylineSearchProvider>
-                    <StorySwitcherProvider>
-                      <StoriesWorkspaceShell>
-                        <CalendarWorkspaceShell>
-                          <MediaWorkspaceShell><PresenceProvider>{children}</PresenceProvider></MediaWorkspaceShell>
-                        </CalendarWorkspaceShell>
-                      </StoriesWorkspaceShell>
-                    </StorySwitcherProvider>
+                    <BylineShortcutsProvider>
+                      <StorySwitcherProvider>
+                        <StoriesWorkspaceShell>
+                          <CalendarWorkspaceShell>
+                            <MediaWorkspaceShell><PresenceProvider>{children}</PresenceProvider></MediaWorkspaceShell>
+                          </CalendarWorkspaceShell>
+                        </StoriesWorkspaceShell>
+                      </StorySwitcherProvider>
+                    </BylineShortcutsProvider>
                   </BylineSearchProvider>
                 </BylineCreateProvider>
               </CollectionsWorkspaceShell>

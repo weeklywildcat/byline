@@ -59,8 +59,11 @@ describe("People screen contracts", () => {
     expect(personInitials(" Alex Writer ")).toBe("AW");
     expect(personInitials("Cher")).toBe("C");
     expect(personSummary(person)).toBe(
-      "Photographer · Guest contributor · Outside staff directory · Byline only",
+      "Photographer · Guest contributor · No public profile",
     );
+    // A list already filtered by status does not repeat it, and the usual case is left unsaid.
+    expect(personSummary({ ...person, status: "active", directoryVisible: true, hasProfilePage: true }, { showStatus: false })).toBe("Photographer");
+    expect(personSummary({ ...person, status: "active", directoryVisible: false, hasProfilePage: true }, { showStatus: false })).toBe("Photographer · Not in staff directory");
   });
   it("sends only changed public fields in self-service", () => {
     const draft = clonePerson(person);

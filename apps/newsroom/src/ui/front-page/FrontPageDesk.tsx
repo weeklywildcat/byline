@@ -2,16 +2,21 @@
 
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type Announcements, type DragEndEvent } from "@dnd-kit/core";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
+import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
+import { DisabledReason } from "@byline/newsroom-ui/components/disabled-reason";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
+import { FieldGroup } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, History, Monitor, PanelLeft, Smartphone } from "lucide-react";
@@ -135,15 +140,19 @@ function DeskBody({ api, admin }: { api: string; admin: string }) {
             <div>
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Front Page</p>
               <h1 className="text-xl font-semibold">Live homepage</h1>
-              <p className="text-sm text-muted-foreground" role="status">
-                {!data ? "Loading…" : pending ? `${pending} unpublished change${pending === 1 ? "" : "s"}` : data.scheduled ? "No unpublished changes · a change is scheduled" : "No unpublished changes"}
-              </p>
+              <div className="text-sm text-muted-foreground" role="status">
+                {!data ? <Skeleton className="inline-block h-4 w-40 align-middle" /> : pending ? `${pending} unpublished change${pending === 1 ? "" : "s"}` : data.scheduled ? "No unpublished changes · a change is scheduled" : "No unpublished changes"}
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="ghost" onClick={() => setHistoryOpen(true)}><History data-icon="inline-start" />History</Button>
-              <Button type="button" variant="outline" disabled={!data?.draft || act.isPending} onClick={() => act.mutate({ kind: "discard" })}>Discard changes</Button>
-              <SchedulePopover disabled={!data?.draft || act.isPending} onSchedule={(at) => act.mutate({ kind: "schedule", at })} />
-              <Button type="button" disabled={!pending || act.isPending || Boolean(data?.issues.length)} onClick={() => act.mutate({ kind: "publish" })}>Publish changes</Button>
+              <DisabledReason reason={data && !data.draft ? "Nothing to discard: the homepage has no unpublished changes." : undefined}>
+                <Button type="button" variant="outline" disabled={!data?.draft || act.isPending} onClick={() => act.mutate({ kind: "discard" })}>Discard changes</Button>
+              </DisabledReason>
+              <ScheduleDialog disabled={!data?.draft || act.isPending} reason={data && !data.draft ? "Place a story in a slot first, then schedule the change." : undefined} timeZone={data?.timeZone} onSchedule={(at) => act.mutate({ kind: "schedule", at })} />
+              <DisabledReason reason={data && !act.isPending ? (data.issues.length ? "Fix the problems listed below before publishing." : !pending ? "Nothing to publish: the homepage has no unpublished changes." : undefined) : undefined}>
+                <Button type="button" disabled={!pending || act.isPending || Boolean(data?.issues.length)} onClick={() => act.mutate({ kind: "publish" })}>Publish changes</Button>
+              </DisabledReason>
             </div>
           </header>
           {data?.issues.length ? (
@@ -293,20 +302,31 @@ function SlotRow({ slot, story, selected, changed, onSelect }: { slot: { id: str
 }
 
 /** Schedule…: a newsroom-local time (read in the newsroom's timezone on the server). */
-function SchedulePopover({ disabled, onSchedule }: { disabled: boolean; onSchedule: (at: string) => void }) {
+function ScheduleDialog({ disabled, reason, timeZone, onSchedule }: { disabled: boolean; reason?: string; timeZone?: string; onSchedule: (at: string) => void }) {
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState("");
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button type="button" variant="outline" disabled={disabled} />}>Schedule…</PopoverTrigger>
-      <PopoverContent align="end" className="w-72">
-        <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); if (at) { onSchedule(at); setOpen(false); } }}>
-          <label className="text-sm font-medium" htmlFor="front-page-schedule">Change the homepage at</label>
-          <Input id="front-page-schedule" type="datetime-local" value={at} onChange={(event) => setAt(event.target.value)} required />
-          <p className="text-xs text-muted-foreground">Newsroom time. It activates by itself; you can cancel before then.</p>
-          <Button type="submit" size="sm" disabled={!at}>Schedule changes</Button>
-        </form>
-      </PopoverContent>
-    </Popover>
+    <>
+      <DisabledReason reason={reason}>
+        <Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>Schedule…</Button>
+      </DisabledReason>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Schedule homepage changes</DialogTitle>
+            <DialogDescription>The unpublished placements go live by themselves at the time you choose. You can cancel before then.</DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); if (at) { onSchedule(at); setOpen(false); setAt(""); } }}>
+            <FieldGroup>
+              <DateTimeField label="Change the homepage at" value={at} onChange={setAt} timeZone={timeZone} clearable={false} defaultTime="07:00" />
+            </FieldGroup>
+            <DialogFooter>
+              <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+              <Button type="submit" disabled={!at}>Schedule changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

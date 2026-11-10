@@ -72,7 +72,7 @@ export function CalendarControls({ timezone, scheduleFeed, currentUserId, onDate
         <>
           <SidebarSeparator className="mx-0" />
           <SidebarGroup>
-            <SidebarGroupLabel>My schedule</SidebarGroupLabel>
+            <SidebarGroupLabel>Whose work</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <ToggleRow checked={state.filters.mine} disabled={!currentUserId} onToggle={(next) => workspace.setFilter("mine", next)} label="My schedule" description="Only my appointments, production and tasks" />

@@ -37,7 +37,7 @@ export function TextAreaField({ label, value, onChange, error, hint, optional, m
   </FormField>;
 }
 
-export function SelectField<T extends string>({ label, value, options, onChange, disabled, error, hint, optional }: FieldChrome & { value: T; options: Array<{ value: T; label: string }>; onChange: (value: T) => void; disabled?: boolean }) {
+export function SelectField<T extends string>({ label, value, options, onChange, disabled, error, hint, optional }: FieldChrome & { value: T; options: ReadonlyArray<{ value: T; label: string }>; onChange: (value: T) => void; disabled?: boolean }) {
   const id = useId();
   return <FormField id={id} label={label} error={error} hint={hint} optional={optional}>
     <Select items={options} value={value} disabled={disabled} onValueChange={(next) => { if (next) onChange(next as T); }}>

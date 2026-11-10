@@ -184,7 +184,7 @@ export function StoryHeader({ context }: { context: StoryScreenContext }) {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Story</p>
               {liveDesk?.mode === "live" && liveDesk.status !== "off" ? <LiveBadge desk={liveDesk} timeZone={context.timeZone} /> : null}
             </div>
-            <p className="truncate text-sm font-medium">{headline.value?.trim() || "Untitled story"}</p>
+            <h1 className="m-0 truncate text-sm leading-normal font-medium">{headline.value?.trim() || "Untitled story"}</h1>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
