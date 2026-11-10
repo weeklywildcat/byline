@@ -133,7 +133,9 @@ relationship `transcript-selections.usedIn`; no rich text is scanned on reads.
 
 The provider boundary is `reporting/transcription/provider.ts`. The initial
 provider is self-hosted **faster-whisper** (`services/faster-whisper`, with VAD
-and word timestamps; the model is configuration and nothing assumes a GPU):
+and segment timestamps; word-level alignment is off by default because Byline
+does not store it. The model and inference tuning are configuration and nothing
+assumes a GPU):
 
 | Variable | Meaning |
 | --- | --- |
@@ -158,8 +160,12 @@ progress on the transcript; Reporting polls active work every five seconds and
 the focused transcript view does the same, so progress survives navigation.
 The service runs one Whisper job at a time by default
 (`WHISPER_MAX_WORKERS=1`) to avoid several CPU-heavy interviews competing on
-a newsroom server. Its `/health` endpoint remains responsive while Whisper is
-working.
+a newsroom server. CPU installs can tune `WHISPER_COMPUTE_TYPE=int8`,
+`WHISPER_CPU_THREADS` and `WHISPER_BATCH_SIZE`; batch sizes above 1 use
+faster-whisper's batched inference pipeline. `WHISPER_WORD_TIMESTAMPS=1`
+exists only for deployments that explicitly need per-word alignment. Its
+`/health` endpoint remains responsive while Whisper is working and reports
+the active inference settings.
 
 Temporary failures (network, 5xx, 429, model-loading failures and processing
 timeouts) retry with backoff up to five attempts; a retry uses the same

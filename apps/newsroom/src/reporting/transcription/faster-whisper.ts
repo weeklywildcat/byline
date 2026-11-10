@@ -98,7 +98,7 @@ export function fasterWhisperProvider(config: {
       const language = input.language ?? config.language;
       if (language) form.set("language", language);
       form.set("vad", "true");
-      form.set("word_timestamps", "true");
+      form.set("word_timestamps", "false");
 
       const timeout = AbortSignal.timeout(config.timeoutMs);
       const combined = AbortSignal.any([signal, timeout]);
