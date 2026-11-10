@@ -1,8 +1,13 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { normalizeLiveCoverage } from "@byline/core";
 import { createLocalReq, getPayload, type Payload } from "payload";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
-import { readCurrentRevision } from "../../src/db/publication-state";
+import { readCurrentRevision, readPublicationState } from "../../src/db/publication-state";
+import { DEPLOY_PUBLIC_SITE_TASK } from "../../src/public/deployment";
+import { PREPARE_PUBLIC_SNAPSHOT_TASK } from "../../src/public/queue";
+import { SnapshotStore } from "../../src/public/snapshot/store";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -40,6 +45,16 @@ const post = (key: string, storyKey: string, data: Record<string, unknown>) => c
 const patch = (key: string, storyKey: string, update: number, data: Record<string, unknown>) => call("patch", "/byline/stories/:id/live/:update", key, { data, routeParams: { id: String(story[storyKey]), update: String(update) } });
 const remove = (key: string, storyKey: string, update: number) => call("delete", "/byline/stories/:id/live/:update", key, { routeParams: { id: String(story[storyKey]), update: String(update) } });
 const feed = (storyKey: string) => call("get", "/byline/live/:id", null, { routeParams: { id: String(story[storyKey]) } });
+
+async function pendingJobs(taskSlug: string) {
+  return (await payload.find({
+    collection: "payload-jobs",
+    where: { and: [{ taskSlug: { equals: taskSlug } }, { completedAt: { exists: false } }] },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true
+  })).docs;
+}
 
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
@@ -222,5 +237,59 @@ describe("the public feed", () => {
     expect(await readCurrentRevision(payload)).toBe(before);
     await post("editor", "game", { text: "Final score: 21–14", state: "published" });
     expect(await readCurrentRevision(payload)).toBeGreaterThan(before);
+  });
+
+  it("carries a published live update through snapshot promotion to the deploy hook", async () => {
+    const savedHook = process.env.BYLINE_DEPLOY_HOOK_URL;
+    delete process.env.BYLINE_DEPLOY_HOOK_URL;
+    // Drain earlier coalesced publication work so the assertions below belong
+    // to this one update rather than another test's public mutation.
+    await payload.jobs.run({ queue: "publication", limit: 20 });
+
+    await setLive(story.game, { state: "live", endedAt: null });
+    const before = await readCurrentRevision(payload);
+    const marker = "SENTINEL-LIVE-DEPLOY touchdown";
+    await post("editor", "game", { text: marker, state: "published" });
+    const revision = await readCurrentRevision(payload);
+    expect(revision).toBeGreaterThan(before);
+    expect(await pendingJobs(PREPARE_PUBLIC_SNAPSHOT_TASK)).toHaveLength(1);
+
+    const hook = "https://deploy.example.test/hooks/live";
+    const fetcher = vi.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+    process.env.BYLINE_DEPLOY_HOOK_URL = hook;
+    vi.stubGlobal("fetch", fetcher);
+    try {
+      // First publication job prepares/promotes the exact current snapshot and
+      // must enqueue a separate durable deploy job.
+      await payload.jobs.run({ queue: "publication", limit: 1 });
+      const state = await readPublicationState(payload);
+      expect(state.completed?.revision).toBe(revision);
+      expect(await pendingJobs(PREPARE_PUBLIC_SNAPSHOT_TASK)).toHaveLength(0);
+      expect(await pendingJobs(DEPLOY_PUBLIC_SITE_TASK)).toHaveLength(1);
+
+      const completed = state.completed!;
+      const artifactPath = new SnapshotStore().pathFor(completed.filename);
+      expect(artifactPath).not.toBeNull();
+      const bytes = await readFile(artifactPath!);
+      expect(bytes.byteLength).toBe(completed.bytes);
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(completed.sha256);
+      const artifact = JSON.parse(bytes.toString("utf8")) as { datasets: { stories: Array<{ id: number; live?: unknown }> } };
+      const publicStory = artifact.datasets.stories.find((entry) => entry.id === story.game);
+      expect(JSON.stringify(publicStory?.live)).toContain(marker);
+
+      // The next publication job delivers that promoted identity to Workers
+      // Builds; it never posts an obsolete or unpromoted revision.
+      await payload.jobs.run({ queue: "publication", limit: 1 });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const [url, init] = (fetcher as unknown as { mock: { calls: Array<[URL, RequestInit]> } }).mock.calls[0];
+      expect(url.toString()).toBe(hook);
+      expect(new Headers(init.headers).get("X-Byline-Expected-Revision")).toBe(String(revision));
+      expect(new Headers(init.headers).get("X-Byline-Snapshot-Digest")).toBe(state.completed?.sha256);
+      expect(await pendingJobs(DEPLOY_PUBLIC_SITE_TASK)).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+      if (savedHook === undefined) delete process.env.BYLINE_DEPLOY_HOOK_URL;
+      else process.env.BYLINE_DEPLOY_HOOK_URL = savedHook;
+    }
   });
 });

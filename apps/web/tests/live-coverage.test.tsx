@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ArticleView, StoryCard } from "@byline/ui";
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { buildArticleLiveView, buildLiveFeed, formatLiveTime } from "@/lib/live-coverage";
+import { archiveLiveState } from "@/lib/native-archive-views";
+import { buildArticleLiveView, buildLiveFeed, formatLiveTime, liveFeedCacheKey } from "@/lib/live-coverage";
 import { buildNewsSitemapXml } from "@/lib/news-sitemap";
 import { getNewsArticleSchema, getPostTimestamps } from "@/lib/seo";
 import { toStoryView } from "@/lib/story-view";
@@ -57,6 +58,34 @@ describe("live coverage on the public site", () => {
     expect(feed.updates[0].html).toContain('id="update-31"');
     expect(feed.updates[0].html).toContain("Halftime: 14-7.");
     expect(buildLiveFeed(post())).toBeNull();
+  });
+
+  it("gives static live feeds content-scoped incremental cache keys", () => {
+    const key = liveFeedCacheKey(liveStory);
+    expect(key).toMatch(/^[a-f0-9]{16}$/);
+    expect(liveFeedCacheKey({ ...liveStory, title: { rendered: "A retitled live story" } })).toBe(key);
+    const changed = post({ id: 9, live: { status: "live", startedAt: "2026-10-14T22:20:00Z", endedAt: "", updates: [
+      { ...updates[0], id: 32, date: "2026-10-15T00:01:00Z", modified: "2026-10-15T00:01:00Z" },
+      ...updates
+    ] } });
+    expect(liveFeedCacheKey(changed)).not.toBe(key);
+    expect(liveFeedCacheKey(post())).toBeNull();
+  });
+
+  it("keeps archive-card live state without copying the update timeline", () => {
+    const projected = archiveLiveState({
+      status: "live",
+      startedAt: "2026-10-14T22:20:00.000Z",
+      endedAt: "",
+      updates: [{ id: 31 } as never]
+    });
+    expect(projected).toEqual({
+      status: "live",
+      startedAt: "2026-10-14T22:20:00.000Z",
+      endedAt: "",
+      updates: []
+    });
+    expect(toStoryView(post({ id: 9, live: projected })).live).toBe(true);
   });
 
   it("describes the story as a LiveBlogPosting with its updates", () => {
