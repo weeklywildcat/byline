@@ -116,7 +116,7 @@ export const DataDatasets: CollectionConfig = {
       const users = [...new Map(
         [...drafts.docs, ...published.docs]
           .filter((project) => Array.isArray(project.bindings) && (project.bindings as Array<{ dataset?: string }>).some((binding) => binding.dataset === dataset.key))
-          .map((project) => [project.id, project])
+          .map((project) => [project.id, project] as const)
       ).values()];
       if (users.length) throw new APIError(`${users.map((project) => project.title).join(", ")} ${users.length === 1 ? "uses" : "use"} this dataset. Remove it from ${users.length === 1 ? "that project" : "those projects"} first.`, 409);
       await req.payload.delete({ collection: "data-records", where: { dataset: { equals: id } }, ...system(req) });
