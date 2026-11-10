@@ -176,40 +176,69 @@ describe("recordings, ground rules and transcription", () => {
     await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "on-record" }, overrideAccess: true, context: { bylineSystem: true } });
   });
 
-  it("transcribes on the reporting queue, stores provider-neutral segments and tells the uploader", async () => {
+  it("transcribes through an idempotent service job, persists progress and tells the uploader", async () => {
     // Use the actual multipart provider against a local implementation of the
-    // service contract. The model itself is exercised separately.
-    const received: Array<{ path?: string; authorization?: string; form: FormData }> = [];
-    let status = 200;
+    // job contract. Short status requests are what let long interviews run
+    // without Node's response-header timeout.
+    const received: Array<{ path: string; authorization?: string; form: FormData }> = [];
+    const jobs = new Map<string, { bad: boolean; polls: number }>();
     const server = createServer(async (request, response) => {
-      const chunks: Buffer[] = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const form = await new Response(Buffer.concat(chunks), { headers: { "Content-Type": request.headers["content-type"]! } }).formData();
-      received.push({ path: request.url, authorization: request.headers.authorization, form });
-      response.writeHead(status, { "Content-Type": "application/json" });
-      response.end(JSON.stringify(status === 200 ? {
-        language: "EN", duration: 12,
-        segments: stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }))
-      } : { detail: "Unsupported audio codec." }));
+      const pathname = request.url ?? "";
+      const send = (status: number, body: unknown) => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === "POST") {
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const form = await new Response(Buffer.concat(chunks), { headers: { "Content-Type": request.headers["content-type"]! } }).formData();
+        const upload = form.get("file") as File;
+        const bad = upload.name === "http-broken.wav";
+        received.push({ path: pathname, authorization: request.headers.authorization, form });
+        jobs.set(pathname, { bad, polls: 0 });
+        if (bad) return send(202, { job: pathname, state: "failed", detail: "Unsupported audio codec.", retryable: false, progress: null });
+        return send(202, { job: pathname, state: "queued", progress: null, message: "Waiting for transcription worker" });
+      }
+      if (request.method === "GET") {
+        const job = jobs.get(pathname);
+        if (!job) return send(404, { detail: "Transcription job not found" });
+        job.polls += 1;
+        if (job.polls === 1) return send(200, { job: pathname, state: "transcribing", progress: 0.42, message: "Transcribing audio" });
+        return send(200, {
+          job: pathname,
+          state: "ready",
+          progress: 1,
+          message: "Transcript ready",
+          result: {
+            language: "EN", duration: 12,
+            segments: stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }))
+          }
+        });
+      }
+      send(405, { detail: "Method not allowed" });
     });
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Missing transcription test address");
     const url = `http://127.0.0.1:${address.port}`;
-    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 5000, token: "fixture-token" });
+    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 5000, token: "fixture-token", pollIntervalMs: 10 });
     setTranscriptionProviderForTests(provider);
     try {
       await runReporting();
       expect(received).toHaveLength(1);
-      expect(received[0]).toMatchObject({ path: "/transcribe", authorization: "Bearer fixture-token" });
+      expect(received[0].authorization).toBe("Bearer fixture-token");
+      expect(received[0].path).toMatch(/^\/jobs\/transcript-\d+-[0-9a-f-]{36}$/);
       const form = received[0].form;
       expect(Object.fromEntries([...form].filter(([key]) => key !== "file"))).toEqual({ model: "test-model", language: "en", vad: "true", word_timestamps: "true" });
       const upload = form.get("file") as File;
       expect(upload.name).toBe("coach-smith.wav");
       expect(Buffer.from(await upload.arrayBuffer())).toEqual(wav("coach-smith.wav").data);
 
-      status = 422;
+      const complete = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
+      expect(complete).toMatchObject({ state: "ready", progressPercent: 100, progressMessage: "Transcript ready" });
+      expect(complete.transcriptionRunToken).toMatch(/^[0-9a-f-]{36}$/);
+
       const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, file: wav("http-broken.wav") });
       await runReporting();
       const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } }, depth: 0 })).docs[0];
@@ -220,16 +249,16 @@ describe("recordings, ground rules and transcription", () => {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
     const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-    expect(transcript).toMatchObject({ state: "ready", provider: "faster-whisper", model: "test-model", language: "en", durationMs: 12000 });
+    expect(transcript).toMatchObject({ state: "ready", provider: "faster-whisper", model: "test-model", language: "en", durationMs: 12000, progressPercent: 100 });
     expect(transcript.segments).toEqual(stubSegments);
     expect(JSON.stringify(transcript)).not.toContain(url);
     expect(transcript.searchText).toContain("man coverage");
     const notices = await payload.find({ collection: "notifications", where: { and: [{ recipient: { equals: accounts.alice.id } }, { kind: { equals: "transcriptReady" } }] } });
     expect(notices.totalDocs).toBe(1);
-    // The feed carries a summary, never the body.
+    // The feed carries progress/summary metadata, never the transcript body.
     const feed = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
     const item = feed.body.materials.find((entry: { key: string }) => entry.key === `file:${ids.recording}`);
-    expect(item.transcript).toMatchObject({ id: ids.transcript, state: "ready", origin: "machine" });
+    expect(item.transcript).toMatchObject({ id: ids.transcript, state: "ready", origin: "machine", progressPercent: 100, progressMessage: "Transcript ready" });
     expect(JSON.stringify(feed.body)).not.toContain("man coverage");
   });
 
