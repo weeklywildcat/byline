@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import {
   Avatar,
   AvatarFallback,
@@ -16,22 +17,29 @@ import {
 } from "@byline/newsroom-ui/ui/dialog";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@byline/newsroom-ui/ui/empty";
 import {
   Field,
+  FieldContent,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSet,
+  FieldTitle,
 } from "@byline/newsroom-ui/ui/field";
 import { TextField } from "@byline/newsroom-ui/components/form-fields";
+import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@byline/newsroom-ui/ui/input-group";
 import {
@@ -45,15 +53,24 @@ import {
 } from "@byline/newsroom-ui/ui/item";
 import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  SearchX,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PeopleApi } from "./people-api";
 import {
   PEOPLE_VIEWS,
   PERSON_ACCESS_ROLES,
+  personFlags,
   personInitials,
-  personSummary,
   type NewPerson,
   type PeopleQuery,
   type PersonDetail,
@@ -61,21 +78,39 @@ import {
 } from "./people-model";
 import { peopleKeys, usePeople } from "./people-query";
 
+const PAGE_SIZE = 50;
+
 export function PersonAvatar({
   person,
-  large = false,
+  className = "size-10",
+  onError,
 }: {
   person: Pick<PersonRow, "name" | "portrait">;
-  large?: boolean;
+  className?: string;
+  onError?: () => void;
 }) {
   return (
-    <Avatar className={large ? "size-24" : "size-10"} aria-hidden="true">
+    <Avatar className={className} aria-hidden="true">
       {person.portrait?.url ? (
-        <AvatarImage src={person.portrait.url} alt="" />
+        <AvatarImage src={person.portrait.url} alt="" onError={onError} />
       ) : null}
       <AvatarFallback>{personInitials(person.name)}</AvatarFallback>
     </Avatar>
   );
+}
+
+/** A plain click opens in place; modified clicks keep the browser's own behaviour. */
+export function inPlace(event: React.MouseEvent, open: () => void) {
+  if (
+    event.button ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return;
+  event.preventDefault();
+  open();
 }
 
 /** The editor's compact identity directory. Its host owns the URL and navigation. */
@@ -85,12 +120,15 @@ export function PeoplePage({
   onQueryChange,
   href,
   onOpen,
+  nav,
 }: {
   api: PeopleApi;
   query: PeopleQuery;
   onQueryChange: (query: PeopleQuery) => void;
   href: (id: number) => string;
   onOpen: (id: number) => void;
+  /** The team's sibling screens, shown under the page header. */
+  nav?: ReactNode;
 }) {
   const result = usePeople(api, query);
   const cache = useQueryClient();
@@ -110,178 +148,217 @@ export function PeoplePage({
     );
     return () => window.clearTimeout(timer);
   }, [query, onQueryChange, searchText]);
+  const data = result.data;
+  const canCreate = Boolean(data?.canCreate);
+  const first = data ? (data.page - 1) * PAGE_SIZE + 1 : 0;
+  const last = data ? first + data.people.length - 1 : 0;
+
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">People</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Public bylines, staff profiles, guest contributors and newsroom access in one place.
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Bylines, staff profiles, guest contributors and newsroom access.
           </p>
         </div>
-        {result.data?.canCreate ? (
+        {canCreate ? (
           <Button
             type="button"
             onClick={() => setCreating(true)}
             className="pointer-coarse:min-h-11"
           >
-            <Plus aria-hidden="true" />
+            <Plus data-icon="inline-start" aria-hidden="true" />
             New person
           </Button>
         ) : null}
       </header>
-      <Tabs
-        value={query.view}
-        onValueChange={(view) =>
-          onQueryChange({
-            ...query,
-            view: view as PeopleQuery["view"],
-            page: 1,
-          })
-        }
+      {nav}
+      <div
+        className="flex flex-wrap items-center justify-between gap-3"
+        role="toolbar"
+        aria-label="Filter people"
       >
-        <TabsList
-          className="flex h-auto w-fit max-w-full flex-wrap"
-          aria-label="People views"
+        <Tabs
+          value={query.view}
+          onValueChange={(view) =>
+            onQueryChange({
+              ...query,
+              view: view as PeopleQuery["view"],
+              page: 1,
+            })
+          }
         >
-          {Object.entries(PEOPLE_VIEWS).map(([value, label]) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="pointer-coarse:min-h-11"
-            >
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      <InputGroup className="max-w-md pointer-coarse:min-h-11">
-        <InputGroupAddon>
-          <Search aria-hidden="true" />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label="Search People"
-          placeholder="Search name or newsroom role…"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-        />
-      </InputGroup>
-      <p
-        className="text-sm text-muted-foreground"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {result.isPending
-          ? "Loading people…"
-          : result.data
-          ? `${result.data.total} ${
-              result.data.total === 1 ? "person" : "people"
-            }`
-          : ""}
-      </p>
+          <TabsList
+            className="max-w-full flex-wrap group-data-horizontal/tabs:h-auto"
+            aria-label="People views"
+          >
+            {Object.entries(PEOPLE_VIEWS).map(([value, label]) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="pointer-coarse:min-h-11"
+              >
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <InputGroup className="w-full sm:w-72 pointer-coarse:min-h-11">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            aria-label="Search People"
+            placeholder="Search name or role…"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && searchText) {
+                event.preventDefault();
+                setSearchText("");
+              }
+            }}
+          />
+          {searchText ? (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-xs"
+                aria-label="Clear search"
+                onClick={() => setSearchText("")}
+              >
+                <X aria-hidden="true" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
+      </div>
+
       {result.isPending ? (
-        <div className="space-y-3" aria-label="Loading people">
-          {[0, 1, 2].map((id) => (
-            <Skeleton key={id} className="h-16 w-full" />
+        <div
+          className="divide-y overflow-hidden rounded-xl border"
+          aria-busy="true"
+          aria-label="Loading people"
+        >
+          {[0, 1, 2, 3].map((id) => (
+            <div key={id} className="flex items-center gap-3 px-3 py-3">
+              <Skeleton className="size-10 rounded-full" />
+              <div className="grid flex-1 gap-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
           ))}
         </div>
       ) : result.isError ? (
-        <div role="alert" className="space-y-3">
-          <p>{result.error.message}</p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void result.refetch()}
-          >
-            Try again
-          </Button>
-        </div>
-      ) : result.data?.people.length ? (
-        <ItemGroup className="gap-1" aria-label="People">
-          {result.data.people.map((person) => (
-            <Item
-              key={person.id}
-              size="sm"
-              render={
-                <a
-                  href={href(person.id)}
-                  onClick={(event) => {
-                    if (
-                      event.button ||
-                      event.metaKey ||
-                      event.ctrlKey ||
-                      event.shiftKey ||
-                      event.altKey
-                    )
-                      return;
-                    event.preventDefault();
-                    onOpen(person.id);
-                  }}
-                />
-              }
-              className="min-h-16 flex-nowrap"
-              data-person-row={person.id}
-            >
-              <ItemMedia>
-                <PersonAvatar person={person} />
-              </ItemMedia>
-              <ItemContent className="min-w-0">
-                <ItemTitle className="max-w-full break-words">
-                  {person.name}
-                </ItemTitle>
-                <ItemDescription className="line-clamp-none break-words">
-                  {personSummary(person, { showStatus: query.view === "all" })}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions className="shrink-0">
-                {person.access !== undefined ? (
-                  <Badge variant={person.access?.enabled ? "outline" : "secondary"} className="hidden sm:inline-flex">
-                    {!person.access ? "No access" : person.access.enabled ? PERSON_ACCESS_ROLES[person.access.role] : "Access off"}
-                  </Badge>
-                ) : null}
-                <ChevronRight className="size-4" aria-hidden="true" />
-                <span className="sr-only">Edit {person.name}</span>
-              </ItemActions>
-            </Item>
+        <InlineAlert
+          title="People couldn’t be loaded"
+          onAction={() => void result.refetch()}
+        >
+          {result.error.message}
+        </InlineAlert>
+      ) : data?.people.length ? (
+        <ItemGroup
+          className="gap-0 divide-y overflow-hidden rounded-xl border"
+          aria-label="People"
+        >
+          {data.people.map((person) => (
+            <div role="listitem" key={person.id}>
+              <PersonListItem
+                person={person}
+                showStatus={query.view === "all"}
+                href={href(person.id)}
+                onOpen={() => onOpen(person.id)}
+              />
+            </div>
           ))}
         </ItemGroup>
       ) : (
-        <Empty>
+        <Empty className="rounded-xl border border-dashed">
           <EmptyHeader>
+            <EmptyMedia variant="icon">
+              {query.search ? (
+                <SearchX aria-hidden="true" />
+              ) : (
+                <UsersRound aria-hidden="true" />
+              )}
+            </EmptyMedia>
             <EmptyTitle>
               {query.search ? "No matching people" : "No people in this view"}
             </EmptyTitle>
             <EmptyDescription>
               {query.search
                 ? "Try a different name or newsroom role."
-                : "New people can be added with New person."}
+                : query.view === "active"
+                ? "Add the first staff member to start crediting bylines."
+                : `Nobody is listed under ${PEOPLE_VIEWS[query.view]} yet.`}
             </EmptyDescription>
           </EmptyHeader>
+          {query.search ? (
+            <EmptyContent>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchText("")}
+              >
+                Clear search
+              </Button>
+            </EmptyContent>
+          ) : canCreate ? (
+            <EmptyContent>
+              <Button type="button" size="sm" onClick={() => setCreating(true)}>
+                <Plus data-icon="inline-start" aria-hidden="true" />
+                New person
+              </Button>
+            </EmptyContent>
+          ) : null}
         </Empty>
       )}
-      {result.data && result.data.pages > 1 ? (
-        <nav className="flex items-center gap-3" aria-label="People pages">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={query.page <= 1}
-            onClick={() => onQueryChange({ ...query, page: query.page - 1 })}
-          >
-            Previous
-          </Button>
-          <span className="text-sm">
-            Page {result.data.page} of {result.data.pages}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={query.page >= result.data.pages}
-            onClick={() => onQueryChange({ ...query, page: query.page + 1 })}
-          >
-            Next
-          </Button>
-        </nav>
-      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p
+          className="text-sm text-muted-foreground tabular-nums"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {result.isPending
+            ? "Loading people…"
+            : data
+            ? data.pages > 1
+              ? `${first}–${last} of ${data.total} people`
+              : `${data.total} ${data.total === 1 ? "person" : "people"}`
+            : ""}
+        </p>
+        {data && data.pages > 1 ? (
+          <nav aria-label="People pages">
+            <ButtonGroup>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={query.page <= 1}
+                onClick={() => onQueryChange({ ...query, page: query.page - 1 })}
+              >
+                <ChevronLeft data-icon="inline-start" aria-hidden="true" />
+                Previous
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={query.page >= data.pages}
+                onClick={() => onQueryChange({ ...query, page: query.page + 1 })}
+              >
+                Next
+                <ChevronRight data-icon="inline-end" aria-hidden="true" />
+              </Button>
+            </ButtonGroup>
+          </nav>
+        ) : null}
+      </div>
+
       {creating ? (
         <NewPersonDialog
           api={api}
@@ -301,6 +378,83 @@ export function PeoplePage({
   );
 }
 
+function PersonListItem({
+  person,
+  showStatus,
+  href,
+  onOpen,
+}: {
+  person: PersonRow;
+  showStatus: boolean;
+  href: string;
+  onOpen: () => void;
+}) {
+  const flags = personFlags(person, { showStatus });
+  const access = person.access;
+  return (
+    <Item
+      className="flex-nowrap rounded-none border-0 px-4"
+      render={<a href={href} onClick={(event) => inPlace(event, onOpen)} />}
+      data-person-row={person.id}
+    >
+      <ItemMedia>
+        <PersonAvatar person={person} />
+      </ItemMedia>
+      <ItemContent className="min-w-0">
+        <ItemTitle className="line-clamp-none flex-wrap gap-x-2 gap-y-1">
+          <span className="break-words">{person.name}</span>
+          {flags.map((flag, index) => (
+            <Badge
+              key={flag}
+              variant={showStatus && index === 0 ? "secondary" : "outline"}
+              className="font-normal"
+            >
+              {flag}
+            </Badge>
+          ))}
+        </ItemTitle>
+        <ItemDescription className="line-clamp-1 break-words">
+          {person.newsroomRole || "No newsroom role"}
+        </ItemDescription>
+      </ItemContent>
+      <ItemActions className="shrink-0">
+        {access ? (
+          <Badge
+            variant={access.enabled ? "secondary" : "destructive"}
+            className="hidden sm:inline-flex"
+            title="Newsroom access"
+          >
+            {access.enabled ? PERSON_ACCESS_ROLES[access.role] : "Access off"}
+          </Badge>
+        ) : null}
+        <ChevronRight
+          className="size-4 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <span className="sr-only">Edit {person.name}</span>
+      </ItemActions>
+    </Item>
+  );
+}
+
+const PERSON_TYPES: Array<{
+  value: NewPerson["type"];
+  title: string;
+  description: string;
+}> = [
+  {
+    value: "active",
+    title: "Current staff",
+    description: "Listed in the staff directory, with a public profile page.",
+  },
+  {
+    value: "guest",
+    title: "Guest contributor",
+    description:
+      "Byline only to start: outside the directory, without a profile page.",
+  },
+];
+
 function NewPersonDialog({
   api,
   onClose,
@@ -310,6 +464,7 @@ function NewPersonDialog({
   onClose: () => void;
   onCreated: (detail: PersonDetail) => void;
 }) {
+  const id = useId();
   const [input, setInput] = useState<NewPerson>({
     name: "",
     type: "active",
@@ -350,11 +505,12 @@ function NewPersonDialog({
         <DialogHeader>
           <DialogTitle>New person</DialogTitle>
           <DialogDescription>
-            Add the Person first. Newsroom access can be granted from their profile.
+            Add someone who can be credited on stories. Newsroom access can be
+            given from their profile afterwards.
           </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-5"
+          className="grid gap-5"
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -369,6 +525,7 @@ function NewPersonDialog({
               autoFocus
               disabled={saving}
               onChange={(name) => setInput({ ...input, name })}
+              hint="As it should appear on bylines."
               error={
                 attempted && !input.name.trim()
                   ? "Give this person a name."
@@ -382,26 +539,28 @@ function NewPersonDialog({
                 onValueChange={(type) =>
                   setInput({ ...input, type: type as NewPerson["type"] })
                 }
-                aria-label="Type"
               >
-                <Field orientation="horizontal">
-                  <RadioGroupItem id="new-person-staff" value="active" />
-                  <FieldLabel htmlFor="new-person-staff">
-                    Current staff
+                {PERSON_TYPES.map((type) => (
+                  <FieldLabel key={type.value} htmlFor={`${id}-${type.value}`}>
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldTitle id={`${id}-${type.value}-title`}>
+                          {type.title}
+                        </FieldTitle>
+                        <FieldDescription id={`${id}-${type.value}-help`}>
+                          {type.description}
+                        </FieldDescription>
+                      </FieldContent>
+                      <RadioGroupItem
+                        id={`${id}-${type.value}`}
+                        value={type.value}
+                        aria-labelledby={`${id}-${type.value}-title`}
+                        aria-describedby={`${id}-${type.value}-help`}
+                      />
+                    </Field>
                   </FieldLabel>
-                </Field>
-                <Field orientation="horizontal">
-                  <RadioGroupItem id="new-person-guest" value="guest" />
-                  <FieldLabel htmlFor="new-person-guest">
-                    Guest contributor
-                  </FieldLabel>
-                </Field>
+                ))}
               </RadioGroup>
-              <p className="text-sm text-muted-foreground">
-                {input.type === "guest"
-                  ? "Byline only to start: outside the staff directory, without a profile page."
-                  : "Starts in the staff directory with a public profile page."}
-              </p>
             </FieldSet>
             <TextField
               label="Newsroom role"
@@ -424,6 +583,7 @@ function NewPersonDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
+              {saving ? <Spinner data-icon="inline-start" /> : null}
               {saving ? "Creating…" : "Create person"}
             </Button>
           </DialogFooter>

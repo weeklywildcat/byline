@@ -38,9 +38,18 @@ import {
 } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@byline/newsroom-ui/ui/card";
+import {
   Item,
   ItemContent,
   ItemDescription,
+  ItemMedia,
   ItemTitle,
 } from "@byline/newsroom-ui/ui/item";
 import {
@@ -149,55 +158,63 @@ export function PersonAccessPanel({
   };
 
   return (
-    <section className="space-y-3" aria-labelledby={id + "-access"}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={id + "-access"} className="text-base font-medium">
+    <Card size="sm" role="region" aria-labelledby={id + "-access"} className="min-w-0">
+      <CardHeader>
+        <CardTitle id={id + "-access"} role="heading" aria-level={2}>
           Newsroom access
-        </h2>
-        <Badge variant={access?.enabled ? "outline" : "secondary"}>
-          {!access ? "No access" : access.enabled ? "Enabled" : "Disabled"}
-        </Badge>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Controls sign-in to Byline. Public profiles, bylines and story history stay separate.
-      </p>
+        </CardTitle>
+        <CardDescription>
+          Sign-in to Byline. Profiles, bylines and story history stay separate.
+        </CardDescription>
+        <CardAction>
+          <Badge variant={!access ? "outline" : access.enabled ? "secondary" : "destructive"}>
+            {!access ? "No access" : access.enabled ? "Enabled" : "Disabled"}
+          </Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {access ? (
+          <Item size="xs" variant="muted" className="flex-nowrap">
+            <ItemMedia variant="icon">
+              <ShieldCheck aria-hidden="true" />
+            </ItemMedia>
+            <ItemContent className="min-w-0">
+              <ItemTitle className="block max-w-full break-all">{access.email}</ItemTitle>
+              <ItemDescription className="line-clamp-none">
+                {PERSON_ACCESS_ROLES[access.role]} · {access.googleConnected ? "Google connected" : "Google not connected"}
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        ) : (
+          <Item size="xs" variant="outline" className="flex-nowrap border-dashed">
+            <ItemMedia variant="icon">
+              <KeyRound aria-hidden="true" />
+            </ItemMedia>
+            <ItemContent className="min-w-0">
+              <ItemDescription className="line-clamp-none">
+                Can be credited on stories but can’t sign in to the newsroom.
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        )}
 
-      {access ? (
-        <Item size="sm" variant="muted" className="items-start">
-          <ItemContent className="min-w-0">
-            <ItemTitle className="break-all">{access.email}</ItemTitle>
-            <ItemDescription className="line-clamp-none">
-              {PERSON_ACCESS_ROLES[access.role]} · {access.googleConnected ? "Google connected" : "Google not connected"}
-            </ItemDescription>
-          </ItemContent>
-        </Item>
-      ) : (
-        <div className="rounded-lg border border-dashed p-3">
-          <div className="flex items-start gap-2">
-            <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">
-              This Person can be credited on stories but cannot sign in to the newsroom.
-            </p>
-          </div>
+        {error && !editing ? <FieldError>{error}</FieldError> : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={beginEdit} disabled={busy}>
+            {access ? "Access settings" : "Give newsroom access"}
+          </Button>
+          {access?.enabled ? (
+            <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirmDisable(true)} disabled={busy}>
+              Disable access
+            </Button>
+          ) : access ? (
+            <Button type="button" size="sm" onClick={() => void setEnabled(true)} disabled={busy}>
+              {busy ? "Enabling…" : "Enable access"}
+            </Button>
+          ) : null}
         </div>
-      )}
-
-      {error && !editing ? <FieldError>{error}</FieldError> : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={beginEdit} disabled={busy}>
-          {access ? "Access settings" : "Give newsroom access"}
-        </Button>
-        {access?.enabled ? (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmDisable(true)} disabled={busy}>
-            Disable access
-          </Button>
-        ) : access ? (
-          <Button type="button" size="sm" onClick={() => void setEnabled(true)} disabled={busy}>
-            {busy ? "Enabling…" : "Enable access"}
-          </Button>
-        ) : null}
-      </div>
+      </CardContent>
 
       <Dialog
         open={editing}
@@ -310,6 +327,6 @@ export function PersonAccessPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Card>
   );
 }

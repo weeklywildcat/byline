@@ -22,23 +22,32 @@ the raw Payload People screen in System administration.
 
 ## Screens and URL state
 
-The index is a compact Nova ItemGroup of Item rows: portrait/initials Avatar,
-name, newsroom role, status, directory/profile context and an edit disclosure.
-It is not the public staff card gallery. Views are Current staff (default),
+The index is the page header (title, New person), the team's sibling-screen
+links, then one toolbar with the view Tabs and a clearable search. People are a
+bordered ItemGroup of Item rows: portrait/initials Avatar, name, newsroom role,
+an access-level Badge for administrators and an edit disclosure. Badges beside
+the name say only what is unusual (`personFlags`): the status in All, a current
+staff member outside the directory, a byline-only person. A count and
+Previous/Next sit under the list. It is not the public staff card gallery. Views are Current staff (default),
 Guests, Alumni and All, with alphabetical sorting and local identity search over
 name, newsroom role and slug. No bios, emails or account fields are searched.
 Results are server-paged at 50. Portraits are batched; there are no per-row account
 reads or story counts. The query (`view`, `search`, `page`) and selected
 `?person=<id>` are the URL's state, including Back, Forward and refresh.
 
-Opening a Person renders a full detail screen under the normal global sidebar,
-with Back to People, a large circular portrait, role/status, Preview and Save.
-At 1180px and above, the public-copy form and 240px publication rail sit beside
-one another; narrower screens use the same composition in a vertical flow.
+Opening a Person renders a full detail screen under the normal global sidebar.
+A toolbar sticks under the app header with a People › Name Breadcrumb, an
+Unsaved changes badge, Cancel changes, Preview and Save, so Save is always in
+reach on a long profile. Below it are the circular portrait, name, role,
+pronouns and status/visibility badges. Public profile and Contact & links are
+Cards; at 1180px and above a 20rem rail of Publication, Newsroom access and
+Bylines Cards sits beside them, and narrower screens stack the same Cards.
+A failed save moves focus to the first invalid field.
 There is no contextual People sidebar or inspector Sheet.
 
 **New person** belongs only on this screen, never global Create. Its small Dialog
-asks for Name, Current staff / Guest contributor and an optional newsroom role.
+asks for Name, Current staff / Guest contributor (RadioGroup choice cards that
+explain the starting visibility) and an optional newsroom role.
 Current staff starts active, in the directory and with a profile page. Guests
 start outside the directory and without a profile page. Creation immediately
 opens the full editor. It creates no account, invitation or account link.
@@ -111,7 +120,7 @@ normal guarded Open story links. Staff never gain Story access through People.
 
 People has explicit Save / Cancel changes, no drafts, autosave, document locks
 or version engine. Unsaved work is protected by the existing shell leave guard,
-the shared history guard for Back/Forward, a local discard Dialog for within-
+the shared history guard for Back/Forward, a local discard AlertDialog for within-
 People moves/reload, and the browser's beforeunload prompt. Successful save
 clears dirty state. Account-menu profile/system navigation and sign-out use the
 same shell guard before navigating or changing session state.
@@ -155,10 +164,13 @@ PeoplePage, PersonEditor and PersonPreview. It imports no Payload types.
 `packages/ui/src/contributor-profile.*` owns reader presentation only.
 
 Components used are Nova/shadcn Item/ItemGroup/ItemMedia/ItemContent/ItemTitle/
-ItemDescription/ItemActions, Avatar/Image/Fallback, Badge, Empty, Skeleton,
-Separator, FieldSet/Legend/Description/Group/Field/Label/Error, Input, Textarea,
-Select, Checkbox, InputGroup/Addon/Input, Combobox, Dialog, Tabs, RadioGroup,
-Collapsible and Button. Existing Media controls and shell prompts retain their
+ItemDescription/ItemActions, Avatar/Image/Fallback, Badge, Breadcrumb, Card,
+Alert (save errors, conflicts, unavailable portraits, load failures), Empty
+(with EmptyMedia and actions), Skeleton, FieldSet/Legend/Description/Group/
+Field/Content/Title/Label/Separator/Error, Input, Textarea, Select, Switch
+(directory and profile-page visibility), InputGroup/Addon/Input/Button,
+Combobox, ButtonGroup, Dialog, AlertDialog, Tabs, RadioGroup, Collapsible,
+Spinner and Button. Existing Media controls and shell prompts retain their
 native shadcn primitives. No component library or People Sheet was added.
 
 ## Public projection and deferred work

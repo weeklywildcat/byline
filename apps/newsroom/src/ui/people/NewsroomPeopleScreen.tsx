@@ -20,21 +20,26 @@ import type { PersonWork } from "@byline/newsroom-screens/people/person-form";
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { themeTokensToCssVariables } from "@byline/ui";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@byline/newsroom-ui/ui/dialog";
-import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@byline/newsroom-ui/ui/empty";
+import { UserRoundX } from "lucide-react";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { useMediaWorkspace } from "../media/MediaWorkspaceShell";
 import type { MediaPicker } from "@byline/newsroom-screens/workspace/media-picker";
@@ -58,7 +63,6 @@ export function NewsroomPeopleScreen({ self = false }: { self?: boolean }) {
         className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"
         data-byline-people-screen=""
       >
-        {self ? null : <TeamNav current="people" />}
         <PeopleBody self={self} />
       </main>
     </AdminRoot>
@@ -183,27 +187,45 @@ function PeopleBody({ self }: { self: boolean }) {
     <>
       {self || personId !== null ? (
         detail.isPending ? (
-          <div className="space-y-5" aria-label="Loading profile">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-96 w-full" />
+          <div className="grid gap-6" aria-busy="true" aria-label="Loading profile">
+            <Skeleton className="h-8 w-48" />
+            <div className="flex items-center gap-4">
+              <Skeleton className="size-20 rounded-full" />
+              <div className="grid gap-2">
+                <Skeleton className="h-7 w-56" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <div className="grid gap-6 min-[1180px]:grid-cols-[minmax(0,1fr)_20rem]">
+              <Skeleton className="h-96 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
           </div>
         ) : detail.isError ? (
-          <div role="alert" className="space-y-3">
-            <h1 className="text-xl font-semibold">Profile unavailable</h1>
-            <p>{detail.error.message}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void detail.refetch()}
-            >
-              Try again
-            </Button>
-            {!self ? (
-              <Button type="button" variant="ghost" onClick={() => open(null)}>
-                Back to People
+          <Empty role="alert" className="rounded-xl border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UserRoundX aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>Profile unavailable</EmptyTitle>
+              <EmptyDescription>{detail.error.message}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="flex-row justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void detail.refetch()}
+              >
+                Try again
               </Button>
-            ) : null}
-          </div>
+              {!self ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => open(null)}>
+                  Back to People
+                </Button>
+              ) : null}
+            </EmptyContent>
+          </Empty>
         ) : detail.data ? (
           <PersonEditor
             key={`${self}:${detail.data.person.id}:${reloadKey}`}
@@ -214,6 +236,7 @@ function PeopleBody({ self }: { self: boolean }) {
             previewStyle={previewStyle}
             onWorkChange={onWorkChange}
             onBack={self ? undefined : () => open(null)}
+            backHref={href(null)}
             onNavigate={navigate}
             onReload={reload}
             accessPanel={!self && detail.data.capabilities.manageAccess ? (
@@ -232,8 +255,11 @@ function PeopleBody({ self }: { self: boolean }) {
             }}
           />
         ) : (
-          <Empty>
+          <Empty className="rounded-xl border border-dashed">
             <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UserRoundX aria-hidden="true" />
+              </EmptyMedia>
               <EmptyTitle>My profile</EmptyTitle>
               <EmptyDescription>
                 Your account does not have a public byline profile yet. Ask an
@@ -249,33 +275,27 @@ function PeopleBody({ self }: { self: boolean }) {
           onQueryChange={changeQuery}
           href={(id) => href(id)}
           onOpen={open}
+          nav={<TeamNav current="people" />}
         />
       )}
-      <Dialog
+      <AlertDialog
         open={pending !== null}
         onOpenChange={(isOpen) => {
           if (!isOpen) setPending(null);
         }}
       >
-        <DialogContent showCloseButton={!busy}>
-          <DialogHeader>
-            <DialogTitle>Discard unsaved changes?</DialogTitle>
-            <DialogDescription>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
               {busy
                 ? "Wait for the current operation to finish before leaving this profile."
                 : "Your changes to this public profile haven’t been saved."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPending(null)}
-            >
-              Keep editing
-            </Button>
-            <Button
-              type="button"
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
               variant="destructive"
               disabled={busy}
               onClick={() => {
@@ -287,10 +307,10 @@ function PeopleBody({ self }: { self: boolean }) {
               }}
             >
               Discard changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
