@@ -130,40 +130,50 @@ export function DatasetWorkspace({ id }: { id: number }) {
   });
 
   const refreshStatus = useCallback(() => queries.invalidateQueries({ queryKey: dataKeys.dataset(id), exact: true }), [queries, id]);
+  const invalidateRows = useCallback(() => queries.invalidateQueries({ queryKey: [...dataKeys.dataset(id), "rows"] }), [queries, id]);
   const patchCache = useCallback((update: (rows: DataRow[]) => DataRow[]) => {
+    // A server-mode cache entry is one sorted/filtered page, not the dataset.
+    // Mutating every cached page would put rows on pages where they do not belong.
+    if (serverMode) return;
     queries.setQueriesData<RowsPage>({ queryKey: [...dataKeys.dataset(id), "rows"] }, (current) => {
       if (!current) return current;
       const next = update(current.rows);
       return { ...current, rows: next, total: current.total + next.length - current.rows.length };
     });
-  }, [queries, id]);
+  }, [queries, id, serverMode]);
   const track = useCallback(async <T,>(work: () => Promise<T>): Promise<T | undefined> => {
     pending.current++;
     setSaving(true);
     try {
       return await work();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        toast.error(error.message);
-        await queries.invalidateQueries({ queryKey: [...dataKeys.dataset(id), "rows"] });
-      } else toast.error((error as Error).message);
+      if (error instanceof ApiError && error.status === 409) toast.error(error.message);
+      else toast.error((error as Error).message);
+      // Any rejected optimistic write must be replaced by authoritative rows,
+      // not left looking saved in the grid.
+      await invalidateRows();
       return undefined;
     } finally {
       pending.current--;
       if (!pending.current) setSaving(false);
       void refreshStatus();
     }
-  }, [queries, id, refreshStatus]);
+  }, [invalidateRows, refreshStatus]);
 
-  const merge = (updated: DataRow[]) => {
+  const merge = async (updated: DataRow[]) => {
+    if (serverMode) {
+      await invalidateRows();
+      return;
+    }
     const byId = new Map(updated.map((row) => [row.id, row]));
     patchCache((current) => current.map((row) => byId.get(row.id) ?? row));
   };
 
-  const commit = (row: DataRow, field: FieldDefinition, value: DataValue) => {
-    const base = row.values[field.key] ?? null;
+  const commit = (row: DataRow, field: FieldDefinition, value: DataValue, base: DataValue) => {
     patchCache((current) => current.map((entry) => (entry.id === row.id ? { ...entry, values: { ...entry.values, [field.key]: value } } : entry)));
-    void track(async () => merge((await changeRows(api, id, [{ id: row.id, values: { [field.key]: value }, base: { [field.key]: base } }])).rows));
+    void track(async () => {
+      await merge((await changeRows(api, id, [{ id: row.id, values: { [field.key]: value }, base: { [field.key]: base } }])).rows);
+    });
   };
 
   const paste = (plan: PastePlan) => {
@@ -173,10 +183,11 @@ export function DatasetWorkspace({ id }: { id: number }) {
     }
     if (!plan.changes.length && !plan.additions.length) return;
     void track(async () => {
-      if (plan.changes.length) merge((await changeRows(api, id, plan.changes)).rows);
+      if (plan.changes.length) await merge((await changeRows(api, id, plan.changes)).rows);
       if (plan.additions.length) {
         const added = await addRows(api, id, plan.additions.map((values) => ({ values })));
-        patchCache((current) => [...current, ...added.rows]);
+        if (serverMode) await invalidateRows();
+        else patchCache((current) => [...current, ...added.rows]);
       }
       toast.success(`Pasted ${plan.cells} ${plan.cells === 1 ? "cell" : "cells"}${plan.additions.length ? ` and added ${plan.additions.length} ${plan.additions.length === 1 ? "row" : "rows"}` : ""}.`);
     });
@@ -185,24 +196,29 @@ export function DatasetWorkspace({ id }: { id: number }) {
   // The server places a new row between `after` and the row that follows it (positions are fractional, never renumbered).
   const addRow = (after?: DataRow) => void track(async () => {
     const added = await addRows(api, id, [{ values: {} }], after?.position);
-    patchCache((current) => [...current, ...added.rows]);
+    if (serverMode) await invalidateRows();
+    else patchCache((current) => [...current, ...added.rows]);
   });
 
   const remove = (row: DataRow) => void track(async () => {
     await removeRows(api, id, [row.id]);
-    patchCache((current) => current.filter((entry) => entry.id !== row.id));
+    if (serverMode) await invalidateRows();
+    else patchCache((current) => current.filter((entry) => entry.id !== row.id));
     toast("Row deleted.", {
       action: {
         label: "Undo",
         onClick: () => void track(async () => {
           const restored = await addRows(api, id, [{ recordId: row.id, values: row.values, included: row.included, position: row.position } as never]);
-          patchCache((current) => [...current, ...restored.rows]);
+          if (serverMode) await invalidateRows();
+          else patchCache((current) => [...current, ...restored.rows]);
         })
       }
     });
   });
 
-  const toggleIncluded = (row: DataRow) => void track(async () => merge((await changeRows(api, id, [{ id: row.id, included: !row.included }])).rows));
+  const toggleIncluded = (row: DataRow) => void track(async () => {
+    await merge((await changeRows(api, id, [{ id: row.id, included: !row.included }])).rows);
+  });
 
   if (detail.isError) {
     return <main className="mx-auto w-full max-w-[1400px] px-4 py-6 lg:px-6"><InlineAlert title="This dataset isn't available" onAction={() => void detail.refetch()}>{(detail.error as Error).message}</InlineAlert></main>;
