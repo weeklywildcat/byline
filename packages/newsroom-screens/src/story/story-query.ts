@@ -1,5 +1,6 @@
 import { collectionsKey } from "../collections/collection-api";
 import { QueryClient } from "@tanstack/react-query";
+import { workloadHintsKey } from "../editorial/workload-hints";
 import { homeKey } from "../home/home-query";
 import { workspaceKey } from "../workspace/workspace-query";
 
@@ -35,6 +36,7 @@ export function invalidateStoryData(client: QueryClient, storyId?: number | null
     client.invalidateQueries({ queryKey: planningRootKey }),
     client.invalidateQueries({ queryKey: scheduleRootKey }),
     client.invalidateQueries({ queryKey: mediaDeskKey }),
+    client.invalidateQueries({ queryKey: workloadHintsKey }),
     ...(storyId ? [client.invalidateQueries({ queryKey: workspaceKey(storyId) })] : [])
   ]);
 }

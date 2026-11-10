@@ -26,7 +26,7 @@ import type { SchoolEvent, SportsGame } from "@/lib/headless";
 import { hasCategory, resolveWeeklyWildcatHomepage, type HomepageSelection } from "@/lib/homepage-selection";
 import { toHomepagePublicationInput, toHomepageStoryInputs } from "@/lib/homepage-story-input";
 import { getPublicationConfig } from "@/lib/publication";
-import type { WordPressPost } from "@/lib/wordpress";
+import type { ArchivePost } from "@/lib/public-content";
 
 // The build-time host's thin adapter over the canonical resolver.
 //
@@ -122,7 +122,7 @@ export function toCalendarEntries(
  * places it explicitly.
  */
 export function resolveCompatibilityHomepageSelection(
-  posts: WordPressPost[],
+  posts: ArchivePost[],
   pinnedStoryIds?: ReadonlySet<number>
 ): HomepageSelection {
   return resolveWeeklyWildcatHomepage(posts, pinnedStoryIds);
@@ -135,7 +135,7 @@ export { hasCategory };
 type PackageResolutionInput = {
   packageId: string;
   props: unknown;
-  posts: WordPressPost[];
+  posts: ArchivePost[];
   selection: HomepageSelection;
   usedStoryIds?: ReadonlySet<number>;
   compatibilitySelection?: boolean;

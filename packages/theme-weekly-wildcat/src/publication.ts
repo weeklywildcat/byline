@@ -31,7 +31,7 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
   timezone: "America/New_York",
   urls: {
     publicSite: "https://weeklywildcat.com",
-    cms: "https://cms.weeklywildcat.com",
+    cms: "https://byline.weeklywildcat.com",
     contact: "/contact/"
   },
   branding: {

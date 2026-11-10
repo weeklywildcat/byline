@@ -1,7 +1,7 @@
 import { isoDurationSeconds } from "@byline/core";
 import { escapeXml, SITEMAP_NAMESPACE } from "@/lib/sitemap-xml";
 import { getVideoStoryMetadata } from "@/lib/story-video";
-import { getPostHref, getPostRouteParts, type WordPressPost } from "@/lib/wordpress";
+import { getPostHref, getPostRouteParts, type ArchivePost } from "@/lib/public-content";
 
 export const VIDEO_SITEMAP_NAMESPACE = "http://www.google.com/schemas/sitemap-video/1.1";
 /** Google ignores `<video:duration>` outside 1–28,800 seconds. */
@@ -14,7 +14,7 @@ const MAX_VIDEO_DURATION_SECONDS = 28800;
  * the title, description, thumbnail and player URL are the ones the page's
  * VideoObject names.
  */
-export function buildVideoSitemapXml(posts: WordPressPost[], { siteUrl }: { siteUrl: string }) {
+export function buildVideoSitemapXml(posts: ArchivePost[], { siteUrl }: { siteUrl: string }) {
   const urls = posts.flatMap((post) => {
     const video = getVideoStoryMetadata(post);
     if (!video || !getPostRouteParts(post)) return [];

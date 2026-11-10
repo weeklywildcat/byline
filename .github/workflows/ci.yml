@@ -39,7 +39,6 @@ jobs:
         run: |
           test "$(cat apps/web/node_modules/.astro/cloudflare-cache-sentinel)" = retained
           test -d node_modules/@byline/content
-          test ! -d node_modules/@wordpress/env
           # The private newsroom (Payload) never enters the public build.
           test ! -d node_modules/payload
           test -s apps/web/out/_byline/manifest.json
@@ -96,28 +95,20 @@ jobs:
           PGPASSWORD=byline psql -h localhost -U byline -d postgres -c "CREATE DATABASE byline_newsroom_migrations"
           npm run migrate:check --workspace @byline/newsroom
 
-  php-compatibility:
-    name: Plugin PHP ${{ matrix.php }} compatibility
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ["7.4", "8.0", "8.3"]
+      - name: Install Chromium for Payload snapshot parity
+        run: npx playwright install --with-deps chromium
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-
-      - name: Lint and run plugin PHP regression suite
-        run: npm run test:php
+      - name: Verify Payload snapshot acquisition, media, and static export
+        env:
+          DATABASE_URL: postgres://byline:byline@localhost:5432/byline_newsroom_migrations
+          PAYLOAD_SECRET: ci-snapshot-parity-secret-0123456789abcdef
+          BYLINE_DB_PUSH: "0"
+          BYLINE_MEDIA_LOCAL_DIR: ${{ runner.temp }}/parity-originals
+          BYLINE_PUBLICATION_MEDIA_DIR: ${{ runner.temp }}/parity-publication
+        run: npm run payload --workspace @byline/newsroom -- run scripts/payload-snapshot-parity.ts "${{ runner.temp }}/parity"
 
   validate:
-    name: Test, build, and package
+    name: Shared contracts and public site
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -131,36 +122,22 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.3"
-          tools: composer:v2
-
       - name: Install workspace dependencies
         run: npm ci
 
-      - name: Typecheck all workspaces
-        run: npm run typecheck
+      - name: Typecheck public and shared packages
+        run: npm run typecheck:packages && npm run typecheck:frontend
 
-      - name: Test all workspaces
-        run: npm test
+      - name: Test public and shared packages
+        run: npm run test:packages && npm run test:frontend
 
       - name: Build and verify Weekly Wildcat Astro static export
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
-          BYLINE_CONTENT_MODE: weekly-wildcat-fixture
-          BYLINE_DEPLOYMENT_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
-          BYLINE_DISCORD_BRIDGE_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
-          BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_CONTENT_MODE: weekly-wildcat-browser-fixture
+          BYLINE_BUILD_TOKEN: BYLINE_TEST_SECRET_DO_NOT_EXPORT
+          BYLINE_DEPLOY_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
         run: npm run build:frontend
-
-      - name: Build through prepared snapshot discovery and forbid renderer CMS requests
-        env:
-          BYLINE_DEPLOYMENT_HOOK_URL: BYLINE_TEST_SECRET_DO_NOT_EXPORT
-          BYLINE_DISCORD_BRIDGE_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
-          BYLINE_DISCORD_CLIENT_SECRET: BYLINE_TEST_SECRET_DO_NOT_EXPORT
-        run: npm run test:frontend:snapshot-build
 
       - name: Install Chromium for public Astro browser tests
         run: npx playwright install --with-deps chromium
@@ -168,57 +145,8 @@ jobs:
       - name: Run public Astro browser tests
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
-          BYLINE_CONTENT_MODE: weekly-wildcat-fixture
+          BYLINE_CONTENT_MODE: weekly-wildcat-browser-fixture
         run: npm run test:frontend:browser
 
-      - name: Build plugin and Discord workspaces
-        run: |
-          npm run build:plugin
-          npm run build:discord
-
-
-      - name: Verify compatibility and updater transition
+      - name: Verify public and shared contracts
         run: npm run verify:contracts
-
-      - name: Validate production plugin archive
-        run: npm run package:plugin
-
-      - name: Upload plugin archive simulation
-        uses: actions/upload-artifact@v4
-        with:
-          name: weekly-wildcat-headless
-          path: wordpress-plugin/release/weekly-wildcat-headless.zip
-          if-no-files-found: error
-
-  wordpress-e2e:
-    name: WordPress E2E (primary)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install workspace dependencies
-        run: npm ci
-
-      - name: Set up PHP for the bundled MCP runtime
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.3"
-          tools: composer:v2
-
-      - name: Build plugin assets
-        run: npm run build:plugin
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Start WordPress and run browser smoke tests
-        run: npm run test:e2e:primary --workspace @byline/wordpress-plugin

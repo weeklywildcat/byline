@@ -4,7 +4,7 @@ import { StoryTeaser } from "@/components/StoryTeaser";
 import { filterGeneralEditorialPosts } from "@/lib/content";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getPublicationConfig } from "@/lib/publication";
-import { getAllPosts } from "@/lib/wordpress";
+import { getAllPosts } from "@/lib/public-content";
 
 const publication = getPublicationConfig();
 

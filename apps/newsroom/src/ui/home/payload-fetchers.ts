@@ -1,7 +1,10 @@
 "use client";
 
+import { storyCreateBody } from "@byline/newsroom-screens/story/story-fetchers";
+
 import type { CorrectionInput, ContributorEntry, TaskInput, TaskPatch } from "@byline/newsroom-screens/editorial/editorial-model";
 import type { CorrectionPayload, ContributorPayload, EditorialRestClient, TaskPayload } from "@byline/newsroom-screens/editorial/editorial-rest";
+import type { WorkloadHints } from "@byline/newsroom-screens/editorial/workload-hints";
 import type { HomePresetsPayload } from "@byline/newsroom-screens/home/home-model";
 import type { HomeFetchers } from "@byline/newsroom-screens/home/home-api";
 import type { HomeBootstrap } from "@byline/newsroom-screens/home/newsroom-model";
@@ -10,6 +13,8 @@ import type { MediaAssignmentsResponse, ReportingResponse, ResourcePurpose, Sche
 import { queryPath } from "@byline/newsroom-screens/planning/planning-api";
 import type { StoryCorrections } from "../../newsroom/story-corrections";
 import type { StoryDistributionView } from "../../distribution/server";
+import { workloadHint } from "../../domain/workload";
+import type { WorkloadView } from "../../newsroom/workload";
 import { createPayloadCollectionApi } from "../collections/payload-collection-api";
 
 /**
@@ -97,7 +102,20 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     addToNewsletter: notYet("Newsletters")
   };
 
+  // Advisory workload text for the people pickers, from the same endpoint as the Workload view. Only editors may read it;
+  // for anyone else the pickers simply show names, so a refusal is not an error here.
+  const getWorkloadHints = async (): Promise<WorkloadHints> => {
+    try {
+      const view = await request<WorkloadView>("/workload");
+      return Object.fromEntries(view.rows.map((row) => [String(row.userId), workloadHint(row)] as const).filter(([, hint]) => hint));
+    } catch (error) {
+      if ((error as ScreenError | undefined)?.data?.status === 403) return {};
+      throw error;
+    }
+  };
+
   const workspace: WorkspaceClient = {
+    getWorkloadHints,
     // The Story workspace's Collections, interviews and resources.
     collections,
     getWorkspace,
@@ -123,7 +141,8 @@ export function createPayloadHomeFetchers(api: string): HomeFetchers {
     getWorkspace,
     workspace,
     editorial,
-    createStory: (title, preset) => request<StoryWorkspace>("/stories", "POST", preset ? { title, preset } : { title }),
+    getWorkloadHints,
+    createStory: (title, preset, details) => request<StoryWorkspace>("/stories", "POST", storyCreateBody(title, preset, details)),
     getPresets: () => request<HomePresetsPayload>("/presets"),
     getHome: () => request<HomeBootstrap>("/home"),
     searchStories: (query) => request(`/home/search?query=${encodeURIComponent(query)}`)

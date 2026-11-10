@@ -3,7 +3,7 @@ import { visualizationHeight } from './visualization';
 /**
  * The Interactive block's frame contract, shared by the editor preview, the
  * public enhancer and (by a contract test) the PHP renderer in
- * `wordpress-plugin/includes/content/interactive-block.php`.
+ * the original content store.
  *
  * An interactive is one self-contained HTML file. It is printed as the
  * `srcdoc` of an iframe sandboxed with `allow-scripts` and nothing else: the

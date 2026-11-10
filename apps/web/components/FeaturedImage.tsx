@@ -1,10 +1,10 @@
 import { stripHtml } from "@/lib/format";
 import type { ImageCropShape } from "@byline/core";
 import { getResponsiveImageProps, type ImageSearchVisibility } from "@/lib/media";
-import { getMediaCredit, type WordPressMedia } from "@/lib/wordpress";
+import { getMediaCredit, type ArchiveMedia } from "@/lib/public-content";
 
 type FeaturedImageProps = {
-  image: WordPressMedia | null;
+  image: ArchiveMedia | null;
   priority?: boolean;
   showCaption?: boolean;
   // Shows just the photo credit under the image when the full caption is hidden.

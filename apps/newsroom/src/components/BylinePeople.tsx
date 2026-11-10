@@ -4,6 +4,9 @@ import type { AdminViewServerProps } from "payload";
 import { redirectIfSignedOut } from "../auth/session";
 import { atLeast, requestUser } from "../access/user";
 import { NewsroomPeopleScreen } from "../ui/people/NewsroomPeopleScreen";
+import { RolesScreen } from "../ui/roles/RolesScreen";
+import { RolloverScreen } from "../ui/roles/RolloverScreen";
+import { WorkloadScreen } from "../ui/roles/WorkloadScreen";
 
 export function BylinePeople({
   initPageResult,
@@ -12,6 +15,9 @@ export function BylinePeople({
 }: AdminViewServerProps) {
   const { req, locale, permissions, visibleEntities } = initPageResult;
   redirectIfSignedOut({ req, params, searchParams });
+  // People, plus the team's operational screens beside it (Review workflows have their own page).
+  const view = typeof searchParams?.view === "string" ? searchParams.view : "";
+  const Screen = view === "roles" ? RolesScreen : view === "workload" ? WorkloadScreen : view === "rollover" ? RolloverScreen : NewsroomPeopleScreen;
   return (
     <DefaultTemplate
       i18n={req.i18n}
@@ -25,7 +31,7 @@ export function BylinePeople({
       visibleEntities={visibleEntities}
     >
       {atLeast(requestUser(req), "editor") ? (
-        <NewsroomPeopleScreen />
+        <Screen />
       ) : (
         <Gutter>
           <p>

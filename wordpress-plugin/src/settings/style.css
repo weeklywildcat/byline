@@ -1,8 +1,0 @@
-/*
- * Settings is still rendered by the WordPress admin React entrypoint. Only the
- * navigation island opts into the shared Nova/shadcn theme so existing
- * @wordpress/components forms keep their current styling.
- */
-@import "@byline/newsroom-ui/styles.css";
-@source "./";
-@source "@byline/newsroom-ui/ui/sidebar.tsx";

@@ -39,6 +39,7 @@ import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { useMediaWorkspace } from "../media/MediaWorkspaceShell";
 import type { MediaPicker } from "@byline/newsroom-screens/workspace/media-picker";
 import { PersonAccessPanel } from "./PersonAccessPanel";
+import { TeamNav } from "../roles/TeamNav";
 import { useNewsroomRoutes } from "../shell/account";
 import { createHistoryGuard } from "../shell/history-guard";
 import { useLeaveGuard, useShellNavigation } from "../shell/navigation";
@@ -57,6 +58,7 @@ export function NewsroomPeopleScreen({ self = false }: { self?: boolean }) {
         className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"
         data-byline-people-screen=""
       >
+        {self ? null : <TeamNav current="people" />}
         <PeopleBody self={self} />
       </main>
     </AdminRoot>

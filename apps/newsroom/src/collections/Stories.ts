@@ -20,6 +20,7 @@ import {
 } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
 import { storyLivePreview } from "../preview/config";
+import { staleApprovalsAfterStoryChange } from "../newsroom/review";
 
 /**
  * Keep the story's plan in step: create it with the story, and copy the
@@ -204,7 +205,7 @@ export const Stories: CollectionConfig = {
       delete req.context.bylineVersionRestore;
       return data;
     }, pinContentFormat, requireStoryFacts, guardPrivilegedBlocks, requireCompleteBody, requirePublishableMedia, guardOffRecordQuotes, stampFirstPublication, urlChanges.beforeChange, beforeStoryActivity],
-    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange],
+    afterChange: [syncPlan, urlChanges.afterChange, afterStoryActivity, queueFactsAfterStoryChange, notifyAfterStoryChange, syncQuoteProvenance, seedDistributionAfterStoryChange, staleApprovalsAfterStoryChange],
     beforeDelete: [async ({ id, req }) => {
       // A hard delete removes private dependents; the ordinary trash update keeps them.
       const where = { story: { equals: id } };
@@ -252,7 +253,7 @@ export const Stories: CollectionConfig = {
           type: "select",
           required: true,
           defaultValue: "byline-v1",
-          options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Imported WordPress body" })),
+          options: CONTENT_FORMATS.map((value) => ({ value, label: value === "byline-v1" ? "Byline editor" : "Archived HTML body" })),
           admin: { readOnly: true, position: "sidebar" }
         },
         // The byline-v1 body: prose plus the Byline story blocks (@byline/editor). Never Payload's generic block forms.
@@ -265,9 +266,9 @@ export const Stories: CollectionConfig = {
           name: "legacyHtml",
           label: "Imported body (HTML)",
           type: "code",
-          admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Imported from WordPress. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
+          admin: { language: "html", readOnly: true, condition: (data) => data?.contentFormat === "legacy-html", description: "Archived HTML. It renders as published; converting it to the Byline editor is a separate, reviewed step." }
         },
-        { name: "legacySource", label: "Original Gutenberg source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
+        { name: "legacySource", label: "Original imported source", type: "code", admin: { language: "html", readOnly: true, hidden: true } },
         {
           type: "collapsible",
           label: "Presentation",

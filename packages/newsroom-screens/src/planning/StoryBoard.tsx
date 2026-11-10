@@ -9,7 +9,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
-import { ProductionSummary, StoryDueLabel, StorySignals, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
+import { ProductionSummary, StoryAttentionSignals, StoryDueLabel, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
 import { StoryHoverCard } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
@@ -73,10 +73,13 @@ function useStoryDrag(element: HTMLElement | null, story: PlanningStory, movable
 }
 
 /** The whole stage is the drop target, folded or not. It accepts any movable story that is not already in it. */
-function useStageDrop(element: HTMLElement | null, statusId: string, canMoveStories: boolean): boolean {
+/** A stage takes a drop only when the reader may move a story there (Review and Ready come from review for non-editors). */
+function useStageDrop(element: HTMLElement | null, status: PlanningWorkflowStatus, canMoveStories: boolean): boolean {
+  const statusId = status.id;
+  const accepts = canMoveStories && status.selectable;
   const [over, setOver] = useState(false);
   useEffect(() => {
-    if (!element || !canMoveStories) return undefined;
+    if (!element || !accepts) return undefined;
     return dropTargetForElements({
       element,
       getData: () => ({ statusId }),
@@ -85,7 +88,7 @@ function useStageDrop(element: HTMLElement | null, statusId: string, canMoveStor
       onDragLeave: () => setOver(false),
       onDrop: () => setOver(false)
     });
-  }, [canMoveStories, element, statusId]);
+  }, [accepts, element, statusId]);
   return over;
 }
 
@@ -128,7 +131,7 @@ function BoardCard(props: StoryItemProps) {
       <CardContent className="flex flex-col gap-1 px-2.5">
         <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="pr-5 text-[13px] leading-[1.35] line-clamp-2" data-story-title={story.id} /></StoryHoverCard>
         <StoryMeta story={story} timezone={timezone} now={now} />
-        <StorySignals story={story} className="min-w-0" />
+        <StoryAttentionSignals story={story} />
       </CardContent>
       <CornerMenu {...props} />
     </Card>
@@ -148,7 +151,7 @@ function DenseRow(props: StoryItemProps) {
       <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="block w-full truncate pr-5 text-[13px] leading-[18px] font-medium" data-story-title={story.id} /></StoryHoverCard>
       <div className="flex min-w-0 items-center gap-2 text-xs leading-4">
         <span className="min-w-0 flex-1 truncate text-muted-foreground" title={names || undefined}>{names || "Unassigned"}</span>
-        <ProductionSummary story={story} maxSignals={1} empty={null} className="shrink-0 flex-nowrap gap-1 [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0 [&_button]:h-4" />
+        {story.attention ? <StoryAttentionSignals story={story} limit={1} className="max-w-[55%] shrink flex-nowrap [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0" /> : <ProductionSummary story={story} maxSignals={1} empty={null} className="shrink-0 flex-nowrap gap-1 [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0 [&_button]:h-4" />}
         <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={"No deadline"} className="shrink-0 whitespace-nowrap" />
       </div>
       <CornerMenu {...props} />
@@ -179,7 +182,7 @@ const narrowColumn = "max-sm:w-[80vw] max-sm:flex-none max-sm:snap-start";
 function LaneColumn({ status, stories, collapsed, onCollapsedChange, ...items }: StageProps) {
   const [element, setElement] = useState<HTMLElement | null>(null);
   const [body, setBody] = useState<HTMLDivElement | null>(null);
-  const over = useStageDrop(element, status.id, items.canMoveStories);
+  const over = useStageDrop(element, status, items.canMoveStories);
   useAutoScroll(collapsed ? null : body);
   const headingId = `board-column-${status.id}`;
 
@@ -208,7 +211,7 @@ function LaneColumn({ status, stories, collapsed, onCollapsedChange, ...items }:
 function DenseStage({ status, stories, collapsed, onCollapsedChange, ...items }: StageProps) {
   const [element, setElement] = useState<HTMLElement | null>(null);
   const [body, setBody] = useState<HTMLDivElement | null>(null);
-  const over = useStageDrop(element, status.id, items.canMoveStories);
+  const over = useStageDrop(element, status, items.canMoveStories);
   useAutoScroll(collapsed ? null : body);
   const headingId = `board-column-${status.id}`;
   // An empty stage has nothing to open; a stage with stories can always be folded or opened again.
@@ -237,7 +240,7 @@ function DenseStage({ status, stories, collapsed, onCollapsedChange, ...items }:
 /** Dense keeps sidelined stages out of the columns: a chip each, a drop target, opening its stories in a popover. */
 function SidelinedChip({ status, stories, ...items }: StageItems & { status: PlanningWorkflowStatus; stories: PlanningStory[] }) {
   const [element, setElement] = useState<HTMLButtonElement | null>(null);
-  const over = useStageDrop(element, status.id, items.canMoveStories);
+  const over = useStageDrop(element, status, items.canMoveStories);
   const listId = `board-sidelined-${status.id}`;
   return <Popover>
     <PopoverTrigger render={<Button ref={setElement} type="button" variant="outline" size="sm" data-status={status.id} data-over={over} data-moved={items.movedStatusId === status.id} aria-label={`${status.label}, ${storyCount(stories.length)}`} className={cn(overRing, movedFlash)} />}>
@@ -255,7 +258,7 @@ function SidelinedChip({ status, stories, ...items }: StageItems & { status: Pla
 /** Stacked: one section per stage, the page scrolls. An empty section opens up while a story is being dragged, so there is room to drop. */
 function StackedSection({ status, stories, dragActive, ...items }: StageItems & { status: PlanningWorkflowStatus; stories: PlanningStory[]; dragActive: boolean }) {
   const [element, setElement] = useState<HTMLElement | null>(null);
-  const over = useStageDrop(element, status.id, items.canMoveStories);
+  const over = useStageDrop(element, status, items.canMoveStories);
   const headingId = `board-column-${status.id}`;
   const empty = !stories.length;
   return <section ref={setElement} aria-labelledby={headingId} data-status={status.id} data-over={over} data-empty={empty} data-drag-active={dragActive}

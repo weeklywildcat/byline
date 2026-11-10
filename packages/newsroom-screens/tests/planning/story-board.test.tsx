@@ -6,6 +6,8 @@ import { AdminPortalContext } from "@byline/newsroom-ui/lib/portal";
 import { StoryBoard, type StoryBoardProps } from "../../src/planning/StoryBoard";
 import { DEFAULT_WORKFLOW_STATUSES, type PlanningStory } from "../../src/planning/planning-model";
 import { BOARD_COLLAPSED_PREFERENCE_KEY, type BoardLayout } from "../../src/planning/stories-board-layout";
+import { ATTENTION_KINDS, type AttentionSignal, type StoryAttention } from "../../src/story/attention";
+import { PHASE_STATUSES } from "../../src/story/lifecycle";
 
 /**
  * The board in each layout, mounted in a DOM: every story renders, empty
@@ -268,5 +270,45 @@ describe("Dense column widths", () => {
     expect($("[data-status='reporting']")!.className).toMatch(/\bmin-w-56\b/);
     expect($("[data-status='reporting']")!.className).not.toMatch(/\bmin-w-0\b/);
     expect($("[data-board-scroller]")!.className).toContain("overflow-x-auto");
+  });
+});
+
+describe("Lifecycle board (Payload)", () => {
+  const phases = (editor: boolean) => PHASE_STATUSES.filter((status) => status.group !== "derived").map((status) => ({ ...status, selectable: editor || (status.id !== "review" && status.id !== "ready") })) as unknown as StoryBoardProps["statuses"];
+  const phase = (id: string) => PHASE_STATUSES.find((status) => status.id === id)! as unknown as PlanningStory["workflow"];
+  const signal = (kind: AttentionSignal["kind"], label: string, mine = true): AttentionSignal => ({ kind, label, priority: ATTENTION_KINDS.indexOf(kind), detail: null, explanation: "", target: { view: "story" }, mine, at: null });
+  const attention = (...signals: AttentionSignal[]): StoryAttention => ({ storyId: 0, phase: "reporting", signals, needsViewer: signals.some((entry) => entry.mine) });
+  const lifecycleStories = [
+    story(11, "pitch", { workflow: phase("pitch"), openTaskCount: 4, attention: attention() }),
+    story(12, "reporting", { workflow: phase("reporting"), openTaskCount: 2, visual: { type: "photo", status: "needed" }, attention: attention(signal("appointment-soon", "Interview tomorrow · 8:00 AM"), signal("waiting-on-source", "Waiting on district"), signal("deadline-soon", "Due tomorrow")) }),
+    story(13, "drafting", { workflow: phase("drafting"), attention: attention(signal("routing-failed", "Can't be sent for review"), signal("changes-requested", "Changes requested"), signal("deadline-overdue", "Overdue")) }),
+    story(14, "review", { workflow: phase("review"), attention: attention(signal("review-assigned", "Waiting for Sports Editor", false)) }),
+    story(15, "on-hold", { workflow: phase("on-hold"), attention: attention() })
+  ];
+  const signalsOn = (id: number) => $$(`[data-story-id='${id}'] [data-attention]`).map((element) => element.textContent);
+
+  it("has the five lifecycle columns, then the sidelined ones", async () => {
+    await mount("lanes", { stories: lifecycleStories, statuses: phases(true) });
+    expect($$("[data-status]").map((element) => element.dataset.status)).toEqual(["pitch", "reporting", "drafting", "review", "ready", "on-hold", "dropped"]);
+  });
+
+  it("shows one attention signal (two only when both are urgent), never counts or a repeated deadline", async () => {
+    await mount("lanes", { stories: lifecycleStories, statuses: phases(true) });
+    expect(signalsOn(11)).toEqual([]);
+    expect($("[data-story-id='11']")!.textContent).not.toContain("tasks");
+    expect(signalsOn(12)).toEqual(["Interview tomorrow · 8:00 AM"]);
+    expect($("[data-story-id='12']")!.textContent).not.toMatch(/tasks|Photo/);
+    expect(signalsOn(13)).toEqual(["Can't be sent for review", "Changes requested"]);
+    expect(signalsOn(14)).toEqual(["Waiting for Sports Editor"]);
+  });
+
+  it("never offers a reporter Review or Ready: they come from submitting, not moving", async () => {
+    await mount("lanes", { stories: lifecycleStories, statuses: phases(false) });
+    await click($("[data-story-actions='12']"));
+    await click($$("[role=menuitem]").find((item) => item.textContent?.includes("Move to")) ?? null);
+    const options = $$("[role=menuitemradio]").map((item) => item.textContent);
+    expect(options).toEqual(expect.arrayContaining(["Pitch", "Reporting", "Drafting", "On Hold", "Dropped"]));
+    expect(options).not.toContain("Review");
+    expect(options).not.toContain("Ready");
   });
 });

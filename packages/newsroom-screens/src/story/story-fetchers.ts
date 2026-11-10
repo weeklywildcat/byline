@@ -1,11 +1,9 @@
 import type { CollectionApi } from "../collections/collection-api";
-import type { PlanningRequestOptions } from "../planning/planning-api";
+import type { GetWorkloadHints } from "../editorial/workload-hints";
 import type { HomePresetsPayload } from "../home/home-model";
-import { createEditorialRestClient, type EditorialRestClient } from "../editorial/editorial-rest";
-import { createWorkspaceClient, type WorkspaceClient } from "../workspace/workspace-api";
+import type { EditorialRestClient } from "../editorial/editorial-rest";
+import type { WorkspaceClient } from "../workspace/workspace-api";
 import type { StoryWorkspace } from "../workspace/workspace-types";
-
-export type StoryRequest = <T>(options: PlanningRequestOptions) => Promise<T>;
 
 /** What Story Peek and the New story dialog need, whichever screen mounts them. */
 export type StoryFetchers = {
@@ -15,28 +13,22 @@ export type StoryFetchers = {
   workspace?: WorkspaceClient;
   editorial?: EditorialRestClient;
   /** Creates a draft, optionally from a template preset; resolves with the full workspace payload plus `workspaceUrl`/`template`. */
-  createStory?: (title: string, preset?: string) => Promise<StoryWorkspace>;
+  createStory?: (title: string, preset?: string, details?: StoryCreateDetails) => Promise<StoryWorkspace>;
   getPresets?: () => Promise<HomePresetsPayload>;
+  /** Advisory workload text for the people pickers (editors only). Absent, the pickers show names alone. */
+  getWorkloadHints?: GetWorkloadHints;
 };
 
-export type StoryCapabilities = { editPosts?: boolean; manage?: boolean };
+/** New story's optional details (HomePresetsPayload.create says which a host offers). */
+export type StoryCreateDetails = { sectionId?: number | null; writerIds?: number[]; deadline?: string | null };
 
-/**
- * The capability checks keep known-forbidden requests out of the browser while
- * the server remains the final authorization boundary.
- */
-/** `host.collections`: the host's CollectionApi (Collections are not addressed from here). */
-export function createStoryFetchers(request: StoryRequest, capabilities: StoryCapabilities = {}, paths: { presets?: string } = {}, host: { collections?: CollectionApi } = {}): StoryFetchers {
-  const fetchers: StoryFetchers = {};
-  if (capabilities.editPosts !== false) {
-    if (host.collections) fetchers.collections = host.collections;
-    fetchers.workspace = createWorkspaceClient(request, { collections: host.collections });
-    fetchers.getWorkspace = fetchers.workspace.getWorkspace;
-    fetchers.createStory = (title, preset) => request<StoryWorkspace>({ path: "/byline/v1/editorial/stories", method: "POST", data: preset ? { title, preset } : { title } });
-    fetchers.editorial = createEditorialRestClient(request);
-  }
-  if (capabilities.editPosts !== false || capabilities.manage) {
-    fetchers.getPresets = () => request<HomePresetsPayload>({ path: paths.presets || "/byline/v1/editorial/presets" });
-  }
-  return fetchers;
+/** The one request body for creating a story, shared by every host. */
+export function storyCreateBody(title: string, preset?: string, details: StoryCreateDetails = {}): Record<string, unknown> {
+  return {
+    title,
+    ...(preset ? { preset } : {}),
+    ...(details.sectionId ? { sectionId: details.sectionId } : {}),
+    ...(details.writerIds?.length ? { writerIds: details.writerIds } : {}),
+    ...(details.deadline ? { deadline: details.deadline } : {})
+  };
 }

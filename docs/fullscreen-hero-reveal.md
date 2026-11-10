@@ -75,7 +75,7 @@ for w in 960 1600 2400; do
 done
 ```
 
-A story presentation reuses the story's WordPress featured image instead (see
+A story presentation reuses the story's featured image instead (see
 below); it is the same file as the story's `NewsArticle` image, used once.
 
 ### Checklist for a new page

@@ -11,12 +11,13 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
-import { locationFor } from "../../domain/navigation";
+import { locationFor, storyIdFromPath } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { NewsroomPresence } from "./NewsroomPresence";
 import { NotificationsBell } from "./NotificationsBell";
 import { useBylineSearch } from "./search";
 import { useModifierLabel } from "./shortcuts";
+import { useStoryCrumb } from "./story-crumb";
 
 /**
  * The Byline app header (`admin.components.header`): sticky above every admin
@@ -42,7 +43,14 @@ function HeaderBar() {
   const { state, isMobile } = useSidebar();
   const { openSearch } = useBylineSearch();
   const modifier = useModifierLabel();
-  const crumbs = locationFor(pathname, routes.admin);
+  const story = useStoryCrumb(storyIdFromPath(pathname, routes.admin));
+  // On a Story the last crumb is the Story itself (its live headline), and a focused mode adds its own name after it.
+  const crumbs: Array<{ label: string; path?: string; action?: () => void }> = locationFor(pathname, routes.admin).map((crumb) => (story && crumb.label === "Story" ? { label: story.title.trim() || "Untitled story" } : crumb));
+  if (story?.mode && crumbs.length) {
+    const last = crumbs[crumbs.length - 1]!;
+    crumbs[crumbs.length - 1] = { ...last, ...(story.openStory ? { action: story.openStory } : {}) };
+    crumbs.push({ label: story.mode });
+  }
 
   return (
     <header
@@ -61,10 +69,12 @@ function HeaderBar() {
                 <Fragment key={`${crumb.label}-${index}`}>
                   {index > 0 ? <BreadcrumbSeparator /> : null}
                   <BreadcrumbItem className="min-w-0">
-                    {crumb.path !== undefined && index < crumbs.length - 1 ? (
+                    {crumb.action && index < crumbs.length - 1 ? (
+                      <BreadcrumbLink className="max-w-[20ch] truncate" render={<button type="button" onClick={crumb.action} />}>{crumb.label}</BreadcrumbLink>
+                    ) : crumb.path !== undefined && index < crumbs.length - 1 ? (
                       <BreadcrumbLink render={<Link href={`${routes.admin}${crumb.path}`} prefetch={false} />}>{crumb.label}</BreadcrumbLink>
                     ) : (
-                      <BreadcrumbPage className="truncate font-medium">{crumb.label}</BreadcrumbPage>
+                      <BreadcrumbPage className="max-w-[28ch] truncate font-medium" title={crumb.label}>{crumb.label}</BreadcrumbPage>
                     )}
                   </BreadcrumbItem>
                 </Fragment>

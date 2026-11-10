@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ArticleView } from "@byline/ui";
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { getPostContributors, isGuestContributor, type WordPressAuthor } from "@/lib/wordpress";
+import { getPostContributors, isGuestContributor, type ArchiveAuthor } from "@/lib/public-content";
 import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content";
 
 describe("shared article presentation", () => {
@@ -13,7 +13,7 @@ describe("shared article presentation", () => {
       post,
       allPosts: publicEditorialPosts,
       contributors,
-      author: contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? null
+      author: contributors.find((contributor): contributor is ArchiveAuthor => !isGuestContributor(contributor)) ?? null
     });
 
     expect(presentation.title).toBe("Public records guide");
@@ -32,7 +32,7 @@ describe("shared article presentation", () => {
       post,
       allPosts: publicEditorialPosts,
       contributors,
-      author: contributors.find((contributor): contributor is WordPressAuthor => !isGuestContributor(contributor)) ?? null
+      author: contributors.find((contributor): contributor is ArchiveAuthor => !isGuestContributor(contributor)) ?? null
     });
     const markup = renderToStaticMarkup(<ArticleView presentation={presentation} />);
 

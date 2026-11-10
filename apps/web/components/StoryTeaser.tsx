@@ -8,13 +8,13 @@ import {
   getPostContributors,
   getPostHref,
   getPostLiveCoverage,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchivePost
+} from "@/lib/public-content";
 
 type StoryTeaserVariant = "lead" | "secondary" | "standard" | "compact" | "list";
 
 type StoryTeaserProps = {
-  post: WordPressPost;
+  post: ArchivePost;
   variant?: StoryTeaserVariant;
   showImage?: boolean;
   // Off on a section's own page, where every story shares the section label.

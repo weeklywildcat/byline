@@ -19,7 +19,7 @@ function head(overrides: { remove?: string[]; extra?: string; title?: string } =
     modified: `<meta property="article:modified_time" content="2026-10-14T23:00:00.000Z">`,
     section: `<meta property="article:section" content="News">`,
     author: `<meta property="article:author" content="${origin}/author/gibson/">`,
-    ogimage: `<meta property="og:image" content="${origin}/_wordpress-media/a.jpg"><meta property="og:image:width" content="1200"><meta name="twitter:image" content="${origin}/_wordpress-media/a.jpg">`,
+    ogimage: `<meta property="og:image" content="${origin}/_byline/media/a.jpg"><meta property="og:image:width" content="1200"><meta name="twitter:image" content="${origin}/_byline/media/a.jpg">`,
     canonical: `<link rel="canonical" href="${url}">`,
     rss: `<link rel="alternate" type="application/rss+xml" title="Weekly Wildcat" href="${origin}/feed.xml">`
   };
@@ -32,7 +32,7 @@ const articleJson = {
   mainEntityOfPage: { "@type": "WebPage", "@id": url }, datePublished: "2026-10-14T22:15:00.000Z", dateModified: "2026-10-14T23:00:00.000Z",
   author: { "@type": "Person", "@id": `${origin}/author/gibson/#person`, name: "Gibson Bell", url: `${origin}/author/gibson/` },
   publisher: { "@type": "NewsMediaOrganization", "@id": `${origin}/#organization`, name: "Weekly Wildcat" },
-  image: [{ "@type": "ImageObject", "@id": `${url}#primaryimage`, url: `${origin}/_wordpress-media/a.jpg` }],
+  image: [{ "@type": "ImageObject", "@id": `${url}#primaryimage`, url: `${origin}/_byline/media/a.jpg` }],
   primaryImageOfPage: { "@id": `${url}#primaryimage` }
 };
 const breadcrumbJson = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, item: { "@id": `${origin}/` } }] };
@@ -47,7 +47,7 @@ describe("page audit", () => {
   });
 
   it("flags relative or non-absolute social and canonical URLs", () => {
-    const relative = articlePage({ remove: ["ogimage"], extra: `<meta property="og:image" content="/_wordpress-media/a.jpg"><meta name="twitter:image" content="/_wordpress-media/a.jpg">` });
+    const relative = articlePage({ remove: ["ogimage"], extra: `<meta property="og:image" content="/_byline/media/a.jpg"><meta name="twitter:image" content="/_byline/media/a.jpg">` });
     expect(messages(relative)).toEqual(expect.arrayContaining([expect.stringContaining("og:image is not an absolute URL"), expect.stringContaining("twitter:image is not an absolute URL")]));
     expect(messages(articlePage({ remove: ["canonical"], extra: `<link rel="canonical" href="/2026/10/14/news/homecoming-week/">` }))).toEqual(expect.arrayContaining([expect.stringContaining("canonical is not an absolute URL")]));
   });
@@ -82,7 +82,7 @@ describe("page audit", () => {
     expect(messages(articlePage({}, ""))).toEqual(expect.arrayContaining(["missing NewsArticle JSON-LD", "missing BreadcrumbList JSON-LD"]));
     const anonymous = articlePage({}, `${ld({ ...articleJson, publisher: { "@type": "Organization", name: "Weekly Wildcat" } })}${ld(breadcrumbJson)}`);
     expect(messages(anonymous)).toEqual(expect.arrayContaining([expect.stringContaining("shared organization entity")]));
-    const relativeImage = articlePage({}, `${ld({ ...articleJson, image: [{ url: "/_wordpress-media/a.jpg" }] })}${ld(breadcrumbJson)}`);
+    const relativeImage = articlePage({}, `${ld({ ...articleJson, image: [{ url: "/_byline/media/a.jpg" }] })}${ld(breadcrumbJson)}`);
     expect(messages(relativeImage)).toEqual(expect.arrayContaining([expect.stringContaining("structured data url is not absolute")]));
   });
 

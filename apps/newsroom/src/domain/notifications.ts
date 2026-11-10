@@ -12,14 +12,15 @@
 
 export const NOTIFICATION_KINDS = [
   "storyAssignments", "readyForReview", "storyReturned", "mediaAssignments", "highPriorityTasks", "appointments", "publishingFailures", "dueDigest",
-  "transcriptReady", "distributionAssignments", "distributionApproval", "distributionFailures", "frontPageFailures"
+  "transcriptReady", "distributionAssignments", "distributionApproval", "distributionFailures", "frontPageFailures",
+  "reviewComplete", "reviewRouting"
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const NOTIFICATION_LABELS: Record<NotificationKind, { label: string; description: string }> = {
   storyAssignments: { label: "Story assignments", description: "You are made a story's editor or added to its byline." },
-  readyForReview: { label: "Ready for review", description: "A story you edit moves to Editing or Ready." },
-  storyReturned: { label: "Story sent back", description: "A story you wrote is returned for more work." },
+  readyForReview: { label: "Reviews", description: "A story is sent to you, or to a review queue you are in." },
+  storyReturned: { label: "Changes requested", description: "An editor asks for changes on a story you wrote." },
   mediaAssignments: { label: "Media assignments", description: "You are assigned photo, graphic, video or audio work." },
   highPriorityTasks: { label: "High-priority tasks", description: "A high or urgent task is assigned to you." },
   appointments: { label: "Appointments", description: "You are assigned an interview or appointment." },
@@ -29,7 +30,9 @@ export const NOTIFICATION_LABELS: Record<NotificationKind, { label: string; desc
   distributionAssignments: { label: "Distribution assignments", description: "You are made the owner of a story's social or newsletter distribution." },
   distributionApproval: { label: "Distribution approval", description: "Editors only: a distribution draft is waiting for your approval." },
   distributionFailures: { label: "Distribution failures", description: "A distribution you own (or edit) failed." },
-  frontPageFailures: { label: "Front Page failures", description: "Editors only: a scheduled homepage change could not be activated." }
+  frontPageFailures: { label: "Front Page failures", description: "Editors only: a scheduled homepage change could not be activated." },
+  reviewComplete: { label: "Review complete", description: "A story you wrote finished review and is ready." },
+  reviewRouting: { label: "Review routing problems", description: "Editors only: a story could not be sent for review because no reviewer was found." }
 };
 
 export type NotificationChannel = "inApp" | "email";
@@ -76,9 +79,9 @@ export function describeNotification(facts: NotificationFacts): string {
     case "storyAssignments":
       return facts.detail === "editor" ? `${who(facts)} made you the editor of ${quoted(facts)}` : `${who(facts)} added you to the byline of ${quoted(facts)}`;
     case "readyForReview":
-      return `${quoted(facts)} is ready for your review`.replace(/^./, (letter) => letter.toUpperCase());
+      return `${quoted(facts)} is ready for ${facts.detail ? `${facts.detail} review` : "your review"}`.replace(/^./, (letter) => letter.toUpperCase());
     case "storyReturned":
-      return `${who(facts)} sent ${quoted(facts)} back for more work`;
+      return `${who(facts)} requested changes on ${quoted(facts)}`;
     case "mediaAssignments":
       return `${who(facts)} assigned you ${facts.detail ? `“${facts.detail}”` : "media work"} on ${quoted(facts)}`;
     case "highPriorityTasks":
@@ -95,6 +98,10 @@ export function describeNotification(facts: NotificationFacts): string {
       return `${who(facts)} asked you to approve ${facts.detail ?? "a distribution"} for ${quoted(facts)}`;
     case "distributionFailures":
       return `${facts.detail ?? "A distribution"} for ${quoted(facts)} failed`;
+    case "reviewComplete":
+      return `${quoted(facts)} finished review and is ready`.replace(/^./, (letter) => letter.toUpperCase());
+    case "reviewRouting":
+      return `${quoted(facts)} couldn't be sent for review${facts.detail ? `: ${facts.detail}` : ""}`.replace(/^./, (letter) => letter.toUpperCase());
     case "frontPageFailures":
       return `A scheduled homepage change could not be activated${facts.detail ? `: ${facts.detail}` : ""}`;
     case "dueDigest": {

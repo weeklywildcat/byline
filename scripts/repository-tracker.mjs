@@ -8,7 +8,7 @@
 // deploy; an article stores only its key, title and text alternative. --client
 // adds an optional progressive enhancement (client.ts).
 //
-// See docs/newsroom-blocks.md ("Repository Tracker").
+// See docs/article-editor.md ("Repository Tracker").
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -53,7 +53,7 @@ const STATUS: Record<Milestone["status"], string> = { done: "Done", underway: "U
  * The "${key}" tracker, rendered on the server: complete and useful without
  * JavaScript.${client ? " client.ts only enhances it." : ""} The article supplies the title and the text
  * alternative; never type story copy (headline, byline) here.
- * Guide: docs/newsroom-blocks.md ("Repository Tracker").
+ * Guide: docs/article-editor.md ("Repository Tracker").
  */
 export function ${component}({ title }: { title: string; description: string }) {
   const done = TRACKER.milestones.filter((milestone) => milestone.status === "done").length;

@@ -1,7 +1,7 @@
 # People workspace
 
 People is the Payload migration's public/editorial identity workspace. The public
-newspaper remains the static Astro app, with WordPress as production authority.
+newspaper is the static Astro app.
 Saving a Payload profile does not update weeklywildcat.com in this phase.
 
 ## Person and User
@@ -62,7 +62,7 @@ Name is byline copy. Pronouns are free text. Short bio is limited to 400
 characters; full bio to 4000. All public copy is together in one form. Contact
 has a separate public email and up to eight ordered service-label/HTTPS-URL rows.
 Combobox suggestions allow custom labels; arrow buttons preserve meaningful
-public ordering without drag-and-drop. No WordPress handle parsing is retained.
+public ordering without drag-and-drop.
 The schema and endpoint reject non-HTTPS, malformed and credential-bearing URLs.
 
 Publication concepts are independent:
@@ -169,8 +169,7 @@ status, never by whether an account exists. `publicEmail` is its only email
 source. It has no Users query, account join, private media URL or account spread.
 `href` is null for byline-only People; directory visibility remains explicit.
 Portraits are public rendition inputs (ID/alt/dimensions), not private URLs.
-The final WordPress-shaped Snapshot v1 adapter, media materialization, ID import
-and v2 delivery remain later migration phases; nothing is wired to production.
+Snapshot v2 supplies public profiles and prepared portraits to Astro.
 
 Story picker quick-create is deliberately deferred until the concurrent editor
 branch settles. Its seam is **Add contributor → New guest**, using this same
@@ -206,33 +205,3 @@ The public regressions use `npm run test:frontend`,
 Playwright suite. The public site remains static and snapshot-only. The focused
 profile browser regression checks Staff/Author geometry at 1920, 1440, 1366,
 1180, 820 and 390px, profile metadata/Person JSON-LD and fallback presentation.
-
-Validation record for this slice:
-
-| Check | Result |
-| --- | --- |
-| `npm run typecheck` | All monorepo typechecks passed |
-| `npm test` | Full monorepo suite passed; 10 optional live MCP tests retain their default skip |
-| Newsroom unit tests | 138 passed |
-| Shared newsroom screens | 105 passed |
-| Frontend unit tests | 531 passed, including no-story author noindex, social links, JSON-LD and contributor regressions |
-| `BYLINE_TEST_DATABASE_URL=postgres://localhost:5432/byline_newsroom_test_people_slice npm run test:newsroom:integration` | 190 passed, including 36 People access/privacy/concurrency/integrity tests |
-| `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test:people:browser --workspace @byline/newsroom` | 13 browser tests passed; all six widths, realistic guest/alumni/profile fixtures, explicit save, dirty traversal, stale conflict and sign-out |
-| `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome BYLINE_BROWSER_VIDEO=0 npm run test:browser --workspace @byline/web -- tests/browser/contributor-profile.spec.ts tests/browser/public-site.spec.ts` | 15 passed: Staff/Author, article byline/end-of-story geometry and existing public-site regressions; all six profile widths |
-| `npm run test:frontend:snapshot-build` | Static-export, public routes, media, SEO and two-request acquisition boundary passed |
-| `BYLINE_CONTENT_MODE=weekly-wildcat-fixture BYLINE_COMPOSER_BIN=/private/tmp/byline-composer npm run build` | Full public/plugin/Discord build passed using the available local Composer wrapper |
-| `PAYLOAD_SECRET=… DATABASE_URL=… BYLINE_DB_PUSH=0 npm run build --workspace @byline/newsroom` | Production newsroom build passed |
-| `npm run verify:contracts` | Contracts, updater, shared CSS, editor canvas, release helpers and both MCP catalogs passed |
-| `PAYLOAD_SECRET=… DATABASE_URL=… npm run migrate:check --workspace @byline/newsroom` | All committed migrations applied to an empty DB and match the config; no new migration required |
-| `npm run generate:types --workspace @byline/newsroom` | Regenerated with no type-file diff |
-
-Browser widths: 1920, 1440, 1366, 1180, 820 and 390px. Local Chrome was used
-because managed Playwright browsers were absent; public video capture was disabled
-because its FFmpeg binary was absent. Screenshots and traces were retained under
-`/private/tmp`. WordPress E2E and unrelated public browser specs were intentionally
-not run; no WordPress implementation or Story/editor implementation changed.
-
-The snapshot build adds a video fixture, which changes homepage story selection.
-The public browser test pins the three Latest stories from that same snapshot,
-so CI exercises the snapshot artifact without relying on the standard fixture's
-older two-story count. Profile screenshots use Playwright's portable output path.

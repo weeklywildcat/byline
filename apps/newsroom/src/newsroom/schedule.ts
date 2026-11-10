@@ -22,7 +22,7 @@ import { assigneeList, loadPeople, localToday, readableStories, userPerson, type
  * It is never built with administrator access and filtered afterwards.
  * Private notes are never read.
  *
- * Ported from `byline_workspace_schedule()` (wordpress-plugin/includes/editorial/workspace.php):
+ *
  * - exact appointments overlapping the newsroom-day range, cancelled ones
  *   excluded, completed and tentative ones kept (the screens mark them);
  * - open appointments with a target window or no date, whatever the range,

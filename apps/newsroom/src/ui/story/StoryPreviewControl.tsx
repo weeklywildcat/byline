@@ -1,40 +1,24 @@
 "use client";
 
-import { Button } from "@byline/newsroom-ui/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@byline/newsroom-ui/ui/tooltip";
 import { parseYouTubeVideoId } from "@byline/core";
 // The metadata-only resolver: importing the full package here would load every story's React code
 // (and @byline/ui) into the admin bundle, which keeps Payload's Lexical field from mounting.
 import { resolveStoryPresentation, type StoryPresentationIdentity, type StoryPresentationResolution } from "@byline/story-presentations/resolve";
 import { useConfig, useDocumentInfo, useFormFields, useLivePreviewContext } from "@payloadcms/ui";
-import { Eye } from "lucide-react";
 import { useMemo } from "react";
 import { relationIdOf } from "./form";
 
 /**
  * Byline's entry to Payload's Live Preview. Payload owns the preview itself
  * (pane, iframe, toolbar, devices, zoom, pop-out, transport, and remembering
- * whether it was open); this button only flips Payload's own open state
- * through its public context, so there is exactly one preview state.
- * Rendered nothing when Live Preview is not available for this document.
+ * whether it was open); this only flips Payload's own open state through its
+ * public context, so there is exactly one preview state. The Story header
+ * offers it as a menu item; `available` is false when Live Preview is not
+ * available for this document.
  */
-export function PreviewButton() {
+export function useStoryPreview(): { available: boolean; previewing: boolean; toggle: () => void } {
   const { isLivePreviewEnabled, isLivePreviewing, setIsLivePreviewing, url } = useLivePreviewContext();
-  if (!isLivePreviewEnabled || !url) return null;
-  const label = isLivePreviewing ? "Previewing" : "Preview";
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button type="button" variant={isLivePreviewing ? "secondary" : "outline"} size="sm" aria-pressed={isLivePreviewing} onClick={() => setIsLivePreviewing(!isLivePreviewing)} data-story-preview="">
-            <Eye data-icon="inline-start" aria-hidden="true" />
-            <span className="max-md:sr-only">{label}</span>
-          </Button>
-        }
-      />
-      <TooltipContent>{isLivePreviewing ? "Close the live preview" : "Preview the story as readers will see it"}</TooltipContent>
-    </Tooltip>
-  );
+  return { available: Boolean(isLivePreviewEnabled && url), previewing: Boolean(isLivePreviewing), toggle: () => setIsLivePreviewing(!isLivePreviewing) };
 }
 
 /** The shared resolver's answer for the story as it is in the form right now. */

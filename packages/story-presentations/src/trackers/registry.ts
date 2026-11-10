@@ -7,7 +7,7 @@ import type { RepositoryTrackerRegistry } from "./types";
  * builds one for a real story; do not add one merely to populate it.
  * Scaffold one with `npm run tracker -- create <kebab-case-key>`.
  *
- * See docs/newsroom-blocks.md ("Repository Tracker").
+ * See docs/article-editor.md ("Repository Tracker").
  */
 export const repositoryTrackers: RepositoryTrackerRegistry = {};
 

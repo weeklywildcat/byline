@@ -161,16 +161,19 @@ export async function createLiveUpdate(ctx: ScreenContext, storyId: number, inpu
   if (photo) await assertLivePhoto(ctx, storyId, photo);
   const decision = input.wantsPublish ? await canPublishLiveNow(ctx.req, storyId) : null;
   const publish = decision?.ok === true;
+  const deskReason = decision && !decision.ok ? decision.reason : undefined;
   const created = await ctx.req.payload.create({
-    collection: "live-updates", ...as(ctx),
+    // The system flag only lets this one write store `deskReason`; the person's own access still decides everything else.
+    collection: "live-updates", ...as(ctx), context: { ...ctx.req.context, bylineSystem: true },
     data: {
+      ...(deskReason ? { deskReason } : {}),
       story: storyId, headline: clean(input.headline, 200) || undefined, body: plainTextToLexical(text) as never, photo: photo ?? undefined,
       // A key update is a publisher's call; a draft is never pinned (publishing it later is a separate decision).
       pinned: input.pinned === true && publish, state: publish ? "published" : "draft", ...(input.clientKey ? { clientKey: input.clientKey } : {})
     }
   });
   await recordStoryActivity(ctx.req, storyId, !publish ? "live-submitted" : input.queued ? "live-queued-sent" : input.source === "field" ? "live-published-from-field" : "live-published", created.id);
-  return { id: created.id, status: publish ? "posted" : "sent-to-desk", ...(decision && !decision.ok ? { reason: decision.reason } : {}) };
+  return { id: created.id, status: publish ? "posted" : "sent-to-desk", ...(deskReason ? { reason: deskReason } : {}) };
 }
 
 export async function postLiveUpdate(ctx: ScreenContext, storyId: number, input: LiveUpdateInput): Promise<LivePostResult> {
@@ -260,10 +263,10 @@ export type CoverageInput = { action?: unknown; mode?: unknown; publishers?: unk
  * written to the unversioned plan, so going live never saves or publishes the article's unpublished draft;
  * the public projection reads it from there. A Story cannot go live unless it is already public.
  */
-export async function changeLiveCoverage(ctx: ScreenContext, storyId: number, input: CoverageInput): Promise<LiveDeskResponse> {
+export async function changeLiveCoverage(ctx: ScreenContext, storyId: number, input: CoverageInput, seams: { /** Tests only: runs between reading the plan and writing the change. */ beforeWrite?: () => Promise<void> } = {}): Promise<LiveDeskResponse> {
   if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors can change live coverage.", 403);
   const { payload } = ctx.req;
-  const found = await payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, depth: 0, select: { liveCoverage: true, livePublishers: true }, overrideAccess: true, req: ctx.req });
+  const found = await payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, depth: 0, select: { liveCoverage: true, livePublishers: true, updatedAt: true }, overrideAccess: true, req: ctx.req });
   const plan = found.docs[0];
   if (!plan) throw new APIError("That story was not found.", 404);
   const current = normalizeLiveSettings(plan.liveCoverage);
@@ -304,10 +307,16 @@ export async function changeLiveCoverage(ctx: ScreenContext, storyId: number, in
   const before = relationIds(plan.livePublishers).map(Number).sort();
   const publishersChanged = publishers !== null && JSON.stringify([...publishers].sort()) !== JSON.stringify(before);
   if (settingsChanged || publishersChanged) {
-    await payload.update({
-      collection: "story-plans", id: plan.id, depth: 0, overrideAccess: true, req: ctx.req, context: { ...ctx.req.context, bylineSystem: true },
+    await seams.beforeWrite?.();
+    // The change was computed from the plan as read above. Write it only if the plan is still exactly that one, so two
+    // editors (or a slow setup racing an End) can never silently put back state the other already changed.
+    const written = await payload.update({
+      collection: "story-plans", where: { and: [{ id: { equals: plan.id } }, { updatedAt: { equals: plan.updatedAt } }] },
+      depth: 0, overrideAccess: true, req: ctx.req, context: { ...ctx.req.context, bylineSystem: true },
       data: { ...(settingsChanged ? { liveCoverage: next } : {}), ...(publishersChanged ? { livePublishers: publishers! } : {}) }
     });
+    if (written.errors?.length) throw new APIError(written.errors[0]?.message ?? "Byline could not change live coverage.", 500);
+    if (!written.docs.length) throw new APIError("Live coverage changed while you were working. Review it, then try again.", 409);
     resetLivePublisherStories(ctx.req);
     if (settingsChanged && record) await recordStoryActivity(ctx.req, storyId, record);
     if (publishersChanged) await recordStoryActivity(ctx.req, storyId, "live-publishers-changed");

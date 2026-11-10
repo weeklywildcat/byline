@@ -19,7 +19,6 @@ import { resetStoryScope, scopeManages, storyScope } from "../access/story-conte
 import { atLeast } from "../access/user";
 import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/dates";
 import { findPreset, STORY_PRESETS } from "../domain/presets";
-import { isWorkflowStage } from "../domain/workflow";
 import { validResourceUrl } from "../collections/StoryPlans";
 import { parsePlanningFilterParams } from "@byline/newsroom-screens/planning/planning-api";
 import { parseMediaLibraryParams } from "@byline/newsroom-screens/media/media-library-model";
@@ -71,7 +70,13 @@ import {
 import type { CollectionInput, InterviewInput, ResourceInput } from "@byline/newsroom-screens/collections/collection-model";
 import { contributorEntry, editorialTask, homeBootstrap, loadPeople, mediaFor, personIdFor, planFor, reportingFor, screenContext, searchStories, storyResources, storyWorkspace, type ScreenContext } from "./screen-models";
 import type { AppointmentInput, MediaAssignmentInput, SourceInput } from "@byline/newsroom-screens/workspace/workspace-types";
-import { effectiveWorkflow } from "../domain/workflow";
+import { effectiveWorkflow, workflowToStore } from "../domain/workflow";
+import { moveLifecycle } from "./lifecycle";
+import { previewRouting, removeAssignment, rolesOverview, saveAssignment, saveRole, saveWorkflow, workflowsOverview, type RoleInput, type WorkflowInput } from "./newsroom-roles";
+import { workload } from "./workload";
+import { activateYear, discardYear, planYear, previewRollover, yearsOverview } from "./school-years";
+import type { AssignmentInput } from "../domain/role-admin";
+import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
 import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
@@ -99,8 +104,16 @@ const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as
 
 /* ------------------------------------------------------------- presets */
 
-function presetsPayload(): HomePresetsPayload {
+/** Templates, and what the New story dialog may offer this reader (docs/story-lifecycle.md#create). */
+async function presetsPayload(ctx: ScreenContext): Promise<HomePresetsPayload> {
+  const editor = atLeast(ctx.user, "editor");
+  const [sections, people] = await Promise.all([
+    ctx.req.payload.find({ collection: "sections", depth: 0, pagination: false, sort: "name", select: { name: true }, ...asUser(ctx) }),
+    editor ? loadPeople(ctx) : Promise.resolve(null)
+  ]);
+  const writers = people ? [...people.persons.keys()].map((id, order) => contributorEntry(people, id, order)).filter((entry): entry is ContributorEntry => entry !== null) : [];
   return {
+    create: { sections: sections.docs.map((section) => ({ id: section.id, name: section.name })), writers, canAssign: editor },
     presets: Object.fromEntries(
       STORY_PRESETS.map((preset) => [
         preset.id,
@@ -120,27 +133,45 @@ function presetsPayload(): HomePresetsPayload {
   };
 }
 
-/** The one Story creation flow (Home, Stories, Create, and a Collection's New story). */
-export async function createStory(ctx: ScreenContext, req: PayloadRequest, given?: { title?: string; preset?: string }) {
-  const input = given ?? (await body<{ title?: string; preset?: string }>(req));
+type CreateStoryInput = { title?: string; preset?: string; sectionId?: number | null; writerIds?: number[]; deadline?: string | null };
+
+/**
+ * The one Story creation flow (Home, Stories, Create, and a Collection's New
+ * story). Only a title is required; a Story starts as a Pitch. The optional
+ * details are a section, writers and a deadline — writers and deadline only
+ * for editors, as everywhere else — and a template.
+ */
+export async function createStory(ctx: ScreenContext, req: PayloadRequest, given?: CreateStoryInput) {
+  const input = given ?? (await body<CreateStoryInput>(req));
   const title = String(input.title ?? "").trim().slice(0, 300);
   if (!title) throw new APIError("Give the story a working headline.", 400);
   const preset = input.preset ? findPreset(input.preset) : null;
   if (input.preset && !preset) throw new APIError("That template no longer exists.", 400);
   const editor = atLeast(ctx.user, "editor");
   const today = localDay(ctx.now, ctx.timeZone);
+  const writerIds = Array.isArray(input.writerIds) ? [...new Set(input.writerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))] : null;
+  const deadline = typeof input.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.deadline.slice(0, 10)) ? input.deadline.slice(0, 10) : null;
+  if (!editor && (writerIds || deadline)) throw new APIError("Only editors assign writers and deadlines.", 403);
 
   let section: number | null = null;
-  if (preset) {
+  if (input.sectionId) {
+    const found = await req.payload.find({ collection: "sections", where: { id: { equals: Number(input.sectionId) } }, depth: 0, limit: 1, ...asUser(ctx) });
+    if (!found.docs[0]) throw new APIError("That section no longer exists.", 400);
+    section = found.docs[0].id;
+  } else if (preset) {
     const found = await req.payload.find({ collection: "sections", where: { slug: { equals: preset.section } }, depth: 0, limit: 1, ...asUser(ctx) });
     section = found.docs[0]?.id ?? null;
+  }
+  if (writerIds?.length) {
+    const found = await req.payload.find({ collection: "people", where: { id: { in: writerIds } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) });
+    if (found.docs.length !== writerIds.length) throw new APIError("One of those writers no longer exists.", 400);
   }
   const story = await req.payload.create({
     collection: "stories",
     draft: true,
     data: {
       headline: title,
-      contributors: ctx.user.linkedPerson !== null ? [Number(ctx.user.linkedPerson)] : [],
+      contributors: writerIds ?? (ctx.user.linkedPerson !== null ? [Number(ctx.user.linkedPerson)] : []),
       ...(section ? { section } : {}),
       ...(preset?.format ? { format: preset.format } : {})
     },
@@ -148,7 +179,8 @@ export async function createStory(ctx: ScreenContext, req: PayloadRequest, given
     context: {
       bylinePlan: {
         ...(preset ? { workflow: preset.workflow.status, preset: preset.id } : {}),
-        ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {})
+        ...(preset && editor ? { deadline: addDays(today, preset.workflow.deadlinePolicy === "same-day" ? 0 : preset.workflow.deadlineOffsetDays) } : {}),
+        ...(deadline ? { deadline } : {})
       }
     },
     ...asUser(ctx)
@@ -257,8 +289,15 @@ async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<
   }
   const data: Record<string, unknown> = {};
   if (input.status !== undefined) {
-    if (!isWorkflowStage(input.status)) throw new APIError("Choose a valid workflow stage.", 400);
-    data.workflow = input.status;
+    // Phase ids (drafting, review…) and the older stage ids (writing, editing…) both mean a phase.
+    const stored = workflowToStore(input.status);
+    if (!stored) throw new APIError("Choose a valid stage.", 400);
+    // Review and Ready come from the review engine: a reporter submits, they never pick the stage.
+    // Editors keep a manual override for exceptions (docs/story-lifecycle.md#override).
+    if ((stored === "editing" || stored === "ready") && !atLeast(ctx.user, "editor")) {
+      throw new APIError(stored === "editing" ? "Use Submit for review to send this story to an editor." : "Only an editor can mark a story Ready.", 403);
+    }
+    data.workflow = stored;
   }
   if (input.deadline !== undefined) data.deadline = input.deadline ? String(input.deadline).slice(0, 10) : null;
   const planned = input.plannedPublishAt !== undefined ? input.plannedPublishAt : input.plannedPublication;
@@ -268,6 +307,8 @@ async function updateWorkflow(ctx: ScreenContext, req: PayloadRequest): Promise<
   const editor = atLeast(ctx.user, "editor");
   if (!editor && ("deadline" in data || "plannedPublication" in data || "editor" in data)) throw new APIError("Only editors set deadlines, publication plans and editors.", 403);
   const updated = await req.payload.update({ collection: "story-plans", id: plan.id, data, ...asUser(ctx) });
+  // An editor's manual stage change is an override: an open review closes and says so in Activity.
+  if (data.workflow !== undefined && data.workflow !== plan.workflow) await cancelOpenRun(req, storyId, "review-override");
   const story = await req.payload.findByID({ collection: "stories", id: storyId, draft: true, depth: 0, select: { _status: true, headline: true }, ...asUser(ctx) });
   const published = story._status === "published";
   return {
@@ -456,7 +497,7 @@ async function moveToFolder(ctx: ScreenContext, req: PayloadRequest) {
  */
 async function createCollectionStory(ctx: ScreenContext, req: PayloadRequest) {
   const id = idParam(req);
-  const input = await body<{ title?: string; preset?: string }>(req);
+  const input = await body<CreateStoryInput>(req);
   const created = await createStory(ctx, req, input);
   try {
     await addStory(ctx, id, created.story.id);
@@ -550,6 +591,23 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/public-url", method: "get", handler: handle((ctx, req) => storyURLContext(ctx, idParam(req))) },
   { path: "/byline/presence", method: "get", handler: handle(presenceSnapshot) },
   { path: "/byline/presence", method: "post", handler: handle(presenceHeartbeat) },
+  // Newsroom Roles, review workflows, the routing preview and factual workload (editors; docs/newsroom-roles.md).
+  { path: "/byline/roles", method: "get", handler: handle((ctx) => rolesOverview(ctx)) },
+  { path: "/byline/roles", method: "post", handler: handle(async (ctx, req) => saveRole(ctx, null, await body<RoleInput>(req))) },
+  { path: "/byline/roles/:id", method: "patch", handler: handle(async (ctx, req) => saveRole(ctx, idParam(req), await body<RoleInput>(req))) },
+  { path: "/byline/roles/:id/assignments", method: "post", handler: handle(async (ctx, req) => saveAssignment(ctx, idParam(req), null, await body<AssignmentInput>(req))) },
+  { path: "/byline/roles/:id/assignments/:assignment", method: "patch", handler: handle(async (ctx, req) => saveAssignment(ctx, idParam(req), idParam(req, "assignment"), await body<AssignmentInput>(req))) },
+  { path: "/byline/roles/:id/assignments/:assignment", method: "delete", handler: handle((ctx, req) => removeAssignment(ctx, idParam(req, "assignment"))) },
+  { path: "/byline/review-workflows", method: "get", handler: handle((ctx) => workflowsOverview(ctx)) },
+  { path: "/byline/review-workflows", method: "post", handler: handle(async (ctx, req) => saveWorkflow(ctx, null, await body<WorkflowInput>(req))) },
+  { path: "/byline/review-workflows/preview", method: "post", handler: handle(async (ctx, req) => previewRouting(ctx, await body(req))) },
+  { path: "/byline/review-workflows/:id", method: "patch", handler: handle(async (ctx, req) => saveWorkflow(ctx, idParam(req), await body<WorkflowInput>(req))) },
+  { path: "/byline/school-years", method: "get", handler: handle((ctx) => yearsOverview(ctx)) },
+  { path: "/byline/school-years", method: "post", handler: handle(async (ctx, req) => planYear(ctx, await body(req))) },
+  { path: "/byline/school-years/:id", method: "delete", handler: handle((ctx, req) => discardYear(ctx, idParam(req))) },
+  { path: "/byline/school-years/:id/preview", method: "post", handler: handle(async (ctx, req) => previewRollover(ctx, idParam(req), await body(req))) },
+  { path: "/byline/school-years/:id/activate", method: "post", handler: handle(async (ctx, req) => activateYear(ctx, idParam(req), await body(req))) },
+  { path: "/byline/workload", method: "get", handler: handle((ctx) => workload(ctx)) },
   { path: "/byline/people", method: "get", handler: handle((ctx, req) => peopleList(ctx, peopleQuery(req.searchParams))) },
   { path: "/byline/people", method: "post", handler: handle(async (ctx, req) => createPerson(ctx, await body<NewPerson>(req))) },
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
@@ -559,7 +617,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
-  { path: "/byline/presets", method: "get", handler: handle(async () => presetsPayload()) },
+  { path: "/byline/presets", method: "get", handler: handle(presetsPayload) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
   { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
   // The sidebar's open-work counts (Stories, Media, Collections and the promoted Stories views).
@@ -577,6 +635,15 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/workspace", method: "get", handler: handle((ctx, req) => storyWorkspace(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "get", handler: handle((ctx, req) => workflowReadModel(ctx, idParam(req))) },
   { path: "/byline/stories/:id/workflow", method: "post", handler: handle(updateWorkflow) },
+  { path: "/byline/stories/:id/lifecycle", method: "post", handler: handle(async (ctx, req) => moveLifecycle(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review", method: "get", handler: handle((ctx, req) => reviewState(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/submitted", method: "get", handler: handle((ctx, req) => submittedVersion(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/submit", method: "post", handler: handle((ctx, req) => submitForReview(ctx, idParam(req))) },
+  { path: "/byline/stories/:id/review/claim", method: "post", handler: handle(async (ctx, req) => claimReview(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review/comments", method: "post", handler: handle(async (ctx, req) => addReviewComment(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/review/comments/:comment", method: "patch", handler: handle(async (ctx, req) => changeReviewComment(ctx, idParam(req), idParam(req, "comment"), await body(req))) },
+  { path: "/byline/stories/:id/review/comments/:comment", method: "delete", handler: handle((ctx, req) => changeReviewComment(ctx, idParam(req), idParam(req, "comment"), { remove: true })) },
+  { path: "/byline/stories/:id/review/decision", method: "post", handler: handle(async (ctx, req) => decideReview(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/contributors", method: "put", handler: handle(saveContributors) },
   { path: "/byline/stories/:id/resources", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "add")) },
   { path: "/byline/stories/:id/resources/:resourceId", method: "post", handler: handle((ctx, req) => saveResources(ctx, req, "update")) },

@@ -10,5 +10,4 @@
 !**/.env.example
 apps/newsroom/media
 apps/newsroom/publication-media
-wordpress-plugin/release
 .DS_Store

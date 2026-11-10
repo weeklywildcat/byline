@@ -99,7 +99,9 @@ beforeAll(async () => {
   // Plans: Budget is overdue with an editor and a planned publication; Ready is ready and unassigned.
   expect((await workflow("alice", "budget", { status: "reporting" })).status).toBe(200);
   expect((await workflow("editor", "budget", { deadline: "2026-11-05", plannedPublishAt: "2026-11-12T10:00", editorId: accounts.editor.id })).status).toBe(200);
-  expect((await workflow("alice", "ready", { status: "ready" })).status).toBe(200);
+  // Ready is review complete: only the review engine or an editor's override sets it.
+  expect((await workflow("alice", "ready", { status: "ready" })).status).toBe(403);
+  expect((await workflow("editor", "ready", { status: "ready" })).status).toBe(200);
   // 22:00 on the 12th in New York is already the 13th in UTC: the planned day is the newsroom's.
   expect((await workflow("editor", "ready", { plannedPublishAt: "2026-11-12T22:00" })).status).toBe(200);
 
@@ -207,7 +209,8 @@ describe("Stories filters", () => {
   });
   it("unassigned", async () => expect(only(await planning("alice", { unassigned: true }))).toEqual(ids("ready")));
   it("overdue", async () => expect(only(await planning("editor", { overdue: true }))).toEqual(ids("budget")));
-  it("needs review", async () => expect(only(await planning("editor", { needsReview: true }))).toEqual(ids("ready")));
+  // Needs review is the Review phase; Ready means review is complete, so it no longer matches.
+  it("needs review", async () => expect(only(await planning("editor", { needsReview: true }))).toEqual([]));
   it("Collection membership, from the Collection's own story list and within the reader's scope", async () => {
     expect(only(await planning("editor", { collectionId }))).toEqual(ids("budget", "library"));
     expect(only(await planning("alice", { collectionId }))).toEqual(ids("budget"));
@@ -229,8 +232,11 @@ describe("GET /api/byline/planning", () => {
 
 describe("Board moves and List edits", () => {
   it("move a story through the one workflow endpoint", async () => {
-    expect((await workflow("alice", "budget", { status: "editing" })).status).toBe(200);
-    expect((await planning("alice")).stories.find((row) => row.id === story.budget)?.workflow.id).toBe("editing");
+    // Phase ids and the older stage ids both work; Board columns read as phases.
+    expect((await workflow("alice", "budget", { status: "drafting" })).status).toBe(200);
+    expect((await planning("alice")).stories.find((row) => row.id === story.budget)?.workflow).toMatchObject({ id: "drafting", label: "Drafting" });
+    expect((await workflow("alice", "budget", { status: "writing" })).status).toBe(200);
+    expect((await workflow("alice", "budget", { status: "review" })).status).toBe(403);
     expect((await workflow("bob", "budget", { status: "pitch" })).status).toBe(403);
   });
 

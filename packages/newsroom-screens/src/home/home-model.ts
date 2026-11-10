@@ -1,3 +1,4 @@
+import type { ContributorEntry } from "../editorial/editorial-model";
 import {
   isPlanningDateOverdue,
   parsePlanningDate,
@@ -69,6 +70,12 @@ export type HomePresetsPayload = {
   presets: Record<string, HomePreset>;
   types: string[];
   revision: number;
+  /**
+   * What New story may offer this reader besides a title and template. Hosts
+   * that omit it (WordPress) offer title and template only; `canAssign` gates
+   * writers and deadline, which only editors set.
+   */
+  create?: { sections: Array<{ id: number; name: string }>; writers: ContributorEntry[]; canAssign: boolean };
 };
 
 export type HomePresetMutation = {
@@ -136,7 +143,7 @@ function storyHref(story: PlanningStory): string | null {
 }
 
 function isReadyForReview(story: PlanningStory): boolean {
-  return Boolean(story.needsReview || story.workflow.id === "ready" || story.workflow.id === "ready-for-review");
+  return Boolean(story.needsReview || story.workflow.id === "review" || story.workflow.id === "ready-for-review");
 }
 
 function addStoryAttention(items: HomeAttentionItem[], story: PlanningStory, now: Date): void {
@@ -246,7 +253,7 @@ function addDeploymentAttention(items: HomeAttentionItem[], deployment: HomeDepl
     items.push({
       id: "deployment-needs-configuration",
       title: "Configure website publishing",
-      detail: "WordPress has a newer public revision, but no deployment provider is configured.",
+      detail: "The newsroom has a newer public revision, but no deployment provider is configured.",
       severity: "critical",
       source: "deployment"
     });
@@ -257,7 +264,7 @@ function addDeploymentAttention(items: HomeAttentionItem[], deployment: HomeDepl
     items.push({
       id: "deployment-failed",
       title: "Website update failed",
-      detail: "The story remains safely in WordPress. Retry the website update.",
+      detail: "The story remains safely in the newsroom. Retry the website update.",
       severity: "critical",
       source: "deployment"
     });

@@ -35,6 +35,9 @@ beforeAll(async () => {
     insert into story_plans (story_id, workflow, updated_at, created_at) values (1, 'pitch', now(), now()), (2, 'pitch', now(), now()), (3, 'pitch', now(), now()), (4, 'pitch', now(), now())`);
   await db().execute(sql`insert into live_updates (id, story_id, body, state, updated_at, created_at) values (1, 1, '{}'::jsonb, 'published', now(), now()), (2, 2, '{}'::jsonb, 'draft', now(), now())`);
   await payload.db.migrate({ migrations: migrations.slice(0, target + 1) } as never);
+  // Activity recorded by the new live controls, before anyone rolls back.
+  await db().execute(sql`insert into story_activity (story_id, action, updated_at, created_at) values
+    (1, 'live-coverage-started', now(), now()), (1, 'live-mode-changed', now(), now()), (1, 'live-published', now(), now()), (1, 'live-submitted', now(), now()), (1, 'story-created', now(), now())`);
 }, 300_000);
 
 afterAll(async () => {
@@ -69,5 +72,9 @@ describe("live Story mode migration", () => {
     const rows = (await db().execute(sql`select id, live_coverage_state s from stories order by id`)).rows;
     expect(rows.map((row) => row.s)).toEqual(["live", "ended", "off", "off"]);
     expect((await db().execute(sql`select count(*)::int n from live_updates`)).rows[0].n).toBe(2);
+    // Rollback works after the live controls were used: a published update maps to its closest older kind, entries with
+    // no older equivalent are dropped, everything else stays.
+    const actions = (await db().execute(sql`select action::text a from story_activity order by id`)).rows.map((row) => row.a);
+    expect(actions).toEqual(["live-published-from-field", "live-submitted", "story-created"]);
   });
 });

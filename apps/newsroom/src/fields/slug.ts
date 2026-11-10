@@ -36,8 +36,8 @@ export function slugField(from: string, collection: CollectionSlug, overrides: P
   } as TextField;
 }
 
-/** The WordPress ID a record was imported from. Read-only; only the import sets it. */
-export function legacyIdField(name = "legacyWordPressId", label = "WordPress ID"): NumberField {
+/** Historical import provenance. Keep the existing column name for database compatibility. */
+export function legacyIdField(name = "legacyWordPressId", label = "Source record ID"): NumberField {
   return {
     name,
     label,

@@ -46,6 +46,7 @@
     "./editorial/editorial-model": "./src/editorial/editorial-model.ts",
     "./editorial/editorial-rest": "./src/editorial/editorial-rest.ts",
     "./editorial/pickers": "./src/editorial/pickers.tsx",
+    "./editorial/workload-hints": "./src/editorial/workload-hints.ts",
     "./editorial/story-sidebar-navigation": "./src/editorial/story-sidebar-navigation.ts",
     "./editorial/story-video-model": "./src/editorial/story-video-model.ts",
     "./home/HomeApp": "./src/home/HomeApp.tsx",
@@ -101,13 +102,15 @@
     "./story/TaskCreateDialog": "./src/story/TaskCreateDialog.tsx",
     "./story/TaskEditDialog": "./src/story/TaskEditDialog.tsx",
     "./story/TaskQuickFields": "./src/story/TaskQuickFields.tsx",
+    "./story-context/StoryContext": "./src/story-context/StoryContext.tsx",
+    "./story/attention": "./src/story/attention.ts",
+    "./story/lifecycle": "./src/story/lifecycle.ts",
     "./story/media-icons": "./src/story/media-icons.ts",
     "./story/notes-model": "./src/story/notes-model.ts",
     "./story/rows": "./src/story/rows.tsx",
     "./story/story-fetchers": "./src/story/story-fetchers.ts",
     "./story/story-parts": "./src/story/story-parts.tsx",
     "./story/story-query": "./src/story/story-query.ts",
-    "./story/use-complete-task": "./src/story/use-complete-task.ts",
     "./story/use-update-task": "./src/story/use-update-task.ts",
     "./workspace/ActivitySection": "./src/workspace/ActivitySection.tsx",
     "./workspace/AppointmentDialog": "./src/workspace/AppointmentDialog.tsx",
@@ -178,6 +181,6 @@
   },
   "devDependencies": {
     "jsdom": "26.1.0",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }

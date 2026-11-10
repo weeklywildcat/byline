@@ -23,7 +23,6 @@
     "jobs:scheduled": "payload jobs:run --cron '* * * * *' --queue default --limit 10",
     "jobs:reporting": "payload jobs:run --cron '*/10 * * * * *' --queue reporting --limit 1",
     "publication-media:requeue": "payload run scripts/requeue-publication-media.ts",
-    "import:wordpress": "payload run scripts/import-wordpress-native.ts --",
     "publication:snapshot:prepare": "payload run scripts/publication-snapshot.ts prepare",
     "publication:snapshot:status": "payload run scripts/publication-snapshot.ts status",
     "benchmark:publication-media": "node --import tsx scripts/benchmark-publication-media.ts",
@@ -35,8 +34,7 @@
     "test:login:browser": "playwright test --config playwright.login.config.ts",
     "migrate:check": "node scripts/check-migrations.mjs",
     "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
-    "test:people:browser": "playwright test --config playwright.people.config.ts",
-    "provision:wordpress-access": "payload run scripts/provision-wordpress-access.ts --"
+    "test:people:browser": "playwright test --config playwright.people.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -73,12 +71,14 @@
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.10.1",
     "@types/pg": "8.15.6",
+    "jsdom": "26.1.0",
     "pg": "8.20.0",
     "postcss": "8.5.31",
     "postcss-nesting": "14.0.3",
+    "sass": "1.103.1",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vitest": "4.1.11",
+    "vitest": "4.1.12",
     "@playwright/test": "1.62.1",
     "tsx": "4.23.15"
   }

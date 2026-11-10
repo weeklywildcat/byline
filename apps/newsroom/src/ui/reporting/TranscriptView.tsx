@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
@@ -444,11 +445,11 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
         </div>
       ) : null}
       {overriding ? (
-        <form className="grid gap-1.5" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); run.mutate("override"); }}>
+        <InlineForm label="Editor override" className="grid gap-1.5" onSubmit={() => { if (!run.isPending && reason.trim().length >= 8) run.mutate("override"); }} onCancel={() => setOverriding(false)}>
           <p className="text-xs text-destructive">This was said off the record. Approving public use is recorded with your name and reason.</p>
           <Input value={reason} aria-label="Why may this be used?" placeholder="Why may this be used?" onChange={(event) => setReason(event.target.value)} />
-          <div className="flex gap-2"><Button type="submit" size="xs" variant="destructive" disabled={run.isPending || reason.trim().length < 8}>Approve public use</Button><Button type="button" size="xs" variant="ghost" onClick={() => setOverriding(false)}>Cancel</Button></div>
-        </form>
+          <div className="flex gap-2"><Button type="button" size="xs" variant="destructive" disabled={run.isPending || reason.trim().length < 8} onClick={() => run.mutate("override")}>Approve public use</Button><Button type="button" size="xs" variant="ghost" onClick={() => setOverriding(false)}>Cancel</Button></div>
+        </InlineForm>
       ) : null}
     </div>
   );

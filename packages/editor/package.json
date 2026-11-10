@@ -27,5 +27,8 @@
     "payload": "3.92.1",
     "react": "^19.0.0",
     "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "vitest": "4.1.12"
   }
 }

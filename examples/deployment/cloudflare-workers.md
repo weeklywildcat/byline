@@ -1,126 +1,23 @@
 # Cloudflare Workers Builds
 
-Production Byline uses Workers + static assets. Wrangler is pinned in
-`@byline/web`; its scripts explicitly use `apps/web/wrangler.jsonc`. Do not deploy
-through a root redirected Wrangler config, add D1, or upload changed files with
-a custom uploader. Wrangler's static asset manifest deduplicates asset contents.
+The public site uses [Cloudflare Static Assets](https://developers.cloudflare.com/workers/static-assets/). Wrangler deploys `apps/web/out/` with the configuration in `apps/web/wrangler.jsonc`.
 
-## Cloudflare settings to change after merge
+Configure the Git-connected project in **Workers & Pages → byline → Settings → Build**:
 
-**The build variable and build-command changes must be made in the Cloudflare
-Workers dashboard.** The Git repository cannot enforce them through Wrangler.
-In **Workers & Pages → byline → Settings → Build**, set the following for the
-Git-connected Workers Builds project (including preview builds, if enabled):
-
-| Setting | Required value |
+| Setting | Value |
 | --- | --- |
 | Production branch | `main` |
-| Root directory | Prefer `apps/web` (framework detection/cache relative to the Astro project). An existing repository-root setting also works with the new command. |
+| Root directory | `apps/web` |
 | Build command | `npm run build:cloudflare` |
-| Deploy command | `npm run deploy` (when root is `apps/web`; retain an existing working root-relative deploy command otherwise) |
-| Preview command | `npm run deploy:preview` (when root is `apps/web`; retain the existing root-relative preview command otherwise) |
-| Build variable | **`SKIP_DEPENDENCY_INSTALL=1`** (build-time variable, not a Worker runtime secret) |
-| Node version | `24` or a supported newer version |
-| Build cache | **Enabled** |
+| Deploy command | `npm run deploy` |
+| Preview command | `npm run deploy:preview` |
+| Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
+| Build variable | `BYLINE_NEWSROOM_BUILD_URL=https://newsroom.example.edu/api/byline/build` |
+| Build secret | `BYLINE_BUILD_TOKEN`, shared with the newsroom |
+| Build cache | Enabled |
 
-The `build:cloudflare` script is available from **both** the repository root
-and `apps/web`. It installs only `@byline/web` and its workspace dependencies
-using the **existing root lockfile**:
+The scoped build installs just the Astro workspace and dependencies from the root lockfile. It preserves the restored Astro cache across the install. Configure previews with their own intended snapshot source. Keep fixture and offline snapshot overrides out of production.
 
-```sh
-npm ci --workspace=@byline/web --include-workspace-root=false --prefer-offline --no-audit --no-fund
-npm run build:frontend
-```
+Create a production deploy hook and set its HTTPS URL in the publication worker's private environment as `BYLINE_DEPLOY_HOOK_URL`. Once the worker promotes a current snapshot, it requests a build. Confirm `contentSource: "payload"` and the expected `publicationRevision` in the public `/_byline/manifest.json`.
 
-Unlike a plain scoped `npm ci`, the wrapper **moves the restored
-`apps/web/node_modules/.astro` incremental cache out of `node_modules`
-before npm cleans the dependency tree, and moves it back before building**.
-The earlier scoped-install benchmark rejected this approach without the cache
-preservation step; do not replace the wrapper with a raw `npm ci` in the
-dashboard. A cold build remains correct if the cache is missing.
-
-To confirm this is active, the Cloudflare log should **not** contain
-`Installing project dependencies: npm clean-install` before the user build
-command. It should contain `[byline] npm ci ... --workspace=@byline/web` and
-then `[byline] npm run build:frontend`. Without both dashboard changes,
-Cloudflare will continue installing the full monorepo, and can even install
-twice if only the build command was changed.
-
-npm workspaces still link internal `@byline/*` packages. Wrangler is installed
-from the frontend workspace's pinned devDependencies.
-
-For the Payload-backed public build, configure these **Build** values in
-Cloudflare (not Worker runtime variables):
-
-```env
-BYLINE_NEWSROOM_BUILD_URL=https://byline.example.edu/api/byline/build
-BYLINE_BUILD_TOKEN=<same build-only credential configured on the newsroom>
-```
-
-Store `BYLINE_BUILD_TOKEN` as a Cloudflare build secret. Remove rollout
-`BYLINE_LEGACY_REST_BUILD=1` and do not configure fixture variables or
-`BYLINE_BUILD_SNAPSHOT_FILE` in production. Publication configuration comes
-from Snapshot v2.
-
-Create one production **Deploy Hook** for the Git-connected Workers Builds
-project/branch, then put that private HTTPS URL only in the Payload deployment
-environment:
-
-```env
-BYLINE_DEPLOY_HOOK_URL=https://<cloudflare deploy-hook URL>
-```
-
-After Payload promotes a current snapshot, its publication worker queues a
-coalescing `deploy-public-site` job and POSTs that hook. Cloudflare then
-acquires the promoted snapshot through `BYLINE_NEWSROOM_BUILD_URL`. The hook
-URL is credential-like and must not be committed or exposed to the browser.
-
-`WORKERS_CI_BUILD_UUID`, `WORKERS_CI_COMMIT_SHA` and
-`WORKERS_CI_BRANCH` are supplied by Workers, not manually maintained settings.
-
-Configure **Settings → Build → Build watch paths** using these exact patterns
-(relative to the repository root; Cloudflare's `*` spans nested path characters):
-
-```text
-Include:
-apps/web/*
-packages/*
-schemas/*
-wordpress-plugin/*
-scripts/*
-tests/fixtures/*
-package.json
-package-lock.json
-.npmrc
-.nvmrc
-.node-version
-tsconfig*
-.github/workflows/*
-
-Exclude:
-docs/*
-migration/*
-examples/*
-apps/discord-bot/*
-README.md
-AGENTS.md
-```
-
-This conservatively includes WordPress and all shared packages/schemas because
-they can alter public serialization or rendering. Pure documentation or
-Discord-only source pushes do not build the site; a root lockfile change still
-does. Exclusions take precedence. Deploy-hook invocations intentionally still
-build even when there is no relevant Git diff.
-
-Deploy-hook acceptance is not evidence of a live revision. Verify
-`/_byline/manifest.json` through the public hostname. A no-op warm build should
-show restored dynamic routes; absent cache merely produces a correct cold build.
-A cold build always downloads the required media again. Clear cache under
-**Settings → Build → Build cache → Clear Cache**, or use Astro `--force` locally.
-See [snapshot operations](../../docs/build-snapshots.md) and the
-[measured benchmark](../../docs/migration/build-performance-2026-10.md).
-
-Official references: [monorepos](https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/),
-[build configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/),
-[build caching](https://developers.cloudflare.com/workers/ci-cd/builds/build-caching/),
-[watch paths](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/).
+For rollback, select the last known good deployment in Cloudflare. For acquisition or media failures, use [snapshot operations](../../docs/payload-build-snapshots.md) to repair the current revision and rebuild.

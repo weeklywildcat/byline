@@ -47,7 +47,7 @@ export const COLLECTIONS_VIEW_PATH = "/byline-collections";
  * Stories, Calendar, Media, Collections (reporting projects; public coverage
  * is only an optional presentation of a Collection, never a destination),
  * then the editor tools (People, Polls, Feedback…), each as its screen is ported
- * (docs/payload-migration.md §7.2). There is no generic Planning
+ * (docs/newsroom-os.md). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
  * and here each is first-class. Visibility is a convenience; every
  * destination enforces its own access on the server.
@@ -76,6 +76,8 @@ export function navigationFor(role: Role): NavItem[] {
 export function activeNavKey(items: readonly Pick<NavItem, "key" | "path" | "exact">[], pathname: string, adminRoute: string): string | null {
   if (storyIdFromPath(pathname, adminRoute) !== null && items.some((item) => item.key === "stories")) return "stories";
   const path = stripAdmin(pathname, adminRoute);
+  // Review workflows are part of the team's operations, beside People and Roles.
+  if (path === "/review-workflows" && items.some((item) => item.key === "people")) return "people";
   const match = items
     .filter((item) => (item.path === "" || item.exact ? path === item.path : path === item.path || path.startsWith(`${item.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0];
@@ -159,8 +161,9 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   const path = stripAdmin(pathname, adminRoute);
   const nav = NAVIGATION.find((item) => item.path === path);
   if (nav) return [{ label: nav.label }];
-  if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Story" }];
+  if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Stories", path: STORIES_PATH }, { label: "Story" }];
   if (path === "/site") return [{ label: "Site" }];
+  if (path === "/review-workflows") return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
   if (path === "/content-health") return [{ label: "Content Health" }];
   if (/^\/collections\/pages\/\d+$/.test(path)) return [{ label: "Site", path: "/site?tab=pages" }, { label: "Page" }];
   if (path === SYSTEM_ADMINISTRATION_PATH) return [{ label: "System administration" }];

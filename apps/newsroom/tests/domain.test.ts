@@ -63,11 +63,14 @@ describe("workflow", () => {
     expect((WORKFLOW_STAGES as readonly string[]).includes("published")).toBe(false);
   });
 
-  it("derives Published from publication state and recovers the stored stage", () => {
+  it("derives Published from publication state and projects the stored stage onto a phase", () => {
     expect(effectiveWorkflow("editing", "published")).toBe("published");
-    expect(effectiveWorkflow("editing", "draft")).toBe("editing");
+    expect(effectiveWorkflow("editing", "draft")).toBe("review");
+    expect(effectiveWorkflow("assigned", "draft")).toBe("reporting");
+    expect(effectiveWorkflow("writing", "draft")).toBe("drafting");
     expect(effectiveWorkflow(undefined, "draft")).toBe("pitch");
-    expect(workflowLabel("ready")).toBe("Ready for Review");
+    expect(workflowLabel("ready")).toBe("Ready");
+    expect(workflowLabel("editing")).toBe("Review");
   });
 
   it("keeps formats tiny and live out of them", () => {
@@ -155,7 +158,7 @@ describe("navigation", () => {
     expect(activeNavKey(navigationFor("staff"), "/admin/collections/stories", "/admin")).toBeNull();
     expect(locationFor("/admin/stories", "/admin")).toEqual([{ label: "Stories" }]);
     expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
-    expect(locationFor("/admin/collections/stories/12", "/admin")).toEqual([{ label: "Story" }]);
+    expect(locationFor("/admin/collections/stories/12", "/admin")).toEqual([{ label: "Stories", path: "/stories" }, { label: "Story" }]);
   });
 
   it("keeps raw Payload screens in an administrators-only section", () => {
@@ -204,7 +207,7 @@ describe("global Create", () => {
 describe("app header location", () => {
   it("names Byline screens and files raw screens under System administration", () => {
     expect(locationFor("/admin", "/admin")).toEqual([{ label: "Home" }]);
-    expect(locationFor("/admin/collections/stories/3", "/admin")).toEqual([{ label: "Story" }]);
+    expect(locationFor("/admin/collections/stories/3", "/admin")).toEqual([{ label: "Stories", path: "/stories" }, { label: "Story" }]);
     expect(locationFor("/admin/system", "/admin")).toEqual([{ label: "System administration" }]);
     expect(locationFor("/admin/collections/stories", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);
     expect(locationFor("/admin/collections/stories/create", "/admin")).toEqual([{ label: "System administration", path: "/system" }, { label: "Stories" }]);

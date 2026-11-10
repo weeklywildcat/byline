@@ -63,12 +63,11 @@ async function scopeOf(ctx: ScreenContext): Promise<CollectionScope> {
   return scope;
 }
 
-/** The public page for a presentation that is actually live: the WordPress-authoritative site's, until cutover. */
+/** Address of the public presentation once the next snapshot is deployed. */
 function publicUrl(doc: CollectionDoc): string {
   const site = process.env.BYLINE_PUBLIC_SITE_URL?.replace(/\/$/, "");
   const presentation = doc.publicPresentation;
-  // Only a coverage WordPress already publishes is live; a Payload-only presentation is not, yet.
-  return site && presentation?.enabled && presentation.slug && doc.legacyWordPressId ? `${site}/coverage/${presentation.slug}/` : "";
+  return site && presentation?.enabled && presentation.slug ? `${site}/coverage/${presentation.slug}/` : "";
 }
 
 function presentationDto(doc: CollectionDoc, media: Map<number, Media>): PublicCoveragePresentation {

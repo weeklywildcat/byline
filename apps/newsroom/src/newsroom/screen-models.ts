@@ -17,9 +17,10 @@ import type {
 import { APIError, type PayloadRequest, type Where } from "payload";
 import { scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { atLeast, relationId, relationIds, requestUser, sameId, type NewsroomUser } from "../access/user";
-import { WORKFLOW_OPTIONS } from "../domain/vocabulary";
+import { PHASE_STATUSES } from "@byline/newsroom-screens/story/lifecycle";
 import { effectiveWorkflow, workflowLabel } from "../domain/workflow";
-import type { Appointment, CollectionInterview, Media, Person, ProductionAssignment, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
+import type { Appointment, CollectionInterview, Media, Person, ProductionAssignment, ReviewRun, Section, Source, Story, StoryPlan, Task, User } from "../payload-types";
+import { attentionFor, openRuns, reviewSummary } from "./attention";
 import { scheduledPublicationsForStories } from "./scheduled-publication";
 import { collectionNames } from "./collections";
 import { personAvatarUrls } from "./portraits";
@@ -51,10 +52,18 @@ const asUser = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as
 const num = (value: unknown) => Number(relationId(value));
 const LIMITS = { stories: 200, tasks: 100, visualWork: 50, appointments: 100, activity: 16 } as const;
 
-export const STATUSES = [
-  ...WORKFLOW_OPTIONS.map((option) => ({ id: option.value, label: option.label, group: option.value === "on-hold" || option.value === "dropped" ? "sidelined" : "main", selectable: true })),
-  { id: "published", label: "Published", group: "derived", selectable: false }
-];
+/** Board columns and filters: the lifecycle phases (docs/story-lifecycle.md), never the stored stages. */
+export const STATUSES = PHASE_STATUSES.map((status) => ({ ...status }));
+
+/**
+ * The phases as this reader may set them. Review and Ready come from the
+ * review engine; only an editor's manual override may choose them, so for
+ * everyone else they are not selectable (no Move to, no drop target).
+ */
+export function statusesFor(ctx: Pick<ScreenContext, "user">) {
+  const editor = atLeast(ctx.user, "editor");
+  return STATUSES.map((status) => (!editor && (status.id === "review" || status.id === "ready") ? { ...status, selectable: false } : status));
+}
 
 /* --------------------------------------------------------------- people */
 
@@ -284,6 +293,8 @@ export type StoryExtras = {
   appointments: Appointment[];
   /** The next scheduled publish of an unpublished story, from Payload's own schedule; null when none. */
   scheduledAt: string | null;
+  /** The Story's open review run, when the reader may read it (docs/review.md). */
+  run?: ReviewRun | null;
 };
 
 function featured(story: Story): PlanningStory["featuredImage"] {
@@ -334,7 +345,9 @@ export function planningStory(ctx: ScreenContext, people: People, story: Story, 
     visual: primary ? { type: primary.type as PlanningStory["visual"]["type"], status: primary.status as PlanningStory["visual"]["status"], label: primary.title } : { type: "none", status: "needed" },
     openTaskCount: extras.tasks.filter((task) => task.state !== "completed").length,
     featuredImage: featured(story),
-    needsReview: workflow === "ready",
+    needsReview: workflow === "review",
+    attention: attentionFor(ctx, people, story, plan, extras, workflow, extras.run),
+    review: reviewSummary(extras.run, Number(ctx.user.id)),
     reporting: reportingSummary(extras.sources, extras.appointments, ctx.now, localToday(ctx)),
     mediaSummary: mediaSummary(extras.production),
     notes: null
@@ -373,7 +386,7 @@ export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
     readableStories(ctx, ids, storySelect, 1),
     ctx.req.payload.find({ collection: "tasks", where: byStory, ...all }),
     ctx.req.payload.find({ collection: "production-assignments", where: byStory, ...all }),
-    ctx.req.payload.find({ collection: "sources", where: byStory, ...all, select: { story: true, status: true } }),
+    ctx.req.payload.find({ collection: "sources", where: byStory, ...all, select: { story: true, status: true, label: true, assignees: true, updatedAt: true } }),
     ctx.req.payload.find({ collection: "appointments", where: byStory, ...all })
   ]);
   const extras = new Map<number, StoryExtras>(ids.map((id) => [id, { tasks: [], production: [], sources: [], appointments: [], scheduledAt: null }]));
@@ -388,6 +401,10 @@ export async function storiesWithExtras(ctx: ScreenContext, ids: number[]) {
   for (const row of production.docs) extras.get(num(row.story))?.production.push(row);
   for (const source of sources.docs) extras.get(num(source.story))?.sources.push(source as Source);
   for (const appointment of appointments.docs) extras.get(num(appointment.story))?.appointments.push(appointment);
+  for (const [id, run] of await openRuns(ctx, ids)) {
+    const entry = extras.get(id);
+    if (entry) entry.run = run;
+  }
   return { stories, extras };
 }
 
@@ -533,7 +550,7 @@ export async function storyWorkspace(ctx: ScreenContext, storyId: number): Promi
     format: { format: story.format === "video" ? "video" : "standard", videoUrl: story.video?.url ?? "", video: null },
     sections: row.sections ?? [],
     contributors: { storyId, contributors, available: manager ? everyone : [], canEdit: manager, canCreateGuests: manager && editor },
-    statuses: STATUSES,
+    statuses: statusesFor(ctx),
     tasks: work.tasks.map((task) => editorialTask(people, task)),
     sources: sources.docs.map((source) => storySource(people, source)),
     appointments: work.appointments.map((appointment) => storyAppointment(people, appointment, sourceLabels)),

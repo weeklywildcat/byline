@@ -124,7 +124,6 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
   return (
     <BylineEditorHostProvider host={host}>
       <div className="flex flex-col gap-8">
-        <StoryModeControl />
         <article className="flex w-full flex-col gap-6" aria-label="Article">
           <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-4 md:px-0">
             {showKicker ? (
@@ -205,6 +204,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
                   disabled={readOnly}
                 />
               </Property>
+              <StoryModeControl />
               {format.value === "video" ? (
                 <Property label="YouTube video" htmlFor="story-video-url">
                   <div className="flex max-w-lg flex-col gap-1">
@@ -232,7 +232,7 @@ export function WriteTab({ context, paths }: { context: StoryScreenContext; path
             </section>
             {legacy ? (
               <Alert>
-                <AlertTitle>Imported from WordPress</AlertTitle>
+                <AlertTitle>Archived HTML</AlertTitle>
                 <AlertDescription>This story keeps the body it was published with and renders exactly as before. Converting it to the Byline editor is a separate, reviewed step.</AlertDescription>
               </Alert>
             ) : null}

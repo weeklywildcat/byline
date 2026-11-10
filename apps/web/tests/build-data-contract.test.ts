@@ -23,13 +23,13 @@ describe("required build data", () => {
     const cause = new Error("ECONNRESET");
 
     try {
-      await requireBuildData("/wp-json/wp/v2/posts", async () => {
+      await requireBuildData("public snapshot: posts", async () => {
         throw cause;
       });
       expect.unreachable("should have thrown");
     } catch (error) {
       expect((error as BylineBuildDataError).cause).toBe(cause);
-      expect((error as BylineBuildDataError).endpoint).toBe("/wp-json/wp/v2/posts");
+      expect((error as BylineBuildDataError).endpoint).toBe("public snapshot: posts");
     }
   });
 });

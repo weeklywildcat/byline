@@ -30,7 +30,7 @@ for (const width of [390, 1280]) {
     const update = { id: 904, html: '<article class="article-live-update" id="update-904" data-update-id="904"><header><time datetime="2026-08-15T14:12:00Z" data-live-relative>Aug 15, 10:12 AM</time></header><h3>New from the field</h3><p>A fresh update between static builds.</p></article>' };
     let polls = 0;
     let ended = false;
-    await page.route('**/api/live/9', (route) => {
+    await page.route('**/_byline/live/9.json', (route) => {
       polls++;
       return route.fulfill({ json: { ...feed, status: ended ? "ended" : "live", endedLabel: ended ? "Aug 15, 10:15 AM" : null, updates: [...(ended ? [{ id: 905, html: '<article class="article-live-update" id="update-905" data-update-id="905"><p>Final update.</p></article>' }] : []), update, ...feed.updates] } });
     });

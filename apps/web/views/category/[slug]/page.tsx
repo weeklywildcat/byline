@@ -6,7 +6,7 @@ import { filterGeneralEditorialPosts, isHiddenCategory } from "@/lib/content";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { buildPageMetadata, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getCategorySeoDescription } from "@/lib/sections";
-import { getCategoryBySlug, getPostsByCategory } from "@/lib/wordpress";
+import { getCategoryBySlug, getPostsByCategory } from "@/lib/public-content";
 
 type CategoryPageProps = {
   params: Promise<{

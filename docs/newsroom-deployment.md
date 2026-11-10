@@ -1,8 +1,7 @@
 # Payload newsroom deployment
 
-The Payload newsroom is deployed as a separate service from the legacy WordPress
-CMS. Production should use PostgreSQL, persistent media/publication volumes and
-the repository's cache-friendly `apps/newsroom/Dockerfile`.
+The newsroom uses PostgreSQL, persistent media and publication volumes, and
+the repository's `apps/newsroom/Dockerfile`.
 
 ## Staff entrance
 
@@ -14,10 +13,7 @@ Byline login and signed-in staff to Byline Home. If Google sign-in is enabled,
 register the HTTPS origin and its `/api/byline/auth/google/callback` URL with
 the Google OAuth client.
 
-Before announcing the move, verify that staff can open the root, sign in, and
-reach Byline Home. Once the newsroom cutover is approved, enable the existing
-WordPress move notice with `define('BYLINE_NEWSROOM_CUTOVER', true);` in
-`wp-config.php`. Remove the setting to hide the notice during a rollback.
+Verify the root redirects to the newsroom login and staff can reach Byline Home.
 
 ## Build context
 

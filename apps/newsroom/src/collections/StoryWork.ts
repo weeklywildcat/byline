@@ -29,7 +29,7 @@ import {
 
 /**
  * The Story Workspace's records: separate objects that all point at one story
- * (docs/story-workspace.md). Each has its own owner, deadline and status
+ * (docs/newsroom-os.md). Each has its own owner, deadline and status
  * vocabulary; none of them is the story's workflow or publication state, and
  * none is ever public.
  */

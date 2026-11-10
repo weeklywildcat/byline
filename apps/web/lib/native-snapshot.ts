@@ -35,7 +35,7 @@ export function parseNativeSnapshot(bytes: Uint8Array, pointer?: NativeSnapshotP
 let local: PublicBuildSnapshotV2 | undefined;
 export function getNativeSnapshot(): PublicBuildSnapshotV2 | undefined {
   const file = process.env.BYLINE_PREPARED_SNAPSHOT_FILE;
-  if (!file || process.env.BYLINE_PREPARED_SNAPSHOT_PROVIDER !== "payload") return undefined;
+  if (!file) return undefined;
   return local ??= parseNativeSnapshot(readFileSync(file));
 }
 

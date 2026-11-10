@@ -5,18 +5,18 @@ import { buildArticlePresentation } from "./article-presentation";
 import { buildCoveragePresentation } from "./coverage-presentation";
 import { isGeneralEditorialPost, isVisibleContentPost } from "./content";
 import { getPublicationConfig } from "./publication";
-import { getPostContributors, isGuestContributor, getPostPrimaryGameId, type WordPressAuthor, type WordPressPost } from "./wordpress";
+import { getPostContributors, isGuestContributor, getPostPrimaryGameId, type ArchiveAuthor, type ArchivePost } from "./public-content";
 import type { WebBuildSnapshot } from "./build-snapshot";
 
 const identity = (person: { id: string | number; type?: string }) => `${person.type === "guest" ? "guest" : "user"}:${person.id}`;
 /** Keep the exact presentation calculation shared with the article renderer.
  * The selected related/more-by cards and coverage-area counts, rather than all
  * candidate story bodies, determine whether a different article changes HTML. */
-export function articleRenderInputs(snapshot: WebBuildSnapshot, post: WordPressPost) {
+export function articleRenderInputs(snapshot: WebBuildSnapshot, post: ArchivePost) {
   const contributors = getPostContributors(post).map((embedded) => snapshot.contributors.find((candidate) =>
     isGuestContributor(candidate) === isGuestContributor(embedded) && (candidate.id === embedded.id || candidate.slug === embedded.slug)
   ) ?? embedded);
-  const author = contributors.find((person): person is WordPressAuthor => !isGuestContributor(person)) ?? null;
+  const author = contributors.find((person): person is ArchiveAuthor => !isGuestContributor(person)) ?? null;
   const keys = contributors.map(identity);
   const authorPosts = [...new Map(keys.flatMap((key) => snapshot.indexes.postsByContributor.get(key) ?? []).map((candidate) => [candidate.id, candidate])).values()].filter(isVisibleContentPost);
   const related = [...new Map([
@@ -67,9 +67,7 @@ export function routeCacheDependency(snapshot: WebBuildSnapshot, kind: DynamicRo
   }
   const environment = {
     publicSite: process.env.NEXT_PUBLIC_SITE_URL || publication.urls.publicSite,
-    cmsApi: process.env.NEXT_PUBLIC_WP_API_URL || `${publication.urls.cms.replace(/\/$/, "")}/wp-json/wp/v2`,
     processTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    mirrorMedia: process.env.WORDPRESS_MEDIA_MIRROR !== "0"
   };
   return { key: stableDigest({ version: 1, kind, global, environment, date, data }), dependencies };
 }

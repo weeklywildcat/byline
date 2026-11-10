@@ -1,6 +1,6 @@
 "use client";
 
-import { wordpressLocalDateTime } from "@byline/content";
+import { publicationLocalDateTime } from "@byline/content";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
@@ -33,7 +33,7 @@ export function StoryCorrections({ context }: { context: StoryScreenContext }) {
   const addTrigger = useRef<HTMLButtonElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const label = (type: Row["type"]) => CORRECTION_TYPE_OPTIONS.find((item) => item.value === type)?.label;
-  const local = (value?: string | null) => value ? wordpressLocalDateTime(value, context.timeZone) : "";
+  const local = (value?: string | null) => value ? publicationLocalDateTime(value, context.timeZone) : "";
 
   function edit(row?: Row) {
     trigger.current = document.activeElement as HTMLElement | null;

@@ -1,9 +1,11 @@
 /**
  * Byline's newsroom vocabularies. Each domain keeps its own statuses on
- * purpose (docs/story-workspace.md, "Status vocabularies"): a story's workflow,
+ * purpose (docs/newsroom-os.md): a story's workflow,
  * a task, a production assignment, a source and an appointment never share one
  * "status" list, and none of them is the publication state.
  */
+
+import { STORED_STAGES, type EffectivePhase, type StoredStage } from "@byline/newsroom-screens/story/lifecycle";
 
 type Option<T extends string> = { readonly value: T; readonly label: string };
 
@@ -21,18 +23,23 @@ export const ROLE_OPTIONS = options<Role>([
 
 /**
  * Workflow stages. `published` is derived from Payload's `_status` and is
- * never stored or selected (docs/editorial-workflow.md).
+ * never stored or selected (docs/newsroom-os.md).
  */
-export const WORKFLOW_STAGES = ["pitch", "assigned", "reporting", "writing", "editing", "ready", "on-hold", "dropped"] as const;
-export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
-export type EffectiveWorkflow = WorkflowStage | "published";
+export const WORKFLOW_STAGES = STORED_STAGES;
+export type WorkflowStage = StoredStage;
+export type EffectiveWorkflow = EffectivePhase;
+/**
+ * The stored values, labelled by the phase each one reads as
+ * (packages/newsroom-screens/src/story/lifecycle.ts). `assigned` is legacy:
+ * it reads as Reporting and is never written again.
+ */
 export const WORKFLOW_OPTIONS = options<WorkflowStage>([
   ["pitch", "Pitch"],
-  ["assigned", "Assigned"],
+  ["assigned", "Reporting (assigned, legacy)"],
   ["reporting", "Reporting"],
-  ["writing", "Writing"],
-  ["editing", "Editing"],
-  ["ready", "Ready for Review"],
+  ["writing", "Drafting"],
+  ["editing", "Review"],
+  ["ready", "Ready"],
   ["on-hold", "On Hold"],
   ["dropped", "Dropped"]
 ]);

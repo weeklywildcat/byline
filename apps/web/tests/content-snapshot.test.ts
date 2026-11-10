@@ -3,8 +3,6 @@ import {
   buildContentIndexes,
   buildRouteManifest,
   buildSnapshot,
-  createMediaManifest,
-  deterministicMediaPath,
   memoizeBuildSnapshot,
   stableDigest,
   validateRedirects
@@ -60,13 +58,6 @@ describe("framework-independent content snapshot primitives", () => {
     expect(buildRouteManifest([{ path: "/category//news", kind: "category" }])).toEqual([{ path: "/category/news/", kind: "category" }]);
     expect(() => buildRouteManifest([{ path: "/news", kind: "page" }, { path: "/news/", kind: "category" }])).toThrow(/Duplicate/);
     expect(validateRedirects([{ from: "/old", to: "/new", status: 301, reason: "legacy" }])).toEqual([{ from: "/old/", to: "/new/", status: 301, reason: "legacy" }]);
-  });
-
-  it("uses versioned, deterministic media paths", () => {
-    const source = "https://cms.example.test/uploads/My Image.jpg";
-    expect(deterministicMediaPath(source, 1)).toBe(deterministicMediaPath(source, 1));
-    expect(deterministicMediaPath(source, 2)).not.toBe(deterministicMediaPath(source, 1));
-    expect(createMediaManifest([source, source], 1).items[source].localPath).toContain("My-Image.jpg");
   });
 
   it("loads each source once, then builds indexes, digests, routes, and metrics", async () => {

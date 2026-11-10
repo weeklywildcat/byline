@@ -8,8 +8,8 @@ import {
   getFeaturedMedia,
   getPostContributors,
   getPostHref,
-  type WordPressPost
-} from "@/lib/wordpress";
+  type ArchivePost
+} from "@/lib/public-content";
 import { getPublicationConfig } from "@/lib/publication";
 
 const publication = getPublicationConfig();
@@ -30,7 +30,7 @@ type HomepageStoryVariant =
   | "athlete";
 
 type HomepageStoryProps = {
-  post: WordPressPost;
+  post: ArchivePost;
   variant: HomepageStoryVariant;
   cleanDeck?: boolean;
   showAuthor?: boolean;
@@ -41,14 +41,14 @@ type HomepageStoryProps = {
   priority?: boolean;
 };
 
-function getReadingTime(post: WordPressPost) {
+function getReadingTime(post: ArchivePost) {
   const words = stripHtml(post.content.rendered || post.excerpt.rendered).split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.ceil(words / 225));
 
   return `${minutes} min read`;
 }
 
-function getCleanDeck(post: WordPressPost) {
+function getCleanDeck(post: ArchivePost) {
   const text = stripHtml(post.content.rendered || post.excerpt.rendered)
     .replace(/\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i, "")
     .replace(/\s*(?:&hellip;|…|\.\.\.)\s*$/i, "")

@@ -5,7 +5,7 @@ import { buildArticlePresentation as buildCanonical, storyReadingTime, type Arti
 import { ArticleView, PresentedArticleView } from "@byline/ui";
 import { StructuredArticleBody } from "@byline/ui/article-body";
 import { buildArticlePresentation } from "@/lib/article-presentation";
-import { getPostContributors, isGuestContributor, type WordPressAuthor } from "@/lib/wordpress";
+import { getPostContributors, isGuestContributor, type ArchiveAuthor } from "@/lib/public-content";
 import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content";
 
 /**
@@ -17,7 +17,7 @@ import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content"
 function wordpressPresentation(): ArticlePresentation {
   const post = publicEditorialPosts[0];
   const contributors = getPostContributors(post);
-  return buildArticlePresentation({ post, allPosts: publicEditorialPosts, contributors, author: contributors.find((c): c is WordPressAuthor => !isGuestContributor(c)) ?? null });
+  return buildArticlePresentation({ post, allPosts: publicEditorialPosts, contributors, author: contributors.find((c): c is ArchiveAuthor => !isGuestContributor(c)) ?? null });
 }
 
 describe("the PublicArticleBody renderer boundary", () => {

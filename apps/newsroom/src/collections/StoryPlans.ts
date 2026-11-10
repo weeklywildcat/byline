@@ -32,7 +32,7 @@ export function validResourceUrl(value: unknown): true | string {
  * editorial decision that applies immediately, autosave never touches it, and a
  * version restore never brings back old planning. Nothing here is public.
  *
- * Field rules port docs/editorial-workflow.md: anyone who manages the story
+ * Field rules port docs/newsroom-os.md: anyone who manages the story
  * moves its workflow and edits the brief and links; only editors assign the
  * editor or set the deadline and planned publication.
  */
@@ -84,6 +84,8 @@ export const StoryPlans: CollectionConfig = {
       admin: { description: "Never changes on its own. Published is shown from the story's publication state." },
       access: { update: managersField }
     },
+    // The stage a Story was in when it was put On Hold or Dropped, so Resume returns it there (newsroom/lifecycle.ts).
+    { name: "sidelinedFrom", type: "select", options: [...WORKFLOW_OPTIONS], admin: { readOnly: true }, access: { update: systemOnly, create: systemOnly } },
     { name: "editor", type: "relationship", relationTo: "users", index: true, access: { update: editorsOnlyField, create: systemOnly } },
     {
       name: "deadline",

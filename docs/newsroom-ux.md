@@ -48,7 +48,7 @@ item's private history. [Distribution](distribution.md)
 ## Notifications
 
 The bell in the Byline header is each person's inbox and settings. The same
-eight notifications as WordPress, each on by default, in the inbox and by email:
+eight notifications, each on by default, in the inbox and by email:
 
 | Notification | Who is told | When |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ one row per migrated Story to
 original UTC instant, the Section segment from the live address, and the Story
 slug. The included rows are synthetic Eastern-time boundary examples.
 `npm run test:newsroom` checks pathname parity using the shared
-`publicStoryPath()`; no WordPress numeric ID is required.
+`publicStoryPath()`; no external ID is required.
 
 Publishing a changed Story or Page address confirms the new path. Updating a
 Section slug in Site reviews the number of live Stories affected. Redirect

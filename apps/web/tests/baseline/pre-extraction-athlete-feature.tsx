@@ -2,19 +2,19 @@
 // for why this lives under tests/baseline rather than in components/.
 import { getAthleteSportLabel, getAthleteSpotlightLabel } from "@/lib/content";
 import { stripHtml } from "@/lib/format";
-import { getFeaturedMedia, getPostHref, type WordPressPost } from "@/lib/wordpress";
+import { getFeaturedMedia, getPostHref, type ArchivePost } from "@/lib/public-content";
 
 type SportsAthleteFeatureProps = {
-  post: WordPressPost;
+  post: ArchivePost;
 };
 
-function getAthleteName(post: WordPressPost) {
+function getAthleteName(post: ArchivePost) {
   return stripHtml(post.title.rendered)
     .replace(/^athlete\s+of\s+the\s+(?:week|month)\s*:?\s*/i, "")
     .trim();
 }
 
-function getAthleteBlurb(post: WordPressPost) {
+function getAthleteBlurb(post: ArchivePost) {
   const text = stripHtml(post.excerpt.rendered || post.content.rendered).replace(/\s*\[\s*(?:&hellip;|…|\.\.\.)\s*\]\s*$/i, "");
 
   if (text.length <= 120) {

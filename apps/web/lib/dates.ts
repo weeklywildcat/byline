@@ -63,7 +63,7 @@ export function parseWordPressDate(value: string | null | undefined, assumedTime
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
-type WordPressDateFields = {
+type ArchiveDateFields = {
   /** Local time in the publication's timezone. */
   local?: string | null;
   /** The same instant in UTC. Preferred when present. */
@@ -71,11 +71,11 @@ type WordPressDateFields = {
 };
 
 /** The instant a post/page was published or modified, or null when WordPress gave nothing usable. */
-export function getWordPressInstant({ gmt, local }: WordPressDateFields, publicationTimeZone: string): Date | null {
+export function getWordPressInstant({ gmt, local }: ArchiveDateFields, publicationTimeZone: string): Date | null {
   return parseWordPressDate(gmt, "UTC") ?? parseWordPressDate(local, publicationTimeZone);
 }
 
 /** A valid ISO 8601 UTC timestamp (e.g. 2026-10-14T22:15:00.000Z), or undefined. */
-export function getWordPressIsoTimestamp(fields: WordPressDateFields, publicationTimeZone: string): string | undefined {
+export function getWordPressIsoTimestamp(fields: ArchiveDateFields, publicationTimeZone: string): string | undefined {
   return getWordPressInstant(fields, publicationTimeZone)?.toISOString();
 }
