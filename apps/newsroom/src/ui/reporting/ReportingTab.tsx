@@ -79,7 +79,15 @@ export function ReportingTab(props: ReportingProps) {
 function ReportingBody({ context, width, capture: captureIntent, appointmentId, transcriptId, onTranscript }: ReportingProps & { width: number }) {
   const storyId = Number(context.storyId);
   const cache = useQueryClient();
-  const query = useQuery({ queryKey: reportingKey(storyId), queryFn: () => loadReporting(context.api, storyId), refetchInterval: 20_000 });
+  const query = useQuery({
+    queryKey: reportingKey(storyId),
+    queryFn: () => loadReporting(context.api, storyId),
+    refetchInterval: (current) => {
+      const snapshot = current.state.data as ReportingData | undefined;
+      const transcribing = snapshot?.materials.some((item) => item.kind === "file" && item.transcript && (item.transcript.state === "queued" || item.transcript.state === "processing"));
+      return transcribing ? 5_000 : 20_000;
+    }
+  });
   const [filter, setFilter] = useState<MaterialFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search, 150);
@@ -388,7 +396,15 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
 
   const actions = (
     <>
-      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>{transcript.state === "ready" ? "Open transcript" : transcript.state === "failed" ? "Transcript failed" : "Transcribing…"}</Button> : null}
+      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>
+        {transcript.state === "ready"
+          ? "Open transcript"
+          : transcript.state === "failed"
+            ? "Transcript failed"
+            : transcript.progressPercent !== null
+              ? `${transcript.progressMessage ?? "Transcribing"} · ${Math.round(transcript.progressPercent)}%`
+              : transcript.progressMessage ?? "Transcribing…"}
+      </Button> : null}
       {file && !transcript && file.fileKind === "audio" && editable ? <>
         {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
         <Button type="button" size="xs" variant="outline" onClick={onImport}>Import transcript</Button>
@@ -481,7 +497,11 @@ function FileFacts({ file }: { file: ReportingFileMaterial }) {
     <p className="text-xs text-muted-foreground">
       {bits.join(" · ")}
       {transcript?.state === "ready" ? ` · ${transcript.origin === "manual" ? "Manual transcript" : "Transcript ready"}${transcript.quoteCount ? ` · ${transcript.verifiedCount} of ${transcript.quoteCount} quote${transcript.quoteCount === 1 ? "" : "s"} verified` : ""}` : ""}
-      {transcript && transcript.state !== "ready" ? ` · ${transcript.state === "failed" ? `Transcript failed: ${transcript.failure ?? "unknown error"}` : "Transcribing"}` : ""}
+      {transcript && transcript.state !== "ready"
+        ? ` · ${transcript.state === "failed"
+          ? `Transcript failed: ${transcript.failure ?? "unknown error"}`
+          : `${transcript.progressMessage ?? (transcript.state === "queued" ? "Waiting to transcribe" : "Transcribing")}${transcript.progressPercent !== null ? ` · ${Math.round(transcript.progressPercent)}%` : ""}${transcript.failure ? ` · Last attempt: ${transcript.failure}` : ""}`}`
+        : ""}
     </p>
   );
 }
