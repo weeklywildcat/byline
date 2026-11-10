@@ -1,15 +1,15 @@
 import {
-  describeNotification, DIGEST_LIMIT, isNotificationKind, NOTIFICATION_PREFERENCES_KEY, notificationEmail, resolveNotificationPreferences,
+  describeNotification, DIGEST_LIMIT, isNotificationKind, NOTIFICATION_PREFERENCES_KEY, notificationEmail, reminderFacts, resolveNotificationPreferences,
   type DigestItem, type NotificationFacts, type NotificationKind, type NotificationPreferences
 } from "../domain/notifications";
 import type { Payload, PayloadRequest, TaskConfig, Where } from "payload";
-import { relationId, requestUser, type NewsroomUser } from "../access/user";
+import { relationId, relationIds, requestUser, type NewsroomUser } from "../access/user";
 import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/dates";
 import type { ScreenContext } from "./screen-models";
 
 /**
- * Notifications (gap 1 of the editorial review): the WordPress eight,
- * delivered to an in-app inbox and, when SMTP is configured, by email.
+ * Newsroom notifications are delivered to the in-app inbox and, when SMTP is
+ * configured, by email. Future reminders reuse Payload's jobs queue.
  *
  * Triggers are collection hooks (`notification-hooks.ts`) that call
  * `notify()` inside the saving request's transaction, so a notification exists
@@ -158,7 +158,8 @@ const factsFor = (row: Row, headlines: Map<string, string | null>, names: Map<st
   actor: names.get(String(relationId(row.actor))) ?? null,
   story: headlines.get(String(relationId(row.story))) ?? null,
   detail: row.detail ?? null,
-  items: digestItems(row.data)
+  items: digestItems(row.data),
+  reminder: reminderFacts(row.data)
 });
 
 const origin = () => (process.env.BYLINE_NEWSROOM_URL ?? "").replace(/\/+$/, "");
@@ -274,6 +275,156 @@ export function withFailureNotice(task: TaskConfig, label: string): TaskConfig {
   };
 }
 
+/* ------------------------------------------------------------------- reminders */
+
+type ReminderTarget = "story" | "task" | "production" | "appointment";
+export type ReminderJobInput = { reminderTarget: ReminderTarget; recordId: number; expectedAt: string };
+
+const REMINDER_TARGETS = new Set<ReminderTarget>(["story", "task", "production", "appointment"]);
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+
+function instant(value: unknown): string | null {
+  if (typeof value !== "string" && !(value instanceof Date)) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function reminderInput(value: unknown): ReminderJobInput | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const target = row.reminderTarget;
+  const recordId = Number(row.recordId);
+  if (!REMINDER_TARGETS.has(target as ReminderTarget) || !Number.isSafeInteger(recordId) || recordId <= 0 || typeof row.expectedAt !== "string" || !row.expectedAt) return null;
+  return { reminderTarget: target as ReminderTarget, recordId, expectedAt: row.expectedAt };
+}
+
+/**
+ * Queue a future reminder without making an editorial save depend on the jobs
+ * table. Jobs deliberately re-check the live record when they run, so moving a
+ * deadline or completing work makes an older queued reminder a harmless no-op.
+ */
+async function queueReminder(req: PayloadRequest, input: ReminderJobInput, waitUntil: Date) {
+  if (req.context?.bylineImport === true || req.context?.bylineSuppressNotifications === true) return;
+  if (!Number.isFinite(waitUntil.getTime()) || waitUntil.getTime() <= Date.now()) return;
+  try {
+    const jobs = req.payload.jobs as unknown as { queue: (args: Record<string, unknown>) => Promise<unknown> };
+    await jobs.queue({ task: DUE_DIGEST_TASK, queue: NOTIFICATION_QUEUE, input, waitUntil, req });
+  } catch (error) {
+    req.payload.logger.warn({ err: error, msg: `Could not queue ${input.reminderTarget} reminder.` });
+  }
+}
+
+export async function scheduleTaskDueReminder(req: PayloadRequest, doc: Record<string, unknown>) {
+  const expectedAt = instant(doc.due);
+  const recordId = Number(doc.id);
+  if (!expectedAt || !Number.isSafeInteger(recordId) || doc.state === "completed") return;
+  await queueReminder(req, { reminderTarget: "task", recordId, expectedAt }, new Date(Date.parse(expectedAt) - DAY_MS));
+}
+
+export async function scheduleProductionDueReminder(req: PayloadRequest, doc: Record<string, unknown>) {
+  const expectedAt = instant(doc.deadline);
+  const recordId = Number(doc.id);
+  if (!expectedAt || !Number.isSafeInteger(recordId) || doc.status === "done") return;
+  await queueReminder(req, { reminderTarget: "production", recordId, expectedAt }, new Date(Date.parse(expectedAt) - DAY_MS));
+}
+
+export async function scheduleAppointmentReminder(req: PayloadRequest, doc: Record<string, unknown>) {
+  const expectedAt = instant(doc.startAt);
+  const recordId = Number(doc.id);
+  if (!expectedAt || !Number.isSafeInteger(recordId) || doc.scheduleMode !== "exact" || doc.status === "completed" || doc.status === "cancelled") return;
+  await queueReminder(req, { reminderTarget: "appointment", recordId, expectedAt }, new Date(Date.parse(expectedAt) - HOUR_MS));
+}
+
+export async function scheduleStoryDeadlineReminder(req: PayloadRequest, doc: Record<string, unknown>) {
+  const deadline = typeof doc.deadline === "string" ? doc.deadline.trim() : "";
+  const recordId = Number(doc.id);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || !Number.isSafeInteger(recordId) || ACTIVE_PLAN_STAGES_EXCLUDED.includes(String(doc.workflow))) return;
+  const reminderDay = addDays(deadline, -1);
+  const waitUntil = new Date(localToInstant(`${reminderDay}T16:00`, newsroomTimeZone()));
+  await queueReminder(req, { reminderTarget: "story", recordId, expectedAt: deadline }, waitUntil);
+}
+
+function deadlineReminderWhen(expectedAt: string, now: Date, timeZone = newsroomTimeZone()): "today" | "tomorrow" | null {
+  const dueDay = /^\d{4}-\d{2}-\d{2}$/.test(expectedAt) ? expectedAt : localDay(expectedAt, timeZone);
+  const today = localDay(now, timeZone);
+  if (dueDay === today) return "today";
+  if (dueDay === addDays(today, 1)) return "tomorrow";
+  return null;
+}
+
+function appointmentReminderWhen(expectedAt: string, now: Date): `in ${number} minutes` | "in 1 hour" | null {
+  const remaining = Date.parse(expectedAt) - now.getTime();
+  if (!Number.isFinite(remaining) || remaining <= 0) return null;
+  const minutes = Math.ceil(remaining / 60_000);
+  if (minutes > 120) return null;
+  if (minutes >= 55 && minutes <= 65) return "in 1 hour";
+  return `in ${minutes} minutes`;
+}
+
+/** Run one future reminder after proving its original fact is still current. */
+export async function sendReminder(req: PayloadRequest, input: ReminderJobInput, now = new Date()): Promise<number> {
+  const { payload } = req;
+  const dedupe = `reminder:${input.reminderTarget}:${input.recordId}:${input.expectedAt}`;
+
+  if (input.reminderTarget === "task") {
+    const doc = await payload.findByID({ collection: "tasks", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
+    if (!doc || doc.state === "completed" || instant(doc.due) !== input.expectedAt) return 0;
+    const when = deadlineReminderWhen(input.expectedAt, now);
+    if (!when || Date.parse(input.expectedAt) <= now.getTime()) return 0;
+    return notify(req, {
+      kind: "dueDigest", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
+      data: { reminder: { type: "deadline", target: "task", when } }
+    });
+  }
+
+  if (input.reminderTarget === "production") {
+    const doc = await payload.findByID({ collection: "production-assignments", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
+    if (!doc || doc.status === "done" || instant(doc.deadline) !== input.expectedAt) return 0;
+    const when = deadlineReminderWhen(input.expectedAt, now);
+    if (!when || Date.parse(input.expectedAt) <= now.getTime()) return 0;
+    return notify(req, {
+      kind: "dueDigest", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
+      data: { reminder: { type: "deadline", target: "production", when } }
+    });
+  }
+
+  if (input.reminderTarget === "appointment") {
+    const doc = await payload.findByID({ collection: "appointments", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
+    if (!doc || doc.scheduleMode !== "exact" || doc.status === "completed" || doc.status === "cancelled" || instant(doc.startAt) !== input.expectedAt) return 0;
+    const when = appointmentReminderWhen(input.expectedAt, now);
+    if (!when) return 0;
+    return notify(req, {
+      kind: "appointments", recipients: relationIds(doc.assignees), story: doc.story, detail: doc.title, actor: null, dedupe,
+      data: { reminder: { type: "appointment", target: "appointment", when } }
+    });
+  }
+
+  const plan = await payload.findByID({ collection: "story-plans", id: input.recordId, depth: 0, overrideAccess: true, req, disableErrors: true });
+  if (!plan || plan.deadline !== input.expectedAt || ACTIVE_PLAN_STAGES_EXCLUDED.includes(String(plan.workflow))) return 0;
+  const when = deadlineReminderWhen(input.expectedAt, now);
+  if (!when) return 0;
+  const storyId = relationId(plan.story);
+  if (storyId === null) return 0;
+  const published = await payload.find({
+    collection: "stories",
+    where: { and: [{ id: { equals: storyId } }, { _status: { equals: "published" } }] },
+    draft: false,
+    limit: 1,
+    select: {},
+    ...system(req)
+  });
+  if (published.docs.length) return 0;
+  return notify(req, {
+    kind: "dueDigest",
+    recipients: [...(relationId(plan.editor) !== null ? [plan.editor] : []), ...(await usersForPeople(req, relationIds(plan.contributors)))],
+    story: storyId,
+    actor: null,
+    dedupe,
+    data: { reminder: { type: "deadline", target: "story", when } }
+  });
+}
+
 /* --------------------------------------------------------------------- digest */
 
 const ACTIVE_PLAN_STAGES_EXCLUDED = ["ready", "on-hold", "dropped"];
@@ -335,12 +486,20 @@ export async function sendDueDigests(req: PayloadRequest, now = new Date(), time
 
 export const sendDueDigestTask: TaskConfig = {
   slug: DUE_DIGEST_TASK,
-  label: "Send the daily due digest",
-  // The newsroom day starts at 7: the server clock's hour (set TZ to the newsroom timezone on the worker).
+  label: "Send due digest or reminder",
+  // Scheduled jobs have no input and send the 7 a.m. digest. One-time deadline/appointment
+  // reminders reuse this task with waitUntil so no additional Payload task enum is needed.
+  inputSchema: [
+    { name: "reminderTarget", type: "select", options: ["story", "task", "production", "appointment"] },
+    { name: "recordId", type: "number" },
+    { name: "expectedAt", type: "text" }
+  ],
   schedule: [{ cron: "0 0 7 * * *", queue: NOTIFICATION_QUEUE }],
   concurrency: { key: () => "due-digest", exclusive: true },
-  handler: async ({ req }) => {
-    await sendDueDigests(req);
+  handler: async ({ req, input }) => {
+    const reminder = reminderInput(input);
+    if (reminder) await sendReminder(req, reminder);
+    else await sendDueDigests(req);
     return { output: {} };
   }
 };

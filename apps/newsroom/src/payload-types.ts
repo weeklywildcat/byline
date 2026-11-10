@@ -3205,7 +3205,11 @@ export interface TaskDeliverNotification {
  * via the `definition` "TaskSend-due-digest".
  */
 export interface TaskSendDueDigest {
-  input?: unknown;
+  input: {
+    reminderTarget?: ('story' | 'task' | 'production' | 'appointment') | null;
+    recordId?: number | null;
+    expectedAt?: string | null;
+  };
   output?: unknown;
 }
 /**
