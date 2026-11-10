@@ -250,7 +250,7 @@ describe("recordings, ground rules and transcription", () => {
       expect(received[0].authorization).toBe("Bearer fixture-token");
       expect(received[0].path).toMatch(/^\/jobs\/transcript-\d+-[0-9a-f-]{36}$/);
       const form = received[0].form;
-      expect(Object.fromEntries([...form].filter(([key]) => key !== "file"))).toEqual({ model: "test-model", language: "en", vad: "true", word_timestamps: "true" });
+      expect(Object.fromEntries([...form].filter(([key]) => key !== "file"))).toEqual({ model: "test-model", language: "en", vad: "true", word_timestamps: "false" });
       const upload = form.get("file") as File;
       expect(upload.name).toBe("coach-smith.wav");
       expect(Buffer.from(await upload.arrayBuffer())).toEqual(wav("coach-smith.wav").data);
