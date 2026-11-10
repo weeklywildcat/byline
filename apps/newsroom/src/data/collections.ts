@@ -109,8 +109,15 @@ export const DataDatasets: CollectionConfig = {
     }],
     beforeDelete: [async ({ id, req }) => {
       const dataset = await req.payload.findByID({ collection: "data-datasets", id, ...system(req) });
-      const projects = await req.payload.find({ collection: "data-projects", draft: true, pagination: false, select: { title: true, bindings: true }, ...system(req) });
-      const users = projects.docs.filter((project) => Array.isArray(project.bindings) && (project.bindings as Array<{ dataset?: string }>).some((binding) => binding.dataset === dataset.key));
+      const [drafts, published] = await Promise.all([
+        req.payload.find({ collection: "data-projects", draft: true, pagination: false, select: { title: true, bindings: true }, ...system(req) }),
+        req.payload.find({ collection: "data-projects", draft: false, where: { _status: { equals: "published" } }, pagination: false, select: { title: true, bindings: true }, ...system(req) })
+      ]);
+      const users = [...new Map(
+        [...drafts.docs, ...published.docs]
+          .filter((project) => Array.isArray(project.bindings) && (project.bindings as Array<{ dataset?: string }>).some((binding) => binding.dataset === dataset.key))
+          .map((project) => [project.id, project])
+      ).values()];
       if (users.length) throw new APIError(`${users.map((project) => project.title).join(", ")} ${users.length === 1 ? "uses" : "use"} this dataset. Remove it from ${users.length === 1 ? "that project" : "those projects"} first.`, 409);
       await req.payload.delete({ collection: "data-records", where: { dataset: { equals: id } }, ...system(req) });
     }]
