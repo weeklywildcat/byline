@@ -156,14 +156,33 @@ describe("the Stories workspace", () => {
     fetchers.getPlanning = vi.fn(async () => ({ ...response, stories: [...response.stories, published], workflowStatuses: [...response.workflowStatuses, published.workflow] })) as never;
     await mount();
     expect($("[data-status='published']")).toBeNull();
+    expect($("[data-hidden-published]")?.textContent).toContain("1 finished published story is hidden");
+    expect($("p[aria-live='polite']")?.textContent).toContain("2 stories shown");
 
     await click($$("button").find((button) => button.textContent?.includes("More filters")));
     await click($("#story-filter-published"));
 
     expect($("[data-status='published'] [data-story-id='3']")).not.toBeNull();
+    expect($("p[aria-live='polite']")?.textContent).toContain("3 stories shown");
     expect($("[data-board-layout-picker]")).not.toBeNull();
     expect(window.location.search).toContain("view=board");
     expect($("[aria-label='Remove filter: Showing published']")).not.toBeNull();
+    expect($("[data-hidden-published]")).toBeNull();
+    await click($$("button").find((button) => button.textContent === "Clear"));
+    expect($("[data-status='published']")).toBeNull();
+    expect($("[aria-label='Remove filter: Showing published']")).toBeNull();
+    expect($("[data-hidden-published]")).not.toBeNull();
+    await click($$("button").find((button) => button.textContent === "Show published"));
+    expect($("[data-status='published'] [data-story-id='3']")).not.toBeNull();
+  });
+
+  it("opens Peek from noninteractive List content, not just empty cell space", async () => {
+    fetchers.getPlanning = vi.fn(async () => response) as never;
+    fetchers.getWorkspace = vi.fn(() => new Promise(() => {})) as never;
+    await mount({ initialView: "list" });
+    const people = $("[data-story-id='1'] td:nth-child(3) span");
+    await click(people);
+    expect($("[data-slot=sheet-content]")).not.toBeNull();
   });
 
   it("honors an explicit Published filter without requiring the temporary toggle", async () => {

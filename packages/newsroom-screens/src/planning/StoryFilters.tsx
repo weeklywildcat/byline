@@ -105,7 +105,7 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sh
           <MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} />
         </PopoverContent>
       </Popover>}
-      {hasActiveFilters(filters) ? <Button variant="ghost" className="shrink-0" onClick={() => onChange({ ...EMPTY_PLANNING_FILTERS })}>Clear</Button> : null}
+      {hasActiveFilters(filters) || showPublished?.value ? <Button type="button" variant="ghost" className="shrink-0" onClick={() => { onChange({ ...EMPTY_PLANNING_FILTERS }); showPublished?.onChange(false); }}>Clear</Button> : null}
     </div>
     {chips.length ? <ul className="flex flex-wrap items-center gap-1.5" aria-label={"Active filters"}>
       {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10 any-pointer-coarse:relative any-pointer-coarse:after:absolute any-pointer-coarse:after:top-1/2 any-pointer-coarse:after:right-0 any-pointer-coarse:after:size-11 any-pointer-coarse:after:-translate-y-1/2" aria-label={`Remove filter: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}

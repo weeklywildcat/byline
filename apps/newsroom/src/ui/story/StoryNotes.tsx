@@ -67,7 +67,7 @@ export function StoryNotes({ context, plain = false }: { context: StoryScreenCon
         <form className="grid gap-3" onSubmit={create}>
           <Textarea aria-label="Note text" required maxLength={4000} rows={4} value={text} onChange={(event) => setText(event.target.value)} />
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
-          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />}>Cancel</DialogClose><Button type="submit" disabled={busy || !text.trim()}>Add note</Button></DialogFooter>
+          <DialogFooter><DialogClose render={<Button type="button" variant="outline" disabled={busy} />} onClick={() => { setText(""); setError(""); }}>Cancel</DialogClose><Button type="submit" disabled={busy || !text.trim()}>Add note</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>;
