@@ -1208,6 +1208,11 @@ export interface ReportingTranscript {
   searchText?: string | null;
   failure?: string | null;
   attempts?: number | null;
+  transcriptionRunToken?: string | null;
+  progressPercent?: number | null;
+  progressMessage?: string | null;
+  transcriptionStartedAt?: string | null;
+  lastProgressAt?: string | null;
   completedAt?: string | null;
   createdBy?: (number | null) | User;
   capturedAt?: string | null;
@@ -2387,6 +2392,11 @@ export interface ReportingTranscriptsSelect<T extends boolean = true> {
   searchText?: T;
   failure?: T;
   attempts?: T;
+  transcriptionRunToken?: T;
+  progressPercent?: T;
+  progressMessage?: T;
+  transcriptionStartedAt?: T;
+  lastProgressAt?: T;
   completedAt?: T;
   createdBy?: T;
   capturedAt?: T;
