@@ -9,7 +9,7 @@ import { reportingEndpoints } from "../../src/reporting/endpoints";
 import { privateReportingDir } from "../../src/reporting/paths";
 import { fasterWhisperProvider } from "../../src/reporting/transcription/faster-whisper";
 import { PermanentTranscriptionError, TemporaryTranscriptionError, type TranscriptionProvider } from "../../src/reporting/transcription/provider";
-import { setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
+import { recoverQueuedTranscriptions, setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -358,6 +358,67 @@ describe("recordings, ground rules and transcription", () => {
     expect(queued.state).toBe("queued");
     expect(queued.attempts).toBe(1);
     expect(queued.failure).toContain("503");
+    providerMode = "ok";
+  });
+
+  it("recovers an orphaned queued transcript exactly once", async () => {
+    providerMode = "temporary";
+    const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
+      params: { id: ids.story },
+      data: {},
+      file: wav("orphaned.wav")
+    });
+    await runReporting();
+    const transcript = (await payload.find({
+      collection: "reporting-transcripts",
+      where: { file: { equals: recording.body.id } },
+      depth: 0
+    })).docs[0];
+    expect(transcript.state).toBe("queued");
+
+    const jobs = await payload.find({
+      collection: "payload-jobs",
+      where: {
+        and: [
+          { taskSlug: { equals: "transcribe-reporting-file" } },
+          { queue: { equals: "reporting" } },
+          { completedAt: { exists: false } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true
+    });
+    const matching = jobs.docs.filter((job) => {
+      const input = job.input && typeof job.input === "object" && !Array.isArray(job.input) ? job.input as Record<string, unknown> : {};
+      return Number(input.transcriptId) === transcript.id;
+    });
+    for (const job of matching) {
+      await payload.delete({ collection: "payload-jobs", id: job.id, overrideAccess: true });
+    }
+
+    const first = await recoverQueuedTranscriptions(payload);
+    expect(first.recovered).toBeGreaterThanOrEqual(1);
+    const after = await payload.find({
+      collection: "payload-jobs",
+      where: {
+        and: [
+          { taskSlug: { equals: "transcribe-reporting-file" } },
+          { queue: { equals: "reporting" } },
+          { completedAt: { exists: false } }
+        ]
+      },
+      depth: 0,
+      pagination: false,
+      overrideAccess: true
+    });
+    expect(after.docs.filter((job) => {
+      const input = job.input && typeof job.input === "object" && !Array.isArray(job.input) ? job.input as Record<string, unknown> : {};
+      return Number(input.transcriptId) === transcript.id && job.hasError !== true;
+    })).toHaveLength(1);
+
+    const second = await recoverQueuedTranscriptions(payload);
+    expect(second.recovered).toBe(0);
     providerMode = "ok";
   });
 
