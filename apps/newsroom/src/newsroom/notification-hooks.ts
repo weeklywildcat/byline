@@ -63,11 +63,12 @@ export const notifyAfterPlanChange: CollectionAfterChangeHook = async ({ doc, pr
 
 /** High and urgent tasks tell their assignees: newly assigned, or newly made high priority. */
 export const notifyAfterTaskChange: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
-  if (doc?.priority !== "high" && doc?.priority !== "urgent") return doc;
   const before = operation === "create" ? null : previousDoc;
-  const raised = before?.priority !== doc.priority && before?.priority !== (doc.priority === "urgent" ? "high" : "urgent");
-  const recipients = raised ? relationIds(doc.assignees) : added(doc.assignees, before?.assignees);
-  if (recipients.length && doc.state !== "completed") await notify(req, { kind: "highPriorityTasks", recipients, story: doc.story, detail: doc.title });
+  if (doc?.priority === "high" || doc?.priority === "urgent") {
+    const raised = before?.priority !== doc.priority && before?.priority !== (doc.priority === "urgent" ? "high" : "urgent");
+    const recipients = raised ? relationIds(doc.assignees) : added(doc.assignees, before?.assignees);
+    if (recipients.length && doc.state !== "completed") await notify(req, { kind: "highPriorityTasks", recipients, story: doc.story, detail: doc.title });
+  }
   if (!before || doc.due !== before.due || doc.state !== before.state || !sameRelations(doc.assignees, before.assignees)) await scheduleTaskDueReminder(req, doc);
   return doc;
 };
