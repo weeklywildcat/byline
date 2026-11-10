@@ -1,6 +1,14 @@
 import type { CollectionAfterChangeHook } from "payload";
 import { relationId, relationIds, sameId } from "../access/user";
-import { editorRecipients, notify, usersForPeople } from "./notifications";
+import {
+  editorRecipients,
+  notify,
+  scheduleAppointmentReminder,
+  scheduleProductionDueReminder,
+  scheduleStoryDeadlineReminder,
+  scheduleTaskDueReminder,
+  usersForPeople
+} from "./notifications";
 
 /**
  * The collection hooks that raise notifications. Each compares the saved
@@ -13,6 +21,12 @@ import { editorRecipients, notify, usersForPeople } from "./notifications";
 const added = (now: unknown, before: unknown) => {
   const had = new Set(relationIds(before).map(String));
   return relationIds(now).filter((id) => !had.has(String(id)));
+};
+
+const sameRelations = (left: unknown, right: unknown) => {
+  const a = relationIds(left).map(String).sort();
+  const b = relationIds(right).map(String).sort();
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 };
 
 /** Stories: people newly added to the byline are told they are on the story. */
@@ -41,6 +55,9 @@ export const notifyAfterPlanChange: CollectionAfterChangeHook = async ({ doc, pr
       await notify(req, { kind: "storyReturned", recipients: await usersForPeople(req, relationIds(doc.contributors)), story });
     }
   }
+  if (!before || doc.deadline !== before.deadline || doc.workflow !== before.workflow || !sameId(doc.editor, before.editor) || !sameRelations(doc.contributors, before.contributors)) {
+    await scheduleStoryDeadlineReminder(req, doc);
+  }
   return doc;
 };
 
@@ -51,19 +68,24 @@ export const notifyAfterTaskChange: CollectionAfterChangeHook = async ({ doc, pr
   const raised = before?.priority !== doc.priority && before?.priority !== (doc.priority === "urgent" ? "high" : "urgent");
   const recipients = raised ? relationIds(doc.assignees) : added(doc.assignees, before?.assignees);
   if (recipients.length && doc.state !== "completed") await notify(req, { kind: "highPriorityTasks", recipients, story: doc.story, detail: doc.title });
+  if (!before || doc.due !== before.due || doc.state !== before.state || !sameRelations(doc.assignees, before.assignees)) await scheduleTaskDueReminder(req, doc);
   return doc;
 };
 
 /** Photo, graphic, video and audio work tells its new assignees. */
 export const notifyAfterProductionChange: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
-  const recipients = added(doc?.assignees, operation === "create" ? null : previousDoc?.assignees);
+  const before = operation === "create" ? null : previousDoc;
+  const recipients = added(doc?.assignees, before?.assignees);
   if (recipients.length) await notify(req, { kind: "mediaAssignments", recipients, story: doc.story, detail: doc.title });
+  if (!before || doc.deadline !== before.deadline || doc.status !== before.status || !sameRelations(doc.assignees, before.assignees)) await scheduleProductionDueReminder(req, doc);
   return doc;
 };
 
 /** Interviews and appointments tell their new assignees. */
 export const notifyAfterAppointmentChange: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
-  const recipients = added(doc?.assignees, operation === "create" ? null : previousDoc?.assignees);
+  const before = operation === "create" ? null : previousDoc;
+  const recipients = added(doc?.assignees, before?.assignees);
   if (recipients.length) await notify(req, { kind: "appointments", recipients, story: doc.story, detail: doc.title });
+  if (!before || doc.startAt !== before.startAt || doc.scheduleMode !== before.scheduleMode || doc.status !== before.status || !sameRelations(doc.assignees, before.assignees)) await scheduleAppointmentReminder(req, doc);
   return doc;
 };
