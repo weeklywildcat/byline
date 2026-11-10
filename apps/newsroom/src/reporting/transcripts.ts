@@ -146,7 +146,10 @@ async function selectionViews(ctx: ScreenContext, audience: ReportingAudience, r
 export async function transcriptDetail(ctx: ScreenContext, id: number): Promise<TranscriptDetail> {
   const audience = await audienceOf(ctx);
   const { payload } = ctx.req;
-  const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
+  const found = await payload.find({
+    collection: "reporting-transcripts", where: { id: { equals: id } }, limit: 1,
+    ...as(ctx), context: { bylineReadTranscriptDraft: true }
+  });
   const row = found.docs[0];
   if (!row) throw new APIError("That transcript is not available.", 404);
   const fileFound = await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, ...as(ctx) });
@@ -314,6 +317,7 @@ export async function createSelection(ctx: ScreenContext, transcriptId: number, 
   const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: transcriptId } }, limit: 1, ...as(ctx) });
   const transcript = found.docs[0];
   if (!transcript) throw new APIError("That transcript is not available.", 404);
+  if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
   const ids = Array.isArray(input.segmentIds) ? (input.segmentIds as unknown[]).filter((id): id is string => typeof id === "string").slice(0, 200) : [];
   const picked = selectionFromSegments(normalizeSegments(transcript.segments), ids, typeof input.text === "string" ? input.text : undefined);
   if (!picked) throw new APIError("Select the words to save.", 400);

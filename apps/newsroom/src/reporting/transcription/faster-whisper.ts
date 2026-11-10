@@ -15,6 +15,7 @@ type WhisperJob = {
   progress?: unknown;
   processed?: unknown;
   duration?: unknown;
+  segments?: unknown;
   message?: unknown;
   detail?: unknown;
   retryable?: unknown;
@@ -32,8 +33,16 @@ function jobBody(value: unknown): WhisperJob & { state: WhisperJobState } {
 }
 
 function progressOf(job: WhisperJob & { state: WhisperJobState }): TranscriptionProgress | null {
-  if (job.state !== "queued" && job.state !== "loading-model" && job.state !== "transcribing") return null;
+  if (job.state === "ready") return null;
+  const draft = Array.isArray(job.segments) && job.segments.length ? normalizeWhisperTranscript({ ...job, segments: job.segments }) : null;
   const fraction = typeof job.progress === "number" && Number.isFinite(job.progress) ? Math.max(0, Math.min(1, job.progress)) : null;
+  const percent = fraction === null ? null : Math.round(fraction * 100);
+  if (job.state === "failed" || job.state === "cancelled") {
+    // Save any last passages yielded between the previous poll and failure.
+    return draft?.segments.length
+      ? { state: "transcribing", percent, message: "Transcribing audio", segments: draft.segments, durationMs: draft.durationMs }
+      : null;
+  }
   const message = typeof job.message === "string" && job.message.trim()
     ? job.message.trim().slice(0, 160)
     : job.state === "queued"
@@ -41,7 +50,14 @@ function progressOf(job: WhisperJob & { state: WhisperJobState }): Transcription
       : job.state === "loading-model"
         ? "Loading Whisper model"
         : "Transcribing audio";
-  return { state: job.state, percent: fraction === null ? null : Math.round(fraction * 100), message };
+  return {
+    state: job.state,
+    percent,
+    message,
+    // A restarted service can report an empty job before any new speech is
+    // available. Keep the saved draft until the new job has a prefix to show.
+    ...(draft?.segments.length ? { segments: draft.segments, durationMs: draft.durationMs } : {})
+  };
 }
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {
@@ -179,13 +195,20 @@ export function fasterWhisperProvider(config: {
 /** faster-whisper's seconds-based response → Byline's normalized transcript. Exported for tests. */
 export function fromFasterWhisper(body: unknown): NormalizedTranscript {
   if (!body || typeof body !== "object" || !Array.isArray((body as { segments?: unknown }).segments)) throw new PermanentTranscriptionError("The transcription service returned something Byline could not read.");
-  const record = body as { language?: unknown; duration?: unknown; segments: Array<Record<string, unknown>> };
-  const seconds = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value * 1000) : null);
-  const normalized = normalizeTranscript({
-    language: typeof record.language === "string" ? record.language.toLowerCase() : null,
-    durationMs: seconds(record.duration),
-    segments: record.segments.map((segment, index) => ({ id: segmentId(index), startMs: seconds(segment.start), endMs: seconds(segment.end), speaker: segment.speaker, text: segment.text }))
-  });
+  const normalized = normalizeWhisperTranscript(body as { segments: unknown[] });
   if (!normalized.segments.length) throw new PermanentTranscriptionError("No speech was found in this recording.");
   return normalized;
+}
+
+function normalizeWhisperTranscript(record: { language?: unknown; duration?: unknown; segments: unknown[] }): NormalizedTranscript {
+  const seconds = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value * 1000) : null);
+  return normalizeTranscript({
+    language: typeof record.language === "string" ? record.language.toLowerCase() : null,
+    durationMs: seconds(record.duration),
+    segments: record.segments.map((raw, index) => {
+      if (!raw || typeof raw !== "object") return null;
+      const segment = raw as Record<string, unknown>;
+      return { id: segmentId(index), startMs: seconds(segment.start), endMs: seconds(segment.end), speaker: segment.speaker, text: segment.text };
+    })
+  });
 }

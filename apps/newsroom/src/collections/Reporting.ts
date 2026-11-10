@@ -1,6 +1,7 @@
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FieldAccess, type PayloadRequest } from "payload";
 import { changeReporting, createReporting, readReporting } from "../access/reporting-context";
 import { atLeast, newsroomUser, relationChanged, relationId, requestUser, sameId } from "../access/user";
+import { lockRow } from "../db/locks";
 import { normalizeGroundRules, REPORTING_FILE_MIME_TYPES, REPORTING_LIMITS, reportingFileKind } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { privateReportingDir } from "../reporting/paths";
@@ -186,7 +187,8 @@ export const ReportingFiles: CollectionConfig = {
 const projectSearchText: CollectionBeforeChangeHook = ({ data, originalDoc, operation, req }) => {
   if (data.segments !== undefined) {
     data.searchText = transcriptSearchText(Array.isArray(data.segments) ? data.segments : []);
-    if (operation === "update" && req.context?.bylineSystem !== true) {
+    if (operation === "update" && !systemWrite({ req })) {
+      if (originalDoc?.state !== "ready") throw new APIError("The transcript is not ready to edit yet.", 409);
       data.editedBy = requestUser(req)?.id ?? null;
       data.editedAt = new Date().toISOString();
     }
@@ -202,6 +204,9 @@ const transcriptState = [
   { value: "ready", label: "Ready" },
   { value: "failed", label: "Failed" }
 ];
+
+// Draft text is read through the focused transcript endpoint after collection access.
+const readTranscriptText: FieldAccess = ({ doc, req }) => doc?.state === "ready" || req.context?.bylineReadTranscriptDraft === true;
 
 export const ReportingTranscripts: CollectionConfig = {
   slug: "reporting-transcripts",
@@ -225,8 +230,8 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "language", type: "text", maxLength: 16 },
     { name: "durationMs", type: "number", min: 0, access: { update: systemWrite } },
     // `TranscriptSegment[]` (domain/transcript.ts): provider-neutral, stable segment ids.
-    { name: "segments", type: "json" },
-    { name: "searchText", type: "textarea", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
+    { name: "segments", type: "json", access: { read: readTranscriptText } },
+    { name: "searchText", type: "textarea", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite, read: readTranscriptText } },
     { name: "failure", type: "text", maxLength: 400, access: { update: systemWrite } },
     { name: "attempts", type: "number", defaultValue: 0, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     // One logical run keeps the same token across Payload retries, so Whisper can reattach instead of duplicating CPU work.
@@ -256,7 +261,21 @@ export const TranscriptSelections: CollectionConfig = {
   hooks: {
     beforeChange: [
       stampCreator,
-      ({ data, originalDoc, operation }) => {
+      async ({ data, originalDoc, operation, req }) => {
+        const transcriptId = relationId(data.transcript);
+        if (operation === "create" && transcriptId !== null) {
+          await lockRow(req, "reporting_transcripts", transcriptId);
+          const transcript = await req.payload.findByID({
+            collection: "reporting-transcripts",
+            id: transcriptId,
+            overrideAccess: systemWrite({ req }) && !requestUser(req),
+            disableErrors: true,
+            depth: 0,
+            req
+          });
+          if (!transcript) throw new APIError("That transcript is not available.", 404);
+          if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
+        }
         if (operation === "update" && originalDoc && data.transcript !== undefined && relationChanged(data.transcript, originalDoc.transcript)) throw new APIError("A selection cannot move to another transcript.", 400);
         // Changing the words un-verifies them: verification is of exact words against the audio.
         if (operation === "update" && originalDoc?.state === "verified" && data.text !== undefined && data.text !== originalDoc.text) {

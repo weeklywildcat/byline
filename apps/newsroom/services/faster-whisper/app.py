@@ -82,6 +82,8 @@ def _snapshot(job: dict[str, Any]) -> dict[str, Any]:
         "duration": job.get("duration"),
         "message": job.get("message", ""),
     }
+    if job["state"] != "ready":
+        result["segments"] = job["segments"].copy()
     if job.get("detail"):
         result["detail"] = job["detail"]
     if job.get("retryable") is not None:
@@ -91,10 +93,12 @@ def _snapshot(job: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _set_job(job: dict[str, Any], **changes: Any) -> None:
+def _set_job(job: dict[str, Any], *, segment: dict[str, Any] | None = None, **changes: Any) -> None:
     with JOBS_LOCK:
         if JOBS.get(job["key"]) is not job:
             return
+        if segment is not None:
+            job["segments"].append(segment)
         job.update(changes)
         job["updated_at"] = time.time()
         if changes.get("state") in {"ready", "failed", "cancelled"}:
@@ -168,7 +172,6 @@ def _run_job(job: dict[str, Any]) -> None:
                 )
             duration = float(info.duration) if getattr(info, "duration", None) else None
             _set_job(job, duration=duration)
-            rows: list[dict[str, Any]] = []
             processed = 0.0
             for segment in segments:
                 if _cancelled(job):
@@ -176,10 +179,9 @@ def _run_job(job: dict[str, Any]) -> None:
                     return
                 processed = max(processed, float(segment.end or 0.0))
                 progress = min(0.99, processed / duration) if duration and duration > 0 else None
-                rows.append({"start": segment.start, "end": segment.end, "text": segment.text})
                 _set_job(
                     job,
-                    state="transcribing",
+                    segment={"start": segment.start, "end": segment.end, "text": segment.text},
                     progress=progress,
                     processed=processed,
                     duration=duration,
@@ -198,7 +200,7 @@ def _run_job(job: dict[str, Any]) -> None:
         result = {
             "language": info.language,
             "duration": duration,
-            "segments": rows,
+            "segments": job["segments"],
         }
         _set_job(
             job,
@@ -291,6 +293,7 @@ async def start_job(
         "detail": None,
         "retryable": None,
         "result": None,
+        "segments": [],
         "path": path,
         "model": model or os.environ.get("WHISPER_MODEL", "small"),
         "language": language,
@@ -311,8 +314,9 @@ async def start_job(
                 pass
             return JSONResponse(_snapshot(existing), status_code=200 if existing["state"] == "ready" else 202)
         JOBS[job_key] = job
+        snapshot = _snapshot(job)
     EXECUTOR.submit(_run_job, job)
-    return JSONResponse(_snapshot(job), status_code=202)
+    return JSONResponse(snapshot, status_code=202)
 
 
 @app.get("/jobs/{job_key}")

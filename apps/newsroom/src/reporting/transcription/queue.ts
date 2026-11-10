@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { APIError, type CollectionAfterChangeHook, type Payload, type PayloadRequest, type TaskConfig, type Where } from "payload";
 import { relationId } from "../../access/user";
+import { inTransaction, lockRow } from "../../db/locks";
+import { normalizeSegments } from "../../domain/transcript";
 import { recordStoryActivity } from "../../newsroom/story-activity";
 import { notifyTranscriptReady } from "../notifications";
 import { privateReportingDir } from "../paths";
@@ -120,7 +122,10 @@ export async function recoverQueuedTranscriptions(payload: Payload): Promise<{
 
   for (const job of jobs.docs) {
     const transcriptId = jobTranscriptId(job.input);
-    if (transcriptId === null || !activeById.has(transcriptId) || job.hasError === true) continue;
+    const transcript = transcriptId === null ? undefined : activeById.get(transcriptId);
+    if (!transcript || job.hasError === true) continue;
+    const { runToken } = job.input as { runToken?: string };
+    if (runToken && runToken !== transcript.transcriptionRunToken) continue;
 
     if (job.processing === true) {
       await payload.update({
@@ -135,7 +140,7 @@ export async function recoverQueuedTranscriptions(payload: Payload): Promise<{
       });
       released++;
     }
-    pendingIds.add(transcriptId);
+    pendingIds.add(transcript.id);
   }
 
   let legacyReset = 0;
@@ -165,7 +170,7 @@ export async function recoverQueuedTranscriptions(payload: Payload): Promise<{
     await (payload.jobs as unknown as Jobs).queue({
       task: TRANSCRIBE_TASK,
       queue: REPORTING_QUEUE,
-      input: { transcriptId: transcript.id },
+      input: { transcriptId: transcript.id, runToken: transcript.transcriptionRunToken ?? undefined },
       overrideAccess: true
     });
     pendingIds.add(transcript.id);
@@ -193,28 +198,34 @@ export async function queueTranscription(req: PayloadRequest, fileId: number, { 
   if (file.kind !== "audio") throw new APIError("Only recordings can be transcribed.", 400);
   const existing = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0, limit: 1, overrideAccess: true, req });
   const context = { ...req.context, bylineSystem: true };
-  let transcriptId: number;
-  if (existing.docs[0]) {
-    const row = existing.docs[0];
-    if (row.state === "ready" && row.origin === "manual") throw new APIError("This recording already has a manual transcript.", 409);
-    if (row.state === "queued" || row.state === "processing") return row.id;
-    await req.payload.update({
-      collection: "reporting-transcripts",
-      id: row.id,
-      data: {
-        state: "queued",
-        failure: null,
-        attempts: 0,
-        origin: "machine",
-        provider: provider.id,
-        model: provider.model,
-        ...newRun()
-      },
-      overrideAccess: true, depth: 0, context, req
-    });
-    transcriptId = row.id;
-  } else {
-    const created = await req.payload.create({
+  const run = newRun();
+  return inTransaction(req, async () => {
+    const existingId = existing.docs[0]?.id;
+    if (existingId !== undefined) {
+      await lockRow(req, "reporting_transcripts", existingId);
+      const row = await req.payload.findByID({ collection: "reporting-transcripts", id: existingId, depth: 0, overrideAccess: true, req });
+      if (row.state === "ready" && row.origin === "manual") throw new APIError("This recording already has a manual transcript.", 409);
+      if (row.state === "queued" || row.state === "processing") return row.id;
+      await req.payload.update({
+        collection: "reporting-transcripts",
+        id: row.id,
+        data: {
+          state: "queued",
+          failure: null,
+          attempts: 0,
+          origin: "machine",
+          provider: provider.id,
+          model: provider.model,
+          segments: [],
+          durationMs: null,
+          editedAt: null,
+          editedBy: null,
+          ...run
+        },
+        overrideAccess: true, depth: 0, context, req
+      });
+    }
+    const transcriptId = existingId ?? (await req.payload.create({
       collection: "reporting-transcripts",
       data: {
         story: relationId(file.story) as number,
@@ -230,14 +241,19 @@ export async function queueTranscription(req: PayloadRequest, fileId: number, { 
         createdBy: (requestedBy ?? relationId(file.createdBy)) as number | null,
         capturedAt: file.capturedAt ?? new Date().toISOString(),
         attempts: 0,
-        ...newRun()
+        ...run
       },
       overrideAccess: true, depth: 0, context, req
+    })).id;
+    await (req.payload.jobs as unknown as Jobs).queue({
+      task: TRANSCRIBE_TASK,
+      queue: REPORTING_QUEUE,
+      input: { transcriptId, runToken: run.transcriptionRunToken },
+      overrideAccess: true,
+      req
     });
-    transcriptId = created.id;
-  }
-  await (req.payload.jobs as unknown as Jobs).queue({ task: TRANSCRIBE_TASK, queue: REPORTING_QUEUE, input: { transcriptId }, overrideAccess: true, req });
-  return transcriptId;
+    return transcriptId;
+  });
 }
 
 /** After a recording is uploaded: queue it only when the provider is the newsroom's own (private). */
@@ -250,12 +266,12 @@ export const queueTranscriptionAfterUpload: CollectionAfterChangeHook = async ({
   return doc;
 };
 
-const activeMachineWhere = (id: number, runToken?: string): Where => ({
+const activeMachineWhere = (id: number, runToken: string | null): Where => ({
   and: [
     { id: { equals: id } },
     { origin: { equals: "machine" } },
     { state: { not_equals: "ready" } },
-    ...(runToken ? [{ transcriptionRunToken: { equals: runToken } }] : [])
+    runToken ? { transcriptionRunToken: { equals: runToken } } : { transcriptionRunToken: { exists: false } }
   ]
 });
 
@@ -264,20 +280,26 @@ const activeMachineWhere = (id: number, runToken?: string): Where => ({
  * run). Every asynchronous write after work starts is compare-and-set against
  * the run token and origin instead of trusting the row we read minutes ago.
  */
-async function updateActiveRun(payload: Payload, req: PayloadRequest, id: number, runToken: string | undefined, data: Record<string, unknown>): Promise<boolean> {
-  const updated = await payload.update({
-    collection: "reporting-transcripts",
-    where: activeMachineWhere(id, runToken),
-    data: data as never,
-    overrideAccess: true,
-    depth: 0,
-    context: { bylineSystem: true },
-    req
+async function updateActiveRun(payload: Payload, req: PayloadRequest, id: number, runToken: string | null, data: Record<string, unknown>): Promise<boolean> {
+  return inTransaction(req, async () => {
+    // Payload's bulk update resolves its where clause before issuing writes.
+    // Lock the row before checking the token so a manual import cannot slip in.
+    await lockRow(req, "reporting_transcripts", id);
+    const updated = await payload.update({
+      collection: "reporting-transcripts",
+      where: activeMachineWhere(id, runToken),
+      data,
+      overrideAccess: true,
+      depth: 0,
+      context: { bylineSystem: true },
+      req
+    });
+    if (updated.errors.length) throw new Error("Could not update the transcription run.");
+    return updated.docs.length > 0;
   });
-  return updated.docs.length > 0;
 }
 
-async function markFailed(payload: Payload, req: PayloadRequest, id: number, failure: string, runToken?: string): Promise<boolean> {
+async function markFailed(payload: Payload, req: PayloadRequest, id: number, failure: string, runToken: string | null): Promise<boolean> {
   return updateActiveRun(payload, req, id, runToken, {
     state: "failed",
     failure: failure.slice(0, 400),
@@ -289,68 +311,73 @@ async function markFailed(payload: Payload, req: PayloadRequest, id: number, fai
 export const transcribeReportingFileTask: TaskConfig = {
   slug: TRANSCRIBE_TASK,
   label: "Transcribe a reporting recording",
-  inputSchema: [{ name: "transcriptId", type: "number", required: true }],
+  inputSchema: [
+    { name: "transcriptId", type: "number", required: true },
+    { name: "runToken", type: "text" }
+  ],
   retries: { attempts: MAX_ATTEMPTS - 1, backoff: { type: "exponential", delay: 60_000 } },
   concurrency: ({ input }) => `transcribe:${(input as { transcriptId?: number }).transcriptId}`,
   handler: async ({ input, req }) => {
     const { payload } = req;
-    const id = Number((input as { transcriptId?: unknown }).transcriptId);
+    const { transcriptId, runToken: queuedToken } = input as { transcriptId?: unknown; runToken?: string };
+    const id = Number(transcriptId);
     const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: id } }, depth: 0, limit: 1, overrideAccess: true, req });
     const transcript = found.docs[0];
     // Removed, or already finished by someone else (a manual import): nothing to do.
     if (!transcript || transcript.state === "ready") return { output: { skipped: true } };
+    const previousToken = transcript.transcriptionRunToken || null;
+    if (queuedToken && queuedToken !== previousToken) return { output: { skipped: true } };
     const provider = activeProvider();
     if (!provider) {
-      await markFailed(payload, req, id, "Transcription is not configured.");
+      await markFailed(payload, req, id, "Transcription is not configured.", previousToken);
       return { output: { failed: true } };
     }
     const fileId = relationId(transcript.file);
     const file = fileId === null ? null : await payload.findByID({ collection: "reporting-files", id: fileId, depth: 0, overrideAccess: true, req, disableErrors: true });
     if (!file?.filename) {
-      await markFailed(payload, req, id, "The recording is gone.");
+      await markFailed(payload, req, id, "The recording is gone.", previousToken);
       return { output: { failed: true } };
     }
 
     const attempts = (typeof transcript.attempts === "number" ? transcript.attempts : 0) + 1;
-    const runToken = typeof transcript.transcriptionRunToken === "string" && transcript.transcriptionRunToken
-      ? transcript.transcriptionRunToken
-      : randomUUID();
-    const startedAt = transcript.transcriptionStartedAt ?? new Date().toISOString();
-    const claimed = await payload.update({
-      collection: "reporting-transcripts",
-      where: activeMachineWhere(id),
-      data: {
-        state: "processing",
-        attempts,
-        failure: null,
-        transcriptionRunToken: runToken,
-        transcriptionStartedAt: startedAt,
-        progressMessage: transcript.progressMessage || "Starting transcription",
-        lastProgressAt: new Date().toISOString()
-      },
-      overrideAccess: true, depth: 0, context: { bylineSystem: true }, req
+    const runToken = previousToken ?? randomUUID();
+    const claimed = await updateActiveRun(payload, req, id, previousToken, {
+      state: "processing",
+      attempts,
+      failure: null,
+      transcriptionRunToken: runToken,
+      transcriptionStartedAt: transcript.transcriptionStartedAt ?? new Date().toISOString(),
+      progressMessage: transcript.progressMessage || "Starting transcription",
+      lastProgressAt: new Date().toISOString()
     });
-    // A manual import may have won between the initial read and this claim.
-    if (!claimed.docs.length) return { output: { skipped: true } };
+    if (!claimed) return { output: { skipped: true } };
 
-    let lastProgressWrite = 0;
-    let lastState = "";
-    let lastPercent: number | null = null;
-    let lastMessage = "";
+    let lastState: TranscriptionProgress["state"] | undefined;
+    let lastPercent = transcript.progressPercent ?? null;
+    let lastMessage = transcript.progressMessage ?? "";
+    let lastSegments = JSON.stringify(normalizeSegments(transcript.segments));
+    let lastDuration = transcript.durationMs ?? null;
     const recordProgress = async (progress: TranscriptionProgress) => {
-      const now = Date.now();
-      const changed = progress.state !== lastState || progress.percent !== lastPercent || progress.message !== lastMessage;
-      if (!changed || (now - lastProgressWrite < 4_000 && progress.state === lastState)) return;
-      lastProgressWrite = now;
-      lastState = progress.state;
-      lastPercent = progress.percent;
-      lastMessage = progress.message;
+      const prefix = progress.segments === undefined ? lastSegments : JSON.stringify(progress.segments);
+      const duration = progress.durationMs === undefined ? lastDuration : progress.durationMs;
+      const textChanged = prefix !== lastSegments;
+      const durationChanged = duration !== lastDuration;
+      if (!textChanged && !durationChanged && progress.state === lastState && progress.percent === lastPercent && progress.message === lastMessage) return;
+      // The provider coalesces segments into one full prefix per status poll.
+      // Replacing the prefix also covers replay and a Whisper restart.
       await updateActiveRun(payload, req, id, runToken, {
         state: progress.state === "queued" ? "queued" : "processing",
         progressPercent: progress.percent,
         progressMessage: progress.message,
-        lastProgressAt: new Date(now).toISOString()
+        lastProgressAt: new Date().toISOString(),
+        ...(textChanged ? { segments: progress.segments } : {}),
+        ...(durationChanged ? { durationMs: duration } : {})
       });
+      lastState = progress.state;
+      lastPercent = progress.percent;
+      lastMessage = progress.message;
+      lastSegments = prefix;
+      lastDuration = duration;
     };
 
     try {

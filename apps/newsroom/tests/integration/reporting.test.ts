@@ -183,9 +183,11 @@ describe("recordings, ground rules and transcription", () => {
     // job contract. Short status requests are what let long interviews run
     // without Node's response-header timeout.
     const received: Array<{ path: string; authorization?: string; form: FormData }> = [];
-    const jobs = new Map<string, { bad: boolean; polls: number; dropped: boolean }>();
+    const jobs = new Map<string, { bad: boolean; polls: number; dropped: boolean; replayed: boolean }>();
     const posts = new Map<string, number>();
     const forgotten = new Set<string>();
+    const drafts: Call[] = [];
+    const serviceSegments = stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }));
     const server = createServer(async (request, response) => {
       const pathname = request.url ?? "";
       const send = (status: number, body: unknown) => {
@@ -205,7 +207,7 @@ describe("recordings, ground rules and transcription", () => {
           if (existing.bad) return send(202, { job: pathname, state: "failed", detail: "Unsupported audio codec.", retryable: false, progress: null });
           return send(202, { job: pathname, state: "queued", progress: null, message: "Waiting for transcription worker" });
         }
-        jobs.set(pathname, { bad, polls: 0, dropped: false });
+        jobs.set(pathname, { bad, polls: 0, dropped: false, replayed: false });
         if (bad) return send(202, { job: pathname, state: "failed", detail: "Unsupported audio codec.", retryable: false, progress: null });
         return send(202, { job: pathname, state: "queued", progress: null, message: "Waiting for transcription worker" });
       }
@@ -222,8 +224,22 @@ describe("recordings, ground rules and transcription", () => {
           jobs.delete(pathname);
           return send(404, { detail: "Transcription job not found" });
         }
-        job.polls += 1;
-        if (job.polls === 1) return send(200, { job: pathname, state: "transcribing", progress: 0.42, message: "Transcribing audio" });
+        const mainRun = pathname.startsWith(`/jobs/transcript-${ids.transcript}-`);
+        if (mainRun && job.polls > 0) {
+          drafts.push(await call("get", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript } }));
+          if (!job.dropped) {
+            job.dropped = true;
+            request.socket.destroy();
+            return;
+          }
+        }
+        if (mainRun && job.dropped && !job.replayed) job.replayed = true;
+        else job.polls += 1;
+        if (job.polls <= 2) return send(200, {
+          job: pathname, state: "transcribing", duration: 12,
+          // Keep the percentage constant to exercise text-only progress.
+          progress: 0.42, message: "Transcribing audio", segments: serviceSegments.slice(0, job.polls)
+        });
         return send(200, {
           job: pathname,
           state: "ready",
@@ -231,7 +247,7 @@ describe("recordings, ground rules and transcription", () => {
           message: "Transcript ready",
           result: {
             language: "EN", duration: 12,
-            segments: stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }))
+            segments: serviceSegments
           }
         });
       }
@@ -242,7 +258,7 @@ describe("recordings, ground rules and transcription", () => {
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Missing transcription test address");
     const url = `http://127.0.0.1:${address.port}`;
-    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 5000, token: "fixture-token", pollIntervalMs: 10 });
+    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 15_000, token: "fixture-token", pollIntervalMs: 10 });
     setTranscriptionProviderForTests(provider);
     try {
       await runReporting();
@@ -255,9 +271,23 @@ describe("recordings, ground rules and transcription", () => {
       expect(upload.name).toBe("coach-smith.wav");
       expect(Buffer.from(await upload.arrayBuffer())).toEqual(wav("coach-smith.wav").data);
 
+      const waiting = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
+      expect(waiting).toMatchObject({ state: "queued", segments: stubSegments.slice(0, 1) });
+      const retryJob = (await payload.find({ collection: "payload-jobs", where: { queue: { equals: "reporting" } }, depth: 0 })).docs.find((job) =>
+        (job.input as { transcriptId?: number })?.transcriptId === ids.transcript
+      );
+      expect(retryJob).toBeDefined();
+      await payload.update({ collection: "payload-jobs", id: retryJob!.id, data: { waitUntil: new Date(0).toISOString() } });
+      await runReporting();
+      expect(received).toHaveLength(1);
+      expect(drafts.map(({ status }) => status)).toEqual([200, 200, 200, 200]);
+      expect(drafts.map(({ body }) => body.segments)).toEqual([stubSegments.slice(0, 1), stubSegments.slice(0, 1), stubSegments.slice(0, 1), stubSegments.slice(0, 2)]);
+      expect(drafts[0].body).toMatchObject({ state: "processing", progressPercent: 42, durationMs: 12000 });
+
       const complete = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
       expect(complete).toMatchObject({ state: "ready", progressPercent: 100, progressMessage: "Transcript ready" });
       expect(complete.transcriptionRunToken).toMatch(/^[0-9a-f-]{36}$/);
+      expect(complete.transcriptionRunToken).toBe(waiting.transcriptionRunToken);
 
       const recording = await payload.findByID({ collection: "reporting-files", id: ids.recording, depth: 0 });
       const providerInput = (jobKey: string) => ({
@@ -270,14 +300,15 @@ describe("recordings, ground rules and transcription", () => {
 
       // A dropped poll does not start Whisper twice. The second provider call
       // reattaches by the exact same job key and sees the existing service job.
-      await expect(provider.transcribe(providerInput("retry-contract"), AbortSignal.timeout(1_000))).rejects.toThrow(/connection/i);
-      const retried = await provider.transcribe(providerInput("retry-contract"), AbortSignal.timeout(1_000));
+      const signal = new AbortController().signal;
+      await expect(provider.transcribe(providerInput("retry-contract"), signal)).rejects.toThrow(/connection/i);
+      const retried = await provider.transcribe(providerInput("retry-contract"), signal);
       expect(retried.segments).toEqual(stubSegments);
       expect(posts.get("/jobs/retry-contract")).toBe(1);
 
       // If the service restarted and genuinely forgot an active job, the
       // provider resubmits the same key and finishes the replacement run.
-      const restarted = await provider.transcribe(providerInput("restart-contract"), AbortSignal.timeout(1_000));
+      const restarted = await provider.transcribe(providerInput("restart-contract"), signal);
       expect(restarted.segments).toEqual(stubSegments);
       expect(posts.get("/jobs/restart-contract")).toBe(2);
 
@@ -311,13 +342,14 @@ describe("recordings, ground rules and transcription", () => {
       model: "test-model",
       private: true,
       async transcribe(_input, _signal, onProgress) {
+        await onProgress?.({ state: "transcribing", percent: 25, message: "Transcribing audio", segments: stubSegments.slice(0, 1) });
         const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
           params: { id: ids.story },
           data: { fileId, replace: true },
           file: text("manual-race.txt", "Coach Smith: This is the manual replacement.")
         });
         expect(imported.status).toBe(200);
-        await onProgress?.({ state: "transcribing", percent: 75, message: "Transcribing audio" });
+        await onProgress?.({ state: "transcribing", percent: 75, message: "Transcribing audio", segments: stubSegments.slice(0, 2) });
         return { language: "en", durationMs: 12000, segments: stubSegments };
       }
     };
@@ -342,6 +374,60 @@ describe("recordings, ground rules and transcription", () => {
     expect(JSON.stringify(transcript.segments)).toContain("manual replacement");
     expect(JSON.stringify(transcript.segments)).not.toContain("man coverage");
     setTranscriptionProviderForTests(stub);
+  });
+
+  it("keeps a failed draft private and clears it for a fresh machine run", async () => {
+    setTranscriptionProviderForTests({
+      ...stub,
+      async transcribe(_input, _signal, onProgress) {
+        await onProgress?.({ state: "transcribing", percent: 25, message: "Transcribing audio", segments: stubSegments.slice(0, 1) });
+        throw new PermanentTranscriptionError("The recording could not be decoded.");
+      }
+    });
+    try {
+      const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
+        params: { id: ids.story }, data: { confidential: true }, file: wav("failed-draft.wav")
+      });
+      expect(recording.status).toBe(200);
+      await runReporting();
+      const draft = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: recording.body.id } }, depth: 0 })).docs[0];
+      expect(draft).toMatchObject({ state: "failed", segments: stubSegments.slice(0, 1), searchText: expect.stringContaining("tackle better") });
+      const params = { id: draft.id };
+      const raw = await payload.findByID({ collection: "reporting-transcripts", id: draft.id, req: await reqAs("alice"), overrideAccess: false, depth: 0 });
+      expect(raw.segments).toBeUndefined();
+      expect(raw.searchText).toBeUndefined();
+      expect(await call("get", "/byline/reporting/transcripts/:id", "alice", { params })).toMatchObject({ status: 200, body: { segments: stubSegments.slice(0, 1) } });
+      expect((await call("get", "/byline/reporting/transcripts/:id", "bob", { params })).status).toBe(404);
+      for (const kind of ["highlight", "quote"]) {
+        expect((await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
+          params, data: { kind, segmentIds: ["s0"] }
+        })).status).toBe(409);
+      }
+      await expect(payload.create({
+        collection: "transcript-selections",
+        data: { story: ids.story, transcript: draft.id, text: "Draft quote" } as never,
+        req: await reqAs("alice"),
+        overrideAccess: false
+      })).rejects.toMatchObject({ status: 409 });
+
+      const retried = await call("post", "/byline/reporting/files/:id/transcribe", "alice", { params: { id: recording.body.id } });
+      expect(retried.status).toBe(200);
+      const queued = await payload.findByID({ collection: "reporting-transcripts", id: draft.id, depth: 0 });
+      expect(queued).toMatchObject({ state: "queued", segments: [], searchText: "", attempts: 0 });
+      expect(queued.transcriptionRunToken).not.toBe(draft.transcriptionRunToken);
+      const replacement = [{ ...stubSegments[0], text: "A different transcription of this passage." }];
+      setTranscriptionProviderForTests({
+        ...stub,
+        async transcribe(_input, _signal, onProgress) {
+          await onProgress?.({ state: "transcribing", percent: 30, message: "Transcribing audio", segments: replacement });
+          return { segments: replacement, durationMs: 12000, language: "en" };
+        }
+      });
+      await runReporting();
+      expect(await payload.findByID({ collection: "reporting-transcripts", id: draft.id, depth: 0 })).toMatchObject({ state: "ready", segments: replacement });
+    } finally {
+      setTranscriptionProviderForTests(stub);
+    }
   });
 
   it("fails malformed audio once and retries temporary outages", async () => {
@@ -410,7 +496,7 @@ describe("recordings, ground rules and transcription", () => {
     await payload.update({
       collection: "payload-jobs",
       id: job!.id,
-      data: { processing: true },
+      data: { processing: true, input: { transcriptId: transcript.id } },
       overrideAccess: true
     });
 
