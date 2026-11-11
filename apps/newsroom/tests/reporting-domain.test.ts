@@ -132,16 +132,17 @@ describe("transcript editing and search", () => {
   });
   it("edits keep ids and timing; renames apply everywhere", () => {
     const edited = editSegment(segments, "ax", { text: "What changed on defense?" });
-    expect(edited[1]).toEqual({ id: "ax", startMs: 1000, endMs: 2000, speaker: "SPEAKER_01", text: "What changed on defense?" });
+    expect(edited[1]).toEqual({ id: "ax", startMs: 1000, endMs: 2000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "What changed on defense?" });
     expect(renameSpeaker(segments, "SPEAKER_00", "Coach Smith")[0].speaker).toBe("Coach Smith");
+    expect(renameSpeaker(segments, "Speaker 1", "Coach Smith")[0].speaker).toBe("Coach Smith");
   });
   it("searches words and speakers, and follows playback", () => {
     expect(searchTranscript(segments, "changed")).toEqual([{ segmentId: "ax", start: 5, end: 12 }]);
-    expect(searchTranscript(segments, "speaker_01")).toEqual([{ segmentId: "ax", start: -1, end: -1 }]);
+    expect(searchTranscript(segments, "speaker 2")).toEqual([{ segmentId: "ax", start: -1, end: -1 }]);
     expect(activeSegmentAt(segments, 1500)).toBe("ax");
   });
   it("snapshots a selection's words, timing and single speaker", () => {
-    expect(selectionFromSegments(segments, ["a"], "tackled better")).toEqual({ text: "tackled better", startMs: 0, endMs: 1000, speaker: "SPEAKER_00", segmentIds: ["a"] });
+    expect(selectionFromSegments(segments, ["a"], "tackled better")).toEqual({ text: "tackled better", startMs: 0, endMs: 1000, speaker: "Speaker 1", segmentIds: ["a"] });
     expect(selectionFromSegments(segments, ["a", "ax"])?.speaker).toBeNull();
   });
 });

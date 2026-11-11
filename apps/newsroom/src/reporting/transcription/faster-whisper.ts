@@ -8,7 +8,7 @@ import {
   type TranscriptionProvider
 } from "./provider";
 
-type WhisperJobState = "queued" | "loading-model" | "transcribing" | "ready" | "failed" | "cancelled";
+type WhisperJobState = "queued" | "loading-diarization" | "diarizing" | "loading-model" | "transcribing" | "ready" | "failed" | "cancelled";
 type WhisperJob = {
   job?: unknown;
   state?: unknown;
@@ -22,7 +22,7 @@ type WhisperJob = {
   result?: unknown;
 };
 
-const JOB_STATES = new Set<WhisperJobState>(["queued", "loading-model", "transcribing", "ready", "failed", "cancelled"]);
+const JOB_STATES = new Set<WhisperJobState>(["queued", "loading-diarization", "diarizing", "loading-model", "transcribing", "ready", "failed", "cancelled"]);
 const defaultPollMs = 5_000;
 
 function jobBody(value: unknown): WhisperJob & { state: WhisperJobState } {
@@ -47,9 +47,13 @@ function progressOf(job: WhisperJob & { state: WhisperJobState }): Transcription
     ? job.message.trim().slice(0, 160)
     : job.state === "queued"
       ? "Waiting for transcription worker"
-      : job.state === "loading-model"
-        ? "Loading Whisper model"
-        : "Transcribing audio";
+      : job.state === "loading-diarization"
+        ? "Loading speaker model"
+        : job.state === "diarizing"
+          ? "Identifying speakers"
+          : job.state === "loading-model"
+            ? "Loading Whisper model"
+            : "Transcribing audio";
   return {
     state: job.state,
     percent,
@@ -114,7 +118,12 @@ export function fasterWhisperProvider(config: {
       const language = input.language ?? config.language;
       if (language) form.set("language", language);
       form.set("vad", "true");
+      // Segment-only unless the service diarizes: it turns word timing on
+      // itself when it needs it to place a speaker change inside a segment.
       form.set("word_timestamps", "false");
+      // Optional, never required: automatic speaker detection is the normal path.
+      const hints = speakerHints(input.speakers);
+      for (const [name, value] of Object.entries(hints)) form.set(name, String(value));
 
       const timeout = AbortSignal.timeout(config.timeoutMs);
       const combined = AbortSignal.any([signal, timeout]);
@@ -190,6 +199,21 @@ export function fasterWhisperProvider(config: {
       throw new TemporaryTranscriptionError("The transcription service lost the job.");
     }
   };
+}
+
+/**
+ * Per-job speaker-count hints for the service's diarizer (`Auto` sends none).
+ * An exact count wins over a range; contradictory or out-of-range values are
+ * dropped so a bad hint can never fail a job.
+ */
+export function speakerHints(speakers: TranscriptionInput["speakers"]): Record<string, number> {
+  const valid = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 20 ? value : null);
+  const exact = valid(speakers?.exact);
+  if (exact) return { num_speakers: exact };
+  const min = valid(speakers?.min);
+  const max = valid(speakers?.max);
+  if (min && max && min > max) return {};
+  return { ...(min ? { min_speakers: min } : {}), ...(max ? { max_speakers: max } : {}) };
 }
 
 /** faster-whisper's seconds-based response → Byline's normalized transcript. Exported for tests. */

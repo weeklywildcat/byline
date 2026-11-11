@@ -15,11 +15,11 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/ne
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, PanelRight, Pencil, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, PanelRight, Pencil, Play, Search } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
-import { activeSegmentAt, formatPosition, searchTranscript, type TranscriptSegment } from "../../domain/transcript";
+import { activeSegmentAt, formatPosition, machineSpeakerLabel, searchTranscript, speakerLabel, speakerProfiles, speakerTurns, type SpeakerProfile, type TranscriptSegment } from "../../domain/transcript";
 import {
   editSelection,
   editTranscript,
@@ -100,6 +100,8 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const followingLatest = useRef(true);
   const previousCount = useRef<number | null>(null);
   const previousScrollTop = useRef(0);
+  // A speaker sample plays a short passage, then stops by itself.
+  const stopAt = useRef<number | null>(null);
   const [hasNewPassages, setHasNewPassages] = useState(false);
   const [position, setPosition] = useState(0);
   const [query, setQuery] = useState("");
@@ -115,6 +117,10 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const transcribing = detail?.state === "queued" || detail?.state === "processing";
   const segments = detail?.segments ?? [];
   const segmentCount = segments.length;
+  const turns = useMemo(() => speakerTurns(segments), [segments]);
+  const profiles = useMemo(() => speakerProfiles(segments), [segments]);
+  // Once any passage has a voice, a passage without one is shown as unknown, never as someone.
+  const diarized = profiles.length > 0;
   const lastEnd = segments.at(-1)?.endMs;
   const active = ready || (lastEnd != null && position <= lastEnd) ? activeSegmentAt(segments, position) : null;
 
@@ -153,8 +159,23 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const seek = useCallback((ms: number | null) => {
     const audio = audioRef.current;
     if (!audio || ms === null) return;
+    stopAt.current = null;
     audio.currentTime = ms / 1000;
     void audio.play().catch(() => undefined);
+  }, []);
+  const playSample = useCallback((startMs: number, endMs: number | null) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = startMs / 1000;
+    stopAt.current = endMs !== null && endMs > startMs ? endMs : startMs + 8000;
+    void audio.play().catch(() => undefined);
+  }, []);
+  const onTime = useCallback((ms: number) => {
+    setPosition(ms);
+    if (stopAt.current !== null && ms >= stopAt.current) {
+      stopAt.current = null;
+      audioRef.current?.pause();
+    }
   }, []);
 
   // A new search starts at its first result; stepping scrolls and seeks to it.
@@ -202,7 +223,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
   if (!detail) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
 
-  const contextPanel = <TranscriptContext context={context} detail={detail} seek={seek} refresh={refresh} />;
+  const contextPanel = <TranscriptContext context={context} detail={detail} profiles={profiles} canEdit={canEdit} seek={seek} playSample={playSample} refresh={refresh} />;
   const searchBar = (
     <div className="flex items-center gap-2">
       <div className="min-w-0 flex-1"><SearchBar query={query} onQuery={changeQuery} count={matches.length} index={current ? Math.min(matchIndex, matches.length - 1) : -1} onStep={step} /></div>
@@ -231,25 +252,31 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           onMouseUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
           onKeyUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
         >
-          {segments.map((segment) => (
-            <Segment
-              key={segment.id}
-              segment={segment}
-              speakers={detail.speakers}
-              sourceName={detail.source?.label ?? null}
-              isActive={active === segment.id}
-              ranges={matches.filter((match) => match.segmentId === segment.id && match.start >= 0).map((match) => [match.start, match.end] as [number, number])}
-              currentRange={current && current.segmentId === segment.id && current.start >= 0 ? [current.start, current.end] : null}
-              editing={ready && editing === segment.id}
-              canEdit={ready && canEdit}
-              onSeek={() => seek(segment.startMs)}
-              onEdit={() => setEditing(segment.id)}
-              onDone={() => setEditing(null)}
-              transcriptId={transcriptId}
-              api={context.api}
-              updatedAt={detail.updatedAt}
-              refresh={refresh}
-            />
+          {turns.map((turn) => (
+            <div key={turn.id} data-turn={turn.identity ?? ""} className="border-t pt-1 first:border-t-0 first:pt-0">
+              {turn.segments.map((segment, index) => (
+                <Segment
+                  key={segment.id}
+                  segment={segment}
+                  heading={index === 0}
+                  diarized={diarized}
+                  profiles={profiles}
+                  sourceName={detail.source?.label ?? null}
+                  isActive={active === segment.id}
+                  ranges={matches.filter((match) => match.segmentId === segment.id && match.start >= 0).map((match) => [match.start, match.end] as [number, number])}
+                  currentRange={current && current.segmentId === segment.id && current.start >= 0 ? [current.start, current.end] : null}
+                  editing={ready && editing === segment.id}
+                  canEdit={ready && canEdit}
+                  onSeek={() => seek(segment.startMs)}
+                  onEdit={() => setEditing(segment.id)}
+                  onDone={() => setEditing(null)}
+                  transcriptId={transcriptId}
+                  api={context.api}
+                  updatedAt={detail.updatedAt}
+                  refresh={refresh}
+                />
+              ))}
+            </div>
           ))}
           {transcribing ? (
             <p className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
@@ -296,7 +323,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         <ResizablePanelGroup orientation="horizontal" className="min-h-[28rem] rounded-lg border">
           <ResizablePanel id="transcript" minSize={420} className="flex flex-col overflow-y-auto">
             <div className="flex min-h-0 flex-1 flex-col px-4 pb-2">
-              <Player detail={detail} audioRef={audioRef} onTime={setPosition} />
+              <Player detail={detail} audioRef={audioRef} onTime={onTime} />
               {searchBar}
               {stream}
             </div>
@@ -306,7 +333,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         </ResizablePanelGroup>
       ) : (
         <div className="flex min-h-0 flex-col">
-          <Player detail={detail} audioRef={audioRef} onTime={setPosition} />
+          <Player detail={detail} audioRef={audioRef} onTime={onTime} />
           {searchBar}
           {stream}
         </div>
@@ -401,11 +428,11 @@ function GroundRulesBanner({ detail }: { detail: TranscriptDetail }) {
 }
 
 type SegmentProps = {
-  segment: TranscriptSegment; speakers: string[]; sourceName: string | null; isActive: boolean; ranges: Array<[number, number]>; currentRange: [number, number] | null;
+  segment: TranscriptSegment; heading: boolean; diarized: boolean; profiles: SpeakerProfile[]; sourceName: string | null; isActive: boolean; ranges: Array<[number, number]>; currentRange: [number, number] | null;
   editing: boolean; canEdit: boolean; onSeek: () => void; onEdit: () => void; onDone: () => void; transcriptId: number; api: string; updatedAt: string; refresh: () => Promise<unknown>;
 };
 
-function Segment({ segment, speakers, sourceName, isActive, ranges, currentRange, editing, canEdit, onSeek, onEdit, onDone, transcriptId, api, updatedAt, refresh }: SegmentProps) {
+function Segment({ segment, heading, diarized, profiles, sourceName, isActive, ranges, currentRange, editing, canEdit, onSeek, onEdit, onDone, transcriptId, api, updatedAt, refresh }: SegmentProps) {
   const [text, setText] = useState(segment.text);
   useEffect(() => setText(segment.text), [segment.text, editing]);
   const save = useMutation({
@@ -414,13 +441,13 @@ function Segment({ segment, speakers, sourceName, isActive, ranges, currentRange
     onError: (error: Error) => toast.error(error.message)
   });
   return (
-    <div data-segment={segment.id} data-active={isActive ? "" : undefined} className={`group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 rounded-md px-2 py-2 ${isActive ? "bg-accent/60" : ""}`}>
+    <div data-segment={segment.id} data-active={isActive ? "" : undefined} className={`group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 rounded-md px-2 ${heading ? "py-2" : "py-1"} ${isActive ? "bg-accent/60" : ""}`}>
       <button type="button" onClick={onSeek} disabled={segment.startMs === null} aria-label={segment.startMs === null ? "No timestamp" : `Play from ${formatPosition(segment.startMs)}`} className="touch-hit h-fit min-h-8 select-none text-left text-xs tabular-nums text-muted-foreground underline-offset-2 hover:underline focus-visible:underline disabled:no-underline">
         {formatPosition(segment.startMs)}
       </button>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          {segment.speaker || canEdit ? <SpeakerEditor segment={segment} speakers={speakers} sourceName={sourceName} canEdit={canEdit} transcriptId={transcriptId} api={api} updatedAt={updatedAt} refresh={refresh} /> : null}
+          {heading && (speakerLabel(segment) || canEdit || diarized) ? <SpeakerEditor segment={segment} diarized={diarized} profiles={profiles} sourceName={sourceName} canEdit={canEdit} transcriptId={transcriptId} api={api} updatedAt={updatedAt} refresh={refresh} /> : null}
           {canEdit && !editing ? <Button type="button" variant="ghost" size="xs" onClick={onEdit} aria-label="Edit this passage" className="select-none [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"><Pencil data-icon="inline-start" />Edit</Button> : null}
         </div>
         {editing ? (
@@ -436,24 +463,31 @@ function Segment({ segment, speakers, sourceName, isActive, ranges, currentRange
   );
 }
 
+/** What a reporter typed for a voice, or nothing while it still has a machine label. */
+const givenName = (segment: Pick<TranscriptSegment, "speaker">) => (segment.speaker && !machineSpeakerLabel(segment.speaker) ? segment.speaker : "");
+const machineKeyOf = (key: string | undefined) => (key && /^SPEAKER_\d{2,3}$/.test(key) ? key : null);
+
 /** A speaker is edited where it is shown: this passage, or everywhere. */
-function SpeakerEditor({ segment, speakers, sourceName, canEdit, transcriptId, api, updatedAt, refresh }: { segment: TranscriptSegment; speakers: string[]; sourceName: string | null; canEdit: boolean; transcriptId: number; api: string; updatedAt: string; refresh: () => Promise<unknown> }) {
+function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, transcriptId, api, updatedAt, refresh }: { segment: TranscriptSegment; diarized: boolean; profiles: SpeakerProfile[]; sourceName: string | null; canEdit: boolean; transcriptId: number; api: string; updatedAt: string; refresh: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(segment.speaker ?? "");
-  useEffect(() => { if (open) setName(segment.speaker ?? ""); }, [open, segment.speaker]);
-  const suggestions = [...new Set([...speakers, ...(sourceName ? [sourceName] : [])])].filter((entry) => entry !== name && entry !== segment.speaker);
+  const [name, setName] = useState(givenName(segment));
+  useEffect(() => { if (open) setName(givenName(segment)); }, [open, segment]);
+  const shown = speakerLabel(segment);
+  const suggestions = [...new Set([...profiles.filter((profile) => profile.named).map((profile) => profile.label), ...(sourceName ? [sourceName] : [])])].filter((entry) => entry !== name && entry !== shown);
   const apply = useMutation({
     mutationFn: (everywhere: boolean) => everywhere && segment.speaker
-      ? editTranscript(api, transcriptId, { renameSpeaker: { from: segment.speaker, to: name }, expectedUpdatedAt: updatedAt })
+      ? editTranscript(api, transcriptId, { renameSpeaker: { from: segment.speaker, to: name, key: machineKeyOf(segment.speakerKey) }, expectedUpdatedAt: updatedAt })
       : editTranscript(api, transcriptId, { segmentId: segment.id, speaker: name, expectedUpdatedAt: updatedAt }),
     onSuccess: async () => { setOpen(false); await refresh(); },
     onError: (error: Error) => toast.error(error.message)
   });
-  const label = segment.speaker || "Add speaker";
-  if (!canEdit) return <span className="select-none text-sm font-medium">{label}</span>;
+  // A diarized transcript never presents an unattributed passage as someone's words.
+  const label = shown ?? (diarized ? "Unknown speaker" : "Add speaker");
+  const plain = shown ? "" : "text-muted-foreground";
+  if (!canEdit) return <span data-speaker-label="" className={`select-none text-sm font-medium ${plain}`}>{label}</span>;
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${segment.speaker ? "" : "text-muted-foreground"}`} aria-label={segment.speaker ? `Speaker: ${segment.speaker}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
+      <PopoverTrigger render={<button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${plain}`} aria-label={shown ? `Speaker: ${shown}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
       <PopoverContent align="start" className="w-72">
         <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
           <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
@@ -469,8 +503,62 @@ function SpeakerEditor({ segment, speakers, sourceName, canEdit, transcriptId, a
   );
 }
 
+/**
+ * The detected voices (docs/reporting.md#speaker-diarization): hear a
+ * representative passage, then name each voice once. Byline tells voices
+ * apart; it never says whose they are. A reporter supplies the name, and the
+ * Source is only ever offered as a suggestion to pick.
+ */
+function SpeakersPanel({ api, detail, profiles, canEdit, playSample, refresh }: { api: string; detail: TranscriptDetail; profiles: SpeakerProfile[]; canEdit: boolean; playSample: (startMs: number, endMs: number | null) => void; refresh: () => Promise<unknown> }) {
+  const ready = detail.state === "ready";
+  const [naming, setNaming] = useState<string | null>(null);
+  const playable = Boolean(detail.file.url);
+  return (
+    <section aria-label="Speakers" className="grid gap-2" data-speakers="">
+      <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Speakers</h3>
+      {!ready ? <p className="text-xs text-muted-foreground">Voices are listed as they are found. You can name them when the transcript is ready.</p> : null}
+      <ul className="grid gap-3">
+        {profiles.map((profile) => (
+          <li key={profile.key} data-speaker={profile.key} className="grid gap-1.5 border-l-2 border-border pl-3">
+            <p className="text-sm font-medium">{profile.label}{profile.named ? null : <span className="ml-2 text-xs font-normal text-muted-foreground">Not named yet</span>}</p>
+            {profile.sample ? <p className="line-clamp-3 text-xs text-muted-foreground [overflow-wrap:anywhere]">“{profile.sample.text}”</p> : null}
+            {naming === profile.key && ready && canEdit ? (
+              <NameSpeaker api={api} detail={detail} profile={profile} profiles={profiles} onDone={async () => { setNaming(null); await refresh(); }} onCancel={() => setNaming(null)} />
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {playable && profile.sample ? <Button type="button" size="xs" variant="outline" onClick={() => playSample(profile.sample!.startMs, profile.sample!.endMs)}><Play data-icon="inline-start" />Play sample</Button> : null}
+                {ready && canEdit ? <Button type="button" size="xs" variant="ghost" onClick={() => setNaming(profile.key)}>{profile.named ? "Rename speaker" : "Name speaker"}</Button> : null}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function NameSpeaker({ api, detail, profile, profiles, onDone, onCancel }: { api: string; detail: TranscriptDetail; profile: SpeakerProfile; profiles: SpeakerProfile[]; onDone: () => Promise<unknown>; onCancel: () => void }) {
+  const [name, setName] = useState(profile.named ? profile.label : "");
+  const suggestions = [...new Set([...profiles.filter((entry) => entry.named && entry.key !== profile.key).map((entry) => entry.label), ...(detail.source ? [detail.source.label] : [])])].filter((entry) => entry !== name);
+  const rename = useMutation({
+    mutationFn: () => editTranscript(api, detail.id, { renameSpeaker: { from: profile.stored, to: name, key: machineKeyOf(profile.key) }, expectedUpdatedAt: detail.updatedAt }),
+    onSuccess: onDone,
+    onError: (error: Error) => toast.error(error.message)
+  });
+  return (
+    <InlineForm label={`Name ${profile.label}`} className="grid gap-1.5" onSubmit={() => { if (!rename.isPending) rename.mutate(); }} onCancel={onCancel}>
+      <Input value={name} maxLength={120} aria-label={`Name for ${profile.label}`} placeholder="Name this speaker" autoFocus onChange={(event) => setName(event.target.value)} />
+      {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 5).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
+      <div className="flex gap-2">
+        <Button type="button" size="xs" disabled={rename.isPending || (!name.trim() && !profile.named)} onClick={() => rename.mutate()}>{name.trim() || !profile.named ? "Save name" : "Clear name"}</Button>
+        <Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </InlineForm>
+  );
+}
+
 /** The Source, the ground rules in force when this was recorded, and the quotes saved from it. */
-function TranscriptContext({ context, detail, seek, refresh }: { context: StoryScreenContext; detail: TranscriptDetail; seek: (ms: number | null) => void; refresh: () => Promise<unknown> }) {
+function TranscriptContext({ context, detail, profiles, canEdit, seek, playSample, refresh }: { context: StoryScreenContext; detail: TranscriptDetail; profiles: SpeakerProfile[]; canEdit: boolean; seek: (ms: number | null) => void; playSample: (startMs: number, endMs: number | null) => void; refresh: () => Promise<unknown> }) {
   const rules = detail.groundRules;
   return (
     <div className="grid gap-5 p-4 text-sm" data-transcript-context="">
@@ -483,6 +571,7 @@ function TranscriptContext({ context, detail, seek, refresh }: { context: StoryS
         {detail.source && detail.source.currentGroundRules && detail.source.currentGroundRules !== groundRuleLabel(rules.rule) ? <p className="text-xs text-muted-foreground">The source's ground rules are now “{detail.source.currentGroundRules}”. This recording keeps what was agreed when it was made.</p> : null}
         <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Manual transcript" : `Machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
       </section>
+      {profiles.length ? <SpeakersPanel api={context.api} detail={detail} profiles={profiles} canEdit={canEdit} playSample={playSample} refresh={refresh} /> : null}
       {detail.state === "ready" ? <section aria-label="Saved quotes" className="grid gap-2">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this recording</h3>
         {detail.selections.length === 0 ? <p className="text-muted-foreground">Select words in the transcript to save a highlight or a quote.</p> : (
@@ -517,7 +606,7 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       <p className="[overflow-wrap:anywhere]">“{selection.text}”</p>
       <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
         <button type="button" className="touch-hit underline-offset-2 hover:underline focus-visible:underline" onClick={() => seek(selection.startMs)} aria-label={`Play from ${formatPosition(selection.startMs)}`}>{formatPosition(selection.startMs)}</button>
-        {selection.speaker ? <span>{selection.speaker}</span> : null}
+        {selection.speaker ? <span>{machineSpeakerLabel(selection.speaker) ?? selection.speaker}</span> : null}
         <StatusBadge tone={selection.state === "verified" ? "done" : "neutral"}>{selection.kind === "highlight" ? "Highlight" : selection.state === "verified" ? "Verified" : "Not verified"}</StatusBadge>
       </p>
       {selection.state === "verified" && selection.verifiedBy ? <p className="text-xs text-muted-foreground">Verified by {selection.verifiedBy.name}{selection.verifiedAt ? ` · ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: context.timeZone }).format(new Date(selection.verifiedAt))}` : ""}</p> : null}

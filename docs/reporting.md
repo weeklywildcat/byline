@@ -101,8 +101,15 @@ A transcript belongs to one recording and one Story and stores Byline's own
 provider-neutral segments (`domain/transcript.ts`):
 
 ```ts
-type TranscriptSegment = { id: string; startMs: number | null; endMs: number | null; speaker?: string; text: string };
+type TranscriptSegment = { id: string; startMs: number | null; endMs: number | null; speaker?: string; speakerKey?: string; text: string };
 ```
+
+`speaker` is what the transcript shows: a machine label (`SPEAKER_00`) until a
+reporter names the person. `speakerKey` is the stable machine identity of a
+diarized voice **within this one transcript**; renaming changes `speaker` and
+never the key, so a later rename still reaches every passage of that voice.
+`SPEAKER_00` in one recording is never the same person as `SPEAKER_00` in
+another. Screens show `SPEAKER_00` as **Speaker 1**.
 
 plus state (`queued | processing | ready | failed`), origin (**MACHINE** or
 **MANUAL TRANSCRIPT**), provider, model, language, duration, a plain-text search
@@ -133,9 +140,9 @@ relationship `transcript-selections.usedIn`; no rich text is scanned on reads.
 
 The provider boundary is `reporting/transcription/provider.ts`. The initial
 provider is self-hosted **faster-whisper** (`services/faster-whisper`, with VAD
-and segment timestamps; word-level alignment is off by default because Byline
-does not store it. The model and inference tuning are configuration and nothing
-assumes a GPU):
+and segment timestamps; word timing is used inside the service only when it
+needs it to place a speaker change, and is never stored. The model and inference
+tuning are configuration and nothing assumes a GPU):
 
 | Variable | Meaning |
 | --- | --- |
@@ -154,8 +161,10 @@ Byline submits the recording once, then polls short status responses. A stable
 run key means an automatic Payload retry reattaches to work that is still
 running instead of starting a second transcription.
 
-The service reports **Waiting for transcription worker → Loading Whisper model
-→ Transcribing audio (percent) → Transcript ready**. Byline persists that
+The service reports **Waiting for transcription worker → Loading speaker model →
+Identifying speakers (percent) → Loading Whisper model → Transcribing audio
+(percent) → Transcript ready** (the two speaker steps only when diarization is
+on). Byline persists that
 progress and the completed segment prefix on the private transcript. The
 Reporting feed polls the summary, and the focused transcript view polls the
 draft so reporters can read, search and seek while more passages arrive. Editing,
@@ -167,9 +176,57 @@ The service runs one Whisper job at a time by default
 a newsroom server. CPU installs can tune `WHISPER_COMPUTE_TYPE=int8`,
 `WHISPER_CPU_THREADS` and `WHISPER_BATCH_SIZE`; batch sizes above 1 use
 faster-whisper's batched inference pipeline. `WHISPER_WORD_TIMESTAMPS=1`
-exists only for deployments that explicitly need per-word alignment. Its
+exists only for deployments that explicitly need per-word alignment even
+without speaker identification. Its
 `/health` endpoint remains responsive while Whisper is working and reports
 the active inference settings.
+
+### Speaker diarization
+
+A transcript of an interview must show who is speaking. With
+`WHISPER_DIARIZATION=1` the service runs a **local** pyannote stage
+(`pyannote/speaker-diarization-community-1`, `services/faster-whisper/diarization.py`)
+and keeps faster-whisper as the ASR engine:
+
+```
+recording → pyannote diarization (once, whole recording) → speaker timeline
+          → faster-whisper (word timing) → words matched to the timeline
+          → Byline segments with a speaker
+```
+
+- **Whole recording first.** Separately diarized chunks would not agree on who
+  `SPEAKER_00` is, so the recording is diarized once and the labels are
+  renumbered by first appearance (`SPEAKER_00` speaks first).
+- **Sequential.** Diarization and Whisper run one after the other by default so
+  they do not compete for the same CPU cores.
+- **Exclusive diarization.** The timeline uses the model's
+  `exclusive_speaker_diarization`; pyannote objects never leave
+  `diarization.py`.
+- **Word attribution** (`speakers.py`, pure and fixture-tested). Each word goes
+  to the speaker whose turn overlaps it most (a tie goes to the speaker at the
+  word's midpoint). A speaker change inside a Whisper segment splits it into two
+  Byline segments, with timing from the first and last word of each. A word far
+  from any turn has **no speaker** and is shown as *Unknown speaker*; it is never
+  attributed to a person.
+- **Progressive text already has speakers.** Segments are only published after
+  the timeline exists, so the first draft a reporter sees is labelled; a partial
+  prefix and the final transcript give the same words the same speaker and id.
+- **No biometrics.** Byline distinguishes voices; it never says whose voice
+  one is. A reporter supplies the name (the Source's name is only a suggestion
+  to pick).
+- **Speaker count** is automatic. The service also accepts `num_speakers`,
+  `min_speakers` and `max_speakers` per job (the provider's `speakers` input) and
+  `WHISPER_MIN_SPEAKERS` / `WHISPER_MAX_SPEAKERS` defaults, so a future
+  `Auto / 2 / 3 / 4+` control needs no service redesign.
+
+The transcript screen groups consecutive passages by one speaker into a turn
+(each passage keeps its own id and timestamp). The **Speakers** area in the
+context panel lists each voice with a representative passage, **Play sample**,
+and **Name speaker**. Naming opens when the transcript is **ready**, never while
+machine text is still arriving: the rename runs under the transcript's row lock,
+the same lock machine writes take, so it cannot mix identities or be overwritten
+by a stale run. Renaming changes `speaker` on every passage of that voice and
+nothing else: timestamps, ids and words are untouched.
 
 Temporary failures (network, 5xx, 429, model-loading failures and processing
 timeouts) retry with backoff up to five attempts; a retry uses the same

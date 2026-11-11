@@ -57,9 +57,9 @@ const text = (name: string, body: string, mimetype = "text/plain"): NonNullable<
 };
 
 const stubSegments = [
-  { id: "s0", startMs: 0, endMs: 4000, speaker: "SPEAKER_00", text: "We knew going into the second half we had to tackle better." },
-  { id: "s1", startMs: 4000, endMs: 7000, speaker: "SPEAKER_01", text: "What changed defensively?" },
-  { id: "s2", startMs: 7000, endMs: 12000, speaker: "SPEAKER_00", text: "We switched to man coverage and trusted our corners." }
+  { id: "s0", startMs: 0, endMs: 4000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We knew going into the second half we had to tackle better." },
+  { id: "s1", startMs: 4000, endMs: 7000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "What changed defensively?" },
+  { id: "s2", startMs: 7000, endMs: 12000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We switched to man coverage and trusted our corners." }
 ];
 let providerMode: "ok" | "permanent" | "temporary" = "ok";
 const stub: TranscriptionProvider = {
@@ -430,6 +430,68 @@ describe("recordings, ground rules and transcription", () => {
     }
   });
 
+  it("shows speaker stages and speaker-labelled drafts, and only lets a reporter name voices once the transcript is ready", async () => {
+    const messages: string[] = [];
+    let fileId = 0;
+    const stages: Array<{ status: number; segments: Array<{ speaker?: string; speakerKey?: string; startMs: number | null; text: string }>; message: string | null }> = [];
+    const peek = async () => {
+      const found = await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0, limit: 1 });
+      const row = found.docs[0];
+      const detail = await call("get", "/byline/reporting/transcripts/:id", "alice", { params: { id: row.id } });
+      const rename = await call("patch", "/byline/reporting/transcripts/:id", "alice", {
+        params: { id: row.id }, data: { renameSpeaker: { from: "Speaker 1", to: "Owen Carter", key: "SPEAKER_00" } }
+      });
+      stages.push({ status: rename.status, segments: detail.body.segments, message: row.progressMessage ?? null });
+    };
+    setTranscriptionProviderForTests({
+      ...stub,
+      async transcribe(_input, _signal, onProgress) {
+        for (const progress of [
+          { state: "loading-diarization" as const, percent: null, message: "Loading speaker model" },
+          { state: "diarizing" as const, percent: 40, message: "Identifying speakers" },
+          { state: "loading-model" as const, percent: null, message: "Loading Whisper model" },
+          { state: "transcribing" as const, percent: 20, message: "Transcribing audio", segments: stubSegments.slice(0, 2) }
+        ]) {
+          await onProgress?.(progress);
+          messages.push(progress.message);
+          await peek();
+        }
+        return { language: "en", durationMs: 12000, segments: stubSegments };
+      }
+    });
+    try {
+      const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("two-voices.wav") });
+      fileId = recording.body.id;
+      await runReporting();
+
+      expect(messages).toEqual(["Loading speaker model", "Identifying speakers", "Loading Whisper model", "Transcribing audio"]);
+      expect(stages.map((stage) => stage.message)).toEqual(messages);
+      // Naming is refused for the whole of the run: no alias, no mixed identities.
+      expect(stages.map((stage) => stage.status)).toEqual([409, 409, 409, 409]);
+      // No speaker text before speakers are known; the first text already carries them.
+      expect(stages.slice(0, 3).every((stage) => stage.segments.length === 0)).toBe(true);
+      expect(stages[3].segments.map((segment) => [segment.speaker, segment.speakerKey])).toEqual([["SPEAKER_00", "SPEAKER_00"], ["SPEAKER_01", "SPEAKER_01"]]);
+
+      const ready = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0, limit: 1 })).docs[0];
+      expect(ready.state).toBe("ready");
+      const params = { id: ready.id };
+      const renamed = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params, data: { renameSpeaker: { from: "Speaker 1", to: "Owen Carter", key: "SPEAKER_00" } } });
+      expect(renamed.status).toBe(200);
+      const after = renamed.body.segments as Array<{ id: string; speaker?: string; speakerKey?: string; startMs: number; endMs: number; text: string }>;
+      expect(after.map((segment) => segment.speaker)).toEqual(["Owen Carter", "SPEAKER_01", "Owen Carter"]);
+      expect(after.map(({ id, startMs, endMs, text }) => ({ id, startMs, endMs, text }))).toEqual(stubSegments.map(({ id, startMs, endMs, text }) => ({ id, startMs, endMs, text })));
+      // A second rename still reaches every passage of that voice; the search text follows.
+      const again = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params, data: { renameSpeaker: { from: "Owen Carter", to: "Owen R. Carter", key: "SPEAKER_00" } } });
+      expect(again.body.segments.filter((segment: { speaker?: string }) => segment.speaker === "Owen R. Carter")).toHaveLength(2);
+      expect((await payload.findByID({ collection: "reporting-transcripts", id: ready.id, depth: 0 })).searchText).toContain("Owen R. Carter: We knew going into");
+      // Quotes still wait for ready, then snapshot the shown name.
+      const quote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params, data: { kind: "highlight", segmentIds: ["s1"] } });
+      expect(quote.body.speaker).toBe("Speaker 2");
+    } finally {
+      setTranscriptionProviderForTests(stub);
+    }
+  });
+
   it("fails malformed audio once and retries temporary outages", async () => {
     providerMode = "permanent";
     const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("broken.wav") });
@@ -597,8 +659,8 @@ describe("quotes, verification and provenance", () => {
 
   it("edits transcript words and speakers without moving timing or ids, refusing stale edits", async () => {
     const detail = (await call("get", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript } })).body;
-    expect(detail.speakers).toEqual(["SPEAKER_00", "SPEAKER_01"]);
-    const renamed = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript }, data: { renameSpeaker: { from: "SPEAKER_00", to: "Coach Smith" }, expectedUpdatedAt: detail.updatedAt } });
+    expect(detail.speakers).toEqual(["Speaker 1", "Speaker 2"]);
+    const renamed = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript }, data: { renameSpeaker: { from: "SPEAKER_00", to: "Coach Smith", key: "SPEAKER_00" }, expectedUpdatedAt: detail.updatedAt } });
     expect(renamed.status).toBe(200);
     const edited = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript }, data: { segmentId: "s1", text: "What changed on defense?", expectedUpdatedAt: renamed.body.updatedAt } });
     expect(edited.body.segments.find((segment: { id: string }) => segment.id === "s1")).toMatchObject({ text: "What changed on defense?", startMs: 4000, endMs: 7000 });
