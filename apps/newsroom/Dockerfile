@@ -4,8 +4,9 @@
 ARG ENGINE_DIR=.
 ARG BYLINE_SITE=sites/default
 
-# Collect the workspace root's manifest and lock, and every workspace manifest
-# (found by glob, so a new package or site needs no edit here), at their own paths.
+# Collect the workspace root's manifest and lock, every workspace manifest (found
+# by glob, so a new package or site needs no edit here), and the site selector the
+# root postinstall runs, at their own paths.
 # This stage reruns on any source change, but its output only changes with a
 # manifest, so the npm ci layer below stays cached for source-only changes.
 FROM node:24.22.1-bookworm-slim AS manifests
@@ -14,7 +15,7 @@ ARG BYLINE_SITE
 WORKDIR /src
 COPY . .
 RUN set -eu; mkdir -p /manifests; \
-    for file in package.json package-lock.json "$ENGINE_DIR"/apps/*/package.json "$ENGINE_DIR"/packages/*/package.json "$ENGINE_DIR"/sites/*/package.json "$BYLINE_SITE"/package.json; do \
+    for file in package.json package-lock.json "$ENGINE_DIR"/apps/*/package.json "$ENGINE_DIR"/packages/*/package.json "$ENGINE_DIR"/sites/*/package.json "$BYLINE_SITE"/package.json "$ENGINE_DIR"/scripts/select-site.mjs; do \
       [ -f "$file" ] || continue; mkdir -p "/manifests/$(dirname "$file")"; cp "$file" "/manifests/$file"; \
     done
 

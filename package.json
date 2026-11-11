@@ -8,6 +8,7 @@
     "sites/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/select-site.mjs",
     "dev": "npm run dev --workspace @byline/web",
     "typecheck": "npm run typecheck:packages && npm run typecheck:frontend && npm run typecheck:newsroom",
     "typecheck:packages": "tsc --noEmit -p tsconfig.packages.json",
