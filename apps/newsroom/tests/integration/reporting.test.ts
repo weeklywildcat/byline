@@ -598,6 +598,44 @@ describe("recordings, ground rules and transcription", () => {
     expect(doc).toMatchObject({ kind: "document", source: ids.coach, appointment: ids.interview });
     setTranscriptionProviderForTests(stub);
   });
+
+  it("deletes a recording with its transcript and selections without a foreign-key failure", async () => {
+    const uploaded = await call("post", "/byline/stories/:id/reporting/files", "alice", {
+      params: { id: ids.story },
+      data: { sourceId: ids.coach },
+      file: wav("delete-me.wav")
+    });
+    expect(uploaded.status).toBe(200);
+
+    const transcript = (await payload.find({
+      collection: "reporting-transcripts",
+      where: { file: { equals: uploaded.body.id } },
+      depth: 0,
+      limit: 1
+    })).docs[0];
+    expect(transcript).toBeDefined();
+
+    await payload.update({
+      collection: "reporting-transcripts",
+      id: transcript!.id,
+      data: { state: "ready", segments: stubSegments } as never,
+      overrideAccess: true,
+      context: { bylineSystem: true }
+    });
+
+    const selection = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
+      params: { id: transcript!.id },
+      data: { segmentIds: ["s0"], kind: "highlight" }
+    });
+    expect(selection.status).toBe(200);
+
+    const removed = await call("delete", "/byline/reporting/files/:id", "alice", { params: { id: uploaded.body.id } });
+    expect(removed.status).toBe(200);
+    expect((await payload.count({ collection: "reporting-files", where: { id: { equals: uploaded.body.id } } })).totalDocs).toBe(0);
+    expect((await payload.count({ collection: "reporting-transcripts", where: { id: { equals: transcript!.id } } })).totalDocs).toBe(0);
+    expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: selection.body.id } } })).totalDocs).toBe(0);
+  });
+
 });
 
 describe("quotes, verification and provenance", () => {
