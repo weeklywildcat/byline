@@ -40,6 +40,8 @@ try {
     npm([
       "ci",
       "--workspace=@byline/web",
+      // The selected site is a workspace too, so its own dependencies install.
+      `--workspace=${process.env.BYLINE_SITE || "sites/default"}`,
       "--include-workspace-root=false",
       "--prefer-offline",
       "--no-audit",
@@ -58,4 +60,7 @@ try {
   await rm(cacheStagingDirectory, { recursive: true, force: true });
 }
 
+// npm ci recreated node_modules, so point @byline/site at the selected site again.
+const select = spawnSync(process.execPath, [path.join(root, "scripts/select-site.mjs")], { cwd: root, stdio: "inherit", env: process.env });
+if (select.status !== 0) throw new Error("Selecting the Byline site failed.");
 npm(["run", "build:frontend"]);

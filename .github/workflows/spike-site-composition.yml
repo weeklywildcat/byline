@@ -1,0 +1,102 @@
+# Phase 0 spike (docs/generalization-phase-0.md). Throwaway: delete with the branch.
+name: Spike - site composition
+
+on:
+  push:
+    branches: [spike/site-composition]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: Docker (${{ matrix.layout }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - layout: in-repo, default site
+            context: engine
+            engine_dir: .
+            site: sites/default
+            site_id: default
+          - layout: in-repo, Weekly Wildcat site
+            context: engine
+            engine_dir: .
+            site: sites/weekly-wildcat
+            site_id: weekly-wildcat
+          - layout: publication repo, engine as submodule
+            context: publication
+            engine_dir: byline
+            site: site
+            site_id: weekly-wildcat
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: byline
+          POSTGRES_PASSWORD: byline
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U byline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENGINE_DIR: ${{ matrix.engine_dir }}
+      BYLINE_SITE: ${{ matrix.site }}
+      SITE_ID: ${{ matrix.site_id }}
+      IMAGE: byline-newsroom:spike
+      DATABASE_URL: postgres://byline:byline@localhost:5432/byline_spike
+      PAYLOAD_SECRET: ci-spike-secret-0123456789abcdef0123456789
+      BYLINE_NEWSROOM_URL: http://localhost:3010
+    steps:
+      - name: Check out the engine
+        uses: actions/checkout@v4
+        with:
+          path: engine
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Make the publication repository
+        if: matrix.context == 'publication'
+        run: |
+          engine/scripts/spike/make-publication.sh engine publication
+          node engine/scripts/spike/compare-locks.mjs publication/byline/package-lock.json publication/package-lock.json
+
+      - name: Validate the Dockerfile
+        working-directory: ${{ matrix.context }}
+        run: docker build --check -f "$ENGINE_DIR/apps/newsroom/Dockerfile" --build-arg ENGINE_DIR --build-arg BYLINE_SITE .
+
+      - name: Build the newsroom image
+        working-directory: ${{ matrix.context }}
+        run: docker build -f "$ENGINE_DIR/apps/newsroom/Dockerfile" --build-arg ENGINE_DIR --build-arg BYLINE_SITE -t "$IMAGE" .
+
+      - name: The image links the selected site
+        run: docker run --rm -e SITE_ID "$IMAGE" bash -c 'readlink -f /app/node_modules/@byline/site && node -e "import(\"@byline/site/config\").then((m) => { if (m.default.id !== process.env.SITE_ID) throw new Error(m.default.id); console.log(\"config:\", m.default.id); })"'
+
+      - name: Committed migrations apply and match the config, inside the image
+        run: |
+          PGPASSWORD=byline psql -h localhost -U byline -d postgres -c "CREATE DATABASE byline_spike"
+          docker run --rm --network host -e DATABASE_URL -e PAYLOAD_SECRET -e BYLINE_NEWSROOM_URL -w "/app/$ENGINE_DIR/apps/newsroom" "$IMAGE" npm run migrate:check
+
+      - name: Newsroom production build inside the image bundles preview, never web
+        run: |
+          docker run --rm --network host -e DATABASE_URL -e PAYLOAD_SECRET -e BYLINE_NEWSROOM_URL -e SITE_ID -w "/app/$ENGINE_DIR/apps/newsroom" "$IMAGE" bash -euo pipefail -c '
+            npx next build
+            preview=$(grep -rl "byline-site-preview-marker-$SITE_ID" .next | wc -l)
+            web=$(grep -rl "byline-site-web-only-marker" .next | wc -l || true)
+            astro=$(grep -rl "Head\.astro" .next | wc -l || true)
+            echo "preview files: $preview, web-only files: $web, .astro references: $astro"
+            test "$preview" -gt 0
+            test "$web" -eq 0
+            test "$astro" -eq 0
+            grep -o "data-site-spike=\"[^\"]*\"" .next/server/app/preview/site-spike.html
+          '

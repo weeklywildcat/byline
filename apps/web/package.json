@@ -31,7 +31,8 @@
     "@iconify/react": "^6.0.2",
     "astro": "7.3.3",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "@byline/site-contract": "0.1.0"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
@@ -48,5 +49,8 @@
   },
   "optionalDependencies": {
     "lightningcss-linux-x64-gnu": "1.33.0"
+  },
+  "exports": {
+    "./layout": "./src/layouts/BaseLayout.astro"
   }
 }

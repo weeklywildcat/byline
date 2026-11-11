@@ -14,6 +14,7 @@ import { absoluteUrl, SITE_DESCRIPTION } from "@/lib/seo";
 import { serializeMetadata, type Metadata, type SocialImage } from "@/lib/metadata";
 import { getPublicationConfig } from "@/lib/publication";
 import { getActiveTheme, getThemeCssVariables, SELF_HOSTED_FONTS } from "@/lib/theme";
+import { Head as SiteHead } from "@byline/site/web";
 
 interface Props {
   metadata?: Metadata;
@@ -93,6 +94,7 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
     {socialMetadataTags.map((tag) => tag.kind === "property"
       ? <meta property={tag.key} content={tag.content} />
       : <meta name={tag.key} content={tag.content} />)}
+    <SiteHead />
     <script type="speculationrules" is:inline set:html={JSON.stringify({ prefetch: [{ where: { and: [{ href_matches: "/*" }, { not: { href_matches: ["/_byline/*", "/brand/*", "/*.xml", "/*.txt", "/*.jpg", "/*.jpeg", "/*.png", "/*.webp", "/*.avif", "/*.gif", "/*.svg"] } }] }, eagerness: "moderate" }] })}></script>
   </head>
   <body>

@@ -1,0 +1,15 @@
+---
+import BaseLayout from "@byline/web/layout";
+import { interactives } from "@byline/site/web";
+import "../src/page.css";
+const Counter = interactives[0].Component;
+---
+<BaseLayout metadata={{ title: "Site spike page" }}>
+  <main class="spike-site-page" data-site="default"><h1>Default Site spike page</h1><Counter /></main>
+</BaseLayout>
+<script>
+  import start from "../src/interactives/spike-counter/client";
+  import "../src/interactives/spike-counter/styles.css";
+  const root = document.querySelector<HTMLElement>("[data-spike-counter]");
+  if (root) start(root);
+</script>

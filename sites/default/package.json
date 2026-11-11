@@ -1,0 +1,15 @@
+{
+  "name": "@byline/site-default",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./config": "./src/config.ts",
+    "./web": "./src/web.ts",
+    "./preview": "./src/preview.tsx",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@byline/site-contract": "0.1.0"
+  }
+}
