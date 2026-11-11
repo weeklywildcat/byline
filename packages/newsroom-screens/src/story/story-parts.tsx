@@ -26,8 +26,8 @@ export function StoryTitleButton({ story, onOpen, className, ...props }: { story
 }
 
 /** "Due tomorrow", "2d overdue", or a quiet fallback. Overdue is the one warning. */
-export function StoryDueLabel({ value, timezone, now, prefix = "", empty = "No deadline", className }: { value: string | null | undefined; timezone: string; now: Date; prefix?: string; empty?: string; className?: string }) {
-  if (!value) return <span className={cn("text-muted-foreground", className)}>{empty}</span>;
+export function StoryDueLabel({ value, timezone, now, prefix = "", empty = "No deadline", className }: { value: string | null | undefined; timezone: string; now: Date; prefix?: string; /** Null shows nothing: a card that repeats "No deadline" on every row says nothing. */ empty?: string | null; className?: string }) {
+  if (!value) return empty === null ? null : <span className={cn("text-muted-foreground", className)}>{empty}</span>;
   const overdue = dayDistance(value, timezone, now) < 0;
   const label = dateLabel(value, timezone, now);
   return <time dateTime={value} title={exactDate(value, timezone)} className={cn(overdue ? "text-warning" : "text-muted-foreground", className)}>{prefix}{prefix ? label.charAt(0).toLowerCase() + label.slice(1) : label}</time>;

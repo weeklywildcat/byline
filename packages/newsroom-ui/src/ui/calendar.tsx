@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "../lib/utils"
+import { WEEK_STARTS_ON } from "../lib/week"
 import {
   DayPicker,
   getDefaultClassNames,
@@ -17,6 +18,7 @@ function Calendar({
   classNames,
   showOutsideDays = true,
   captionLayout = "label",
+  weekStartsOn = WEEK_STARTS_ON,
   buttonVariant = "ghost",
   locale,
   formatters,
@@ -37,6 +39,7 @@ function Calendar({
         className
       )}
       captionLayout={captionLayout}
+      weekStartsOn={weekStartsOn}
       locale={locale}
       formatters={{
         formatMonthDropdown: (date) =>

@@ -2,7 +2,7 @@ import type { MouseEvent, ReactElement } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { anyPicture, PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { DatePicker } from "../editorial/pickers";
-import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
+import { useElementWidth, useIncrementalItems } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
@@ -147,6 +147,8 @@ function Publication({ story, timezone, editable, disabled, onChange }: { story:
 export function StoryList(props: StoryListProps) {
   const { stories, statuses, sort, canMoveStories, canAssignStories, canUpdateStories, movingStoryId, updatingStoryId, timezone, now, workspaceUrl, onSortChange, onMoveStory, onUpdateStory, onOpenStory, hiddenPublished = 0 } = props;
   const [ref, width] = useElementWidth<HTMLDivElement>();
+  // Long lists (Show published, a big archive) render in steps as the reader scrolls; ordinary ones render whole.
+  const { visible, hasMore, sentinel } = useIncrementalItems(stories, { resetKey: sort });
   const busy = (story: PlanningStory) => movingStoryId === story.id || updatingStoryId === story.id;
   const menu = (story: PlanningStory) => <StoryActionsMenu additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} />;
   const context = (story: PlanningStory, child: ReactElement) => <StoryContextMenu key={story.id} additionalActions={props.additionalActions?.(story)} story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>{child}</StoryContextMenu>;
@@ -170,7 +172,7 @@ export function StoryList(props: StoryListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {stories.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
+          {visible.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
             <TableCell className="py-2 pl-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
             <TableCell className="py-2 [&_[data-slot=select-trigger]]:max-w-full [&_[data-slot=badge]]:max-w-full"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
             <TableCell className="py-2 whitespace-normal"><People story={story} /></TableCell>
@@ -180,10 +182,11 @@ export function StoryList(props: StoryListProps) {
             <TableCell className="py-2 text-xs text-muted-foreground">{story.modifiedAt ? <time dateTime={story.modifiedAt} title={exactDate(story.modifiedAt, timezone)}>{relativeTime(story.modifiedAt, timezone, now)}</time> : "—"}</TableCell>
             <TableCell className="py-2 text-right">{menu(story)}</TableCell>
           </TableRow>))}
+          {hasMore ? <TableRow ref={sentinel} aria-hidden="true" className="hover:bg-transparent"><TableCell colSpan={8} className="h-12" /></TableRow> : null}
         </TableBody>
       </Table>
       : <ItemGroup className="gap-0" aria-label={"Stories"}>
-        {stories.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="cursor-pointer rounded-none border-0 border-b border-border/70 hover:bg-muted/40 active:bg-muted/60 last:border-b-0" aria-busy={busy(story) || undefined} onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
+        {visible.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="cursor-pointer rounded-none border-0 border-b border-border/70 hover:bg-muted/40 active:bg-muted/60 last:border-b-0" aria-busy={busy(story) || undefined} onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
           <ItemContent>
             <ItemTitle><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 font-semibold" /></StoryHoverCard></ItemTitle>
             <div className="text-sm"><People story={story} /></div>
@@ -196,6 +199,7 @@ export function StoryList(props: StoryListProps) {
           </ItemContent>
           <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
         </Item>))}
+        {hasMore ? <div ref={sentinel} aria-hidden="true" className="h-12" /> : null}
       </ItemGroup>}
   </div></div>;
 }

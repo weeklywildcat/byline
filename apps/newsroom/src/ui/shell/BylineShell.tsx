@@ -4,10 +4,11 @@ import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { SidebarProvider } from "@byline/newsroom-ui/ui/sidebar";
 import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-query";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { BylineCreateProvider } from "./create";
-import { ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useAdaptiveNavigation, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
+import { routeSidebarWidthRule, shellRouteFor, ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useAdaptiveNavigation, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
 import { ShellNavigationProvider } from "./navigation";
 import { BylineSearchProvider } from "./search";
 import { BylineShortcutsProvider } from "./shortcuts";
@@ -43,9 +44,13 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
   const adaptive = useAdaptiveNavigation(routes.admin);
   const layout = useCurrentShellLayout(routes.admin, adaptive);
   const width = useSidebarWidthLayout(layout);
-  const style = useMemo(() => shellSidebarStyle(width.applied), [width.applied]);
+  const style = useMemo(() => shellSidebarStyle(width.applied, { fromRoute: width.fromRoute }), [width.applied, width.fromRoute]);
+  const pathname = usePathname() ?? "";
+  const search = useSearchParams()?.toString() ?? "";
+  const widthRule = routeSidebarWidthRule(shellRouteFor(pathname, routes.admin, search));
   return (
     <QueryClientProvider client={client}>
+      {widthRule ? <style>{widthRule}</style> : null}
       <SidebarProvider defaultOpen={defaultOpen} keyboardShortcut={adaptive ? false : SIDEBAR_SHORTCUT} persistCookie={SIDEBAR_COOKIE} style={style}>
         <ShellLayoutProvider value={layout}>
           <SidebarWidthSyncProvider value={width.sync}>

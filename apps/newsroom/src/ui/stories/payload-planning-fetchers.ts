@@ -16,7 +16,7 @@ export function createPayloadPlanningFetchers(api: string, preferences: Preferen
   const request = createBylineRequest(api);
   const workflow = (storyId: number, changes: Record<string, unknown>) => request(`/stories/${storyId}/workflow`, "POST", changes);
   return {
-    getPlanning: (filters) => request<PlanningResponse>(queryPath("/planning", planningFilterParams(filters))),
+    getPlanning: (filters, options) => request<PlanningResponse>(queryPath("/planning", { ...planningFilterParams(filters), ...(options?.working ? { scope: "working" } : {}) })),
     moveStory: (storyId, status) => workflow(storyId, { status }),
     updateStory: workflow,
     getSchedule: (from, to, includeTasks = false, collectionId) => request<ScheduleResponse>(scheduleQuery(from, to, includeTasks, collectionId)),

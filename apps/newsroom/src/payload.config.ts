@@ -204,11 +204,11 @@ export default buildConfig({
       header: ["/ui/shell/BylineAppHeader#BylineAppHeader"],
       views: {
         login: { Component: "/auth/BylineLogin#BylineLogin" },
-        dashboard: { Component: "/components/BylineHome#BylineHome" },
+        dashboard: { Component: "/components/BylineHome#BylineHome", meta: { title: "Home" } },
         // Byline Stories. Payload's raw Stories list stays at /collections/stories for administrators.
-        stories: { Component: "/components/BylineStories#BylineStories", path: "/stories" },
+        stories: { Component: "/components/BylineStories#BylineStories", path: "/stories", meta: { title: "Stories" } },
         // Byline Calendar: the newsroom schedule (Schedule-X), a destination of its own.
-        calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar" },
+        calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar", meta: { title: "Calendar" } },
         // Byline Media: the asset Library (Payload Media, folders) and production Work. Raw Media stays an administrator fallback.
         media: { Component: "/components/BylineMedia#BylineMedia", path: "/media", meta: { title: "Media" } },
         // Byline Collections: reporting projects, served at exactly /admin/collections by app/(payload)/admin/collections/page.tsx
@@ -227,7 +227,7 @@ export default buildConfig({
         frontPage: { Component: "/components/BylineFrontPage#BylineFrontPage", path: "/front-page", exact: true, meta: { title: "Front Page" } },
         distribution: { Component: "/components/BylineDistribution#BylineDistribution", path: "/distribution", exact: true, meta: { title: "Distribution" } },
         // Administrators only: the entry to Payload's raw collection screens.
-        system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system" }
+        system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system", meta: { title: "System administration" } }
       }
     }
   },

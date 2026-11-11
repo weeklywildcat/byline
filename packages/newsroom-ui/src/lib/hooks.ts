@@ -113,3 +113,28 @@ export function useFineHoverPointer(): boolean {
   const observedHover = useObservedFineHover();
   return mediaHover || observedHover;
 }
+
+/**
+ * Renders a long list in steps: the first `initial` items at once, then
+ * `step` more each time the sentinel (placed after the last rendered item)
+ * comes within `rootMargin` of the scroll viewport. Ordinary lists (fewer
+ * than `initial` items) render in full, so search-in-page, keyboard order
+ * and drag and drop behave as before; only long archives are stepped.
+ * The count resets when the list's identity (`resetKey`) changes.
+ */
+export function useIncrementalItems<T>(items: readonly T[], options: { initial?: number; step?: number; rootMargin?: string; resetKey?: unknown } = {}): { visible: readonly T[]; hasMore: boolean; sentinel: (element: Element | null) => void } {
+  const { initial = 100, step = 100, rootMargin = "800px", resetKey } = options;
+  const [count, setCount] = useState(initial);
+  const [element, setElement] = useState<Element | null>(null);
+  useEffect(() => { setCount(initial); }, [resetKey, initial]);
+  const hasMore = items.length > count;
+  useEffect(() => {
+    if (!element || !hasMore || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setCount((current) => current + step);
+    }, { rootMargin });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element, hasMore, step, rootMargin]);
+  return { visible: hasMore ? items.slice(0, count) : items, hasMore, sentinel: setElement };
+}

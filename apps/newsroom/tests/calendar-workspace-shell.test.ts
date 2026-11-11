@@ -95,7 +95,7 @@ describe("Calendar navigation", () => {
 
   it("is a custom root view registered with Payload like Home and Stories", () => {
     const config = src("payload.config.ts");
-    expect(config).toContain('calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar" }');
+    expect(config).toContain('calendar: { Component: "/components/BylineCalendar#BylineCalendar", path: "/calendar", meta: { title: "Calendar" } }');
     expect(src("app/(payload)/admin/importMap.js")).toContain("/components/BylineCalendar#BylineCalendar");
     expect(src("components/BylineCalendar.tsx")).toContain("DefaultTemplate");
   });

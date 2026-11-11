@@ -216,7 +216,16 @@ export type PlanningResponse = {
   currentUser?: PlanningPerson | null;
   total?: number;
   nextPage?: string | null;
+  /** With a working read (`PlanningReadOptions.working`): how many finished published stories the server left out. */
+  hiddenPublished?: number;
 };
+
+/**
+ * How much of the collection to read. A working read leaves finished
+ * published stories (published, nothing open; `hideFinishedPublished`) on the
+ * server, which is what Board, List and every pane count show by default.
+ */
+export type PlanningReadOptions = { working?: boolean };
 
 export type MediaAttachmentChecks = {
   alt: boolean;

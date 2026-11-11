@@ -619,7 +619,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/home/search", method: "get", handler: handle((ctx, req) => searchStories(ctx, String(req.searchParams.get("query") ?? ""))) },
   { path: "/byline/presets", method: "get", handler: handle(presetsPayload) },
   // The Stories collection (Board and List). Board moves and inline edits use /stories/:id/workflow.
-  { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams))) },
+  { path: "/byline/planning", method: "get", handler: handle((ctx, req) => planningResponse(ctx, parsePlanningFilterParams(req.searchParams), { working: req.searchParams.get("scope") === "working" })) },
   // The sidebar's open-work counts (Stories, Media, Collections and the promoted Stories views).
   { path: "/byline/navigation-counts", method: "get", handler: handle((ctx) => navigationCounts(ctx)) },
   { path: "/byline/schedule", method: "get", handler: handle((ctx, req) => scheduleResponse(ctx, parseScheduleQuery(req.searchParams, scheduleToday(ctx)))) },

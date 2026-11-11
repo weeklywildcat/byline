@@ -114,7 +114,7 @@ function StoryMeta({ story, timezone, now }: { story: PlanningStory; timezone: s
         ? <><PeopleAvatars people={writers} /><span className="truncate text-muted-foreground" title={names}>{names}</span></>
         : <span className="text-muted-foreground">Unassigned</span>}
     </span>
-    <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={"No deadline"} className="shrink-0 whitespace-nowrap" />
+    <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={null} className="shrink-0 whitespace-nowrap" />
   </div>;
 }
 
@@ -138,7 +138,7 @@ function BoardCard(props: StoryItemProps) {
   const { dragging, touch, setHandle } = useStoryDrag(element, story, movable);
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
     <Card ref={setElement} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
-      className={cn("relative shrink-0 gap-1 rounded-[10px] py-2 shadow-xs transition-colors duration-700", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
+      className={cn("relative shrink-0 gap-1 rounded-[10px] py-2 shadow-xs transition-colors duration-700 [content-visibility:auto] [contain-intrinsic-size:auto_64px]", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <CardContent className="flex flex-col gap-1 px-2.5">
         <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("pr-5 text-[13px] leading-[1.35] line-clamp-2 any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
         <StoryMeta story={story} timezone={timezone} now={now} />
@@ -159,12 +159,12 @@ function DenseRow(props: StoryItemProps) {
   const names = writersOf(story).map((person) => person.name).join(", ");
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
     <div ref={setElement} role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
-      className={cn("group/card relative shrink-0 border-b border-border/60 bg-card px-2.5 py-[7px] transition-colors duration-700 hover:bg-muted/40", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
+      className={cn("group/card relative shrink-0 border-b border-border/60 bg-card px-2.5 py-[7px] transition-colors duration-700 hover:bg-muted/40 [content-visibility:auto] [contain-intrinsic-size:auto_50px]", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("block w-full truncate pr-5 text-[13px] leading-[18px] font-medium any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
       <div className="flex min-w-0 items-center gap-2 text-xs leading-4">
         <span className="min-w-0 flex-1 truncate text-muted-foreground" title={names || undefined}>{names || "Unassigned"}</span>
         {story.attention ? <StoryAttentionSignals story={story} limit={1} className="max-w-[55%] shrink flex-nowrap [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0" /> : <ProductionSummary story={story} maxSignals={1} empty={null} className="shrink-0 flex-nowrap gap-1 [&_[data-work-kind]]:h-4 [&_[data-work-kind]]:py-0 [&_button]:h-4" />}
-        <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={"No deadline"} className="shrink-0 whitespace-nowrap" />
+        <StoryDueLabel value={story.deadline} timezone={timezone} now={now} prefix="" empty={null} className="shrink-0 whitespace-nowrap" />
       </div>
       {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
