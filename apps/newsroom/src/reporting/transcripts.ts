@@ -1,6 +1,7 @@
 import { APIError, type Where } from "payload";
 import { canChangeMaterial, canSeeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
 import { atLeast, relationId } from "../access/user";
+import { inTransaction, lockRow } from "../db/locks";
 import { groundRuleLabel, normalizeGroundRules, quoteUse, REPORTING_LIMITS, type GroundRulesSnapshot, type QuoteUse } from "../domain/reporting";
 import {
   editSegment,
@@ -190,33 +191,45 @@ export async function transcriptDetail(ctx: ScreenContext, id: number): Promise<
 
 export type TranscriptEdit =
   | { segmentId: string; text?: string; speaker?: string | null; expectedUpdatedAt?: string }
-  | { renameSpeaker: { from: string; to: string }; expectedUpdatedAt?: string }
+  | { renameSpeaker: { from: string; to: string; key?: string | null }; expectedUpdatedAt?: string }
   | { language: string; expectedUpdatedAt?: string };
 
-/** Edits words or speakers. Timing and segment ids never change; a stale edit is a 409, never an overwrite. */
+/**
+ * Edits words or speakers. Timing and segment ids never change; a stale edit is
+ * a 409, never an overwrite.
+ *
+ * Only a finished transcript is editable. The check and the write happen under
+ * the transcript's row lock, the same lock a machine run takes to claim or
+ * write the row, so a speaker rename can never interleave with machine partial
+ * writes or a regenerate that is replacing the segments.
+ */
 export async function editTranscript(ctx: ScreenContext, id: number, input: TranscriptEdit): Promise<{ updatedAt: string; segments: TranscriptSegment[] }> {
   const { payload } = ctx.req;
-  const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
-  const row = found.docs[0];
-  if (!row) throw new APIError("That transcript is not available.", 404);
-  if (row.state !== "ready") throw new APIError("The transcript is not ready to edit yet.", 409);
-  if (typeof input.expectedUpdatedAt === "string" && input.expectedUpdatedAt && Date.parse(input.expectedUpdatedAt) !== Date.parse(row.updatedAt)) {
-    throw new APIError("Someone else changed this transcript. Reload to see their edit.", 409);
-  }
-  let segments = normalizeSegments(row.segments);
-  const data: Record<string, unknown> = {};
-  if ("segmentId" in input) {
-    if (!segments.some((segment) => segment.id === input.segmentId)) throw new APIError("That passage is no longer in the transcript.", 404);
-    segments = editSegment(segments, input.segmentId, { text: input.text, speaker: input.speaker });
-    data.segments = segments;
-  } else if ("renameSpeaker" in input) {
-    segments = renameSpeaker(segments, String(input.renameSpeaker.from ?? ""), String(input.renameSpeaker.to ?? ""));
-    data.segments = segments;
-  } else if ("language" in input) {
-    data.language = /^[a-z]{2,3}$/.test(String(input.language)) ? input.language : null;
-  }
-  const updated = await payload.update({ collection: "reporting-transcripts", id, data, ...as(ctx) });
-  return { updatedAt: updated.updatedAt, segments: normalizeSegments(updated.segments) };
+  return inTransaction(ctx.req, async () => {
+    await lockRow(ctx.req, "reporting_transcripts", id);
+    const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
+    const row = found.docs[0];
+    if (!row) throw new APIError("That transcript is not available.", 404);
+    if (row.state !== "ready") throw new APIError("The transcript is not ready to edit yet.", 409);
+    if (typeof input.expectedUpdatedAt === "string" && input.expectedUpdatedAt && Date.parse(input.expectedUpdatedAt) !== Date.parse(row.updatedAt)) {
+      throw new APIError("Someone else changed this transcript. Reload to see their edit.", 409);
+    }
+    let segments = normalizeSegments(row.segments);
+    const data: Record<string, unknown> = {};
+    if ("segmentId" in input) {
+      if (!segments.some((segment) => segment.id === input.segmentId)) throw new APIError("That passage is no longer in the transcript.", 404);
+      segments = editSegment(segments, input.segmentId, { text: input.text, speaker: input.speaker });
+      data.segments = segments;
+    } else if ("renameSpeaker" in input) {
+      const { from, to, key } = input.renameSpeaker;
+      segments = renameSpeaker(segments, String(from ?? ""), String(to ?? ""), typeof key === "string" && key ? key : null);
+      data.segments = segments;
+    } else if ("language" in input) {
+      data.language = /^[a-z]{2,3}$/.test(String(input.language)) ? input.language : null;
+    }
+    const updated = await payload.update({ collection: "reporting-transcripts", id, data, ...as(ctx) });
+    return { updatedAt: updated.updatedAt, segments: normalizeSegments(updated.segments) };
+  });
 }
 
 /** Starts (or retries) machine transcription for a recording the person may change. */

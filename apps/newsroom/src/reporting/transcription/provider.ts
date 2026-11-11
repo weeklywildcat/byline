@@ -21,10 +21,12 @@ export type TranscriptionInput = {
   language?: string | null;
   /** Stable for one logical run, including automatic Payload retries. */
   jobKey: string;
+  /** Optional speaker-count hints; omit for automatic detection (the normal newsroom path). */
+  speakers?: { exact?: number; min?: number; max?: number };
 };
 
 export type TranscriptionProgress = {
-  state: "queued" | "loading-model" | "transcribing";
+  state: "queued" | "loading-diarization" | "diarizing" | "loading-model" | "transcribing";
   /** 0-100 when Whisper can measure it, otherwise null. */
   percent: number | null;
   message: string;

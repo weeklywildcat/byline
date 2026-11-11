@@ -4,3 +4,7 @@ uvicorn==0.34.0
 python-multipart==0.0.31
 # faster-whisper 1.1.1 imports requests without declaring it.
 requests==2.34.2
+# Speaker diarization (WHISPER_DIARIZATION=1). Imported lazily: a service with
+# diarization off never loads torch. On a CPU-only server install the CPU
+# wheels first: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+pyannote.audio==4.0.4

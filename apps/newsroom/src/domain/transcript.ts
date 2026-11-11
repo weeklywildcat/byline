@@ -14,7 +14,15 @@ export type TranscriptSegment = {
   id: string;
   startMs: number | null;
   endMs: number | null;
+  /** What the transcript shows: a machine label (`SPEAKER_00`) until a reporter names the person. */
   speaker?: string;
+  /**
+   * The stable machine identity of a diarized voice (`SPEAKER_00`), scoped to
+   * this one transcript. Renaming changes `speaker`, never this key, so a
+   * second rename still reaches every passage that voice spoke. It is not an
+   * identity across recordings.
+   */
+  speakerKey?: string;
   text: string;
 };
 
@@ -28,8 +36,12 @@ export const TRANSCRIPT_LIMITS = {
   segments: 20_000,
   segmentText: 4000,
   speaker: 120,
+  speakerKey: 40,
   importBytes: 5 * 1024 * 1024
 } as const;
+
+/** A machine diarization label: `SPEAKER_00`, `SPEAKER_01`... Valid only within one transcript. */
+const MACHINE_SPEAKER = /^SPEAKER_\d{2,3}$/;
 
 const clean = (value: unknown, max: number) => (typeof value === "string" ? value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "");
 
@@ -65,7 +77,10 @@ export function normalizeSegments(input: unknown): TranscriptSegment[] {
     let endMs = ms(record.endMs);
     if (startMs !== null && endMs !== null && endMs < startMs) endMs = null;
     const speaker = clean(record.speaker, TRANSCRIPT_LIMITS.speaker);
-    out.push({ id, startMs, endMs, ...(speaker ? { speaker } : {}), text });
+    // A machine label stored before keys existed is its own key.
+    const given = typeof record.speakerKey === "string" ? record.speakerKey : speaker;
+    const key = MACHINE_SPEAKER.test(given) ? given : "";
+    out.push({ id, startMs, endMs, ...(speaker ? { speaker } : {}), ...(key ? { speakerKey: key } : {}), text });
   }
   return out;
 }
@@ -79,7 +94,10 @@ export function normalizeTranscript(input: { language?: unknown; durationMs?: un
 
 /** The plain-text projection stored for search (speaker and words, one segment per line). */
 export function transcriptSearchText(segments: readonly unknown[]): string {
-  return normalizeSegments(segments).map((segment) => (segment.speaker ? `${segment.speaker}: ${segment.text}` : segment.text)).join("\n").slice(0, 2_000_000);
+  return normalizeSegments(segments).map((segment) => {
+    const label = speakerLabel(segment);
+    return label ? `${label}: ${segment.text}` : segment.text;
+  }).join("\n").slice(0, 2_000_000);
 }
 
 /* ------------------------------------------------------------------ import */
@@ -191,7 +209,7 @@ export function searchTranscript(segments: readonly TranscriptSegment[], query: 
   if (needle.length < 2) return [];
   const matches: TranscriptMatch[] = [];
   for (const segment of segments) {
-    const speakerHit = (segment.speaker ?? "").toLowerCase().includes(needle);
+    const speakerHit = (speakerLabel(segment) ?? "").toLowerCase().includes(needle);
     const haystack = segment.text.toLowerCase();
     let from = 0;
     let found = false;
@@ -226,23 +244,128 @@ export function editSegment(segments: readonly TranscriptSegment[], id: string, 
     if (segment.id !== id) return segment;
     const text = patch.text !== undefined ? clean(patch.text, TRANSCRIPT_LIMITS.segmentText) || segment.text : segment.text;
     const speakerValue = patch.speaker === undefined ? segment.speaker : clean(patch.speaker ?? "", TRANSCRIPT_LIMITS.speaker);
-    const { speaker: _old, ...rest } = segment;
-    return { ...rest, text, ...(speakerValue ? { speaker: speakerValue } : {}) };
+    // A hand-set speaker for one passage is a correction, not the machine's
+    // voice: it leaves the diarized identity so renaming that voice later does
+    // not overwrite the reporter's correction.
+    const { speaker: _old, speakerKey: key, ...rest } = segment;
+    const keepKey = patch.speaker === undefined && key ? { speakerKey: key } : {};
+    return { ...rest, ...keepKey, text, ...(speakerValue ? { speaker: speakerValue } : {}) };
   });
 }
 
-/** Renames a speaker everywhere ("SPEAKER_00" → "Coach Smith"). */
-export function renameSpeaker(segments: readonly TranscriptSegment[], from: string, to: string): TranscriptSegment[] {
+/** `SPEAKER_00` → `Speaker 1`; anything that is not a machine label → null. */
+export function machineSpeakerLabel(raw: string | undefined): string | null {
+  const match = raw ? /^SPEAKER_(\d{2,3})$/.exec(raw) : null;
+  return match ? `Speaker ${Number(match[1]) + 1}` : null;
+}
+
+/** The speaker as shown: a reporter's name, else `Speaker N` for a machine label, else nothing. */
+export function speakerLabel(segment: Pick<TranscriptSegment, "speaker" | "speakerKey">): string | undefined {
+  if (segment.speaker) return machineSpeakerLabel(segment.speaker) ?? segment.speaker;
+  return machineSpeakerLabel(segment.speakerKey) ?? undefined;
+}
+
+/** The stable identity a passage belongs to within this transcript, or null when unattributed. */
+export function speakerIdentity(segment: Pick<TranscriptSegment, "speaker" | "speakerKey">): string | null {
+  return segment.speakerKey ?? segment.speaker ?? null;
+}
+
+/**
+ * Renames a speaker everywhere ("Speaker 1" → "Coach Smith"). Timing, ids and
+ * words never change. By `key` (a diarized voice) it reaches every passage that
+ * voice spoke, even after an earlier rename; otherwise it matches the shown
+ * name. An empty name returns a diarized voice to its machine label.
+ */
+export function renameSpeaker(segments: readonly TranscriptSegment[], from: string, to: string, key?: string | null): TranscriptSegment[] {
   const next = clean(to, TRANSCRIPT_LIMITS.speaker);
   return segments.map((segment) => {
-    if (segment.speaker !== from) return segment;
+    const matches = key ? segment.speakerKey === key : segment.speaker === from || speakerLabel(segment) === from;
+    if (!matches || (!key && !segment.speaker)) return segment;
     const { speaker: _old, ...rest } = segment;
-    return next ? { ...rest, speaker: next } : rest;
+    if (next) return { ...rest, speaker: next };
+    return segment.speakerKey ? { ...rest, speaker: segment.speakerKey } : rest;
   });
 }
 
+/** The distinct speakers as shown, in order of first appearance. */
 export function speakersOf(segments: readonly TranscriptSegment[]): string[] {
-  return [...new Set(segments.map((segment) => segment.speaker).filter((speaker): speaker is string => Boolean(speaker)))];
+  return [...new Set(segments.map(speakerLabel).filter((speaker): speaker is string => Boolean(speaker)))];
+}
+
+export type SpeakerProfile = {
+  /** Stable within this transcript: the diarized key, or the name for an import. */
+  key: string;
+  label: string;
+  /** A reporter (or an import) supplied this name; false for `Speaker N`. */
+  named: boolean;
+  /** The `speaker` value stored on the passages today (for a rename by name). */
+  stored: string;
+  passages: number;
+  spokenMs: number;
+  /** A representative passage to play and recognise the voice by. */
+  sample: { segmentId: string; startMs: number; endMs: number | null; text: string } | null;
+};
+
+/** Passages long enough to be recognisable, short enough to read at a glance. */
+const SAMPLE_MIN = 24;
+const SAMPLE_MAX = 200;
+
+/** One entry per detected voice (the Speakers panel), in order of first appearance. */
+export function speakerProfiles(segments: readonly TranscriptSegment[]): SpeakerProfile[] {
+  const byKey = new Map<string, TranscriptSegment[]>();
+  for (const segment of segments) {
+    const key = speakerIdentity(segment);
+    if (!key) continue;
+    byKey.set(key, [...(byKey.get(key) ?? []), segment]);
+  }
+  return [...byKey].map(([key, own]) => {
+    const first = own[0];
+    const stored = first.speaker ?? first.speakerKey ?? key;
+    const timed = own.filter((segment) => segment.startMs !== null);
+    const candidates = timed.filter((segment) => segment.text.length >= SAMPLE_MIN && segment.text.length <= SAMPLE_MAX);
+    const pick = candidates.reduce<TranscriptSegment | null>((best, segment) => (best === null || segment.text.length > best.text.length ? segment : best), null) ?? timed[0] ?? null;
+    return {
+      key,
+      label: speakerLabel(first) ?? key,
+      named: machineSpeakerLabel(first.speaker) === null && Boolean(first.speaker),
+      stored,
+      passages: own.length,
+      spokenMs: own.reduce((total, segment) => total + (segment.startMs !== null && segment.endMs !== null ? Math.max(0, segment.endMs - segment.startMs) : 0), 0),
+      sample: pick ? { segmentId: pick.id, startMs: pick.startMs!, endMs: pick.endMs, text: pick.text } : null
+    };
+  });
+}
+
+export type SpeakerTurn = {
+  /** The first passage's id, stable while later passages join the turn. */
+  id: string;
+  identity: string | null;
+  label: string | undefined;
+  segments: TranscriptSegment[];
+};
+
+/** A pause longer than this starts a new turn even for the same speaker. */
+export const TURN_GAP_MS = 8000;
+
+/**
+ * Groups consecutive passages by the same speaker into conversational turns
+ * (display only: every segment keeps its own id and timing). An unattributed
+ * passage never joins a neighbour, so it is never read as someone's words.
+ */
+export function speakerTurns(segments: readonly TranscriptSegment[], gapMs: number = TURN_GAP_MS): SpeakerTurn[] {
+  const turns: SpeakerTurn[] = [];
+  for (const segment of segments) {
+    const identity = speakerIdentity(segment);
+    const turn = turns.at(-1);
+    const previous = turn?.segments.at(-1);
+    const gap = previous && previous.endMs !== null && segment.startMs !== null ? segment.startMs - previous.endMs : 0;
+    if (turn && identity !== null && turn.identity === identity && gap <= gapMs) {
+      turn.segments.push(segment);
+    } else {
+      turns.push({ id: segment.id, identity, label: speakerLabel(segment), segments: [segment] });
+    }
+  }
+  return turns;
 }
 
 /** `12:41` / `1:02:03` for a position. */

@@ -11,6 +11,12 @@ never has to keep a single HTTP request open for an entire interview.
 A job key is supplied by Byline and is stable across automatic queue retries.
 That means a dropped connection can reattach to the same Whisper work instead
 of starting a second expensive transcription.
+
+With ``WHISPER_DIARIZATION=1`` a job first diarizes the *whole* recording once
+(pyannote, see ``diarization.py``) and only then transcribes with faster-whisper,
+sequentially so the two never compete for the same CPU cores. Whisper's word
+timing is reconciled with the speaker timeline (``speakers.py``) so every
+segment, including each progressive prefix, already carries its speaker.
 """
 from __future__ import annotations
 
@@ -27,6 +33,9 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from faster_whisper import BatchedInferencePipeline, WhisperModel
 
+import diarization
+from speakers import segments_for
+
 app = FastAPI(title="Byline transcription")
 TOKEN = os.environ.get("BYLINE_TRANSCRIPTION_TOKEN", "").strip()
 JOB_TTL_SECONDS = max(300, int(os.environ.get("WHISPER_JOB_TTL_SECONDS", str(6 * 60 * 60))))
@@ -36,6 +45,30 @@ COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default").strip() or "def
 CPU_THREADS = max(0, int(os.environ.get("WHISPER_CPU_THREADS", "0")))
 BATCH_SIZE = max(1, int(os.environ.get("WHISPER_BATCH_SIZE", "1")))
 WORD_TIMESTAMPS_DEFAULT = os.environ.get("WHISPER_WORD_TIMESTAMPS", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _count(name: str) -> int | None:
+    """An optional speaker-count setting: a small positive integer, else automatic."""
+    try:
+        value = int(os.environ.get(name, "").strip())
+    except ValueError:
+        return None
+    return value if 1 <= value <= 20 else None
+
+
+# Speaker diarization (pyannote). Off unless enabled; the Hugging Face token is
+# server-side only: never returned by /health or a job, never logged.
+DIARIZATION_ENABLED = _flag("WHISPER_DIARIZATION")
+DIARIZATION_MODEL = os.environ.get("WHISPER_DIARIZATION_MODEL", "").strip() or "pyannote/speaker-diarization-community-1"
+DIARIZATION_TOKEN = os.environ.get("WHISPER_DIARIZATION_TOKEN", "").strip()
+DIARIZATION_DEVICE = os.environ.get("WHISPER_DIARIZATION_DEVICE", "").strip() or ("cuda" if DEVICE.startswith("cuda") else "cpu")
+MIN_SPEAKERS = _count("WHISPER_MIN_SPEAKERS")
+MAX_SPEAKERS = _count("WHISPER_MAX_SPEAKERS")
+ACTIVE_STATES = {"loading-diarization", "diarizing", "loading-model", "transcribing"}
 JOB_KEY = re.compile(r"^[A-Za-z0-9._:-]{1,160}$")
 EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="byline-whisper")
 JOBS: dict[str, dict[str, Any]] = {}
@@ -55,6 +88,26 @@ def load(model: str) -> WhisperModel:
 @lru_cache(maxsize=2)
 def load_batched(model: str) -> BatchedInferencePipeline:
     return BatchedInferencePipeline(model=load(model))
+
+
+def load_diarizer():
+    """Seam for tests: the cached pyannote pipeline."""
+    return diarization.load_pipeline(DIARIZATION_MODEL, DIARIZATION_TOKEN, DIARIZATION_DEVICE)
+
+
+def diarize_recording(path: str, pipeline: Any, hints: dict[str, int], on_progress, cancelled) -> list[dict[str, Any]]:
+    """Seam for tests: one whole-recording diarization → a plain speaker timeline."""
+    if CPU_THREADS:
+        import torch
+
+        torch.set_num_threads(CPU_THREADS)
+    return diarization.diarize(
+        diarization.load_audio(path),
+        pipeline=pipeline,
+        on_progress=on_progress,
+        cancelled=cancelled,
+        **hints,
+    )
 
 
 def authorize(authorization: str | None) -> None:
@@ -81,6 +134,7 @@ def _snapshot(job: dict[str, Any]) -> dict[str, Any]:
         "processed": job.get("processed"),
         "duration": job.get("duration"),
         "message": job.get("message", ""),
+        "diarization": bool(job.get("diarize")),
     }
     if job["state"] != "ready":
         result["segments"] = job["segments"].copy()
@@ -93,12 +147,16 @@ def _snapshot(job: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _set_job(job: dict[str, Any], *, segment: dict[str, Any] | None = None, **changes: Any) -> None:
+def _set_job(job: dict[str, Any], *, segment: dict[str, Any] | None = None, segments: list[dict[str, Any]] | None = None, **changes: Any) -> None:
     with JOBS_LOCK:
         if JOBS.get(job["key"]) is not job:
             return
         if segment is not None:
             job["segments"].append(segment)
+        if segments:
+            # One Whisper segment may become several speaker turns; publish
+            # them together so a status poll never sees half a segment.
+            job["segments"].extend(segments)
         job.update(changes)
         job["updated_at"] = time.time()
         if changes.get("state") in {"ready", "failed", "cancelled"}:
@@ -128,12 +186,68 @@ def _run_job(job: dict[str, Any]) -> None:
         model_name = str(job["model"])
         language = job.get("language")
         vad = bool(job["vad"])
-        word_timestamps = bool(job["word_timestamps"])
+        diarize = bool(job.get("diarize"))
+        hints = dict(job.get("speaker_hints") or {})
+        # Speaker attribution needs word timing; otherwise stay segment-only (faster).
+        word_timestamps = bool(job["word_timestamps"]) or diarize
 
     try:
         if _cancelled(job):
             _finish_cancelled(job)
             return
+
+        turns: list[dict[str, Any]] = []
+        if diarize:
+            # Whole recording, once, before any text: one consistent speaker
+            # clustering for the entire interview.
+            _set_job(job, state="loading-diarization", message="Loading speaker model", progress=None)
+            try:
+                pipeline = load_diarizer()
+            except diarization.DiarizationUnavailable as error:
+                _set_job(
+                    job,
+                    state="failed",
+                    message="The speaker model could not be loaded",
+                    detail="Speaker identification is unavailable: check the service's diarization model, access and cache.",
+                    retryable=error.retryable,
+                )
+                return
+            except Exception as error:  # noqa: BLE001
+                _set_job(
+                    job,
+                    state="failed",
+                    message="The speaker model could not be loaded",
+                    detail=f"Could not load the speaker model ({type(error).__name__}).",
+                    retryable=True,
+                )
+                return
+            if _cancelled(job):
+                _finish_cancelled(job)
+                return
+            _set_job(job, state="diarizing", message="Identifying speakers", progress=0.0, processed=None)
+            try:
+                turns = diarize_recording(
+                    path,
+                    pipeline,
+                    hints,
+                    lambda fraction: _set_job(job, progress=min(0.99, float(fraction))),
+                    lambda: _cancelled(job),
+                )
+            except diarization.DiarizationCancelled:
+                _finish_cancelled(job)
+                return
+            except Exception as error:  # noqa: BLE001
+                _set_job(
+                    job,
+                    state="failed",
+                    message="Speakers could not be identified",
+                    detail=f"Could not identify speakers ({type(error).__name__}).",
+                    retryable=False,
+                )
+                return
+            if _cancelled(job):
+                _finish_cancelled(job)
+                return
 
         _set_job(job, state="loading-model", message="Loading Whisper model", progress=None)
         try:
@@ -179,9 +293,17 @@ def _run_job(job: dict[str, Any]) -> None:
                     return
                 processed = max(processed, float(segment.end or 0.0))
                 progress = min(0.99, processed / duration) if duration and duration > 0 else None
+                if diarize:
+                    words = [
+                        {"start": word.start, "end": word.end, "word": word.word}
+                        for word in (getattr(segment, "words", None) or [])
+                    ]
+                    pieces = segments_for(start=segment.start, end=segment.end, text=segment.text, words=words, turns=turns)
+                else:
+                    pieces = [{"start": segment.start, "end": segment.end, "text": segment.text}]
                 _set_job(
                     job,
-                    segment={"start": segment.start, "end": segment.end, "text": segment.text},
+                    segments=pieces,
                     progress=progress,
                     processed=processed,
                     duration=duration,
@@ -219,6 +341,33 @@ def _run_job(job: dict[str, Any]) -> None:
             pass
 
 
+def _should_diarize(requested: bool | None) -> bool:
+    """The service decides whether it can diarize; a job may only opt out."""
+    return DIARIZATION_ENABLED and requested is not False
+
+
+def _speaker_hints(exact: int | None, low: int | None, high: int | None) -> dict[str, int]:
+    """Optional speaker-count hints; automatic detection when none are given.
+
+    Per-job values win over the service defaults. An exact count excludes a range.
+    """
+    def valid(value: int | None) -> int | None:
+        return value if value is not None and 1 <= value <= 20 else None
+
+    exact = valid(exact)
+    if exact:
+        return {"num_speakers": exact}
+    low, high = valid(low) or MIN_SPEAKERS, valid(high) or MAX_SPEAKERS
+    if low and high and low > high:
+        low = high = None
+    hints: dict[str, int] = {}
+    if low:
+        hints["min_speakers"] = low
+    if high:
+        hints["max_speakers"] = high
+    return hints
+
+
 @app.get("/health")
 async def health():
     with JOBS_LOCK:
@@ -226,14 +375,17 @@ async def health():
         states = [job["state"] for job in JOBS.values()]
     return {
         "ok": True,
-        "active": sum(state in {"loading-model", "transcribing"} for state in states),
+        "active": sum(state in ACTIVE_STATES for state in states),
         "queued": states.count("queued"),
         "workers": MAX_WORKERS,
         "device": DEVICE,
         "compute_type": COMPUTE_TYPE,
         "cpu_threads": CPU_THREADS or None,
         "batch_size": BATCH_SIZE,
-        "word_timestamps": WORD_TIMESTAMPS_DEFAULT,
+        "word_timestamps": WORD_TIMESTAMPS_DEFAULT or DIARIZATION_ENABLED,
+        # The model name is public; the Hugging Face token is never exposed.
+        "diarization": DIARIZATION_ENABLED,
+        "diarization_model": DIARIZATION_MODEL if DIARIZATION_ENABLED else None,
     }
 
 
@@ -245,6 +397,10 @@ async def start_job(
     language: str | None = Form(None),
     vad: bool = Form(True),
     word_timestamps: bool = Form(WORD_TIMESTAMPS_DEFAULT),
+    diarize: bool | None = Form(None),
+    num_speakers: int | None = Form(None),
+    min_speakers: int | None = Form(None),
+    max_speakers: int | None = Form(None),
     authorization: str | None = Header(None),
 ):
     authorize(authorization)
@@ -299,6 +455,8 @@ async def start_job(
         "language": language,
         "vad": vad,
         "word_timestamps": word_timestamps,
+        "diarize": _should_diarize(diarize),
+        "speaker_hints": _speaker_hints(num_speakers, min_speakers, max_speakers),
         "cancel": Event(),
         "created_at": now,
         "updated_at": now,
