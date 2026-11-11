@@ -12,6 +12,16 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 - `packages/newsroom-ui/` and `packages/newsroom-screens/`: private UI components and screens.
 - `packages/ui/`, `packages/design/`, and `packages/theme-weekly-wildcat/`: public UI, layout contracts, and the Weekly Wildcat theme.
 
+## Generalization in progress
+
+Byline is being generalized so any publication can run it. Read the [plan](docs/generalization-plan.md) before working on it, or on anything that touches the theme, Publication settings, public routes, the homepage design, the presentation registries, the Dockerfile, or the install and build scripts.
+
+- To continue the work, follow [Picking up a phase](docs/generalization-plan.md#picking-up-a-phase): one slice per pull request, in order, with the parity check.
+- The plan's status table says what is done. Update it, and this guide, in the pull request that changes them.
+- The plan's decisions are settled with the user. Ask before departing from one.
+- Until slice 1f lands, the rules below describe the current code. Do not add new Weekly Wildcat references to engine packages; put new publication-specific work where the plan says it will live, or beside the code it extends.
+- The spike branch `spike/site-composition` is reference only. Never merge it or base work on it.
+
 ## Architecture rules
 
 - Payload owns editorial content, access, drafts, jobs, and publishing. Keep planning state on the unversioned story plan. Project public content through explicit allowlists.
