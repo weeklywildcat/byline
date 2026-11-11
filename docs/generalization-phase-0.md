@@ -1,15 +1,15 @@
 # Generalization Phase 0 results
 
 Date: 2026-11-11. Plan: [generalization-plan.md](generalization-plan.md).
-Spike code: this branch, `spike/site-composition`, based on `main` at `179ba9c0`. Throwaway: not meant to merge as is.
+Spike code: draft pull request [#305](https://github.com/weeklywildcat/byline/pull/305), branch `spike/site-composition`, based on `main` at `179ba9c0`. Reference only; it is never merged.
 
 ## What the spike built
 
 - `packages/site-contract`: `defineSiteConfig`, `assertSiteCompatible`, contract versions, the entry type.
 - `sites/default` and `sites/weekly-wildcat`: each exports `./config` (plain data), `./web` (an Astro head component and the interactives), `./preview` (a stylesheet and the interactives). Each has a site page, a replacement `/about/` page, one interactive with its own stylesheet and client, and one public asset.
-- `scripts/select-site.mjs`: links `node_modules/@byline/site` to the selected site directory (`BYLINE_SITE`, or an argument).
+- `scripts/select-site.mjs`: links `node_modules/@byline/site` to the selected site directory (`BYLINE_SITE`, or an argument). The root `postinstall` runs it.
 - `apps/web/site-integration.mjs`: an Astro integration that asserts compatibility, injects site pages, injects engine routes the site has not switched off, and copies site assets after the build with reserved-path and collision checks.
-- Wiring: `astro.config.mjs`, a site `<Head />` in `BaseLayout.astro`, site pages in the route manifest (`build-snapshot.ts`) and the sitemap (`sitemap.ts`), the site directory in the source fingerprint, `payload.config.ts` loading `config`, an unlinked newsroom route `/preview/site-spike` rendering `preview`, the site workspace in `build-cloudflare.mjs`, and a Dockerfile that globs manifests.
+- Wiring: `astro.config.mjs`, a site `<Head />` in `BaseLayout.astro`, site pages in the route manifest (`build-snapshot.ts`) and the sitemap (`sitemap.ts`), the site directory in the source fingerprint, `payload.config.ts` loading `config`, an unlinked newsroom route `/preview/site-spike` rendering `preview`, the site workspace in `build-cloudflare.mjs`, and a Dockerfile that collects manifests in a build stage and takes `ENGINE_DIR` and `BYLINE_SITE`.
 - A scratch publication repository (outside this repository) with the spike engine as a git submodule pinned to a tag, `site/` beside it, and its own `package.json` and lockfile.
 
 ## Results
@@ -21,7 +21,7 @@ Spike code: this branch, `spike/site-composition`, based on `main` at `179ba9c0`
 | Package typecheck | Pass | Not run separately |
 | Web typecheck (`astro check`, `tsc`) | Pass, 0 errors | Pass, 0 errors |
 | Newsroom typecheck | Pass | Pass |
-| Web Vitest | 600 of 601. The failure is a test that reads `src/pages/about.astro` by path, which the spike moved | Same |
+| Web Vitest | 601 of 601, after pointing one test at the moved `about.astro` | 600 of 601 before that fix; not rerun |
 | Newsroom Vitest | 501 of 501 | Not run |
 | Package tests, `verify:contracts` | Pass | Not run |
 | Payload CLI: committed migrations, drift check, type generation | Pass under both sites, no drift | Pass, engine stays clean |
@@ -30,7 +30,8 @@ Spike code: this branch, `spike/site-composition`, based on `main` at `179ba9c0`
 | Site page, replaced `/about/`, site head tag, site interactive's CSS and client | Present in the output | Present |
 | Asset copier | Rejects `_byline/manifest.json` (reserved) and `favicon-32.png` (collision) | Not repeated |
 | Public browser tests | 124 of 124 | Not run |
-| Docker build | Running in CI (`spike-site-composition.yml`), both sites | Running in CI, publication repository built in the job |
+| Docker build (CI) | Pass with each site: image builds, links the right site, migrations apply with no drift, and `next build` inside the image bundles `preview` and never `web` | Pass, same checks, from a publication repository built in the job, after its lockfile check |
+| Repository CI on the spike (scoped Cloudflare build, newsroom job with integration tests and snapshot parity, public site job with browser tests) | Pass | Not applicable |
 | Deploy rehearsal | **Not run**: needs a staging stack | **Not run** |
 
 ### Incremental builds (fixture, 41 routes)
@@ -54,8 +55,8 @@ The layouts behave the same. Byline's source fingerprint drops Astro's cache on 
 3. **The verifiers caught the gaps.** `verify-build` failed on the unlisted site page and `verify-seo` on its missing sitemap entry. Site pages must feed the route manifest and sitemap from `config`. An engine route a site can switch off must move out of `src/pages` and be injected.
 4. **The engine assumed it owns `node_modules`.** `packages/newsroom-ui/src/styles.css` loaded Geist from `../../../node_modules/geist/...`, which broke the newsroom build in the submodule layout. The spike vendored the font file (69 KB, OFL) into the package. Phase 1 needs a check against relative `node_modules` paths in engine source.
 5. **The lockfile check is workable.** A publication lock seeded from the engine's had identical third-party versions; one package moved between hoisting locations. A site dependency that conflicts with the engine's (zod 3 against the engine's zod 4) nests under `site/node_modules`, and the engine still resolves its own. The check should compare names and versions, allowing hoisting moves.
-6. **The Dockerfile needs a decision.** In this repository, `COPY --parents` with globs replaces the hand-written manifest list. In the submodule layout the build context is the publication root and engine manifests sit under `byline/`, so the engine Dockerfile needs an engine-directory argument, or the template ships its own. Both are unverified.
-7. **The site must be reselected after install.** `npm ci` recreates `node_modules`, and `--include-workspace-root=false` skips the root `postinstall`, so every build entry point runs the site selection itself.
+6. **One Dockerfile serves both layouts.** A first stage collects the root manifest, the lock, and every workspace manifest by glob, replacing the hand-written list. `COPY --parents` would be shorter but exists only in the labs Dockerfile frontend, and failed validation in CI. `ENGINE_DIR` says where the engine sits in the build context (`.` here, `byline` in a publication repository) and `BYLINE_SITE` names the site.
+7. **The site must be reselected after install.** `npm ci` recreates `node_modules`. CI's typecheck failed on the first push because nothing selected the site after a plain install; a root `postinstall` now does. `--include-workspace-root=false` skips that script, so the Cloudflare build selects the site itself, and the Dockerfile's manifest stage carries the selector so `npm ci` can run it.
 8. **One schema confirmed.** The migration drift check passed identically under both sites.
 9. **Local submodules need `protocol.file.allow=always`.** This matters only for local testing; a GitHub URL does not need it.
 
@@ -66,22 +67,15 @@ The layouts behave the same. Byline's source fingerprint drops Astro's cache on 
 | Where is the engine? | A git submodule at `byline/`, pinned to a tag. Works |
 | What is the workspace root? | The publication repository: `byline/apps/*`, `byline/packages/*`, `site`. Works |
 | Who owns `package-lock.json`? | The publication repository, seeded from the engine's. Works; check per finding 5 |
-| What is the Docker build context? | The publication root. Unverified; see finding 6 |
+| What is the Docker build context? | The publication root, with the engine's Dockerfile, `ENGINE_DIR=byline`, `BYLINE_SITE=site`. Works in CI |
 | Which commit does Cloudflare build? | The publication commit, which pins the engine. The scoped install and build work; the hosted Workers build was not run |
 | Where does `deploy:newsroom` run? | Not tested |
 
 ## Before Phase 1
 
-Phase 0's done-when is not fully met. Still open:
+Phase 1 can start. Two items from Phase 0's done-when stay open and are assigned to later phases in the plan:
 
-- The Docker build in both layouts: the `spike-site-composition` workflow on this branch builds the image, applies migrations, and runs the newsroom build inside it. Results pending.
-- A deploy rehearsal on a staging stack.
-- The incremental measurement on a production-size snapshot.
+- A deploy rehearsal on a staging stack (before Phase 3 changes `deploy:newsroom`).
+- The incremental measurement on a production-size snapshot (before Phase 7).
 
-Changes to Phase 1 from these results:
-
-- Select the site with the link script, not tool aliases. Require a `./package.json` export.
-- Feed site pages to the route manifest and sitemap, and move switchable engine routes to injection.
-- Add a check against relative `node_modules` paths in engine source.
-- Decide whether the engine Dockerfile takes an engine-directory argument or the template owns one.
-- The spike pointed the `about` page test at the moved file; Phase 1 should locate routes through the route table instead.
+What Phase 1 takes from these results is written into the plan's [slices](generalization-plan.md#phase-1-the-site-seam) and [traps](generalization-plan.md#traps-phase-0-found).
