@@ -397,8 +397,8 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
         : null}
       {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
       {editable && file
-        ? transcript?.usedQuoteCount
-          ? <span className="px-2 text-xs text-muted-foreground">{transcript.usedQuoteCount === 1 ? "Quote used in article" : `${transcript.usedQuoteCount} quotes used in articles`}</span>
+        ? transcript?.usedSelectionCount
+          ? <span className="px-2 text-xs text-muted-foreground">{transcript.usedSelectionCount === 1 ? "Used in article · remove there first" : `${transcript.usedSelectionCount} saved items used in articles`}</span>
           : <ConfirmRemoveFileButton file={file} removing={remove.isPending} onRemove={() => remove.mutate()} />
         : editable
           ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button>
