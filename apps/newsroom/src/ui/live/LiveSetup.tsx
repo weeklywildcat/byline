@@ -1,13 +1,17 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Switch } from "@byline/newsroom-ui/ui/switch";
 import { PersonAvatar } from "@byline/newsroom-ui/components/person-avatar";
 import { useIsMobile } from "@byline/newsroom-ui/lib/hooks";
+import { CircleAlert } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { LiveDeskResponse } from "../../newsroom/live-coverage";
 import { useLiveCandidates } from "./api";
@@ -64,9 +68,9 @@ export function PublisherFields({ api, storyId, selected, onChange, disabled }: 
         <h3 id={`direct-publishing-${storyId}`} className="text-sm font-medium">Direct publishing</h3>
         <p className="text-sm text-muted-foreground">Editors can always publish live updates. Choose reporters who may also publish directly on this Story.</p>
       </div>
-      {candidates.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading reporters…</p> : null}
-      {candidates.isError ? <p role="alert" className="text-sm text-destructive">{(candidates.error as Error).message}</p> : null}
-      {candidates.data && !people.length ? <p className="text-sm text-muted-foreground">No reporters work on this story yet. Add them to the byline or give them work, then choose who may publish.</p> : null}
+      {candidates.isPending ? <div role="status" aria-label="Loading reporters" className="grid gap-2"><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /></div> : null}
+      {candidates.isError ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>Reporters couldn’t be loaded</AlertTitle><AlertDescription>{(candidates.error as Error).message}</AlertDescription></Alert> : null}
+      {candidates.data && !people.length ? <Empty className="min-h-0 items-start px-0 py-3 text-left"><EmptyHeader><EmptyTitle>No reporters to add</EmptyTitle><EmptyDescription>Add someone to the byline or give them Story work, then they can be granted direct publishing here.</EmptyDescription></EmptyHeader></Empty> : null}
       {people.length ? (
         <FieldGroup className="gap-3">
           {people.map((person) => {
@@ -141,7 +145,7 @@ export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, r
       <div className="grid gap-4">
         {!manage && !desk.storyPublished ? <p className="text-sm text-muted-foreground">This story isn't published yet. Publish & go live runs the normal publication checks first; if the story can't be published, coverage doesn't start.</p> : null}
         {!manage && !goLiveHere ? <p className="text-sm text-muted-foreground">Publish this story from Write to go live. You can still set up Live mode and direct publishers now.</p> : null}
-        {blocked ? <p role="alert" className="text-sm text-destructive">Only editors can change live coverage.</p> : null}
+        {blocked ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>Live coverage is read-only</AlertTitle><AlertDescription>Only editors can change live coverage.</AlertDescription></Alert> : null}
         <PublisherFields api={api} storyId={desk.storyId} selected={selected} onChange={setSelected} disabled={busy || blocked} />
       </div>
     </ResponsiveSheet>
