@@ -10,13 +10,12 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
-import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/newsroom-ui/ui/resizable";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, LoaderCircle, PanelRight, Pencil, Play, Search } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Play, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
 import { activeSegmentAt, formatPosition, machineSpeakerLabel, searchTranscript, speakerLabel, speakerProfiles, speakerTurns, type SpeakerProfile, type TranscriptSegment } from "../../domain/transcript";
@@ -28,7 +27,6 @@ import {
   removeSelection,
   reportingKey,
   saveSelection,
-  startTranscription,
   transcriptKey,
   verifySelection,
   type SelectionView,
@@ -90,19 +88,13 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const storyId = Number(context.storyId);
   const detailQuery = useQuery({
     queryKey: transcriptKey(transcriptId),
-    queryFn: () => loadTranscript(context.api, transcriptId),
-    // Only a transcript still being made is polled.
-    refetchInterval: (query) => (query.state.data && (query.state.data.state === "queued" || query.state.data.state === "processing") ? 5000 : false)
+    queryFn: () => loadTranscript(context.api, transcriptId)
   });
   const detail = detailQuery.data;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
-  const followingLatest = useRef(true);
-  const previousCount = useRef<number | null>(null);
-  const previousScrollTop = useRef(0);
   // A speaker sample plays a short passage, then stops by itself.
   const stopAt = useRef<number | null>(null);
-  const [hasNewPassages, setHasNewPassages] = useState(false);
   const [position, setPosition] = useState(0);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
@@ -114,7 +106,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const wide = width >= SIDE_BY_SIDE;
 
   const ready = detail?.state === "ready";
-  const transcribing = detail?.state === "queued" || detail?.state === "processing";
   const segments = detail?.segments ?? [];
   const segmentCount = segments.length;
   const turns = useMemo(() => speakerTurns(segments), [segments]);
@@ -122,37 +113,8 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   // Once any passage has a voice, a passage without one is shown as unknown, never as someone.
   const diarized = profiles.length > 0;
   const lastEnd = segments.at(-1)?.endMs;
-  const active = ready || (lastEnd != null && position <= lastEnd) ? activeSegmentAt(segments, position) : null;
+  const active = lastEnd != null && position <= lastEnd ? activeSegmentAt(segments, position) : null;
 
-  const loaded = detail !== undefined;
-  useLayoutEffect(() => {
-    if (!loaded) return;
-    const previous = previousCount.current;
-    previousCount.current = segmentCount;
-    const stream = streamRef.current;
-    if (!stream) {
-      followingLatest.current = true;
-      previousScrollTop.current = 0;
-      setHasNewPassages(false);
-      return;
-    }
-    if (previous === null) {
-      // An already long draft opens at the beginning, just like a ready transcript.
-      followingLatest.current = stream.scrollHeight - stream.clientHeight <= 48;
-      return;
-    }
-    if (segmentCount <= previous || (!transcribing && previous === 0)) return;
-    if (followingLatest.current) stream.scrollTop = stream.scrollHeight;
-    else setHasNewPassages(true);
-  }, [loaded, segmentCount, transcribing]);
-
-  const jumpToLatest = () => {
-    const stream = streamRef.current;
-    if (!stream) return;
-    followingLatest.current = true;
-    stream.scrollTop = stream.scrollHeight;
-    setHasNewPassages(false);
-  };
   const matches = useMemo(() => searchTranscript(segments, query), [segments, query]);
   const current = matches.length ? matches[Math.min(matchIndex, matches.length - 1)] : null;
 
@@ -192,7 +154,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
     const stream = streamRef.current;
     const passage = stream?.querySelector(`[data-segment="${hit.segmentId}"]`);
     if (stream && passage) {
-      followingLatest.current = false;
       stream.scrollTo({
         top: stream.scrollTop + passage.getBoundingClientRect().top - stream.getBoundingClientRect().top - stream.clientHeight / 2,
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
@@ -212,12 +173,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
     },
     onError: (error: Error) => toast.error(error.message)
   });
-  const retry = useMutation({
-    mutationFn: () => startTranscription(context.api, detail!.file.id),
-    onSuccess: refresh,
-    onError: (error: Error) => toast.error(error.message)
-  });
-
   const detailError = detailQuery.error;
   const accessLost = detailError instanceof ApiError && detailError.status >= 400 && detailError.status < 500;
   if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
@@ -227,14 +182,11 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const searchBar = (
     <div className="flex items-center gap-2">
       <div className="min-w-0 flex-1"><SearchBar query={query} onQuery={changeQuery} count={matches.length} index={current ? Math.min(matchIndex, matches.length - 1) : -1} onStep={step} /></div>
-      {hasNewPassages && segmentCount > 0 ? (
-        <Button type="button" variant="ghost" size="xs" className="shrink-0" onClick={jumpToLatest}><ChevronDown data-icon="inline-start" />Jump to latest</Button>
-      ) : null}
     </div>
   );
   const stream = (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TranscriptState detail={detail} onRetry={() => retry.mutate()} retrying={retry.isPending} canRetry={detail.transcription.available && detail.file.kind === "audio" && canEdit} />
+      <TranscriptState detail={detail} />
       {segmentCount > 0 ? (
         <div
           ref={streamRef}
@@ -242,13 +194,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           role="region"
           aria-label="Transcript passages"
           tabIndex={0}
-          onScroll={({ currentTarget }) => {
-            const top = currentTarget.scrollTop;
-            const nearBottom = currentTarget.scrollHeight - top - currentTarget.clientHeight <= 48;
-            followingLatest.current = nearBottom && top >= previousScrollTop.current;
-            previousScrollTop.current = top;
-            if (followingLatest.current) setHasNewPassages(false);
-          }}
           onMouseUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
           onKeyUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
         >
@@ -278,12 +223,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
               ))}
             </div>
           ))}
-          {transcribing ? (
-            <p className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
-              <LoaderCircle aria-hidden="true" className="size-3.5 motion-safe:animate-spin" />
-              {detail.state === "queued" ? "More text will appear when transcription resumes." : "Transcribing the rest of the recording…"}
-            </p>
-          ) : null}
         </div>
       ) : null}
       {ready && draft ? (
@@ -308,7 +247,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-medium">{detail.file.filename}</h2>
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-            <span className="font-medium tracking-wide uppercase" data-provenance={detail.origin}>{detail.origin === "manual" ? "Manual transcript" : "Machine transcript"}</span>
+            <span className="font-medium tracking-wide uppercase" data-provenance={detail.origin}>{detail.origin === "manual" ? "Uploaded transcript" : "Legacy machine transcript"}</span>
             {!ready && segmentCount > 0 ? <Badge variant="secondary">{detail.state === "failed" ? "Incomplete draft" : "Draft transcript"}</Badge> : null}
             {detail.origin === "machine" && detail.model ? <span>{detail.model}</span> : null}
             {detail.language ? <span>{detail.language.toUpperCase()}</span> : null}
@@ -390,28 +329,15 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
   );
 }
 
-function TranscriptState({ detail, onRetry, retrying, canRetry }: { detail: TranscriptDetail; onRetry: () => void; retrying: boolean; canRetry: boolean }) {
-  if (detail.state === "queued" || detail.state === "processing") {
-    const percent = detail.progressPercent === null ? null : Math.round(detail.progressPercent);
-    const label = detail.progressMessage ?? (detail.state === "queued" ? "Waiting to transcribe" : "Transcribing audio");
-    const hasDraft = detail.segments.length > 0;
-    return (
-      <div className={hasDraft ? "grid gap-1 py-2" : "grid gap-2 py-4"}>
-        <span className="sr-only" role="status">{label}</span>
-        <Progress value={percent} aria-label={percent === null ? label : `${label}, ${percent}% complete`}>
-          <span className="text-sm">{label}{percent === null ? "…" : ` · ${percent}%`}</span>
-        </Progress>
-        {!hasDraft || detail.failure ? <p className="text-xs text-muted-foreground">
-          {!hasDraft ? "A long interview can take a while. You can leave this page; Byline keeps the job running and will tell you when it is ready." : ""}
-          {detail.failure ? ` Last attempt: ${detail.failure} Byline will retry automatically.` : ""}
-        </p> : null}
-      </div>
-    );
-  }
-  if (detail.state === "failed") {
-    return <div className="py-3"><InlineAlert title="This recording could not be transcribed" onAction={canRetry ? onRetry : undefined} actionLabel={retrying ? "Retrying…" : "Try again"}>{detail.failure ?? "Transcription failed."} You can import a .txt, .srt or .vtt transcript instead.</InlineAlert></div>;
-  }
-  return null;
+function TranscriptState({ detail }: { detail: TranscriptDetail }) {
+  if (detail.state === "ready") return null;
+  return (
+    <div className="py-3">
+      <InlineAlert title="This legacy transcript is incomplete">
+        Automatic transcription has been retired. Go back to Reporting and upload a .txt, .srt or .vtt transcript for this recording to replace it.
+      </InlineAlert>
+    </div>
+  );
 }
 
 /** Ground rules are conspicuous before any public-use action; anything but "on the record" is flagged. */
@@ -569,7 +495,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
         <p className="flex flex-wrap items-center gap-2"><Badge variant={rules.rule === "off-record" ? "destructive" : "outline"}>{groundRuleLabel(rules.rule)}</Badge>{rules.recordingPermission ? <span className="text-xs text-muted-foreground">Recording permission confirmed</span> : null}</p>
         {rules.note ? <p className="text-xs text-muted-foreground">{rules.note}</p> : null}
         {detail.source && detail.source.currentGroundRules && detail.source.currentGroundRules !== groundRuleLabel(rules.rule) ? <p className="text-xs text-muted-foreground">The source's ground rules are now “{detail.source.currentGroundRules}”. This recording keeps what was agreed when it was made.</p> : null}
-        <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Manual transcript" : `Machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
+        <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Uploaded transcript" : `Legacy machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
       </section>
       {profiles.length ? <SpeakersPanel api={context.api} detail={detail} profiles={profiles} canEdit={canEdit} playSample={playSample} refresh={refresh} /> : null}
       {detail.state === "ready" ? <section aria-label="Saved quotes" className="grid gap-2">
