@@ -160,8 +160,9 @@ for (const story of stories) for (const viewport of viewports) {
       expect(hero.srcset).toBe(3);
       expect(hero.fit).toBe('cover');
       expect(hero.filled).toBe(true);
-      // Bottom-left darkens toward the words with a gradient; centered uses an even scrim.
-      expect(hero.scrim).toMatch(story.alignment === 'bottom-left' ? /linear-gradient/ : /^rgba\(14, 17, 22, 0\.5\d*\)$/);
+      // No whole-image darkening: bottom-left has only a short veil behind the words; centered has none.
+      if (story.alignment === 'bottom-left') expect(hero.scrim).toMatch(/linear-gradient/);
+      else expect(hero.scrim).toBe('rgba(0, 0, 0, 0)');
       expect(hero.headline).toBe('rgb(255, 255, 255)');
       expect(hero.headlineInside).toBe(true);
       expect(hero.background).not.toBe('rgba(0, 0, 0, 0)');
@@ -169,18 +170,8 @@ for (const story of stories) for (const viewport of viewports) {
       expect(hero.currentSrc).toContain('newsroom-meeting-');
     });
 
-    test('the scroll cue is a keyboard link to the article, and the page never traps scrolling', async ({ page }) => {
-      // Keep the anchor jump immediate so it cannot overlap the wheel gesture.
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      const cue = page.locator('a.hero-reveal-scroll');
-      await expect(cue).toHaveAttribute('href', '#immersive-article-surface');
-      await cue.focus();
-      await expect(cue).toBeFocused();
-      await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/#immersive-article-surface$/);
-      // The page reserves `scroll-padding-top` for the docked logo bar, so the surface lands just beneath it.
-      const reserved = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0);
-      await expect.poll(async () => Math.abs((await measure(page)).surface.top - reserved)).toBeLessThan(3);
+    test('has no scroll cue, and the page never traps scrolling', async ({ page }) => {
+      await expect(page.locator('a.hero-reveal-scroll')).toHaveCount(0);
 
       const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
       await page.mouse.move(page.viewportSize()!.width / 2, page.viewportSize()!.height / 2);
@@ -188,8 +179,6 @@ for (const story of stories) for (const viewport of viewports) {
       await expect.poll(() => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1)).toBe(true);
       await page.mouse.wheel(0, -2 * pageHeight);
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-      await page.goBack();
-      await expect(page).not.toHaveURL(/#immersive-article-surface$/);
     });
   });
 }

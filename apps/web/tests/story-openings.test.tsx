@@ -116,7 +116,7 @@ describe("Feature", () => {
 
     const natural = render(base({ storyPresentation: "feature", image: { ...image, sources: undefined, objectPosition: "24% 72%" } }));
     expect(natural.querySelector(".story-opening-media picture")).toBeNull();
-    expect(natural.querySelector(".story-opening-media img")?.style.getPropertyValue("--byline-image-natural-position")).toBe("24% 72%");
+    expect(natural.querySelector<HTMLElement>(".story-opening-media img")?.style.getPropertyValue("--byline-image-natural-position")).toBe("24% 72%");
   });
 
   it("falls back to the normal article without a lead image", () => {
@@ -227,6 +227,14 @@ describe("Minimal story navigation", () => {
     expect(sheet.querySelector("nav")?.getAttribute("aria-label")).toBe("Site sections");
     expect(sheet.querySelector('[aria-label="Close site navigation"]')).not.toBeNull();
     expect(sheet.querySelector(".story-nav__secondary a")?.getAttribute("href")).toBe("/about/");
+  });
+
+  it("shows the masthead logo, not the publication name as text, at the top of the sheet", () => {
+    const title = doc.querySelector("dialog .story-nav__sheet-title")!;
+    expect(title.getAttribute("href")).toBe("/");
+    expect(title.getAttribute("aria-label")).toBe("Weekly Wildcat");
+    expect(title.querySelector("img.story-nav__sheet-logo")?.getAttribute("src")).toBe("/brand/logo.svg");
+    expect(title.textContent).toBe("");
   });
 
   it("orders the controls menu, logo, search for keyboard users", () => {

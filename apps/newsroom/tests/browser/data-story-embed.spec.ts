@@ -59,14 +59,19 @@ async function openStory(page: Page) {
   await page.goto(`/admin/collections/stories/${storyId}?view=write`);
   await expect(body(page)).toBeVisible({ timeout: 60_000 });
   await expect(body(page)).toHaveAttribute("contenteditable", "true");
-  // Payload remembers an open Live Preview for the account: start every test from the editor alone.
-  if (await page.locator(".live-preview-window--is-live-previewing").count()) await togglePreview(page);
+  // Preview is always a popup window, never a pane beside the editor.
   await expect(page.locator(".live-preview-window--is-live-previewing")).toHaveCount(0);
 }
 
 async function togglePreview(page: Page) {
   // Preview is a direct header button (never in the overflow menu).
   await page.locator("[data-story-preview]").click();
+}
+
+/** Opens the preview window from the header button and returns it. */
+async function openPreviewWindow(page: Page) {
+  const [popup] = await Promise.all([page.waitForEvent("popup"), togglePreview(page)]);
+  return popup;
 }
 
 const frame = (page: Page) => block(page, "dataProject");
@@ -220,8 +225,7 @@ test.describe("Live Preview", () => {
   const openPreview = async (page: Page, id: number) => {
     await page.goto(`/admin/collections/stories/${id}?view=write`);
     await expect(body(page)).toBeVisible({ timeout: 60_000 });
-    if (!(await page.locator(".live-preview-window--is-live-previewing").count())) await togglePreview(page);
-    return page.frameLocator("iframe[src*='/preview/story']");
+    return openPreviewWindow(page);
   };
 
   test("says plainly that a draft project cannot publish yet, and still shows the story's words", async ({ page, request, baseURL }) => {

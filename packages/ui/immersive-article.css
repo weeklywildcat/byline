@@ -3,29 +3,18 @@
   background: #14181d;
 }
 
+/* No whole-image darkening: the photograph shows as shot. Only a short, light veil sits behind the
+   bottom-left words; the centered headline relies on its text shadow alone. */
 .immersive-article .immersive-article-hero::before {
-  /* Heavier toward the bottom, where the words sit. */
-  background: linear-gradient(to top, rgba(14, 17, 22, 0.82), rgba(14, 17, 22, 0.28) 62%, rgba(14, 17, 22, 0.12));
+  background: none;
 }
 
-/* Centered headline: an even scrim, since the words sit mid-photograph. */
-.immersive-article-center .immersive-article-hero::before {
-  background: rgba(14, 17, 22, 0.52);
-}
-
-/* Minimal site navigation draws over the photograph: a soft veil at the top keeps the logo and controls
-   legible on a bright or mid-gray sky (`difference` alone fails on midtones). Absent under Standard navigation, so older stories look exactly as they did. */
-.immersive-article[data-site-navigation="minimal"] .immersive-article-hero::after {
-  background: linear-gradient(to bottom, rgba(14, 17, 22, 0.66), rgba(14, 17, 22, 0) calc(170px + env(safe-area-inset-top, 0px)));
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  z-index: 1;
+.immersive-article-bottom-left .immersive-article-hero::before {
+  background: linear-gradient(to top, rgba(14, 17, 22, 0.5), rgba(14, 17, 22, 0) 38%);
 }
 
 .immersive-article .hero-reveal-copy {
-  gap: 14px;
+  gap: 8px;
   margin: 0 auto;
   max-width: 1040px;
   padding-left: 20px;
@@ -93,23 +82,23 @@
 .immersive-article .immersive-article-headline {
   color: #fff;
   font-family: var(--font-headline);
-  font-size: clamp(2rem, 5.2vw, 4rem);
+  font-size: clamp(1.6rem, 3.4vw, 2.5rem);
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.06;
+  line-height: 1.1;
   margin: 0;
-  max-width: 18em;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  max-width: 20em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 2px 18px rgba(0, 0, 0, 0.45);
   text-wrap: balance;
 }
 
 .immersive-article .immersive-article-excerpt {
   color: rgba(255, 255, 255, 0.92);
   font-family: var(--font-serif);
-  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
-  line-height: 1.4;
-  max-width: 34em;
-  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
+  font-size: clamp(0.95rem, 1.3vw, 1.1rem);
+  line-height: 1.35;
+  max-width: 38em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 12px rgba(0, 0, 0, 0.4);
 }
 
 .immersive-article .immersive-article-excerpt p {
@@ -127,13 +116,13 @@
 }
 
 .immersive-article .immersive-article-surface .byline-article-view.article-shell {
-  padding-top: 28px;
+  padding-top: 20px;
 }
 
 .immersive-article .immersive-article-meta {
   border-bottom: 1px solid var(--rule);
-  margin-bottom: 28px;
-  padding-bottom: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
 }
 
 .immersive-article .immersive-article-meta .article-meta-block {
@@ -161,7 +150,7 @@
 }
 
 .immersive-article .hero-reveal-copy-end {
-  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Under Minimal site navigation the photograph runs to the top edge; the words start below the bar. */
@@ -177,7 +166,7 @@
 
   /* A phone gets the larger share of its screen for the photograph. */
   .immersive-article .hero-reveal-copy-end {
-    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   }
 }
 

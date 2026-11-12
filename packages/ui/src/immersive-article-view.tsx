@@ -44,7 +44,7 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
         navZone
         target={SURFACE_ID}
         align={centered ? "center" : "end"}
-        scrim={0.5}
+        scrollCue={false}
         className="immersive-article-hero"
         image={image?.src ? { ...image, sizes: "100vw" } : null}
         imagePosition={image?.objectPosition}

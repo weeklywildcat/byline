@@ -109,9 +109,9 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
   `/api/byline/build/media/:sha256` with `BYLINE_BUILD_TOKEN`. Recipe numbers
   live in `recipe.ts`; changing one bumps `PUBLICATION_MEDIA_RECIPE_VERSION`.
 - **Live Preview** (`src/preview`): Payload owns
-  the pane, iframe, toolbar, devices, zoom, pop-out, transport and open state;
-  Byline owns the `/preview/story` page and the Preview button
-  (`useLivePreviewContext`). Configured once on `stories` with a static URL, never a
+  the toolbar, transport and live updates; Byline owns the `/preview/story` page and
+  the Preview button (`useLivePreviewContext`), which always opens a popup window and
+  never Payload's side-by-side pane (`useStoryPreview` switches the pane off). Configured once on `stories` with a static URL, never a
   function. Never add a second iframe, device/zoom/popup control, `message`
   listener, editable Story copy, preview-only renderer or autosave clock. Keep
   `useLivePreview`'s `initialData` and `requestHandler` referentially stable. The

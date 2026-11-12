@@ -233,7 +233,7 @@ describe("an immersive story", () => {
     expect(hero.nextElementSibling).toBe(surface);
     expect(hero.parentElement).toBe(surface.parentElement);
     expect(hero.parentElement!.tagName).toBe("MAIN");
-    expect(hero.querySelector(`a.hero-reveal-scroll[href="#${surface.id}"]`)).not.toBeNull();
+    expect(hero.querySelector("a.hero-reveal-scroll")).toBeNull();
     expect(shell.contains(document.querySelector(".article-body"))).toBe(true);
     expect(shell.contains(document.querySelector(".article-after"))).toBe(true);
   });
@@ -390,7 +390,7 @@ describe("HeroReveal", () => {
     expect(image.getAttribute("srcset")).toBe("/a-1.jpg 1w");
     expect(image.getAttribute("sizes")).toBe("100vw");
     expect(image.getAttribute("alt")).toBe("Alt");
-    expect(image.getAttribute("style")).toContain("object-position:40% 20%");
+    expect(image.getAttribute("style")).toContain("--hero-reveal-natural-position:40% 20%");
     expect(text(hero.querySelector(".hero-reveal-copy"))).toBe("Words");
     expect(text(hero.querySelector("a.hero-reveal-scroll"))).toBe("Read on");
     expect(document.querySelector("#below.hero-reveal-content")).not.toBeNull();

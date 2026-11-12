@@ -1,6 +1,6 @@
 /* Minimal site navigation for a visually led story (StoryNavigation). Hosts provide
    --paper, --ink, --rule and --font-*. The bar is transparent over the story opening,
-   so every control carries its own legibility; the logo blends as a bonus on top. */
+   so every control carries its own legibility. */
 
 .story-nav {
   --story-nav-bar: 56px;
@@ -51,13 +51,10 @@
 /* The logo is centred on the viewport itself, not in the space the buttons leave. */
 .story-nav__layer--logo {
   justify-content: center;
-  /* Its own stacking context against the page: the blend only works here. */
-  mix-blend-mode: normal;
 }
 
-/* Hit target 44px; the icon itself is bare: no disc, no pill. Legibility comes from a dual-tone halo
-   (a dark icon with a soft white edge), which reads on white sky, dark photographs, midtones and busy
-   foliage alike without drawing a surface. */
+/* Hit target 44px; the icon itself is bare: no disc, no pill. Legibility comes from a hairline white edge
+   on the dark icon (no blur, no glow), without drawing a surface. */
 .story-nav__control {
   align-items: center;
   appearance: none;
@@ -78,7 +75,7 @@
 }
 
 .story-nav__control svg {
-  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255, 255, 255, 0.85));
+  filter: drop-shadow(0 0 0.5px #fff) drop-shadow(0 0 0.5px #fff);
   transition: filter 0.2s ease;
 }
 
@@ -123,33 +120,22 @@
   }
 }
 
-/* The masthead artwork is one dark asset (no black/white pair to maintain). Where blending exists it
-   is inverted to white and combined with `difference`, so it inverts against what is behind it.
-   An <img> plus a filter, not a CSS mask: a mask image must be CORS-readable, and Live Preview
-   shows this artwork from the public site's origin. */
+/* The masthead artwork is one dark asset, shown in its own colours. Over a photograph it gets the same
+   dual-tone halo as the icon controls (a soft white edge), so it reads on bright sky, dark frames and
+   midtones alike. A blend mode is not used: it turned the mark white on a bright photograph. An <img>
+   plus a filter, not a CSS mask: a mask image must be CORS-readable, and Live Preview shows this
+   artwork from the public site's origin. */
 .story-nav__logo-mark {
   display: block;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255, 255, 255, 0.85));
   height: clamp(15px, 4.4vw, 24px);
+  transition: filter 0.2s ease;
   width: auto;
 }
 
-@supports (mix-blend-mode: difference) {
-  .story-nav__layer--logo {
-    mix-blend-mode: difference;
-  }
-
-  .story-nav__logo-mark {
-    filter: brightness(0) invert(1);
-  }
-
-  /* The publication surface is opaque, so the logo returns to its own colours rather than blending. */
-  .story-nav[data-solid="true"] .story-nav__layer--logo {
-    mix-blend-mode: normal;
-  }
-
-  .story-nav[data-solid="true"] .story-nav__logo-mark {
-    filter: none;
-  }
+/* The publication surface is opaque: nothing to separate the mark from. */
+.story-nav[data-solid="true"] .story-nav__logo-mark {
+  filter: none;
 }
 
 /* The menu: a native modal dialog laid out as a left sheet. */
@@ -200,12 +186,17 @@
 }
 
 .story-nav__sheet-title {
-  color: var(--ink, #1f2328);
-  font-family: var(--font-headline, Georgia, serif);
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  align-items: center;
+  display: inline-flex;
+  min-height: 44px;
   text-decoration: none;
+}
+
+/* The masthead artwork in its own colours on the paper sheet. */
+.story-nav__sheet-logo {
+  display: block;
+  height: 22px;
+  width: auto;
 }
 
 .story-nav__sheet-nav {
@@ -268,6 +259,7 @@ body:has(.story-nav__sheet[open]) {
 
 @media (prefers-reduced-motion: reduce) {
   .story-nav__surface,
+  .story-nav__logo-mark,
   .story-nav__control svg {
     transition: none;
   }

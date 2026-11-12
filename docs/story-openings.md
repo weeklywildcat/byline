@@ -10,7 +10,7 @@ a `SettingsSurface`: a Popover with a mouse, a bottom Sheet on touch or a narrow
 | --- | --- | --- |
 | Standard | Most daily stories | Headline, deck, byline, lead photo at article width. Unchanged. |
 | Feature | Profiles, enterprise, narrative | Headline package on the page; a substantially larger photograph below it (**Wide** or **Full**); caption and credit inset. Phone: photograph edge to edge, headline inset. |
-| Immersive | A story with one great photograph | The photograph fills the first screen (`svh`) with the headline over it (**Bottom left** or **Center**), over a fixed scrim. The article rises over the pinned photograph. |
+| Immersive | A story with one great photograph | The photograph fills the first screen (`svh`) with the headline over it (**Bottom left** or **Center**), with no darkening over the photograph (only a short light veil behind a bottom-left headline) and no scroll cue. The article rises over the pinned photograph. |
 | Split | Profiles and visual features | Desktop: photograph on the left or right (slightly more than half), headline package on the other side. Below 1024px: stacked, headline package then an edge-to-edge photograph. The DOM order is always the headline package first. |
 
 Feature, Immersive and Split need a lead image and are not used for video stories; otherwise the
@@ -47,10 +47,9 @@ changing the opening never changes it.
 - **Standard**: the publication header, unchanged.
 - **Minimal**: no utility strip, date, donate, masthead or section row. Only menu (left), logo
   (centre) and search (right) over the opening, on a transparent bar. The logo is one dark asset
-  inverted to white with `mix-blend-mode: difference` (an `<img>` and a filter, because a mask
-  image must be CORS-readable and Live Preview shows the public site's artwork). Blending fails on
-  midtones, so Immersive and a wide Split carry a soft top veil, and the menu and search icons are
-  bare dark icons with a white halo (no disc). Hit targets are 44px. On a wide screen a **Split**
+  shown in its own colours (an `<img>` and a filter, because a mask image must be CORS-readable and
+  Live Preview shows the public site's artwork). Over a photograph it and the menu and search icons
+  get a white edge, no disc, and there is no top veil over the photograph. Hit targets are 44px. On a wide screen a **Split**
   opening puts the logo at the left, beside the menu, because its seam is mid-viewport.
 - The menu is a native modal `<dialog>` laid out as a left sheet: focus trap, Escape, inert page,
   focus restored to the menu button, safe-area padding. Its sections are `getNavigation("header")`

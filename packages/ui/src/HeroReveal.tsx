@@ -33,6 +33,8 @@ export type HeroRevealProps = {
   /** The `id` of the `HeroRevealContent` the scroll cue jumps to. */
   target: string;
   scrollLabel?: string;
+  /** Whether to draw the "Scroll" cue over the image. Defaults to true. */
+  scrollCue?: boolean;
   className?: string;
   /** Marks the hero as the region Minimal site navigation sits over (`data-story-nav-zone`). */
   navZone?: boolean;
@@ -50,7 +52,7 @@ export type HeroRevealProps = {
 export const HERO_REVEAL_FIT_SCRIPT =
   "(function(){var a=document.querySelector('[data-hero-reveal-anchor]');if(!a)return;var r=document.documentElement;function f(){r.style.setProperty('--hero-reveal-header-h',Math.max(0,a.getBoundingClientRect().top+window.scrollY)+'px')}f();addEventListener('resize',f);addEventListener('load',f);if(window.ResizeObserver)new ResizeObserver(f).observe(document.body)})()";
 
-export function HeroReveal({ image, imagePosition, scrim, align = "center", target, scrollLabel = "Scroll", className, navZone = false, children }: HeroRevealProps): ReactNode {
+export function HeroReveal({ image, imagePosition, scrim, align = "center", target, scrollLabel = "Scroll", scrollCue = true, className, navZone = false, children }: HeroRevealProps): ReactNode {
   const style = scrim === undefined ? undefined : ({ "--hero-reveal-scrim": String(scrim) } as CSSProperties);
   return (
     <>
@@ -76,12 +78,14 @@ export function HeroReveal({ image, imagePosition, scrim, align = "center", targ
           </picture>
         ) : null}
         <div className={align === "end" ? "hero-reveal-copy hero-reveal-copy-end" : "hero-reveal-copy"}>{children}</div>
-        <a className="hero-reveal-scroll" href={`#${target}`}>
-          <span>{scrollLabel}</span>
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </a>
+        {scrollCue ? (
+          <a className="hero-reveal-scroll" href={`#${target}`}>
+            <span>{scrollLabel}</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </a>
+        ) : null}
       </header>
     </>
   );

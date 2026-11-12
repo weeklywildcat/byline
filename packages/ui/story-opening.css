@@ -271,16 +271,6 @@
     max-width: none;
     padding: 12px clamp(20px, 2.4vw, 40px);
   }
-
-  /* Under Minimal site navigation the photograph reaches the top edge: a soft veil keeps the logo and
-     menu legible on a bright or mid-gray sky, where the logo's `difference` blend alone fails. */
-  .story-opening-split[data-site-navigation="minimal"] .story-opening-media::after {
-    background: linear-gradient(to bottom, rgba(14, 17, 22, 0.6), rgba(14, 17, 22, 0) calc(170px + env(safe-area-inset-top, 0px)));
-    content: "";
-    inset: 0;
-    pointer-events: none;
-    position: absolute;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
