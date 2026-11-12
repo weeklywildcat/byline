@@ -176,7 +176,7 @@ describe("recordings, ground rules and transcripts", () => {
     expect(imported.status).toBe(200);
     ids.transcript = imported.body.transcriptId;
     const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: "manual", source: ids.coach, appointment: ids.interview });
+    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: null, progressPercent: null, progressMessage: null, source: ids.coach, appointment: ids.interview });
     expect((transcript.segments as Array<{ speaker?: string; startMs: number }>)[0]).toMatchObject({ speaker: "SPEAKER_00", startMs: 0 });
 
     // A standalone plain-text transcript keeps its file as the private document it belongs to.
@@ -267,7 +267,19 @@ describe("recordings, ground rules and transcripts", () => {
     expect(provenance.body.source).toMatchObject({ label: "Coach Smith" });
     expect(provenance.body.appointment).toMatchObject({ title: "Interview Coach Smith" });
     expect(provenance.body.recording).toMatchObject({ filename: "coach-smith.wav", capturedBy: "alice Account" });
-    expect(provenance.body.transcript).toMatchObject({ origin: "manual", provider: "manual" });
+    expect(provenance.body.transcript).toMatchObject({ origin: "manual", provider: null });
+
+    const reporting = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
+    const recording = reporting.body.materials.find((item: { key: string }) => item.key === `file:${ids.recording}`);
+    expect(recording.transcript).toMatchObject({ id: ids.transcript, quoteCount: 1, verifiedCount: 1, usedQuoteCount: 1 });
+
+    // A recording that is the provenance for an article quote cannot be removed.
+    const blocked = await call("delete", "/byline/reporting/files/:id", "alice", { params: { id: ids.recording } });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.message).toMatch(/used in an article/i);
+    expect((await payload.count({ collection: "reporting-files", where: { id: { equals: ids.recording } } })).totalDocs).toBe(1);
+    expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: ids.quote } } })).totalDocs).toBe(1);
+
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
