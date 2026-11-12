@@ -126,10 +126,11 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   const selections = transcripts.length
     ? (await payload.find({ collection: "transcript-selections", where: { transcript: { in: transcripts.map((row) => row.id) } }, pagination: false, select: { transcript: true, kind: true, state: true, usedIn: true }, ...as(ctx) })).docs
     : [];
-  const selectionCounts = new Map<number, { quotes: number; verified: number; used: number }>();
+  const selectionCounts = new Map<number, { total: number; quotes: number; verified: number; used: number }>();
   for (const row of selections) {
     const id = num(row.transcript);
-    const entry = selectionCounts.get(id) ?? { quotes: 0, verified: 0, used: 0 };
+    const entry = selectionCounts.get(id) ?? { total: 0, quotes: 0, verified: 0, used: 0 };
+    entry.total += 1;
     if (row.kind === "quote") {
       entry.quotes += 1;
       if (row.state === "verified") entry.verified += 1;
@@ -139,6 +140,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   }
   const transcriptFor = new Map<number, TranscriptSummary>(transcripts.map((row) => [num(row.file), {
     id: row.id, state: row.state, origin: row.origin, language: row.language ?? null, durationMs: row.durationMs ?? null,
+    selectionCount: selectionCounts.get(row.id)?.total ?? 0,
     quoteCount: selectionCounts.get(row.id)?.quotes ?? 0,
     verifiedCount: selectionCounts.get(row.id)?.verified ?? 0,
     usedSelectionCount: selectionCounts.get(row.id)?.used ?? 0
