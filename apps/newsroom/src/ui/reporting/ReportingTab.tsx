@@ -201,7 +201,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear reporting search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
             </InputGroup>
             {canCapture ? <CaptureMenu capture={capture()} /> : null}
-            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
+            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" aria-label="Sources and appointments" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & schedule</Button> : null}
           </div>
 
           {bound?.label && panel ? <div className="flex items-center gap-2" data-capture-context=""><span className="text-xs text-muted-foreground">Filing with</span><Badge variant="secondary" className="gap-1 pr-1"><span className="max-w-64 truncate">{bound.label}</span><button type="button" className="touch-hit rounded-sm p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Clear " + bound.label} onClick={() => setBound(null)}><X className="size-3" /></button></Badge></div> : null}
@@ -765,7 +765,7 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
     <Button type="submit" size="sm" disabled={save.isPending}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save ground rules</Button>
   </form>;
-  const trigger = <button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11" />;
+  const trigger = <Button type="button" size="xs" variant={source.groundRules === "off-record" ? "destructive" : "outline"} aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} />;
   const changeOpen = (next: boolean) => {
     setOpen(next);
     if (next) {
@@ -775,13 +775,13 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     }
   };
   return touch ? <Drawer open={open} onOpenChange={changeOpen}>
-    <DrawerTrigger render={trigger}>{badge}</DrawerTrigger>
+    <DrawerTrigger render={trigger}><Pencil data-icon="inline-start" />{groundRuleLabel(source.groundRules)}</DrawerTrigger>
     <DrawerContent keyboardAware>
       <DrawerHeader><DrawerTitle>Edit ground rules</DrawerTitle><DrawerDescription>{source.label}</DrawerDescription></DrawerHeader>
       <div className="px-4 pb-2">{form}</div>
     </DrawerContent>
   </Drawer> : <Popover open={open} onOpenChange={changeOpen}>
-    <PopoverTrigger render={trigger}>{badge}</PopoverTrigger>
+    <PopoverTrigger render={trigger}><Pencil data-icon="inline-start" />{groundRuleLabel(source.groundRules)}</PopoverTrigger>
     <PopoverContent align="start" className="w-72">{form}</PopoverContent>
   </Popover>;
 }
