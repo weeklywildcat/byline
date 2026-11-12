@@ -225,7 +225,7 @@ export async function editTranscript(ctx: ScreenContext, id: number, input: Tran
 /**
  * Imports a reporter-provided transcript (.txt, .srt, .vtt). Attached to a recording when one is
  * named; otherwise the transcript file itself is kept as the private reporting
- * document the transcript belongs to. Either way it is MANUAL TRANSCRIPT.
+ * document the transcript belongs to. Either way it is an uploaded transcript.
  */
 export async function importTranscript(ctx: ScreenContext, storyId: number, input: { fileId?: unknown; sourceId?: unknown; appointmentId?: unknown; confidential?: unknown; replace?: unknown; clientKey?: unknown }) {
   const upload = ctx.req.file;
@@ -302,7 +302,7 @@ export type SelectionInput = { segmentIds?: unknown; text?: unknown; kind?: unkn
  * recording, Source, ground rules, confidentiality and timing from the
  * transcript; attribution is the Source's name and role only when the
  * material is on the record (Byline never writes attribution for background).
- * Machine transcript selections start unverified.
+ * Every saved quote starts unverified, regardless of where the transcript came from.
  */
 export async function createSelection(ctx: ScreenContext, transcriptId: number, input: SelectionInput): Promise<SelectionView> {
   const audience = await audienceOf(ctx);
@@ -349,6 +349,12 @@ export async function updateSelection(ctx: ScreenContext, id: number, input: Sel
 }
 
 export async function deleteSelection(ctx: ScreenContext, id: number) {
+  const found = await ctx.req.payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, select: { usedIn: true }, ...as(ctx) });
+  const selection = found.docs[0];
+  if (!selection) throw new APIError("That saved quote is not available.", 404);
+  if (Array.isArray(selection.usedIn) && selection.usedIn.length > 0) {
+    throw new APIError("This saved quote is used in an article. Remove it from the article before deleting it.", 409);
+  }
   await ctx.req.payload.delete({ collection: "transcript-selections", id, ...as(ctx) });
   return { id };
 }
