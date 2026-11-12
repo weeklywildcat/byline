@@ -389,10 +389,11 @@ function iconFor(item: StoryMaterialItem): ReactNode {
 
 function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
   const [editing, setEditing] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [text, setText] = useState(item.kind === "note" ? item.text : "");
   const remove = useMutation({
     mutationFn: () => (item.kind === "note" ? removeNote(context.api, item.id) : removeFile(context.api, item.id)),
-    onSuccess: async () => { toast.success("Removed."); await refresh(); },
+    onSuccess: async () => { setRemoveOpen(false); toast.success("Removed."); await refresh(); },
     onError: (error: Error) => toast.error(error.message)
   });
   const toggle = useMutation({
@@ -411,6 +412,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
   const file = item.kind === "file" ? item : null;
   const transcript = file?.transcript ?? null;
 
+  const removalBlocked = Boolean(file?.transcript?.usedSelectionCount);
   const actions = (
     <>
       {file && transcript?.state === "ready" ? <Button type="button" size="xs" variant="default" onClick={() => onOpenTranscript(transcript.id)}>Open transcript</Button> : null}
@@ -423,16 +425,21 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
               ? <ConfirmReplaceTranscriptButton selectionCount={transcript.selectionCount} onReplace={onImport} />
               : <Button type="button" size="xs" variant="outline" onClick={onImport}>Replace transcript</Button>
         : null}
-      {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
-      {editable && file
-        ? transcript?.usedSelectionCount
-          ? <span className="px-2 text-xs text-muted-foreground">{transcript.usedSelectionCount === 1 ? "Used in article · remove there first" : `${transcript.usedSelectionCount} saved items used in articles`}</span>
-          : <ConfirmRemoveFileButton file={file} removing={remove.isPending} onRemove={() => remove.mutate()} />
-        : editable
-          ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button>
-          : null}
+      {transcript?.usedSelectionCount ? <Badge variant="secondary">{transcript.usedSelectionCount === 1 ? "Used in article" : `${transcript.usedSelectionCount} saved items in articles`}</Badge> : null}
+      {editable && !(item.kind === "note" && editing) ? (
+        <MaterialActionsMenu
+          title={title}
+          confidential={item.confidential}
+          toggling={toggle.isPending}
+          canRemove={!removalBlocked}
+          removing={remove.isPending}
+          onToggle={() => toggle.mutate()}
+          onRemove={() => setRemoveOpen(true)}
+        />
+      ) : null}
     </>
   );
+  const removeDialog = editable ? <ConfirmRemoveMaterialDialog item={item} open={removeOpen} onOpenChange={setRemoveOpen} removing={remove.isPending} onRemove={() => remove.mutate()} /> : null;
 
   // A true file (recording, document, image, photo) is an Attachment; notes, links and live posts are not.
   if (item.kind === "file" || item.kind === "media") {
@@ -449,6 +456,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
           {href ? <AttachmentTrigger render={<a href={href} target="_blank" rel="noreferrer noopener" aria-label={`Open ${title}`} />} /> : null}
         </Attachment>
         <div className="flex flex-wrap items-center gap-1.5 empty:hidden">{actions}</div>
+        {removeDialog}
       </div>
     );
   }
@@ -479,6 +487,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
         {item.kind === "note" && editable && !editing ? <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(true)}>Edit</Button> : null}
         {actions}
       </div>
+      {removeDialog}
     </div>
   );
 }
@@ -504,26 +513,38 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   );
 }
 
-function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: ReportingFileMaterial; removing: boolean; onRemove: () => void }) {
-  const [open, setOpen] = useState(false);
-  const transcript = file.transcript;
-  const interview = file.fileKind === "audio";
-  const title = interview ? "Remove this interview?" : "Remove this file?";
+function MaterialActionsMenu({ title, confidential, toggling, canRemove, removing, onToggle, onRemove }: { title: string; confidential: boolean; toggling: boolean; canRemove: boolean; removing: boolean; onToggle: () => void; onRemove: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button type="button" size="icon-xs" variant="ghost" aria-label={`More actions for ${title}`} />}><MoreHorizontal /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuItem disabled={toggling} onClick={onToggle}><Lock />{confidential ? "Make visible to story team" : "Make confidential"}</DropdownMenuItem>
+        {canRemove ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" disabled={removing} onClick={onRemove}><Trash2 />Remove…</DropdownMenuItem></> : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRemove }: { item: StoryMaterialItem; open: boolean; onOpenChange: (open: boolean) => void; removing: boolean; onRemove: () => void }) {
+  const file = item.kind === "file" ? item : null;
+  const transcript = file?.transcript ?? null;
+  const interview = file?.fileKind === "audio";
+  const title = item.kind === "note" ? "Remove this note?" : interview ? "Remove this interview?" : "Remove this file?";
   const transcriptPart = transcript ? " and its transcript" : "";
   const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger disabled={removing} render={<Button type="button" size="xs" variant="ghost" disabled={removing} />}>Remove</AlertDialogTrigger>
-      <AlertDialogContent>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
+          <AlertDialogMedia><Trash2 /></AlertDialogMedia>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{savedMaterialPart} This cannot be undone.
+            {item.kind === "note" ? "This permanently deletes the private reporting note." : <>This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{savedMaterialPart}</>} This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={removing} onClick={() => { setOpen(false); onRemove(); }}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
+          <AlertDialogAction variant="destructive" disabled={removing} onClick={onRemove}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
