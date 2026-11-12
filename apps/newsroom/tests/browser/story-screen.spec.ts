@@ -217,7 +217,9 @@ test("an interview recording accepts a transcript upload and attaches it to that
   const transcriptView = page.locator("[data-transcript-view]");
   const finalPassage = transcriptView.locator('[data-segment="s1"]');
   await expect(finalPassage).toBeVisible();
-  await transcriptView.locator("audio").evaluate((audio: HTMLAudioElement) => {
+  const player = transcriptView.locator("audio");
+  await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.readyState)).toBeGreaterThanOrEqual(1);
+  await player.evaluate((audio: HTMLAudioElement) => {
     audio.currentTime = 3.5;
     audio.dispatchEvent(new Event("timeupdate", { bubbles: true }));
   });
