@@ -10,6 +10,7 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
@@ -19,7 +20,7 @@ import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, MoreHorizontal, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
@@ -575,6 +576,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
 function SelectionCard({ context, selection, detail, seek, refresh }: { context: StoryScreenContext; selection: SelectionView; detail: TranscriptDetail; seek: (ms: number | null) => void; refresh: () => Promise<unknown> }) {
   const [overriding, setOverriding] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [reason, setReason] = useState("");
   const run = useMutation({
     mutationFn: async (action: "verify" | "unverify" | "remove" | "promote" | "override") => {
@@ -604,33 +606,40 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.use.action !== "insert" && selection.kind === "quote" ? <p className="text-xs font-medium" data-quote-use={selection.use.action}>{selection.use.message}</p> : null}
       {selection.usedIn.length ? <p className="text-xs text-muted-foreground">Used in {selection.usedIn.map((story) => story.headline).join(", ")}</p> : null}
       {selection.canEdit && !context.readOnly ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {selection.kind === "highlight"
             ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button>
             : selection.state === "saved"
               ? detail.file.url
                 ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button>
                 : <Badge variant="outline">No recording to verify</Badge>
-              : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
-          {selection.usedIn.length ? null : (
-            <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
-              <AlertDialogTrigger render={<Button type="button" size="xs" variant="ghost" disabled={run.isPending} />}>Remove</AlertDialogTrigger>
-              <AlertDialogContent size="sm">
-                <AlertDialogHeader>
-                  <AlertDialogMedia><Trash2 /></AlertDialogMedia>
-                  <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <Button type="button" size="xs" variant="outline" onClick={() => setOverriding(true)}>Editor override…</Button> : null}
+              : null}
+          {selection.state === "verified" || !selection.usedIn.length || (blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding) ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button ref={moreTriggerRef} type="button" size="icon-xs" variant="ghost" aria-label="More saved quote actions" disabled={run.isPending} />}><MoreHorizontal /></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                {selection.state === "verified" ? <DropdownMenuItem disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</DropdownMenuItem> : null}
+                {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <DropdownMenuItem onClick={() => setOverriding(true)}>Editor override…</DropdownMenuItem> : null}
+                {!selection.usedIn.length && (selection.state === "verified" || (blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding)) ? <DropdownMenuSeparator /> : null}
+                {!selection.usedIn.length ? <DropdownMenuItem variant="destructive" onClick={() => setRemoveOpen(true)}><Trash2 />Remove…</DropdownMenuItem> : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+            <AlertDialogContent size="sm" finalFocus={moreTriggerRef}>
+              <AlertDialogHeader>
+                <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+                <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       ) : null}
       {overriding ? (
