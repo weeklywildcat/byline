@@ -180,14 +180,29 @@ describe("recordings, ground rules and transcripts", () => {
     expect((transcript.segments as Array<{ speaker?: string; startMs: number }>)[0]).toMatchObject({ speaker: "SPEAKER_00", startMs: 0 });
 
     // A standalone plain-text transcript keeps its file as the private document it belongs to.
-    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+    const standaloneInput = {
       params: { id: ids.story },
-      data: { appointmentId: ids.interview },
+      data: { appointmentId: ids.interview, clientKey: "standalone-transcript-0001" },
       file: text("notes.txt", "Coach Smith: First paragraph.\n\nSecond paragraph.")
-    });
+    };
+    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", standaloneInput);
     expect(standalone.status).toBe(200);
     const doc = await payload.findByID({ collection: "reporting-files", id: standalone.body.fileId, depth: 0 });
     expect(doc).toMatchObject({ kind: "document", source: ids.coach, appointment: ids.interview });
+
+    const replay = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", standaloneInput);
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({ transcriptId: standalone.body.transcriptId, fileId: standalone.body.fileId });
+    expect((await payload.count({ collection: "reporting-files", where: { clientKey: { equals: "standalone-transcript-0001" } } })).totalDocs).toBe(1);
+    expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: standalone.body.fileId } } })).totalDocs).toBe(1);
+
+    const wrongParent = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+      params: { id: ids.story },
+      data: { fileId: standalone.body.fileId, replace: true },
+      file: text("replacement.txt", "This must not silently replace a standalone document.")
+    });
+    expect(wrongParent.status).toBe(400);
+    expect(wrongParent.body.message).toMatch(/interview recording/i);
   });
   it("deletes a recording with its transcript and selections without a foreign-key failure", async () => {
     const uploaded = await call("post", "/byline/stories/:id/reporting/files", "alice", {
