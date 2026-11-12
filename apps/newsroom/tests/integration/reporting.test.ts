@@ -50,11 +50,7 @@ const text = (name: string, body: string, mimetype = "text/plain"): NonNullable<
   return { data, mimetype, name, size: data.length };
 };
 
-const stubSegments = [
-  { id: "s0", startMs: 0, endMs: 4000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We knew going into the second half we had to tackle better." },
-  { id: "s1", startMs: 4000, endMs: 7000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "What changed defensively?" },
-  { id: "s2", startMs: 7000, endMs: 12000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We switched to man coverage and trusted our corners." }
-];
+
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
   url.pathname = `${url.pathname}_reporting`;
