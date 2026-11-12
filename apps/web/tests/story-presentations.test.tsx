@@ -233,7 +233,7 @@ describe("an immersive story", () => {
     expect(hero.nextElementSibling).toBe(surface);
     expect(hero.parentElement).toBe(surface.parentElement);
     expect(hero.parentElement!.tagName).toBe("MAIN");
-    expect(hero.querySelector(`a.hero-reveal-scroll[href="#${surface.id}"]`)).not.toBeNull();
+    expect(hero.querySelector("a.hero-reveal-scroll")).toBeNull();
     expect(shell.contains(document.querySelector(".article-body"))).toBe(true);
     expect(shell.contains(document.querySelector(".article-after"))).toBe(true);
   });

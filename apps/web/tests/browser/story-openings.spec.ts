@@ -142,11 +142,11 @@ test.describe('Site navigation', () => {
     await expect(nav).toHaveAttribute('data-solid', 'false');
   });
 
-  test('reduced motion removes the bar transition, the sheet animation and the scroll cue bob', async ({ page }) => {
+  test('reduced motion removes the bar transition, and the sheet animation', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await open(page, stories.immersive);
     expect(await page.locator('.story-nav__surface').evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s');
-    expect(await page.locator('.hero-reveal-scroll svg').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    expect(await page.locator('.story-nav__logo-mark').evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s');
     await page.getByRole('button', { name: 'Open site navigation' }).click();
     expect(await page.locator('dialog').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
   });

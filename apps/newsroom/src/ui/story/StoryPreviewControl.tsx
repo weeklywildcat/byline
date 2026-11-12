@@ -8,12 +8,13 @@ import { resolveStoryPresentation, type StoryPresentationIdentity, type StoryPre
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { useConfig, useDocumentInfo, useFormFields, useLivePreviewContext } from "@payloadcms/ui";
 import { Eye, X } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { relationIdOf } from "./form";
 
 export type StoryPreview = {
   /** False when Live Preview is not available for this document. */
   available: boolean;
+  /** True while the preview window is open. */
   previewing: boolean;
   open: () => void;
   close: () => void;
@@ -22,18 +23,32 @@ export type StoryPreview = {
 
 /**
  * Byline's entry to Payload's Live Preview. Payload owns the preview itself
- * (pane, iframe, toolbar, devices, zoom, pop-out, transport, and remembering
- * whether it was open); this only sets Payload's own open state through its
- * public context, so there is exactly one preview state: when Payload opens or
- * closes the pane itself, `previewing` follows. Callers say what they mean
- * (`open`, `close`, `toggle`) and never invert the state themselves.
+ * (toolbar, transport, the page it renders and the live updates posted to it);
+ * Byline only chooses where it shows: always a separate popup window, never
+ * Payload's side-by-side pane, which squeezes the editor and breaks its layout.
+ * `open` must run inside a click so the browser allows the window.
+ *
+ * Payload remembers an open pane per account and reopens it on load, and it
+ * falls back to the pane when the popup is closed. Neither is wanted, so
+ * whenever Live Preview is on without a popup window, it is switched off.
  */
 export function useStoryPreview(): StoryPreview {
-  const { isLivePreviewEnabled, isLivePreviewing, setIsLivePreviewing, url } = useLivePreviewContext();
-  const previewing = Boolean(isLivePreviewing);
-  const open = useCallback(() => setIsLivePreviewing(true), [setIsLivePreviewing]);
-  const close = useCallback(() => setIsLivePreviewing(false), [setIsLivePreviewing]);
-  const toggle = useCallback(() => setIsLivePreviewing(!previewing), [previewing, setIsLivePreviewing]);
+  const { isLivePreviewEnabled, isLivePreviewing, isPopupOpen, popupRef, setIsLivePreviewing, setPreviewWindowType, url } = useLivePreviewContext();
+  const previewing = Boolean(isLivePreviewing && isPopupOpen);
+
+  useEffect(() => {
+    if (isLivePreviewing && !isPopupOpen) setIsLivePreviewing(false);
+  }, [isLivePreviewing, isPopupOpen, setIsLivePreviewing]);
+
+  const open = useCallback(() => {
+    setIsLivePreviewing(true);
+    setPreviewWindowType("popup");
+  }, [setIsLivePreviewing, setPreviewWindowType]);
+  const close = useCallback(() => {
+    setIsLivePreviewing(false);
+    popupRef?.current?.close();
+  }, [popupRef, setIsLivePreviewing]);
+  const toggle = useCallback(() => (previewing ? close() : open()), [previewing, open, close]);
   return { available: Boolean(isLivePreviewEnabled && url), previewing, open, close, toggle };
 }
 
@@ -41,7 +56,7 @@ export function useStoryPreview(): StoryPreview {
  * The Story header's Preview action: always visible beside the main actions,
  * never in the overflow menu. One button that stays mounted while it changes
  * from "Preview" to "Close preview", so keyboard focus stays on it when the
- * pane opens or closes. On a narrow header it is icon-only and keeps its name
+ * preview window opens or closes. On a narrow header it is icon-only and keeps its name
  * in `aria-label`. The open state is the secondary (filled) button and a
  * different icon and name, never colour alone.
  */

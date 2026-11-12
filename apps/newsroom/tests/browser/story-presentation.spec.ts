@@ -75,9 +75,9 @@ async function stored(page: Page, request: Parameters<typeof readDraft>[0], base
 
 test.describe("Preview is a first-class action", () => {
   const previewButton = (page: Page) => page.locator("header [data-story-preview]");
-  const pane = (page: Page) => page.locator(".live-preview-window, [class*='live-preview-window']").first();
+  const pane = (page: Page) => page.locator(".live-preview-window, [class*='live-preview-window']");
 
-  test("is visible in the header, opens Payload's Live Preview and becomes Close preview", async ({ page }) => {
+  test("is visible in the header, opens the preview as a popup window and becomes Close preview", async ({ page }) => {
     await openStory(page);
     await expect(previewButton(page)).toBeVisible();
     await expect(previewButton(page)).toHaveAccessibleName("Preview");
@@ -86,29 +86,34 @@ test.describe("Preview is a first-class action", () => {
     await expect(page.getByRole("menuitem", { name: /preview/i })).toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    await previewButton(page).click();
-    await expect(pane(page)).toBeVisible();
+    const [popup] = await Promise.all([page.waitForEvent("popup"), previewButton(page).click()]);
     await expect(previewButton(page)).toHaveAccessibleName("Close preview");
-    // Focus stays on the one button as it changes name.
+    // Focus stays on the one button as it changes name, and the editor never gets a side pane.
     await expect(previewButton(page)).toBeFocused();
+    await expect(pane(page)).toHaveCount(0);
 
     await previewButton(page).click();
-    await expect(pane(page)).toBeHidden();
+    await expect.poll(() => popup.isClosed()).toBe(true);
     await expect(previewButton(page)).toHaveAccessibleName("Preview");
     await expect(previewButton(page)).toBeFocused();
+    await expect(pane(page)).toHaveCount(0);
   });
 
-  test("follows Payload's own preview state when it changes elsewhere", async ({ page }) => {
+  test("closing the popup window itself returns the button to Preview and never opens a side pane", async ({ page }) => {
     await openStory(page);
-    await previewButton(page).click();
-    await expect(pane(page)).toBeVisible();
-    // Payload remembers that the preview was open: a fresh load opens it again, and the button agrees.
+    const [popup] = await Promise.all([page.waitForEvent("popup"), previewButton(page).click()]);
+    await popup.close();
+    await expect(previewButton(page)).toHaveAccessibleName("Preview", { timeout: 5_000 });
+    await expect(pane(page)).toHaveCount(0);
+  });
+
+  test("a remembered open preview does not reopen as a side pane after a reload", async ({ page }) => {
+    await openStory(page);
+    await Promise.all([page.waitForEvent("popup"), previewButton(page).click()]);
     await page.reload();
     await expect(body(page)).toBeVisible({ timeout: 60_000 });
-    await expect(pane(page)).toBeVisible();
-    await expect(previewButton(page)).toHaveAccessibleName("Close preview");
-    await previewButton(page).click();
-    await expect(pane(page)).toBeHidden();
+    await expect(previewButton(page)).toHaveAccessibleName("Preview");
+    await expect(pane(page)).toHaveCount(0);
   });
 
 });
@@ -125,7 +130,7 @@ test.describe("Preview on a phone", () => {
     const target = (await previewButton(page).boundingBox())!;
     expect(target.height).toBeGreaterThanOrEqual(44);
     expect(target.width).toBeGreaterThanOrEqual(44);
-    await previewButton(page).click();
+    await Promise.all([page.waitForEvent("popup"), previewButton(page).click()]);
     await expect(previewButton(page)).toHaveAttribute("aria-label", "Close preview");
     await expect(previewButton(page)).toBeVisible();
     await previewButton(page).click();
