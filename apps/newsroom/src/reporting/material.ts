@@ -124,22 +124,24 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
     ? (await payload.find({ collection: "reporting-transcripts", where: { file: { in: fileIds } }, pagination: false, select: { file: true, state: true, origin: true, language: true, durationMs: true }, ...as(ctx) })).docs
     : [];
   const selections = transcripts.length
-    ? (await payload.find({ collection: "transcript-selections", where: { and: [{ transcript: { in: transcripts.map((row) => row.id) } }, { kind: { equals: "quote" } }] }, pagination: false, select: { transcript: true, state: true, usedIn: true }, ...as(ctx) })).docs
+    ? (await payload.find({ collection: "transcript-selections", where: { transcript: { in: transcripts.map((row) => row.id) } }, pagination: false, select: { transcript: true, kind: true, state: true, usedIn: true }, ...as(ctx) })).docs
     : [];
-  const quoteCounts = new Map<number, { total: number; verified: number; used: number }>();
+  const selectionCounts = new Map<number, { quotes: number; verified: number; used: number }>();
   for (const row of selections) {
     const id = num(row.transcript);
-    const entry = quoteCounts.get(id) ?? { total: 0, verified: 0, used: 0 };
-    entry.total += 1;
-    if (row.state === "verified") entry.verified += 1;
+    const entry = selectionCounts.get(id) ?? { quotes: 0, verified: 0, used: 0 };
+    if (row.kind === "quote") {
+      entry.quotes += 1;
+      if (row.state === "verified") entry.verified += 1;
+    }
     if (Array.isArray(row.usedIn) && row.usedIn.length > 0) entry.used += 1;
-    quoteCounts.set(id, entry);
+    selectionCounts.set(id, entry);
   }
   const transcriptFor = new Map<number, TranscriptSummary>(transcripts.map((row) => [num(row.file), {
     id: row.id, state: row.state, origin: row.origin, language: row.language ?? null, durationMs: row.durationMs ?? null,
-    quoteCount: quoteCounts.get(row.id)?.total ?? 0,
-    verifiedCount: quoteCounts.get(row.id)?.verified ?? 0,
-    usedQuoteCount: quoteCounts.get(row.id)?.used ?? 0
+    quoteCount: selectionCounts.get(row.id)?.quotes ?? 0,
+    verifiedCount: selectionCounts.get(row.id)?.verified ?? 0,
+    usedSelectionCount: selectionCounts.get(row.id)?.used ?? 0
   }]));
 
   // Media linked through production assignments, plus Media captured for the Story; one asset appears once.
