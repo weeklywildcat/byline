@@ -190,7 +190,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   });
   const detailError = detailQuery.error;
   const accessLost = detailError instanceof ApiError && detailError.status >= 400 && detailError.status < 500;
-  if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
+  if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={accessLost ? onBack : () => void detailQuery.refetch()} actionLabel={accessLost ? "Back to Reporting" : "Try again"}>{(detailQuery.error as Error).message}</InlineAlert></div>;
   if (!detail) return <TranscriptSkeleton hideBack={hideBack} onBack={onBack} />;
 
   const contextPanel = <TranscriptContext context={context} detail={detail} profiles={profiles} canEdit={canEdit} seek={seek} playSample={playSample} refresh={refresh} />;
