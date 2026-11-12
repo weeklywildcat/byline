@@ -202,5 +202,5 @@ export function StoryList(props: StoryListProps) {
         </Item>))}
         {hasMore ? <div ref={sentinel} aria-hidden="true" className="h-12" /> : null}
       </ItemGroup>}
-  </div></div>;
+  </Card></div></div>;
 }
