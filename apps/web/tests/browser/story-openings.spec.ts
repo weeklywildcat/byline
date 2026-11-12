@@ -223,7 +223,7 @@ test.describe('Site navigation', () => {
 });
 
 /**
- * The menu and search icons are bare (no disc or pill). A dark icon with a white halo reads on any photograph:
+ * The menu and search icons are bare (no disc or pill). A dark icon with a white outline reads on any photograph:
  * the icon contrasts with its halo (WCAG 1.4.11 asks for 3:1), and the halo is what meets the picture.
  */
 test.describe('control legibility over photographs', () => {
@@ -251,7 +251,7 @@ test.describe('control legibility over photographs', () => {
 
   const backdrops: Record<string, number[]> = { 'white sky': [255, 255, 255], 'dark photograph': [10, 12, 16], 'gray midtone': [128, 128, 128], 'mixed foliage': [90, 100, 60] };
   for (const [name, backdrop] of Object.entries(backdrops)) {
-    test(`${name}: a dark icon inside a white halo`, async ({ page }) => {
+    test(`${name}: a dark icon with a crisp white outline`, async ({ page }) => {
       await open(page, stories.immersive);
       const { icon, filter } = await page.locator('[data-story-nav-open]').evaluate((el) => ({ icon: getComputedStyle(el).color, filter: getComputedStyle(el.querySelector('svg')!).filter }));
       // The halo is white; the icon against it is far above 3:1, and a white halo meets a dark photograph with its own edge.

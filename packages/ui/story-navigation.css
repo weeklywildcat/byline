@@ -53,8 +53,8 @@
   justify-content: center;
 }
 
-/* Hit target 44px; the icon itself is bare: no disc, no pill. Legibility comes from a hairline white edge
-   on the dark icon (no blur, no glow), without drawing a surface. */
+/* Hit target 44px; the icon itself is bare: no disc, no pill. Legibility comes from a crisp white outline
+   around the dark icon (no blur, no glow), so it holds on bright sky and on a dark photograph alike. */
 .story-nav__control {
   align-items: center;
   appearance: none;
@@ -75,7 +75,7 @@
 }
 
 .story-nav__control svg {
-  filter: drop-shadow(0 0 0.5px #fff) drop-shadow(0 0 0.5px #fff);
+  filter: drop-shadow(1.25px 0 0 #fff) drop-shadow(-1.25px 0 0 #fff) drop-shadow(0 1.25px 0 #fff) drop-shadow(0 -1.25px 0 #fff);
   transition: filter 0.2s ease;
 }
 
@@ -121,13 +121,12 @@
 }
 
 /* The masthead artwork is one dark asset, shown in its own colours. Over a photograph it gets the same
-   dual-tone halo as the icon controls (a soft white edge), so it reads on bright sky, dark frames and
-   midtones alike. A blend mode is not used: it turned the mark white on a bright photograph. An <img>
+   crisp white outline as the icon controls, so it reads on bright sky, dark frames and midtones alike. A blend mode is not used: it turned the mark white on a bright photograph. An <img>
    plus a filter, not a CSS mask: a mask image must be CORS-readable, and Live Preview shows this
    artwork from the public site's origin. */
 .story-nav__logo-mark {
   display: block;
-  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255, 255, 255, 0.85));
+  filter: drop-shadow(1.25px 0 0 #fff) drop-shadow(-1.25px 0 0 #fff) drop-shadow(0 1.25px 0 #fff) drop-shadow(0 -1.25px 0 #fff);
   height: clamp(15px, 4.4vw, 24px);
   transition: filter 0.2s ease;
   width: auto;
