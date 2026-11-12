@@ -55,14 +55,16 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
   }, [location.section]);
 
   return (
-    <div ref={frame} className="@container/plan mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 md:px-8" data-plan-workspace="">
-      <nav aria-label="Plan sections" className="-mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm" data-plan-jump="">
-        <span className="mr-1 text-xs text-muted-foreground max-sm:sr-only">Jump to</span>
-        {PLAN_SECTIONS.map((section) => (
-          <Button key={section} type="button" variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground" onClick={() => jump(section)}>
-            {SECTION_TITLES[section]}{section === "todo" ? <WorkspaceCount /> : null}
-          </Button>
-        ))}
+    <div ref={frame} className="@container/plan mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:gap-6 md:px-8" data-plan-workspace="">
+      <nav aria-label="Plan sections" className="-mx-4 -mt-2 overflow-x-auto overscroll-x-contain px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0" data-plan-jump="">
+        <div className="flex w-max min-w-full items-center gap-1 text-sm">
+          <span className="mr-1 shrink-0 text-xs text-muted-foreground max-sm:sr-only">Jump to</span>
+          {PLAN_SECTIONS.map((section) => (
+            <Button key={section} type="button" variant="ghost" size="sm" className="h-9 shrink-0 px-2.5 text-muted-foreground" onClick={() => jump(section)}>
+              {SECTION_TITLES[section]}{section === "todo" ? <WorkspaceCount /> : null}
+            </Button>
+          ))}
+        </div>
       </nav>
 
       <PlanSectionFrame section="brief">
@@ -111,7 +113,7 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
 function PlanSectionFrame({ section, description, actions, children }: { section: PlanSection; description?: string; actions?: ReactNode; children: ReactNode }) {
   const id = planSectionId(section);
   return (
-    <Card id={id} role="region" aria-labelledby={`${id}-title`} className="scroll-mt-24 gap-5 overflow-visible [--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]" data-plan-section={section}>
+    <Card id={id} role="region" aria-labelledby={`${id}-title`} className="scroll-mt-24 gap-4 overflow-visible [--card-spacing:--spacing(3)] sm:gap-5 sm:[--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]" data-plan-section={section}>
       <CardHeader>
         <CardTitle>
           <h2 id={`${id}-title`} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none" data-plan-heading="">{SECTION_TITLES[section]}</h2>

@@ -273,14 +273,14 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
   );
 
   return (
-    <main className={cn("mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-4 py-6 lg:px-6")} data-byline-media-screen="" data-media-view={route.view}>
+    <main className={cn("mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-4 py-4 sm:py-6 lg:px-6")} data-byline-media-screen="" data-media-view={route.view}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         {!paneShowing ? (
-          <Button variant="outline" size="sm" className="mt-0.5" onClick={() => workspace.setSheetOpen(true)} aria-label="Media navigation" data-media-browse="">
+          <Button variant="outline" size="sm" className="order-2 mt-0.5 sm:order-none" onClick={() => workspace.setSheetOpen(true)} aria-label="Media navigation" data-media-browse="">
             <PanelLeft data-icon="inline-start" aria-hidden="true" />Browse
           </Button>
         ) : null}
-        <div className="min-w-0 flex-1">
+        <div className="order-first min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto">
           {route.view === "library" && path.length ? (
             <Breadcrumb className="mb-1">
               <BreadcrumbList>
@@ -315,7 +315,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-        {route.view === "work" ? <Button variant="outline" onClick={upload}><Upload data-icon="inline-start" aria-hidden="true" />Upload</Button> : null}
+        {route.view === "work" ? <Button variant="outline" className="order-2 sm:order-none" onClick={upload}><Upload data-icon="inline-start" aria-hidden="true" />Upload</Button> : null}
       </div>
 
       {route.view === "work" ? (
