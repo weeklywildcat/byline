@@ -241,16 +241,21 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
   const { payload } = ctx.req;
   let fileId = Number(relationId(input.fileId)) || 0;
   let file: Record<string, unknown> | null = null;
+  let replayedStandalone = false;
   if (fileId) {
     const found = await payload.find({ collection: "reporting-files", where: { id: { equals: fileId } }, limit: 1, ...as(ctx) });
     file = (found.docs[0] ?? null) as unknown as Record<string, unknown> | null;
     if (!file || num(file.story) !== storyId) throw new APIError("That recording is not on this story.", 404);
+    if (file.kind !== "audio") throw new APIError("A transcript can only be attached to an interview recording.", 400);
   } else {
     // A transcript without its recording: the imported file is the reporting document it belongs to.
     const context = await resolveCaptureContext(ctx.req, { storyId, sourceId: input.sourceId, appointmentId: input.appointmentId });
     const existing = await existingCapture(ctx.req, "reporting-files", input.clientKey, "createdBy");
-    if (existing) file = existing;
-    else {
+    if (existing) {
+      if (num(existing.story) !== storyId) throw new APIError("That capture key is already in use.", 409);
+      file = existing;
+      replayedStandalone = true;
+    } else {
       file = (await payload.create({
         collection: "reporting-files",
         data: { story: storyId, source: context.source?.id ?? null, appointment: context.appointment?.id ?? null, confidential: input.confidential === true, groundRules: context.groundRules, ...(typeof input.clientKey === "string" ? { clientKey: input.clientKey } : {}) } as never,
@@ -261,6 +266,11 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
     fileId = Number(file.id);
   }
   const existingTranscript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, limit: 1, ...as(ctx) })).docs[0];
+  // A lost-response retry of a standalone upload returns the canonical result,
+  // rather than treating its own earlier success as a replacement conflict.
+  if (replayedStandalone && existingTranscript?.state === "ready") {
+    return { transcriptId: existingTranscript.id, fileId, segments: normalizeSegments(existingTranscript.segments).length };
+  }
   if (existingTranscript && existingTranscript.state === "ready" && input.replace !== true) throw new APIError("This recording already has a transcript. Choose Replace to import over it.", 409);
   const system = { ...as(ctx), context: { ...ctx.req.context, bylineSystem: true } };
   const completedAt = new Date().toISOString();
