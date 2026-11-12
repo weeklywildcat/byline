@@ -526,6 +526,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
 
 function SelectionCard({ context, selection, detail, seek, refresh }: { context: StoryScreenContext; selection: SelectionView; detail: TranscriptDetail; seek: (ms: number | null) => void; refresh: () => Promise<unknown> }) {
   const [overriding, setOverriding] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [reason, setReason] = useState("");
   const run = useMutation({
     mutationFn: async (action: "verify" | "unverify" | "remove" | "promote" | "override") => {
@@ -537,7 +538,7 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
     },
     onSuccess: async (_result, action) => {
       if (action === "override") { setOverriding(false); setReason(""); toast.success("Public use approved. It is recorded in the story's activity."); }
-      if (action === "remove") toast.success("Removed.");
+      if (action === "remove") { setRemoveOpen(false); toast.success("Removed."); }
       await refresh();
     },
     onError: (error: Error) => toast.error(error.message)
@@ -557,10 +558,25 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.canEdit && !context.readOnly ? (
         <div className="flex flex-wrap gap-1.5">
           {selection.kind === "highlight" ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button> : selection.state === "saved" ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button> : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
-          {selection.usedIn.length ? null : <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => run.mutate("remove")}>Remove</Button>}
+          {selection.usedIn.length ? null : <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => setRemoveOpen(true)}>Remove</Button>}
           {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <Button type="button" size="xs" variant="outline" onClick={() => setOverriding(true)}>Editor override…</Button> : null}
         </div>
       ) : null}
+      <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+            <AlertDialogTitle>Remove this saved ${selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the saved ${selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>${run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {overriding ? (
         <InlineForm label="Editor override" className="grid gap-1.5" onSubmit={() => { if (!run.isPending && reason.trim().length >= 8) run.mutate("override"); }} onCancel={() => setOverriding(false)}>
           <p className="text-xs text-destructive">This was said off the record. Approving public use is recorded with your name and reason.</p>
