@@ -1,7 +1,8 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Mic, Square, Upload } from "lucide-react";
+import { AlertCircle, Mic, Square, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
 import { RECORDING_ACCEPT, recordingMimeType, recordingUploadProblem } from "../../domain/reporting";
@@ -126,7 +127,7 @@ export function RecordingUploadButton({ onPicked, busy, className }: { onPicked:
     <>
       <Button type="button" variant="outline" className={className} disabled={busy || reading} onClick={() => input.current?.click()}><Upload data-icon="inline-start" />Upload a recording</Button>
       <input ref={input} type="file" accept={RECORDING_ACCEPT} hidden aria-label="Upload a recording" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void choose(file); }} />
-      {problem ? <p role="alert" className="basis-full text-sm text-destructive">{problem}</p> : null}
+      {problem ? <Alert variant="destructive" className="basis-full"><AlertCircle /><AlertTitle>Can’t use this recording</AlertTitle><AlertDescription>{problem}</AlertDescription></Alert> : null}
     </>
   );
 }
@@ -142,8 +143,12 @@ export function RecorderPanel({ label, onRecorded, onUploaded, busy, large }: { 
   const upload = onUploaded ? <RecordingUploadButton onPicked={onUploaded} busy={busy} className={size} /> : null;
   if (state === "unsupported") {
     return (
-      <div className="flex flex-wrap items-center gap-3" data-recorder={state}>
-        <p className="text-sm text-muted-foreground">{upload ? "This browser can't record audio." : "This browser can't record audio. Upload a recording instead."}</p>
+      <div className="grid gap-2" data-recorder={state}>
+        <Alert>
+          <AlertCircle />
+          <AlertTitle>Recording isn’t available in this browser</AlertTitle>
+          <AlertDescription>{upload ? "You can still upload audio you recorded elsewhere." : "Use a browser that supports microphone recording, or upload audio elsewhere."}</AlertDescription>
+        </Alert>
         {upload}
       </div>
     );
@@ -161,7 +166,7 @@ export function RecorderPanel({ label, onRecorded, onUploaded, busy, large }: { 
           {upload}
         </>
       )}
-      {state === "denied" ? <p role="alert" className="basis-full text-sm text-destructive">Microphone access was blocked. Allow it in the browser's site settings, then try again{upload ? ", or upload a recording" : ""}.</p> : null}
+      {state === "denied" ? <Alert variant="destructive" className="basis-full"><AlertCircle /><AlertTitle>Microphone access is blocked</AlertTitle><AlertDescription>Allow microphone access in the browser’s site settings, then try again{upload ? ", or upload a recording instead" : ""}.</AlertDescription></Alert> : null}
     </div>
   );
 }
