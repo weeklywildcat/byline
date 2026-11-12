@@ -134,6 +134,27 @@ describe("confidential material", () => {
   });
 });
 
+describe("Story resources in the Reporting feed", () => {
+  it("carries the stable Story-plan resource id so Reporting can edit the canonical link", async () => {
+    const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: ids.story } }, limit: 1, depth: 0 })).docs[0]!;
+    const updated = await payload.update({
+      collection: "story-plans",
+      id: plan.id,
+      data: { resources: [{ label: "Source notes", url: "https://example.com/source-notes", purpose: "research" }] } as never,
+      overrideAccess: true,
+      depth: 0
+    });
+    const stored = (updated.resources as Array<{ id?: string; label: string }>)[0]!;
+    expect(stored.id).toBeTruthy();
+
+    const reporting = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
+    const resource = reporting.body.materials.find((item: { kind: string; label?: string }) => item.kind === "resource" && item.label === "Source notes");
+    expect(resource).toMatchObject({ resourceId: stored.id, label: "Source notes", url: "https://example.com/source-notes", canEdit: true });
+
+    await payload.update({ collection: "story-plans", id: plan.id, data: { resources: [] } as never, overrideAccess: true, depth: 0 });
+  });
+});
+
 describe("recordings, ground rules and transcripts", () => {
   it("records from an appointment: the file inherits Story, source, appointment, uploader and a ground-rules snapshot", async () => {
     const result = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: { appointmentId: ids.interview, clientKey: "rec-key-00001" }, file: wav("coach-smith.wav") });
