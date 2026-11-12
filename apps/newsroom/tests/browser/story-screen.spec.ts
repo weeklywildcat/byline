@@ -171,6 +171,31 @@ test("a transcript opens from Plan as a focused view, with Back to Plan and brow
   await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
 });
 
+test("Reporting links can be edited and removed from the material feed", async ({ page }) => {
+  await open(page, draftId, "?view=plan&section=reporting");
+  const reporting = page.locator("#plan-reporting");
+
+  await reporting.getByRole("button", { name: "Capture" }).click();
+  await page.getByRole("menuitem", { name: "Link" }).click();
+  await reporting.getByRole("textbox", { name: "Link address" }).fill("https://example.com/reporting-notes");
+  await reporting.getByRole("button", { name: "Add link" }).click();
+
+  const row = reporting.locator('[data-material="resource"]').filter({ hasText: "example.com" }).first();
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Actions for example.com" }).click();
+  await page.getByRole("menuitem", { name: "Edit link" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Edit link" });
+  await dialog.getByLabel("Label").fill("Source notes");
+  await dialog.getByRole("button", { name: "Save link" }).click();
+
+  const renamed = reporting.locator('[data-material="resource"]').filter({ hasText: "Source notes" }).first();
+  await expect(renamed).toBeVisible();
+  await renamed.getByRole("button", { name: "Actions for Source notes" }).click();
+  await page.getByRole("menuitem", { name: "Remove link" }).click();
+  await expect(renamed).toBeHidden();
+});
+
 test("an interview recording accepts a transcript upload and attaches it to that recording", async ({ page, request, baseURL }) => {
   const wav = Buffer.alloc(44 + 8000 * 2 * 5);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
