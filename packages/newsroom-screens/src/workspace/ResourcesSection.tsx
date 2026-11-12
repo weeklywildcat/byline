@@ -24,7 +24,7 @@ const purposeOptions = RESOURCE_PURPOSES.map((value) => ({ value, label: RESOURC
 
 type LinkDraft = { label: string; url: string; purpose: ResourcePurpose };
 
-function LinkDialog({ open, resource, onClose, finalFocus }: { open: boolean; resource: StoryResource | null; onClose: () => void; finalFocus: () => HTMLElement | null }) {
+export function ResourceDialog({ open, resource, onClose, finalFocus }: { open: boolean; resource: StoryResource | null; onClose: () => void; finalFocus: () => HTMLElement | null }) {
   const { storyId, client, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const [draft, setDraft] = useState<LinkDraft>(() => resource ? { label: resource.label, url: resource.url, purpose: normalizePurpose(resource.purpose) } : { label: "", url: "", purpose: "other" });
@@ -118,7 +118,7 @@ export function ResourcesSection({ plain = false, title = "Files & Links", headi
 
   const add = canManage ? <AddButton data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</AddButton> : null;
   const rows = <ItemGroup role="group" aria-label="Links" className="gap-0">{data.resources.map((resource) => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onEdit={(element) => dialog.openWith(resource, element)} onRemove={() => remove.mutate(resource)} />)}</ItemGroup>;
-  const editor = <LinkDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />;
+  const editor = <ResourceDialog key={`link-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />;
   if (plain) {
     const Heading = headingLevel === 3 ? "h3" : "h2";
     return <section aria-labelledby="ws-files-title" id="ws-files" className="flex flex-col gap-1.5">
