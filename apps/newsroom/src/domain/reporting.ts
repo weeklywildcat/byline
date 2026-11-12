@@ -237,6 +237,8 @@ export type TranscriptSummary = {
   origin: "machine" | "manual";
   language: string | null;
   durationMs: number | null;
+  /** All saved quotes and highlights from this transcript. */
+  selectionCount: number;
   quoteCount: number;
   verifiedCount: number;
   /** Saved selections from this transcript that are currently referenced by an article. */
