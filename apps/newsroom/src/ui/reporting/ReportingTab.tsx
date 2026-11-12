@@ -201,7 +201,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear reporting search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
             </InputGroup>
             {canCapture ? <CaptureMenu capture={capture()} /> : null}
-            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" aria-label="Sources and appointments" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & schedule</Button> : null}
+            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" aria-label="Sources & appointments" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & schedule</Button> : null}
           </div>
 
           {bound?.label && panel ? <div className="flex items-center gap-2" data-capture-context=""><span className="text-xs text-muted-foreground">Filing with</span><Badge variant="secondary" className="gap-1 pr-1"><span className="max-w-64 truncate">{bound.label}</span><button type="button" className="touch-hit rounded-sm p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Clear " + bound.label} onClick={() => setBound(null)}><X className="size-3" /></button></Badge></div> : null}
