@@ -4,6 +4,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent, CardFooter } from "@byline/newsroom-ui/ui/card";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { RadioTower, Smartphone } from "lucide-react";
@@ -163,10 +164,10 @@ export function LiveCoverageSection() {
 
       {desk.status === "live" && desk.canCompose && !readOnly ? (
         // Not a <form>: this renders inside Payload's document form, and forms cannot nest.
-        <div role="group" aria-label="Post a live update" className="grid gap-3 rounded-lg border p-4" data-live-composer="">
-          <LiveFields value={draft} onChange={setDraft} name="live-new" canPin={desk.canPublishNow} />
-          <LiveDeliveryButtons canPublishNow={desk.canPublishNow} disabled={working || !draft.text.trim()} onDeliver={(delivery) => void deliver(delivery)} helperId="live-composer-helper" />
-        </div>
+        <Card role="group" aria-label="Post a live update" size="sm" data-live-composer="">
+          <CardContent><LiveFields value={draft} onChange={setDraft} name="live-new" canPin={desk.canPublishNow} /></CardContent>
+          <CardFooter className="border-t-0 bg-transparent pt-0"><LiveDeliveryButtons canPublishNow={desk.canPublishNow} disabled={working || !draft.text.trim()} onDeliver={(delivery) => void deliver(delivery)} helperId="live-composer-helper" /></CardFooter>
+        </Card>
       ) : null}
 
       {started || desk.updates.length ? <LiveTimeline updates={desk.updates} timeZone={timeZone} storyPublished={desk.storyPublished} controls={controls} /> : null}
