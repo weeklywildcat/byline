@@ -139,6 +139,15 @@ describe("transcript editing and search", () => {
     expect(searchTranscript(segments, "speaker 2")).toEqual([{ segmentId: "ax", start: -1, end: -1 }]);
     expect(activeSegmentAt(segments, 1500)).toBe("ax");
   });
+  it("follows timestamped plain-text playback even when the final passage has no end time", () => {
+    const parsed = parseTranscriptFile("[00:01] First answer.\n\n[00:03] Second answer.", "txt");
+    expect(parsed.segments.map(({ startMs, endMs }) => ({ startMs, endMs }))).toEqual([
+      { startMs: 1000, endMs: 3000 },
+      { startMs: 3000, endMs: null }
+    ]);
+    expect(activeSegmentAt(parsed.segments, 2000)).toBe("s0");
+    expect(activeSegmentAt(parsed.segments, 4500)).toBe("s1");
+  });
   it("snapshots a selection's words, timing and single speaker", () => {
     expect(selectionFromSegments(segments, ["a"], "tackled better")).toEqual({ text: "tackled better", startMs: 0, endMs: 1000, speaker: "Speaker 1", segmentIds: ["a"] });
     expect(selectionFromSegments(segments, ["a", "ax"])?.speaker).toBeNull();
