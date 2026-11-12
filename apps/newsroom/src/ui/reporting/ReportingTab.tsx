@@ -16,6 +16,7 @@ import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
@@ -200,20 +201,25 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear reporting search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
             </InputGroup>
             {canCapture ? <CaptureMenu capture={capture()} /> : null}
-            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
+            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" aria-label="Sources & appointments" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & schedule</Button> : null}
           </div>
 
           {bound?.label && panel ? <div className="flex items-center gap-2" data-capture-context=""><span className="text-xs text-muted-foreground">Filing with</span><Badge variant="secondary" className="gap-1 pr-1"><span className="max-w-64 truncate">{bound.label}</span><button type="button" className="touch-hit rounded-sm p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Clear " + bound.label} onClick={() => setBound(null)}><X className="size-3" /></button></Badge></div> : null}
           {panel === "note" ? <NoteComposer context={context} bound={bound} onDone={() => { setPanel(null); setBound(null); void refresh(); }} onCancel={() => { setPanel(null); setBound(null); }} /> : null}
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
-            <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
-              <p className="text-sm font-medium">Interview</p>
-              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
-              <div className="flex flex-wrap items-center gap-3">
+            <Card size="sm" data-record-panel="">
+              <CardHeader>
+                <CardTitle>Interview</CardTitle>
+                <CardDescription>Record here or upload audio you already have. Byline keeps the recording private and does not transcribe it.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">MP3, M4A, WAV, AAC, Ogg or WebM. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
+              </CardContent>
+              <CardFooter className="flex-wrap gap-3">
                 <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} onCancel={() => { setPanel(null); setBound(null); }} />
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           ) : null}
 
           {data.upNext.length ? (
@@ -509,7 +515,7 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
-      <AlertDialogContent size="sm" finalFocus={finalFocus}>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia><RefreshCw /></AlertDialogMedia>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
@@ -590,7 +596,7 @@ function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRem
   const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent size="sm">
+      <AlertDialogContent size="sm" finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogMedia><Trash2 /></AlertDialogMedia>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -759,7 +765,7 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
     <Button type="submit" size="sm" disabled={save.isPending}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save ground rules</Button>
   </form>;
-  const trigger = <button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11" />;
+  const trigger = <Button type="button" size="xs" variant={source.groundRules === "off-record" ? "destructive" : "outline"} aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} />;
   const changeOpen = (next: boolean) => {
     setOpen(next);
     if (next) {
@@ -769,13 +775,13 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     }
   };
   return touch ? <Drawer open={open} onOpenChange={changeOpen}>
-    <DrawerTrigger render={trigger}>{badge}</DrawerTrigger>
+    <DrawerTrigger render={trigger}><Pencil data-icon="inline-start" />{groundRuleLabel(source.groundRules)}</DrawerTrigger>
     <DrawerContent keyboardAware>
       <DrawerHeader><DrawerTitle>Edit ground rules</DrawerTitle><DrawerDescription>{source.label}</DrawerDescription></DrawerHeader>
       <div className="px-4 pb-2">{form}</div>
     </DrawerContent>
   </Drawer> : <Popover open={open} onOpenChange={changeOpen}>
-    <PopoverTrigger render={trigger}>{badge}</PopoverTrigger>
+    <PopoverTrigger render={trigger}><Pencil data-icon="inline-start" />{groundRuleLabel(source.groundRules)}</PopoverTrigger>
     <PopoverContent align="start" className="w-72">{form}</PopoverContent>
   </Popover>;
 }
