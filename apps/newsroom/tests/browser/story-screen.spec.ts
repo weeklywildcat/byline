@@ -219,6 +219,25 @@ test("an interview recording accepts a transcript upload and attaches it to that
   await expect(finalPassage).toBeVisible();
   const player = transcriptView.locator("audio");
   await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.readyState)).toBeGreaterThanOrEqual(1);
+
+  const transcriptSearch = transcriptView.getByRole("searchbox", { name: "Search this transcript" });
+  await transcriptSearch.fill("district");
+  await transcriptSearch.press("Enter");
+  await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(3);
+  expect(await player.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true);
+
+  const firstPassageText = transcriptView.locator('[data-segment="s0"] [data-segment-text]');
+  await firstPassageText.evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await expect(transcriptView.getByRole("toolbar", { name: "Selected words" })).toBeVisible();
+  await page.evaluate(() => window.getSelection()?.removeAllRanges());
+  await expect(transcriptView.getByRole("toolbar", { name: "Selected words" })).toBeHidden();
+
   await player.evaluate((audio: HTMLAudioElement) => {
     audio.currentTime = 3.5;
     audio.dispatchEvent(new Event("timeupdate", { bubbles: true }));
