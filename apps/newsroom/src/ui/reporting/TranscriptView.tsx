@@ -187,7 +187,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   );
   const stream = (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TranscriptState detail={detail} />
+      <TranscriptState detail={detail} onBack={onBack} />
       {segmentCount > 0 ? (
         <div
           ref={streamRef}
@@ -256,7 +256,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
             {detail.editedAt ? <span>Edited</span> : null}
           </p>
         </div>
-        {!wide ? <Button type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Source & quotes{detail.selections.length ? ` (${detail.selections.length})` : ""}</Button> : null}
+        {!wide ? <Button type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Source & quotes{detail.selections.length ? <Badge variant="secondary" className="ml-1">{detail.selections.length}</Badge> : null}</Button> : null}
       </div>
       <GroundRulesBanner detail={detail} />
       {wide ? (
@@ -284,6 +284,17 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           <div className="px-4 pb-6">{contextPanel}</div>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function TranscriptSkeleton({ hideBack, onBack }: { hideBack: boolean; onBack: () => void }) {
+  return (
+    <div className="grid gap-3" role="status" aria-label="Loading transcript">
+      {hideBack ? null : <BackButton onBack={onBack} />}
+      <div className="flex items-center gap-3"><div className="grid flex-1 gap-2"><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-72 max-w-full" /></div><Skeleton className="h-8 w-32" /></div>
+      <div className="rounded-lg border p-4"><Skeleton className="h-10 w-full" /><Skeleton className="mt-3 h-8 w-full" /><div className="mt-4 grid gap-4">{[0, 1, 2, 3].map((item) => <div key={item} className="grid grid-cols-[3rem_1fr] gap-3"><Skeleton className="h-4 w-10" /><div className="grid gap-2"><Skeleton className="h-4 w-28" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div></div>)}</div></div>
+      <span className="sr-only">Loading transcript…</span>
     </div>
   );
 }
@@ -318,11 +329,12 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
             if (event.key === "Escape") onQuery("");
           }}
         />
-        {query.trim().length >= 2 ? (
+        {query ? (
           <InputGroupAddon align="inline-end">
-            <span role="status" className="text-xs tabular-nums text-muted-foreground">{count ? `${index + 1} of ${count}` : "No results"}</span>
-            <InputGroupButton type="button" size="icon-xs" aria-label="Previous result" disabled={!count} onClick={() => onStep(-1)}><ChevronUp /></InputGroupButton>
-            <InputGroupButton type="button" size="icon-xs" aria-label="Next result" disabled={!count} onClick={() => onStep(1)}><ChevronDown /></InputGroupButton>
+            {query.trim().length >= 2 ? <span role="status" className="text-xs tabular-nums text-muted-foreground">{count ? `${index + 1} of ${count}` : "No results"}</span> : null}
+            {query.trim().length >= 2 ? <InputGroupButton type="button" size="icon-xs" aria-label="Previous result" disabled={!count} onClick={() => onStep(-1)}><ChevronUp /></InputGroupButton> : null}
+            {query.trim().length >= 2 ? <InputGroupButton type="button" size="icon-xs" aria-label="Next result" disabled={!count} onClick={() => onStep(1)}><ChevronDown /></InputGroupButton> : null}
+            <InputGroupButton type="button" size="icon-xs" aria-label="Clear transcript search" onClick={() => onQuery("")}><X /></InputGroupButton>
           </InputGroupAddon>
         ) : null}
       </InputGroup>
@@ -330,13 +342,16 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
   );
 }
 
-function TranscriptState({ detail }: { detail: TranscriptDetail }) {
+function TranscriptState({ detail, onBack }: { detail: TranscriptDetail; onBack: () => void }) {
   if (detail.state === "ready") return null;
   return (
     <div className="py-3">
-      <InlineAlert title="This legacy transcript is incomplete">
-        Automatic transcription has been retired. Go back to Reporting and upload a .txt, .srt or .vtt transcript for this recording to replace it.
-      </InlineAlert>
+      <Alert>
+        <AlertCircle />
+        <AlertTitle>This legacy transcript is incomplete</AlertTitle>
+        <AlertDescription>Automatic transcription has been retired. Upload a .txt, .srt or .vtt replacement from the recording in Reporting.</AlertDescription>
+        <AlertAction><Button type="button" size="xs" variant="outline" onClick={onBack}>Go to recording</Button></AlertAction>
+      </Alert>
     </div>
   );
 }
