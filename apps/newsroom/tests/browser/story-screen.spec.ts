@@ -240,7 +240,8 @@ test("an interview recording accepts a transcript upload and attaches it to that
   await expect(replace).toContainText("The saved quote or highlight stays exactly as saved, including any verification.");
   await replace.getByRole("button", { name: "Cancel" }).click();
 
-  await refreshed.getByRole("button", { name: "Remove" }).click();
+  await refreshed.getByRole("button", { name: `More actions for interview-${stamp}.wav` }).click();
+  await page.getByRole("menuitem", { name: "Remove…" }).click();
   const remove = page.getByRole("alertdialog");
   await expect(remove).toContainText("Saved quotes or highlights from that transcript will also be deleted.");
   await remove.getByRole("button", { name: "Cancel" }).click();
