@@ -305,7 +305,7 @@ function BackButton({ onBack }: { onBack: () => void }) {
 
 /** Audio stays pinned above the transcript while reviewing. */
 function Player({ detail, audioRef, onTime }: { detail: TranscriptDetail; audioRef: React.RefObject<HTMLAudioElement | null>; onTime: (ms: number) => void }) {
-  if (!detail.file.url) return <p className="py-2 text-sm text-muted-foreground">No recording is attached to this transcript, so there is nothing to play. Timestamps still show where each passage was said.</p>;
+  if (!detail.file.url) return <div className="py-2"><Alert><AlertCircle /><AlertTitle>No recording attached</AlertTitle><AlertDescription>Playback is unavailable, but timestamped passages still keep their original positions.</AlertDescription></Alert></div>;
   return (
     <div className="sticky top-0 z-10 -mx-1 bg-background px-1 py-2">
       <audio ref={audioRef} controls preload="metadata" src={detail.file.url} aria-label={`Recording: ${detail.file.filename}`} className="h-10 w-full" onTimeUpdate={(event) => onTime(event.currentTarget.currentTime * 1000)} />
