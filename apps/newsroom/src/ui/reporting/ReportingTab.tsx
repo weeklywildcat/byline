@@ -4,7 +4,7 @@ import { PHOTO_FILE_ACCEPT } from "@byline/core";
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
 import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
@@ -459,7 +459,7 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   const [open, setOpen] = useState(false);
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <Button type="button" size="xs" variant="outline" onClick={() => setOpen(true)}>Replace transcript</Button>
+      <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
@@ -485,7 +485,7 @@ function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: Reporting
   const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <Button type="button" size="xs" variant="ghost" disabled={removing} onClick={() => setOpen(true)}>Remove</Button>
+      <AlertDialogTrigger disabled={removing} render={<Button type="button" size="xs" variant="ghost" disabled={removing} />}>Remove</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
