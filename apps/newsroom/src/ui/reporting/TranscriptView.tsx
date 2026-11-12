@@ -112,8 +112,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const profiles = useMemo(() => speakerProfiles(segments), [segments]);
   // Once any passage has a voice, a passage without one is shown as unknown, never as someone.
   const diarized = profiles.length > 0;
-  const lastEnd = segments.at(-1)?.endMs;
-  const active = lastEnd != null && position <= lastEnd ? activeSegmentAt(segments, position) : null;
+  const active = ready ? activeSegmentAt(segments, position) : null;
 
   const matches = useMemo(() => searchTranscript(segments, query), [segments, query]);
   const current = matches.length ? matches[Math.min(matchIndex, matches.length - 1)] : null;
