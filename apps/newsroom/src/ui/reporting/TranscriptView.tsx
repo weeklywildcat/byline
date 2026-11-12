@@ -119,13 +119,17 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const matches = useMemo(() => searchTranscript(segments, query), [segments, query]);
   const current = matches.length ? matches[Math.min(matchIndex, matches.length - 1)] : null;
 
-  const seek = useCallback((ms: number | null) => {
+  const positionAt = useCallback((ms: number | null) => {
     const audio = audioRef.current;
     if (!audio || ms === null) return;
     stopAt.current = null;
     audio.currentTime = ms / 1000;
-    void audio.play().catch(() => undefined);
+    setPosition(ms);
   }, []);
+  const seek = useCallback((ms: number | null) => {
+    positionAt(ms);
+    if (ms !== null) void audioRef.current?.play().catch(() => undefined);
+  }, [positionAt]);
   const playSample = useCallback((startMs: number, endMs: number | null) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -141,7 +145,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
     }
   }, []);
 
-  // A new search starts at its first result; stepping scrolls and seeks to it.
+  // A new search starts at its first result; stepping scrolls and positions playback without starting audio.
   const changeQuery = (value: string) => {
     setQuery(value);
     setMatchIndex(0);
@@ -160,8 +164,18 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
       });
     }
-    if (segment) seek(segment.startMs);
+    if (segment) positionAt(segment.startMs);
   };
+
+  useEffect(() => {
+    if (!ready) {
+      setDraft(null);
+      return undefined;
+    }
+    const syncSelection = () => setDraft(readSelection(streamRef.current));
+    document.addEventListener("selectionchange", syncSelection);
+    return () => document.removeEventListener("selectionchange", syncSelection);
+  }, [ready]);
 
   const save = useMutation({
     mutationFn: (kind: "highlight" | "quote") => saveSelection(context.api, transcriptId, { segmentIds: draft?.ids, text: draft?.text, kind }),
@@ -195,8 +209,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           role="region"
           aria-label="Transcript passages"
           tabIndex={0}
-          onMouseUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
-          onKeyUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
         >
           {turns.map((turn) => (
             <div key={turn.id} data-turn={turn.identity ?? ""} className="border-t pt-1 first:border-t-0 first:pt-0">
@@ -557,7 +569,13 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.usedIn.length ? <p className="text-xs text-muted-foreground">Used in {selection.usedIn.map((story) => story.headline).join(", ")}</p> : null}
       {selection.canEdit && !context.readOnly ? (
         <div className="flex flex-wrap gap-1.5">
-          {selection.kind === "highlight" ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button> : selection.state === "saved" ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button> : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
+          {selection.kind === "highlight"
+            ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button>
+            : selection.state === "saved"
+              ? detail.file.url
+                ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button>
+                : <Badge variant="outline">No recording to verify</Badge>
+              : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
           {selection.usedIn.length ? null : (
             <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
               <AlertDialogTrigger render={<Button type="button" size="xs" variant="ghost" disabled={run.isPending} />}>Remove</AlertDialogTrigger>
