@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, Star, X } from "lucide-react";
+import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, SlidersHorizontal, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { DateRangeButton } from "@byline/newsroom-ui/components/date-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
@@ -14,6 +14,8 @@ import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, Att
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
@@ -135,6 +137,7 @@ function MediaRowContext({ row, editable, saving, workspaceUrl, onOpenStory, upd
 function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, scope = "all", currentUserId = null, navigate, today }: MediaWorkProps & { data: MediaDeskResponse }) {
   const client = useQueryClient();
   const [filters, setFilters] = useState<MediaDeskFilters>(EMPTY_MEDIA_DESK_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const timezone = data.timezone || "UTC";
   const assignees = data.assignees || [];
@@ -147,6 +150,8 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
   const visible = useMemo(() => sortMediaRows(filterMediaRows(rows, filters, data.timezone), data.timezone), [data.timezone, filters, rows]);
   const set = <K extends keyof MediaDeskFilters>(key: K, value: MediaDeskFilters[K]) => setFilters((current) => ({ ...current, [key]: value }));
   const active = JSON.stringify(filters) !== JSON.stringify(EMPTY_MEDIA_DESK_FILTERS);
+  const filterCount = [filters.type, filters.status, filters.assigneeId, filters.dueFrom || filters.dueTo].filter(Boolean).length;
+  const compactFilters = width > 0 && width < 700;
   const canUpdate = (row: MediaDeskRow) => row.source === "assignment" ? Boolean(fetchers.updateMediaAssignment) : Boolean(fetchers.updateMediaRequest);
 
   // Assignment rows write to their own assignment. The story-level featured image, and the
@@ -218,22 +223,62 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
   const story = (row: MediaDeskRow) => <StoryHoverCard storyId={row.story.id} title={row.story.title}><StoryTitleButton story={row.story} onOpen={onOpenStory} className="font-normal" /></StoryHoverCard>;
   const table = width === 0 || width >= 860;
 
-  return <div className="flex flex-col gap-3">
-    <div className="flex flex-wrap items-center gap-2" role="search" aria-label={"Filter assignments"}>
-      <InputGroup className="min-w-60 flex-1 sm:max-w-sm">
+  const filterControls = <>
+    <Field>
+      <FieldLabel>Type</FieldLabel>
+      <Select items={typeItems} value={filters.type || ANY} onValueChange={(value) => set("type", !value || value === ANY ? "" : value as MediaDeskFilters["type"])}><SelectTrigger aria-label={"Type"} className="w-full"><SelectValue /></SelectTrigger><SelectContent>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+    </Field>
+    <Field>
+      <FieldLabel>Status</FieldLabel>
+      <Select items={statusItems} value={filters.status || ANY} onValueChange={(value) => set("status", !value || value === ANY ? "" : value as MediaDeskFilters["status"])}><SelectTrigger aria-label={"Status"} className="w-full"><SelectValue /></SelectTrigger><SelectContent>{statusItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+    </Field>
+    <Field>
+      <FieldLabel>Assignee</FieldLabel>
+      <Select items={assigneeFilterItems} value={filters.assigneeId || ANY} onValueChange={(value) => set("assigneeId", !value || value === ANY ? "" : String(value))}><SelectTrigger aria-label={"Assignee"} className="w-full"><SelectValue /></SelectTrigger><SelectContent>{assigneeFilterItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+    </Field>
+    <Field>
+      <FieldLabel>Due</FieldLabel>
+      <DateRangeButton aria-label="Due date" className="w-full justify-start font-normal" placeholder="Any due date" today={day} presets={["today", "next7", "month"]} from={filters.dueFrom} to={filters.dueTo} onChange={(dueFrom, dueTo) => setFilters({ ...filters, dueFrom, dueTo })} />
+    </Field>
+  </>;
+
+  return <div ref={ref} className="flex flex-col gap-3">
+    <div className="flex items-center gap-2" role="search" aria-label={"Filter assignments"}>
+      <InputGroup className="min-w-0 flex-1 sm:max-w-sm">
         <InputGroupInput type="search" aria-label={"Find a story or assignment"} placeholder={"Find a story or assignment…"} value={filters.story} onChange={(event) => set("story", event.target.value)} />
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
       </InputGroup>
-      <Select items={typeItems} value={filters.type || ANY} onValueChange={(value) => set("type", !value || value === ANY ? "" : value as MediaDeskFilters["type"])}><SelectTrigger aria-label={"Type"} className="w-32"><SelectValue /></SelectTrigger><SelectContent>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-      <Select items={statusItems} value={filters.status || ANY} onValueChange={(value) => set("status", !value || value === ANY ? "" : value as MediaDeskFilters["status"])}><SelectTrigger aria-label={"Status"} className="w-36"><SelectValue /></SelectTrigger><SelectContent>{statusItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-      <Select items={assigneeFilterItems} value={filters.assigneeId || ANY} onValueChange={(value) => set("assigneeId", !value || value === ANY ? "" : String(value))}><SelectTrigger aria-label={"Assignee"} className="w-40"><SelectValue /></SelectTrigger><SelectContent>{assigneeFilterItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-      <DateRangeButton aria-label="Due date" className="w-auto justify-start font-normal" placeholder="Due date" today={day} presets={["today", "next7", "month"]} from={filters.dueFrom} to={filters.dueTo} onChange={(dueFrom, dueTo) => setFilters({ ...filters, dueFrom, dueTo })} />
-      {active ? <Button variant="ghost" onClick={() => setFilters(EMPTY_MEDIA_DESK_FILTERS)}>{"Clear"}</Button> : null}
+      {compactFilters ? (
+        <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DrawerTrigger render={<Button type="button" variant="outline" className="shrink-0" />}>
+            <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />Filters{filterCount ? <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 tabular-nums">{filterCount}</Badge> : null}
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Filter assignments</DrawerTitle>
+              <DrawerDescription>Narrow the Media desk without crowding the screen.</DrawerDescription>
+            </DrawerHeader>
+            <div className="grid gap-4 px-4">{filterControls}</div>
+            <DrawerFooter className="flex-row">
+              {filterCount ? <Button type="button" variant="ghost" className="flex-1" onClick={() => setFilters((current) => ({ ...current, type: "", status: "", assigneeId: "", dueFrom: "", dueTo: "" }))}>Clear filters</Button> : null}
+              <DrawerClose render={<Button type="button" className="flex-1" />}>Done</DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Select items={typeItems} value={filters.type || ANY} onValueChange={(value) => set("type", !value || value === ANY ? "" : value as MediaDeskFilters["type"])}><SelectTrigger aria-label={"Type"} className="w-32"><SelectValue /></SelectTrigger><SelectContent>{typeItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <Select items={statusItems} value={filters.status || ANY} onValueChange={(value) => set("status", !value || value === ANY ? "" : value as MediaDeskFilters["status"])}><SelectTrigger aria-label={"Status"} className="w-36"><SelectValue /></SelectTrigger><SelectContent>{statusItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <Select items={assigneeFilterItems} value={filters.assigneeId || ANY} onValueChange={(value) => set("assigneeId", !value || value === ANY ? "" : String(value))}><SelectTrigger aria-label={"Assignee"} className="w-40"><SelectValue /></SelectTrigger><SelectContent>{assigneeFilterItems.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <DateRangeButton aria-label="Due date" className="w-auto justify-start font-normal" placeholder="Due date" today={day} presets={["today", "next7", "month"]} from={filters.dueFrom} to={filters.dueTo} onChange={(dueFrom, dueTo) => setFilters({ ...filters, dueFrom, dueTo })} />
+          {active ? <Button variant="ghost" onClick={() => setFilters(EMPTY_MEDIA_DESK_FILTERS)}>{"Clear"}</Button> : null}
+        </div>
+      )}
     </div>
 
     {!visible.length
       ? <NothingHere title={rows.length ? "No assignments match" : scope === "all" ? "No production assignments yet" : `Nothing in ${scopeLabel}`} description={rows.length ? "Try clearing a filter." : scope === "all" ? "Photo, video, graphic and audio work appears here once it is assigned from a story." : "Assignments appear here as soon as they match this view."} />
-      : <div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
+      : <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
         {table
           ? <Table aria-label={"Production assignments"}>
             <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent"><TableHead>{"Assignment"}</TableHead><TableHead>{"Story"}</TableHead><TableHead>{"Assignee"}</TableHead><TableHead>{"Due"}</TableHead><TableHead>{"Status"}</TableHead><TableHead>{"Files"}</TableHead><TableHead className="w-10"><span className="sr-only">{"Actions"}</span></TableHead></TableRow></TableHeader>
