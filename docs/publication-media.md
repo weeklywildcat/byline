@@ -395,8 +395,8 @@ After deploying Phase 5, run `payload migrate`, start the worker, then
 ## Body media discovery (Phase 9 blocks)
 
 `storyMediaRequirements` uses `collectMediaIds`, which reads one exhaustive
-`blockMediaIds` in `@byline/article-body`: Photo, Photo Gallery, Portrait + Text,
-Visual Chapter, Audio, Document, Chart / Map (fallback or static image),
+`blockMediaIds` in `@byline/article-body`: Photo, Photo Gallery, Feature Media,
+Chapter (not a text chapter), Audio, Document, Chart / Map (fallback or static image),
 Annotated Image and Before / After (both photographs). Video is external
 YouTube and never enters preparation. A related Story's thumbnail is Media in the
 body's table once references resolve. Snapshot v2 stores the full manifest in its Media dataset.

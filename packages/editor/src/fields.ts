@@ -26,7 +26,23 @@ import {
   type ParagraphNode,
   type MediaId,
   type Placement,
-  type PortraitSide
+  type PortraitSide,
+  CHAPTER_HEIGHTS,
+  CHAPTER_KINDS,
+  FEATURE_MEDIA_PRESENTATIONS,
+  PHONE_PRESENTATIONS,
+  PULL_QUOTE_PRESENTATIONS,
+  OVERLAY_TONES,
+  SCRIM_STRENGTHS,
+  presetValue,
+  type ChapterHeight,
+  type ChapterKind,
+  type FeatureMediaPhoneOrder,
+  type FeatureMediaPresentation,
+  type OverlayTone,
+  type PhonePresentation,
+  type PullQuotePresentation,
+  type ScrimStrength
 } from "@byline/article-body";
 import { parseYouTubeVideoId } from "@byline/core";
 
@@ -40,17 +56,20 @@ import { parseYouTubeVideoId } from "@byline/core";
  * and never carried forward.
  */
 export type BylineBlockFields = {
-  photo: { media: MediaId | null; caption: string; altOverride: string; placement: Placement };
+  /** `phone`: absent is Auto (presentation.ts). Presentation choices are read as stored and only defaulted where they are used, so an old block stays exactly as it was. */
+  photo: { media: MediaId | null; caption: string; altOverride: string; placement: Placement; phone: PhonePresentation };
   gallery: { items: Array<{ id: string; media: MediaId | null; caption: string; altOverride: string }>; fit: GalleryFit; layout: GalleryLayoutKind };
   reportedQuote: { text: string; attribution: string; sourceUrl: string; sourceLabel: string };
-  pullQuote: { text: string; attribution: string };
+  pullQuote: { text: string; attribution: string; presentation: PullQuotePresentation };
   keyFacts: { heading: string; facts: Array<{ id: string; text: string }>; presentation: KeyFactsPresentation };
   /** Bounded paragraphs. Stored as JSON; a Context saved before formatting holds plain text, read as paragraphs. */
   context: { heading: string; body: ParagraphNode[] };
   document: { media: MediaId | null; title: string; context: string; source: string; pages: Array<{ id: string; page: number | null; label: string; excerpt: string }> };
   timeline: { items: TimelineFields[] };
-  portraitText: { media: MediaId | null; altOverride: string; heading: string; body: string; caption: string; side: PortraitSide };
-  visualChapter: { media: MediaId | null; altOverride: string; eyebrow: string; heading: string; dek: string; placement: ChapterPlacement; align: ChapterAlign };
+  portraitText: { media: MediaId | null; altOverride: string; heading: string; body: string; caption: string; side: PortraitSide; presentation: FeatureMediaPresentation; phoneOrder: FeatureMediaPhoneOrder; phone: PhonePresentation; tone: OverlayTone; scrim: ScrimStrength };
+  /** `height` is null for a chapter saved before heights existed: it keeps its original proportion until a writer picks one. */
+  /** `tone` is the words' colour as stored; null follows the kind (chapterTone). */
+  visualChapter: { media: MediaId | null; altOverride: string; eyebrow: string; heading: string; dek: string; placement: ChapterPlacement; align: ChapterAlign; kind: ChapterKind; height: ChapterHeight | null; tone: OverlayTone | null; scrim: ScrimStrength };
   video: { url: string; title: string; caption: string; captionsConfirmed: boolean; chapters: ChapterFields[]; transcript: string };
   audio: { media: MediaId | null; title: string; caption: string; transcript: string; chapters: ChapterFields[] };
   editorsNote: { body: string };
@@ -143,7 +162,7 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
   photo: (raw) => {
     const fields = record(raw);
     const placement = PLACEMENTS.includes(fields.placement as Placement) ? (fields.placement as Placement) : "column";
-    return { media: mediaIdOf(fields.media), caption: text(fields.caption), altOverride: text(fields.altOverride), placement };
+    return { media: mediaIdOf(fields.media), caption: text(fields.caption), altOverride: text(fields.altOverride), placement, phone: presetValue(PHONE_PRESENTATIONS, fields.phone) ?? "auto" };
   },
   gallery: (raw) => {
     const fields = record(raw);
@@ -151,7 +170,7 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
     return { items: rows(fields.items).map((row, index) => ({ id: rowId(row, index), media: mediaIdOf(row.media), caption: text(row.caption), altOverride: text(row.altOverride) })), fit: fields.fit === "crop" ? "crop" : "natural", layout };
   },
   reportedQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution), sourceUrl: text(record(raw).sourceUrl), sourceLabel: text(record(raw).sourceLabel) }),
-  pullQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution) }),
+  pullQuote: (raw) => ({ text: text(record(raw).text), attribution: text(record(raw).attribution), presentation: presetValue(PULL_QUOTE_PRESENTATIONS, record(raw).presentation) ?? "standard" }),
   keyFacts: (raw) => {
     const fields = record(raw);
     const facts = rows(fields.facts).map((row, index) => ({ id: rowId(row, index), text: text(row.text) }));
@@ -186,7 +205,19 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
   },
   portraitText: (raw) => {
     const fields = record(raw);
-    return { media: mediaIdOf(fields.media), altOverride: text(fields.altOverride), heading: text(fields.heading), body: text(fields.body), caption: text(fields.caption), side: fields.side === "right" ? "right" : "left" };
+    return {
+      media: mediaIdOf(fields.media),
+      altOverride: text(fields.altOverride),
+      heading: text(fields.heading),
+      body: text(fields.body),
+      caption: text(fields.caption),
+      side: fields.side === "right" ? "right" : "left",
+      presentation: presetValue(FEATURE_MEDIA_PRESENTATIONS, fields.presentation) ?? "split",
+      phoneOrder: fields.phoneOrder === "text" ? "text" : "media",
+      phone: presetValue(PHONE_PRESENTATIONS, fields.phone) ?? "auto",
+      tone: fields.tone === "dark" ? "dark" : "light",
+      scrim: presetValue(SCRIM_STRENGTHS, fields.scrim) ?? "standard"
+    };
   },
   visualChapter: (raw) => {
     const fields = record(raw);
@@ -197,7 +228,11 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
       heading: text(fields.heading),
       dek: text(fields.dek),
       placement: CHAPTER_PLACEMENTS.includes(fields.placement as ChapterPlacement) ? (fields.placement as ChapterPlacement) : "full",
-      align: CHAPTER_ALIGNS.includes(fields.align as ChapterAlign) ? (fields.align as ChapterAlign) : "bottom-left"
+      align: CHAPTER_ALIGNS.includes(fields.align as ChapterAlign) ? (fields.align as ChapterAlign) : "bottom-left",
+      kind: presetValue(CHAPTER_KINDS, fields.kind) ?? "media",
+      height: presetValue(CHAPTER_HEIGHTS, fields.height) ?? null,
+      tone: presetValue(OVERLAY_TONES, fields.tone) ?? null,
+      scrim: presetValue(SCRIM_STRENGTHS, fields.scrim) ?? "standard"
     };
   },
   video: (raw) => {
@@ -317,10 +352,10 @@ const optionalText = <K extends string>(key: K, value: string) => (value.trim() 
 
 /** Stored fields → the semantic block (unfinalized: readiness decides what publishes). */
 export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: BylineBlockFields[K]) => ArticleBlockOf<K> } = {
-  photo: (id, fields) => ({ type: "photo", id, media: fields.media, caption: fields.caption, ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}), placement: fields.placement }),
+  photo: (id, fields) => ({ type: "photo", id, media: fields.media, caption: fields.caption, ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}), placement: fields.placement, ...(fields.phone !== "auto" ? { phone: fields.phone } : {}) }),
   gallery: (id, fields) => ({ type: "gallery", id, fit: fields.fit, layout: fields.layout, items: fields.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, ...(item.altOverride.trim() ? { altOverride: item.altOverride } : {}) })) }),
   reportedQuote: (id, fields) => ({ type: "reportedQuote", id, text: fields.text, attribution: fields.attribution, ...optionalText("sourceUrl", fields.sourceUrl), ...optionalText("sourceLabel", fields.sourceLabel) }),
-  pullQuote: (id, fields) => ({ type: "pullQuote", id, text: fields.text, ...(fields.attribution.trim() ? { attribution: fields.attribution } : {}) }),
+  pullQuote: (id, fields) => ({ type: "pullQuote", id, text: fields.text, ...(fields.attribution.trim() ? { attribution: fields.attribution } : {}), ...(fields.presentation !== "standard" ? { presentation: fields.presentation } : {}) }),
   keyFacts: (id, fields) => ({ type: "keyFacts", id, heading: fields.heading, facts: fields.facts.map((fact) => ({ id: fact.id, text: fact.text })), presentation: fields.presentation }),
   context: (id, fields) => ({ type: "context", id, heading: fields.heading, body: fields.body }),
   document: (id, fields) => ({
@@ -354,18 +389,28 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     ...(fields.heading.trim() ? { heading: fields.heading } : {}),
     body: paragraphsFromText(fields.body, LIMITS.portraitBody),
     ...(fields.caption.trim() ? { caption: fields.caption } : {}),
-    side: fields.side
+    side: fields.side,
+    // Only what applies to the chosen presentation (finalizeBlock drops defaults the same way).
+    ...(fields.presentation !== "split" ? { presentation: fields.presentation } : {}),
+    ...(fields.presentation === "split" && fields.phoneOrder === "text" ? { phoneOrder: "text" as const } : {}),
+    ...(fields.phone !== "auto" ? { phone: fields.phone } : {}),
+    ...(fields.presentation === "spotlight" ? { ...(fields.tone === "dark" ? { tone: "dark" as const } : {}), ...(fields.scrim !== "standard" ? { scrim: fields.scrim } : {}) } : {})
   }),
   visualChapter: (id, fields) => ({
     type: "visualChapter",
     id,
-    media: fields.media,
-    ...(fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
+    // A text chapter keeps any photograph it once had in its stored fields (switching back restores it) but never names it.
+    media: fields.kind === "text" ? null : fields.media,
+    ...(fields.kind !== "text" && fields.altOverride.trim() ? { altOverride: fields.altOverride } : {}),
     ...(fields.eyebrow.trim() ? { eyebrow: fields.eyebrow } : {}),
     heading: fields.heading,
     ...(fields.dek.trim() ? { dek: fields.dek } : {}),
     placement: fields.placement,
-    align: fields.align
+    align: fields.align,
+    ...(fields.kind !== "media" ? { kind: fields.kind } : {}),
+    ...(fields.kind !== "text" && fields.height ? { height: fields.height } : {}),
+    ...(fields.tone && fields.tone !== (fields.kind === "media" ? "light" : "dark") ? { tone: fields.tone } : {}),
+    ...(fields.kind === "media" && fields.scrim !== "standard" ? { scrim: fields.scrim } : {})
   }),
   video: (id, fields) => ({ type: "video", id, videoId: parseYouTubeVideoId(fields.url), title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), captionsConfirmed: fields.captionsConfirmed, ...chaptersToArticle(fields.chapters), ...optionalText("transcript", fields.transcript) }),
   audio: (id, fields) => ({ type: "audio", id, media: fields.media, title: fields.title, ...(fields.caption.trim() ? { caption: fields.caption } : {}), transcript: fields.transcript, ...chaptersToArticle(fields.chapters) }),
@@ -448,6 +493,25 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
     ...optionalText("note", fields.note)
   })
 };
+
+/**
+ * What a newly inserted block starts with, where that differs from what an
+ * absent field means for a stored one (Payload's `defaultValue` would apply to
+ * old blocks too). A new Chapter is Half screen; one saved before heights
+ * existed keeps its original proportion.
+ */
+export const NEW_BLOCK_FIELDS: Partial<Record<ArticleBlockType, Readonly<Record<string, unknown>>>> = {
+  visualChapter: { kind: "media", height: "half" }
+};
+
+/** Fills a new block's starting presets into the fields it is being inserted with, never overriding one already given. */
+export function withNewBlockFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const type = fields.blockType;
+  const defaults = typeof type === "string" ? NEW_BLOCK_FIELDS[type as ArticleBlockType] : undefined;
+  if (!defaults) return fields;
+  for (const [key, value] of Object.entries(defaults)) if (fields[key] === undefined) fields[key] = value;
+  return fields;
+}
 
 /** A stored block node's fields as the semantic block. */
 export function articleBlockFromFields<K extends ArticleBlockType>(type: K, id: string, raw: unknown): ArticleBlockOf<K> {

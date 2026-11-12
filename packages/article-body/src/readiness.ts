@@ -5,6 +5,7 @@ import { calendarDate, finalScoreProblem, scoreValue } from "./final-score";
 import { chartDataProblem } from "./native-chart";
 import { parseSocialPostUrl } from "./social";
 import { isDocumentAsset, isImageAsset, mediaKey } from "./media";
+import { chapterHeight, chapterKind, chapterTone, featureMediaPresentation, PHONE_PRESENTATIONS, presetValue, pullQuotePresentation, SCRIM_STRENGTHS } from "./presentation";
 import type { ReferenceLookup } from "./references";
 import { cleanLine, cleanText, hasInlineText } from "./text";
 import { isStubEvent } from "./timeline";
@@ -53,6 +54,8 @@ export type MediaLookup = (id: MediaId) => ArticleMediaAsset | null | undefined;
 type Finalized = { block: ArticleBlock | null; issues: BlockIssue[] };
 
 const optional = (value: string): string | undefined => (value ? value : undefined);
+/** A presentation choice, kept only when it differs from the default: a legacy body finalizes to exactly what it was. */
+const nonDefault = <K extends string, V extends string>(key: K, value: V | undefined, fallback: V): Partial<Record<K, V>> => (value !== undefined && value !== fallback ? ({ [key]: value } as Record<K, V>) : {});
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const clampPercent = (value: unknown): number => {
   const number = typeof value === "number" && Number.isFinite(value) ? value : 50;
@@ -114,7 +117,7 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
     case "photo": {
       const problem = image(block.media, ["photo-missing", "Choose a photograph."], ["photo-unavailable", "This photograph is no longer in Media. Choose another."]);
       if (problem) return problem;
-      return { block: { type: "photo", id: block.id, media: block.media, caption: cleanText(block.caption, LIMITS.caption), altOverride: optional(cleanLine(block.altOverride, LIMITS.altText)), placement: block.placement ?? "column" }, issues };
+      return { block: { type: "photo", id: block.id, media: block.media, caption: cleanText(block.caption, LIMITS.caption), altOverride: optional(cleanLine(block.altOverride, LIMITS.altText)), placement: block.placement ?? "column", ...nonDefault("phone", presetValue(PHONE_PRESENTATIONS, block.phone), "auto") }, issues };
     }
     case "gallery": {
       const items: GalleryItem[] = [];
@@ -137,7 +140,8 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       const problem = image(block.media, ["portrait-missing", "Choose the portrait photograph."], ["portrait-unavailable", "This photograph is no longer in Media. Choose another."]);
       if (problem) return problem;
       const body = paragraphs(block.body);
-      if (!body.length) return omit("portrait-empty", "Write the passage that goes with the portrait.");
+      if (!body.length) return omit("portrait-empty", "Write the passage that goes with the photograph.");
+      const presentation = featureMediaPresentation(block);
       return {
         block: {
           type: "portraitText",
@@ -147,27 +151,41 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
           heading: optional(cleanLine(block.heading, LIMITS.portraitHeading)),
           body,
           caption: optional(cleanText(block.caption, LIMITS.caption)),
-          side: block.side === "right" ? "right" : "left"
+          side: block.side === "right" ? "right" : "left",
+          // Only the choices that apply to this presentation, and only when they differ from its default.
+          ...nonDefault("presentation", presentation, "split"),
+          ...(presentation === "split" && block.phoneOrder === "text" ? { phoneOrder: "text" as const } : {}),
+          ...nonDefault("phone", presetValue(PHONE_PRESENTATIONS, block.phone), "auto"),
+          ...(presentation === "spotlight" ? { ...(block.tone === "dark" ? { tone: "dark" as const } : {}), ...nonDefault("scrim", presetValue(SCRIM_STRENGTHS, block.scrim), "standard") } : {})
         },
         issues
       };
     }
     case "visualChapter": {
-      const problem = image(block.media, ["chapter-missing", "Choose the photograph for this chapter."], ["chapter-unavailable", "This photograph is no longer in Media. Choose another."]);
-      if (problem) return problem;
+      const kind = chapterKind(block);
+      // A text chapter is a typographic break: it needs no photograph, and any it once had is not published.
+      if (kind !== "text") {
+        const problem = image(block.media, ["chapter-missing", "Choose the photograph for this chapter, or make it a text chapter."], ["chapter-unavailable", "This photograph is no longer in Media. Choose another."]);
+        if (problem) return problem;
+      }
       const heading = cleanLine(block.heading, LIMITS.chapterHeading);
       if (!heading) return omit("chapter-heading", "Write the chapter's heading.");
+      const height = chapterHeight(block);
       return {
         block: {
           type: "visualChapter",
           id: block.id,
-          media: block.media,
-          altOverride: optional(cleanLine(block.altOverride, LIMITS.altText)),
+          media: kind === "text" ? null : block.media,
+          altOverride: kind === "text" ? undefined : optional(cleanLine(block.altOverride, LIMITS.altText)),
           eyebrow: optional(cleanLine(block.eyebrow, LIMITS.chapterEyebrow)),
           heading,
           dek: optional(cleanText(block.dek, LIMITS.chapterDek)),
           placement: block.placement === "wide" ? "wide" : "full",
-          align: block.align === "center" ? "center" : "bottom-left"
+          align: block.align === "center" ? "center" : "bottom-left",
+          ...nonDefault("kind", kind, "media"),
+          ...(height ? { height } : {}),
+          ...nonDefault("tone", chapterTone(block), kind === "media" ? "light" : "dark"),
+          ...(kind === "media" ? nonDefault("scrim", presetValue(SCRIM_STRENGTHS, block.scrim), "standard") : {})
         },
         issues
       };
@@ -208,7 +226,7 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
     case "pullQuote": {
       const text = cleanText(block.text, LIMITS.quote);
       if (!text) return omit("quote-empty", "Type the line to pull out.");
-      return { block: { type: "pullQuote", id: block.id, text, attribution: optional(cleanLine(block.attribution, LIMITS.attribution)) }, issues };
+      return { block: { type: "pullQuote", id: block.id, text, attribution: optional(cleanLine(block.attribution, LIMITS.attribution)), ...nonDefault("presentation", pullQuotePresentation(block), "standard") }, issues };
     }
     case "keyFacts": {
       const facts = block.facts.map((fact) => ({ id: fact.id, text: cleanText(fact.text, LIMITS.fact) })).filter((fact) => fact.text);

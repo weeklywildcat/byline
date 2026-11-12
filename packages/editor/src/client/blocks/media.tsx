@@ -1,6 +1,6 @@
 "use client";
 
-import { altFor, ARTICLE_BLOCK_LIMITS as LIMITS, type ArticleMediaAsset, type MediaId, type Placement } from "@byline/article-body";
+import { altFor, ARTICLE_BLOCK_LIMITS as LIMITS, GALLERY_LAYOUTS, PHONE_PRESENTATION_OPTIONS, PLACEMENT_OPTIONS, photoPhone, type ArticleMediaAsset, type GalleryLayoutKind, type MediaId, type Placement, type PresetOption } from "@byline/article-body";
 import { isHeifFile, isRawPhotoFile, PHOTO_FILE_ACCEPT, PRORAW_UNSUPPORTED_MESSAGE } from "@byline/core";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
@@ -20,6 +20,7 @@ import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
 import { useAnnounce, useBylineEditorHost, useEditMediaDetails, useMediaAsset, usePickMedia, useUploadMedia } from "../host";
 import { BlockIcon } from "../icons";
+import { CropsRoute, PHONE_PREVIEWS, PresentationNote, PresentationSurface, PresetField, WIDTH_PREVIEWS } from "./presentation";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
 const ACCEPT = { image: PHOTO_FILE_ACCEPT, document: "application/pdf", audio: "audio/*" } as const;
@@ -128,6 +129,22 @@ export function AltTextSetting({ asset, value, onChange, readOnly }: { asset: Ar
 
 const PLACEMENT_LABELS: Record<Placement, string> = { column: "Column", wide: "Wide", full: "Full" };
 
+const GALLERY_LAYOUT_OPTIONS: ReadonlyArray<PresetOption<GalleryLayoutKind>> = GALLERY_LAYOUTS.map((value) => ({
+  value,
+  label: value === "grid" ? "Grid" : value === "essay" ? "Photo Essay" : "Featured",
+  description: value === "grid" ? "Photographs side by side, a grid on wide screens." : value === "essay" ? "One large whole photograph after another, each with its caption." : "The first photograph leads; the rest follow in a grid."
+}));
+const GALLERY_FIT_OPTIONS: ReadonlyArray<PresetOption<"natural" | "crop">> = [
+  { value: "natural", label: "Whole", description: "Every photograph keeps its own shape." },
+  { value: "crop", label: "Even grid", description: "Photographs are cropped to the same shape, at their focal points." }
+];
+/** What the reader gets on a phone, in words: the CSS owns it (story-presentation.css). */
+const GALLERY_PHONE_NOTES: Record<GalleryLayoutKind, string> = {
+  grid: "On a phone: whole photographs one per row; an even grid keeps two per row.",
+  essay: "On a phone: each photograph reaches both edges of the screen; captions stay inset.",
+  featured: "On a phone: the first photograph reaches both edges of the screen; the rest follow inside the margins."
+};
+
 export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
   const [fields, set] = useTypedFields("photo", node);
   const issues = useReadiness("photo", id, node.fields);
@@ -185,6 +202,12 @@ export function PhotoEditor({ node, id, nodeKey }: BlockEditorProps) {
           }}>
             {(Object.keys(PLACEMENT_LABELS) as Placement[]).map((placement) => <ToggleGroupItem key={placement} value={placement}>{PLACEMENT_LABELS[placement]}</ToggleGroupItem>)}
           </ToggleGroup>
+          <PresentationSurface blockLabel="Photo">
+            <PresetField name="width" label="Width" value={fields.placement} options={PLACEMENT_OPTIONS} preview={(value) => WIDTH_PREVIEWS[value]} onChange={(placement) => set({ placement })} />
+            <PresetField name="phone" label="On phones" value={fields.phone} options={PHONE_PRESENTATION_OPTIONS} preview={(value) => PHONE_PREVIEWS[value]} onChange={(phone) => set({ phone })} />
+            <PresentationNote>{photoPhone(fields) === "bleed" ? "On a phone this photo reaches both edges of the screen; its caption stays inset." : "On a phone this photo keeps the story's margins."}</PresentationNote>
+            <CropsRoute media={fields.media} hint="The focal point keeps what matters in view wherever the photo is cropped." />
+          </PresentationSurface>
           <AltTextSetting asset={asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride })} />
         </>
       ) : null}
@@ -319,7 +342,7 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
     announce(`Photograph ${index + 1} is now the featured photograph.`);
     focusIn(root(), `.byline-gallery > :nth-child(1) figcaption .byline-field`);
   };
-  const setLayout = (layout: "grid" | "essay" | "featured") => {
+  const setLayout = (layout: GalleryLayoutKind) => {
     if (layout === fields.layout) return;
     set({ layout });
     announce(layout === "essay" ? "Photo Essay: one photograph after another." : layout === "featured" ? "Featured: the first photograph leads." : "Grid.");
@@ -336,23 +359,19 @@ export function GalleryEditor({ node, id, nodeKey }: BlockEditorProps) {
             <ToolTextButton label="Add photos" icon={<ImagePlus />} disabled={full} onClick={() => void addMore()} />
           </ButtonGroup>
           <ToggleGroup aria-label="Layout" variant="outline" size="sm" spacing={0} value={[fields.layout]} onValueChange={(next) => {
-            const layout = next[0] as "grid" | "essay" | "featured" | undefined;
+            const layout = next[0] as GalleryLayoutKind | undefined;
             if (layout) setLayout(layout);
           }}>
             <ToggleGroupItem value="grid">Grid</ToggleGroupItem>
             <ToggleGroupItem value="essay">Photo Essay</ToggleGroupItem>
             <ToggleGroupItem value="featured">Featured</ToggleGroupItem>
           </ToggleGroup>
-          {/* A Photo Essay always shows whole photographs: fit only matters for a grid. */}
-          {fields.layout !== "essay" ? (
-            <ToggleGroup aria-label="Fit" variant="outline" size="sm" spacing={0} value={[fields.fit]} onValueChange={(next) => {
-              const fit = next[0] as "natural" | "crop" | undefined;
-              if (fit && fit !== fields.fit) set({ fit });
-            }}>
-              <ToggleGroupItem value="natural">Whole</ToggleGroupItem>
-              <ToggleGroupItem value="crop">Even grid</ToggleGroupItem>
-            </ToggleGroup>
-          ) : null}
+          <PresentationSurface blockLabel="Photo Gallery">
+            <PresetField name="layout" label="Layout" value={fields.layout} options={GALLERY_LAYOUT_OPTIONS} onChange={setLayout} />
+            {/* A Photo Essay always shows whole photographs: fit only matters for a grid. */}
+            {fields.layout !== "essay" ? <PresetField name="fit" label="Photographs" value={fields.fit} options={GALLERY_FIT_OPTIONS} onChange={(fit) => set({ fit })} /> : null}
+            <PresentationNote>{GALLERY_PHONE_NOTES[fields.layout]}</PresentationNote>
+          </PresentationSurface>
         </>
       ) : null}
     >

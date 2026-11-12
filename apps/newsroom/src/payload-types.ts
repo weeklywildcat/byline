@@ -3440,6 +3440,7 @@ export interface BylinePhotoBlock {
   caption?: string | null;
   altOverride?: string | null;
   placement: 'column' | 'wide' | 'full';
+  phone?: ('auto' | 'inset' | 'bleed') | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'photo';
@@ -3474,6 +3475,11 @@ export interface BylinePortraitTextBlock {
   body: string;
   caption?: string | null;
   side: 'left' | 'right';
+  presentation?: ('split' | 'breakout' | 'spotlight' | 'sticky') | null;
+  phoneOrder?: ('media' | 'text') | null;
+  phone?: ('auto' | 'inset' | 'bleed') | null;
+  tone?: ('light' | 'dark') | null;
+  scrim?: ('subtle' | 'standard' | 'strong') | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'portraitText';
@@ -3551,6 +3557,7 @@ export interface BylineReportedQuoteBlock {
 export interface BylinePullQuoteBlock {
   text: string;
   attribution?: string | null;
+  presentation?: ('standard' | 'breakout' | 'full') | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'pullQuote';
@@ -3829,13 +3836,17 @@ export interface BylineBeforeAfterBlock {
  * via the `definition` "BylineVisualChapterBlock".
  */
 export interface BylineVisualChapterBlock {
-  media: number | Media;
+  media?: (number | null) | Media;
   altOverride?: string | null;
   eyebrow?: string | null;
   heading: string;
   dek?: string | null;
   placement: 'wide' | 'full';
   align: 'bottom-left' | 'center';
+  kind?: ('media' | 'text' | 'split') | null;
+  height?: ('short' | 'half' | 'full') | null;
+  tone?: ('light' | 'dark') | null;
+  scrim?: ('subtle' | 'standard' | 'strong') | null;
   id?: string | null;
   blockName?: string | null;
   blockType: 'visualChapter';

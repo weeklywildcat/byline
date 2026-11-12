@@ -1,6 +1,24 @@
 "use client";
 
-import { altFor, ARTICLE_BLOCK_LIMITS as LIMITS, type ArticleMediaAsset } from "@byline/article-body";
+import {
+  altFor,
+  ARTICLE_BLOCK_LIMITS as LIMITS,
+  CHAPTER_HEIGHT_OPTIONS,
+  CHAPTER_KIND_OPTIONS,
+  chapterChoices,
+  chapterTone,
+  featureMediaChoices,
+  FEATURE_MEDIA_OPTIONS,
+  FEATURE_MEDIA_PHONE_OPTIONS,
+  FEATURE_MEDIA_PHONE_ORDER_OPTIONS,
+  featureMediaPhone,
+  OVERLAY_TONE_OPTIONS,
+  PLACEMENT_OPTIONS,
+  SCRIM_OPTIONS,
+  type ArticleMediaAsset,
+  type ChapterPlacement,
+  type PresetOption
+} from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Input } from "@byline/newsroom-ui/ui/input";
@@ -17,9 +35,26 @@ import { useAnnounce, useMediaAsset } from "../host";
 import { MediaPlaceholder, MediaStatus } from "./media";
 import { AltTextSetting } from "./media";
 import { ChoiceToggle, ImageActions, ImageSlot, ParagraphFields, WIDE_IMAGE_RATIO, useReplaceImage } from "./parts";
+import { CHAPTER_HEIGHT_PREVIEWS, CHAPTER_KIND_PREVIEWS, CropsRoute, FEATURE_MEDIA_PREVIEWS, PHONE_PREVIEWS, PresentationNote, PresentationSurface, PresetField, WIDTH_PREVIEWS } from "./presentation";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
 const WIDE_OR_FULL = [{ value: "wide", label: "Wide" }, { value: "full", label: "Full" }] as const;
+const CHAPTER_WIDTH_OPTIONS = PLACEMENT_OPTIONS.filter((option): option is PresetOption<ChapterPlacement> => option.value !== "column");
+const SIDE_OPTIONS: ReadonlyArray<PresetOption<"left" | "right">> = [
+  { value: "left", label: "Photo left", description: "On wide screens the photo sits on the left." },
+  { value: "right", label: "Photo right", description: "On wide screens the photo sits on the right." }
+];
+const ALIGN_OPTIONS: ReadonlyArray<PresetOption<"bottom-left" | "center">> = [
+  { value: "bottom-left", label: "Bottom left", description: "The heading sits low and to the left." },
+  { value: "center", label: "Centered", description: "The heading is centered." }
+];
+/** What Feature Media becomes on a phone, in words (story-presentation.css owns it). */
+const FEATURE_MEDIA_PHONE_NOTES = {
+  split: "On a phone: one after the other, in the order you choose.",
+  breakout: "On a phone: the photo, then the passage.",
+  spotlight: "On a phone the words never sit on the photo: the photo, its caption, then the passage.",
+  sticky: "On a phone nothing sticks: the photo, then the passage, like any other moment."
+} as const;
 
 function Warning({ children }: { children: string }) {
   return (
@@ -46,8 +81,13 @@ export function PortraitTextEditor({ node, id, nodeKey }: BlockEditorProps) {
       announce("Photograph chosen.");
     }
   };
-  const replace = useReplaceImage("Replace the portrait", (chosen) => use([chosen]));
-  const tooWide = Boolean(asset?.width && asset.height && asset.width / asset.height > WIDE_IMAGE_RATIO);
+  const replace = useReplaceImage("Replace the photograph", (chosen) => use([chosen]));
+  const ratio = asset?.width && asset.height ? asset.width / asset.height : null;
+  const presentation = fields.presentation;
+  // A side-by-side layout wants an upright photograph; Spotlight wants a wide one it can set words on.
+  const tooWide = (presentation === "split" || presentation === "sticky") && ratio !== null && ratio > WIDE_IMAGE_RATIO;
+  const tooTall = presentation === "spotlight" && ratio !== null && ratio < 1;
+  const choices = featureMediaChoices(presentation);
 
   return (
     <BlockShell
@@ -57,27 +97,44 @@ export function PortraitTextEditor({ node, id, nodeKey }: BlockEditorProps) {
       actions={fields.media !== null ? (
         <>
           <ImageActions media={fields.media} label="Replace photo" onReplace={() => void replace()} />
-          <ButtonGroup>
-            <ToolTextButton label="Flip sides" icon={<ArrowLeftRight />} onClick={() => {
-              const side = fields.side === "left" ? "right" : "left";
-              set({ side });
-              announce(`Photo on the ${side}.`);
-            }} />
-          </ButtonGroup>
+          {presentation !== "spotlight" ? (
+            <ButtonGroup>
+              <ToolTextButton label="Flip sides" icon={<ArrowLeftRight />} onClick={() => {
+                const side = fields.side === "left" ? "right" : "left";
+                set({ side });
+                announce(`Photo on the ${side}.`);
+              }} />
+            </ButtonGroup>
+          ) : null}
+          <PresentationSurface blockLabel="Feature Media">
+            <PresetField name="layout" label="Layout" value={presentation} options={FEATURE_MEDIA_OPTIONS} preview={(value) => FEATURE_MEDIA_PREVIEWS[value]} onChange={(value) => set({ presentation: value })} />
+            {choices.includes("side") ? <PresetField name="side" label="On wide screens" value={fields.side} options={SIDE_OPTIONS} onChange={(side) => set({ side })} /> : null}
+            {choices.includes("tone") ? <PresetField name="tone" label="Words on the photo" value={fields.tone} options={OVERLAY_TONE_OPTIONS} onChange={(tone) => set({ tone })} /> : null}
+            {choices.includes("scrim") ? <PresetField name="scrim" label="Behind the words" value={fields.scrim} options={SCRIM_OPTIONS} onChange={(scrim) => set({ scrim })} /> : null}
+            {choices.includes("phoneOrder") ? <PresetField name="phoneOrder" label="On phones, first" value={fields.phoneOrder} options={FEATURE_MEDIA_PHONE_ORDER_OPTIONS} onChange={(phoneOrder) => set({ phoneOrder })} /> : null}
+            <PresetField name="phone" label="Photo on phones" value={fields.phone} options={FEATURE_MEDIA_PHONE_OPTIONS} preview={(value) => PHONE_PREVIEWS[value]} onChange={(phone) => set({ phone })} />
+            <PresentationNote>{FEATURE_MEDIA_PHONE_NOTES[presentation]} {featureMediaPhone(fields) === "bleed" ? "The photo reaches both edges of the screen." : "The photo keeps the story's margins."}</PresentationNote>
+            {choices.includes("crops") ? <CropsRoute media={fields.media} hint="Wide screens use this photo's Wide crop when you draw one; otherwise its focal point decides what stays in view." /> : null}
+          </PresentationSurface>
           <AltTextSetting asset={asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride })} />
         </>
       ) : null}
     >
       <PortraitTextFigure
         side={fields.side}
-        media={<ImageSlot media={fields.media} alt={fields.altOverride} readOnly={readOnly} onChosen={use} chooseRef={chooseRef} empty={{ title: "Add the portrait", description: "Choose a photograph from Media or upload one. Its credit comes from Media." }} />}
+        presentation={presentation}
+        phoneOrder={presentation === "split" ? fields.phoneOrder : "media"}
+        tone={presentation === "spotlight" ? fields.tone : undefined}
+        scrim={presentation === "spotlight" ? fields.scrim : undefined}
+        media={<ImageSlot media={fields.media} alt={fields.altOverride} readOnly={readOnly} onChosen={use} chooseRef={chooseRef} empty={{ title: "Add the photograph", description: "Choose the photograph this passage belongs with, from Media or by uploading it. Its credit comes from Media." }} />}
         caption={<InlineText className="byline-caption" label="Caption (optional)" placeholder="Caption (optional)" value={fields.caption} maxLength={LIMITS.caption} readOnly={readOnly} multiline onChange={(caption) => set({ caption })} />}
         credit={asset?.credit}
         heading={<h3><InlineText inputRef={heading} label="Heading (optional)" placeholder="Heading (optional)" value={fields.heading} maxLength={LIMITS.portraitHeading} readOnly={readOnly} onEnter={() => body.current?.focus()} onChange={(value) => set({ heading: value })} /></h3>}
       >
-        <ParagraphFields scope=".byline-portrait-text-body" inputRef={body} label="Passage" placeholder="A short passage about the person or idea in the photograph." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value.slice(0, LIMITS.portraitBody) })} />
+        <ParagraphFields scope=".byline-portrait-text-body" inputRef={body} label="Passage" placeholder="A short passage that belongs with the photograph." value={fields.body} readOnly={readOnly} onChange={(value) => set({ body: value.slice(0, LIMITS.portraitBody) })} />
       </PortraitTextFigure>
-      {tooWide ? <Warning>This photograph is very wide. A portrait fits this layout better. It will still publish.</Warning> : null}
+      {tooWide ? <Warning>This photograph is very wide. An upright photo fits this layout better, or try Breakout. It will still publish.</Warning> : null}
+      {tooTall ? <Warning>Spotlight shows this tall photograph as a wide band on large screens. Check its Crops, or try Breakout. It will still publish.</Warning> : null}
     </BlockShell>
   );
 }
@@ -100,37 +157,67 @@ export function VisualChapterEditor({ node, id, nodeKey }: BlockEditorProps) {
     }
   };
   const replace = useReplaceImage("Replace the chapter photograph", (chosen) => use([chosen]));
+  const kind = fields.kind;
+  const tone = chapterTone({ kind, tone: fields.tone ?? undefined });
+  const needsPhoto = kind !== "text" && fields.media === null;
+  const choices = chapterChoices(kind);
+  const setKind = (next: typeof kind) => set({ kind: next, ...(next !== "text" && !fields.height ? { height: "half" as const } : {}) });
 
   return (
     <BlockShell
       type="visualChapter"
       node={node}
       issues={issues}
-      actions={fields.media !== null ? (
+      actions={
         <>
-          <ImageActions media={fields.media} onReplace={() => void replace()} />
-          <ChoiceToggle label="Placement" value={fields.placement} options={WIDE_OR_FULL} onChange={(placement) => set({ placement })} />
-          <ChoiceToggle label="Heading position" value={fields.align} options={[{ value: "bottom-left", label: "Bottom left" }, { value: "center", label: "Centered" }]} onChange={(align) => set({ align })} />
-          <AltTextSetting asset={media.asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride })} />
+          {kind !== "text" ? <ImageActions media={fields.media} onReplace={() => void replace()} /> : null}
+          <PresentationSurface blockLabel="Chapter">
+            <PresetField name="kind" label="Chapter" value={kind} options={CHAPTER_KIND_OPTIONS} preview={(value) => CHAPTER_KIND_PREVIEWS[value]} onChange={setKind} />
+            {choices.includes("height") ? <PresetField name="height" label="Height" value={fields.height ?? "half"} options={CHAPTER_HEIGHT_OPTIONS} preview={(value) => CHAPTER_HEIGHT_PREVIEWS[value]} onChange={(height) => set({ height })} /> : null}
+            <PresetField name="width" label="Width" value={fields.placement} options={CHAPTER_WIDTH_OPTIONS} preview={(value) => WIDTH_PREVIEWS[value]} onChange={(placement) => set({ placement })} />
+            <PresetField name="align" label="Heading" value={fields.align} options={ALIGN_OPTIONS} onChange={(align) => set({ align })} />
+            <PresetField name="tone" label={kind === "media" ? "Words on the photo" : "Words"} value={tone} options={kind === "media" ? OVERLAY_TONE_OPTIONS : CHAPTER_TEXT_TONE_OPTIONS} onChange={(value) => set({ tone: value })} />
+            {choices.includes("scrim") ? <PresetField name="scrim" label="Behind the words" value={fields.scrim} options={SCRIM_OPTIONS} onChange={(scrim) => set({ scrim })} /> : null}
+            {choices.includes("crops") && fields.media !== null ? <CropsRoute media={fields.media} hint="Phones use this photo's Portrait crop and wide screens its Wide crop, when you draw them; otherwise the focal point decides what stays in view." /> : null}
+            {kind === "media" && fields.height === null ? <PresentationNote>This chapter keeps the proportion it was published with until you choose a height.</PresentationNote> : null}
+          </PresentationSurface>
+          {kind !== "text" && fields.media !== null ? <AltTextSetting asset={media.asset} value={fields.altOverride} readOnly={readOnly} onChange={(altOverride) => set({ altOverride })} /> : null}
         </>
-      ) : null}
+      }
     >
-      {fields.media === null ? (
-        <MediaPlaceholder kind="image" title="Add the chapter photograph" description="A photograph that opens a new part of the story. Its heading is a section of the story." readOnly={readOnly} onChosen={use} chooseRef={chooseRef} />
+      {needsPhoto ? (
+        <div className="byline-chapter-empty" data-byline-chrome="">
+          <MediaPlaceholder kind="image" title="Add the chapter photograph" description="A photograph that opens a new part of the story. Its heading is a section of the story." readOnly={readOnly} onChosen={use} chooseRef={chooseRef} />
+          {readOnly ? null : (
+            <p className="byline-chapter-empty-alternative" contentEditable={false}>
+              No photograph?{" "}
+              <Button type="button" variant="link" size="sm" className="h-auto p-0 any-pointer-coarse:min-h-11" onClick={() => { setKind("text"); announce("Text chapter: no photograph needed."); }}>Make it a text chapter</Button>
+            </p>
+          )}
+        </div>
       ) : (
         <VisualChapterView
           align={fields.align}
+          kind={kind}
+          height={kind === "text" ? undefined : fields.height ?? undefined}
+          tone={tone}
+          scrim={kind === "media" ? fields.scrim : undefined}
           headingId={`${id}-heading`}
-          media={<ImageSlot media={fields.media} alt={fields.altOverride} readOnly={readOnly} onChosen={use} empty={{ title: "", description: "" }} />}
+          media={kind === "text" ? undefined : <ImageSlot media={fields.media} alt={fields.altOverride} readOnly={readOnly} onChosen={use} empty={{ title: "", description: "" }} />}
           eyebrow={<InlineText inputRef={eyebrow} className="byline-kicker byline-visual-chapter-eyebrow" label="Eyebrow (optional)" placeholder="Eyebrow (optional)" value={fields.eyebrow} maxLength={LIMITS.chapterEyebrow} readOnly={readOnly} onEnter={() => heading.current?.focus()} onChange={(value) => set({ eyebrow: value })} />}
           heading={<InlineText inputRef={heading} label="Chapter heading" placeholder="The chapter's heading" value={fields.heading} maxLength={LIMITS.chapterHeading} readOnly={readOnly} onEnter={() => dek.current?.focus()} onChange={(value) => set({ heading: value })} />}
           dek={<InlineText inputRef={dek} className="byline-visual-chapter-dek" label="Dek (optional)" placeholder="A line that sets up the chapter (optional)" value={fields.dek} maxLength={LIMITS.chapterDek} readOnly={readOnly} multiline onChange={(value) => set({ dek: value })} />}
-          credit={media.asset?.credit}
+          credit={kind === "text" ? undefined : media.asset?.credit}
         />
       )}
     </BlockShell>
   );
 }
+
+const CHAPTER_TEXT_TONE_OPTIONS: ReadonlyArray<PresetOption<"light" | "dark">> = [
+  { value: "dark", label: "On the page", description: "Dark words on the page, under a double rule." },
+  { value: "light", label: "Dark band", description: "Light words on a dark band across the story." }
+];
 
 /** Whether two photographs' shapes differ enough that fitting one to the other crops it. */
 const shapesDiffer = (a: ArticleMediaAsset | null, b: ArticleMediaAsset | null): boolean => {

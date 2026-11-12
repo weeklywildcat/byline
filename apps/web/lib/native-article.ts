@@ -36,10 +36,21 @@ export function nativeArticleDate(iso: string) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: timezone }).format(new Date(iso));
 }
 
-export const nativeBodyImage: ArticleRenderHost["imageSources"] = (asset) => {
+/**
+ * Prepared files for a body image. A story block that fills a frame (a photo
+ * Chapter, a Spotlight) may ask for a crop `shape`: it gets the editor's
+ * explicit crop for that shape, or nothing, in which case the natural files
+ * at the focal point serve (automatic crops are never generated).
+ */
+export const nativeBodyImage: ArticleRenderHost["imageSources"] = (asset, _sizes, shape) => {
   const item = nativeMedia(Number(asset.id));
   if (item?.manifest.kind !== "image") return undefined;
   const manifest = item.manifest;
+  if (shape) {
+    const renditions = manifest.crops[shape]?.renditions;
+    if (!renditions?.length) return undefined;
+    return { src: renditions[renditions.length - 1]!.publicPath, srcSet: renditions.map((file) => `${file.publicPath} ${file.width}w`).join(", ") };
+  }
   return { src: largestNaturalImage(manifest).publicPath, srcSet: manifest.natural.map((file) => `${file.publicPath} ${file.width}w`).join(", ") };
 };
 

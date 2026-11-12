@@ -42,17 +42,20 @@ function list(node: ListNode): Json {
 /** Block paragraphs as the plain text a block stores (blank lines between paragraphs). */
 const bodyText = (body: readonly { children: readonly Inline[] }[]): string => body.map((paragraph) => paragraph.children.map((child) => (child.type === "text" ? child.text : child.type === "lineBreak" ? "\n" : "")).join("")).join("\n\n");
 
+/** Presentation choices (docs/story-presentation.md), written only when the block has them, so an older body serializes exactly as before. */
+const presets = (values: Record<string, string | undefined>): Json => Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
+
 export function blockFields(block: ArticleBlock): Json {
   const base = { id: block.id, blockType: block.type, blockName: "" };
   switch (block.type) {
     case "photo":
-      return { ...base, media: block.media, caption: block.caption, altOverride: block.altOverride ?? "", placement: block.placement };
+      return { ...base, media: block.media, caption: block.caption, altOverride: block.altOverride ?? "", placement: block.placement, ...presets({ phone: block.phone }) };
     case "gallery":
       return { ...base, fit: block.fit, layout: block.layout ?? "grid", items: block.items.map((item) => ({ id: item.id, media: item.media, caption: item.caption, altOverride: item.altOverride ?? "" })) };
     case "reportedQuote":
       return { ...base, text: block.text, attribution: block.attribution, sourceUrl: block.sourceUrl ?? "", sourceLabel: block.sourceLabel ?? "" };
     case "pullQuote":
-      return { ...base, text: block.text, attribution: block.attribution ?? "" };
+      return { ...base, text: block.text, attribution: block.attribution ?? "", ...presets({ presentation: block.presentation }) };
     case "keyFacts":
       return { ...base, heading: block.heading, facts: block.facts.map((fact) => ({ ...fact })), presentation: block.presentation ?? "standard" };
     case "context":
@@ -78,9 +81,9 @@ export function blockFields(block: ArticleBlock): Json {
         }))
       };
     case "portraitText":
-      return { ...base, media: block.media, altOverride: block.altOverride ?? "", heading: block.heading ?? "", body: bodyText(block.body), caption: block.caption ?? "", side: block.side };
+      return { ...base, media: block.media, altOverride: block.altOverride ?? "", heading: block.heading ?? "", body: bodyText(block.body), caption: block.caption ?? "", side: block.side, ...presets({ presentation: block.presentation, phoneOrder: block.phoneOrder, phone: block.phone, tone: block.tone, scrim: block.scrim }) };
     case "visualChapter":
-      return { ...base, media: block.media, altOverride: block.altOverride ?? "", eyebrow: block.eyebrow ?? "", heading: block.heading, dek: block.dek ?? "", placement: block.placement, align: block.align };
+      return { ...base, media: block.media, altOverride: block.altOverride ?? "", eyebrow: block.eyebrow ?? "", heading: block.heading, dek: block.dek ?? "", placement: block.placement, align: block.align, ...presets({ kind: block.kind, height: block.height, tone: block.tone, scrim: block.scrim }) };
     case "video":
       return { ...base, url: block.videoId ? `https://www.youtube.com/watch?v=${block.videoId}` : "", title: block.title, caption: block.caption ?? "", captionsConfirmed: block.captionsConfirmed ?? true, chapters: (block.chapters ?? []).map((chapter) => ({ ...chapter })), transcript: block.transcript ?? "" };
     case "audio":

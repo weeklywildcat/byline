@@ -12,7 +12,9 @@ The header holds the lifecycle stage, writers, editor and deadline, the save sta
 
 **Right-click the stage** (the colored badge) for the moves available to you: the primary action, then Put on hold and Drop, or Resume. Editors also get **Move to stage** (the editor override; it closes any open review, History records it, and the toast has Undo). The badge is tinted by stage; the stage is always written out.
 
-Everything occasional is in **one** overflow menu (**More story actions**): Preview (Payload's Live Preview), Story details, View history, Open in Field Mode, Put on hold, Drop, and, before Ready, Publish now without review. Publication actions (Schedule, Unpublish, Move to trash) are the last group and are reachable in every stage for anyone who may publish. **Move to trash** is Payload's recoverable delete, distinct from editorial Drop.
+**Preview** is a direct button beside the save status, never in a menu: Preview (eye) opens Payload's Live Preview, and the same button becomes **Close preview** (X) while it is open, icon-only with its name on a narrow header ([story-presentation.md](story-presentation.md#preview)).
+
+Everything occasional is in **one** overflow menu (**More story actions**): Story details, View history, Open in Field Mode, Put on hold, Drop, and, before Ready, Publish now without review. Publication actions (Schedule, Unpublish, Move to trash) are the last group and are reachable in every stage for anyone who may publish. **Move to trash** is Payload's recoverable delete, distinct from editorial Drop.
 
 Review feedback a writer must act on sits under the header, above the tabs, in both workspaces.
 

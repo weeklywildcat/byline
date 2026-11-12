@@ -4,21 +4,64 @@ import { parseYouTubeVideoId } from "@byline/core";
 // The metadata-only resolver: importing the full package here would load every story's React code
 // (and @byline/ui) into the admin bundle, which keeps Payload's Lexical field from mounting.
 import { resolveStoryPresentation, type StoryPresentationIdentity, type StoryPresentationResolution } from "@byline/story-presentations/resolve";
+import { Button } from "@byline/newsroom-ui/ui/button";
 import { useConfig, useDocumentInfo, useFormFields, useLivePreviewContext } from "@payloadcms/ui";
-import { useMemo } from "react";
+import { Eye, X } from "lucide-react";
+import { useCallback, useMemo } from "react";
 import { relationIdOf } from "./form";
+
+export type StoryPreview = {
+  /** False when Live Preview is not available for this document. */
+  available: boolean;
+  previewing: boolean;
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+};
 
 /**
  * Byline's entry to Payload's Live Preview. Payload owns the preview itself
  * (pane, iframe, toolbar, devices, zoom, pop-out, transport, and remembering
- * whether it was open); this only flips Payload's own open state through its
- * public context, so there is exactly one preview state. The Story header
- * offers it as a menu item; `available` is false when Live Preview is not
- * available for this document.
+ * whether it was open); this only sets Payload's own open state through its
+ * public context, so there is exactly one preview state: when Payload opens or
+ * closes the pane itself, `previewing` follows. Callers say what they mean
+ * (`open`, `close`, `toggle`) and never invert the state themselves.
  */
-export function useStoryPreview(): { available: boolean; previewing: boolean; toggle: () => void } {
+export function useStoryPreview(): StoryPreview {
   const { isLivePreviewEnabled, isLivePreviewing, setIsLivePreviewing, url } = useLivePreviewContext();
-  return { available: Boolean(isLivePreviewEnabled && url), previewing: Boolean(isLivePreviewing), toggle: () => setIsLivePreviewing(!isLivePreviewing) };
+  const previewing = Boolean(isLivePreviewing);
+  const open = useCallback(() => setIsLivePreviewing(true), [setIsLivePreviewing]);
+  const close = useCallback(() => setIsLivePreviewing(false), [setIsLivePreviewing]);
+  const toggle = useCallback(() => setIsLivePreviewing(!previewing), [previewing, setIsLivePreviewing]);
+  return { available: Boolean(isLivePreviewEnabled && url), previewing, open, close, toggle };
+}
+
+/**
+ * The Story header's Preview action: always visible beside the main actions,
+ * never in the overflow menu. One button that stays mounted while it changes
+ * from "Preview" to "Close preview", so keyboard focus stays on it when the
+ * pane opens or closes. On a narrow header it is icon-only and keeps its name
+ * in `aria-label`. The open state is the secondary (filled) button and a
+ * different icon and name, never colour alone.
+ */
+export function StoryPreviewButton({ preview }: { preview: StoryPreview }) {
+  if (!preview.available) return null;
+  const label = preview.previewing ? "Close preview" : "Preview";
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={preview.previewing ? "secondary" : "outline"}
+      onClick={preview.toggle}
+      aria-label={label}
+      data-story-preview=""
+      data-previewing={preview.previewing ? "" : undefined}
+      className="any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11"
+    >
+      {preview.previewing ? <X data-icon="inline-start" aria-hidden="true" /> : <Eye data-icon="inline-start" aria-hidden="true" />}
+      <span className="max-sm:sr-only">{label}</span>
+    </Button>
+  );
 }
 
 /** The shared resolver's answer for the story as it is in the form right now. */

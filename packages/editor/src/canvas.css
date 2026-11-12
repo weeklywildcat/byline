@@ -381,3 +381,16 @@
 /* Data Project: the status line sits quietly above the real presentation, which is drawn by the host in its own frame. */
 .byline-article-canvas .byline-data-project-status { align-items: center; color: var(--muted-foreground, #71717a); display: flex; flex-wrap: wrap; font-family: var(--byline-chrome-font); font-size: 12px; gap: 8px; margin: 0 0 10px; }
 .byline-article-canvas .byline-data-project-stage { min-width: 0; }
+
+/* Presentation (docs/story-presentation.md): mini previews in the surface, and chrome that stays inset when a block bleeds. */
+.byline-preset-preview { color: currentColor; display: block; line-height: 0; opacity: .8; }
+[data-pressed] > .byline-preset-preview { opacity: 1; }
+@container byline-content (max-width: 600px) {
+  .byline-article-canvas .byline-frame-bleed :is(.byline-block-chrome, .byline-block-note, .byline-credit-missing, .byline-chapter-empty) { margin-inline: var(--byline-bleed-inset-start) var(--byline-bleed-inset-end); }
+}
+.byline-chapter-empty-alternative { color: var(--muted-foreground, #71717a); font-family: var(--byline-chrome-font); font-size: 13px; margin: 8px 0 0; text-align: center; }
+/* The chosen preset is marked by more than colour: heavier type and a bar under it (the description below names it too). */
+[data-presentation-surface] [data-slot="toggle-group-item"][aria-pressed="true"] { box-shadow: inset 0 -2px 0 currentColor; font-weight: 600; }
+@media (forced-colors: active) {
+  [data-presentation-surface] [data-slot="toggle-group-item"][aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
