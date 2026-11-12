@@ -260,17 +260,36 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   );
 }
 
+function ReportingSkeleton() {
+  return (
+    <div className="grid gap-4" role="status" aria-label="Loading reporting">
+      <div className="flex gap-2"><Skeleton className="h-8 flex-1" /><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-36" /></div>
+      <div className="flex items-center justify-between gap-3"><Skeleton className="h-4 w-20" /><Skeleton className="h-7 w-56" /></div>
+      <div className="grid gap-3">
+        {[0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 border-y py-3"><Skeleton className="size-8 shrink-0" /><div className="grid flex-1 gap-2"><Skeleton className="h-4 w-2/5" /><Skeleton className="h-3 w-3/5" /></div></div>)}
+      </div>
+      <span className="sr-only">Loading reporting…</span>
+    </div>
+  );
+}
 function CaptureMenu({ capture }: { capture: CaptureActions }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Capture</DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.record}><Mic />Interview</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.file}><Upload />Upload file</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.photo}><ImageIcon />Upload photo</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.link}><Link2 />Add link</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.transcript}><FileText />Upload transcript</DropdownMenuItem>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Reporting</DropdownMenuLabel>
+          <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.record}><Mic />Interview</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.transcript}><FileText />Transcript only</DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Files & references</DropdownMenuLabel>
+          <DropdownMenuItem onClick={capture.photo}><ImageIcon />Photo</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.file}><Upload />File</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.link}><Link2 />Link</DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
