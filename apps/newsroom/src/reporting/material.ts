@@ -188,8 +188,8 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   });
   const plan = plans.docs[0];
   const resources: ResourceMaterial[] = (plan?.resources ?? []).map((row, index) => ({
-    kind: "resource", key: `resource:${row.id ?? index}`, id: index, occurredAt: iso(plan?.updatedAt), author: null, confidential: false, canEdit: manager,
-    label: row.label, url: row.url, purpose: row.purpose ?? "other", source: null, appointment: null
+    kind: "resource", key: `resource:${row.id ?? index}`, id: index, occurredAt: iso(plan?.updatedAt), author: null, confidential: false, canEdit: manager && Boolean(row.id),
+    resourceId: typeof row.id === "string" ? row.id : "", label: row.label, url: row.url, purpose: row.purpose ?? "other", source: null, appointment: null
   }));
   const liveItems: LiveUpdateMaterial[] = live.docs.map((row) => ({
     kind: "live", key: `live:${row.id}`, id: row.id, occurredAt: iso(row.publishedAt ?? row.createdAt), author: person(row.author), confidential: false, canEdit: false,
