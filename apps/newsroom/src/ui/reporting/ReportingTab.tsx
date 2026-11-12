@@ -209,8 +209,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               <p className="text-sm font-medium">Interview</p>
               <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
               <div className="flex flex-wrap items-center gap-3">
-                <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} />
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setPanel(null); setBound(null); }}>Cancel</Button>
+                <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} onCancel={() => { setPanel(null); setBound(null); }} />
               </div>
             </div>
           ) : null}
