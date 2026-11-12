@@ -607,7 +607,7 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
   const name = onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
-  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
+  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><span>{time}</span>{appointment.status === "cancelled" ? <Badge variant="secondary">Cancelled</Badge> : null}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <CalendarClock aria-hidden="true" className="size-4 text-muted-foreground" />
@@ -638,18 +638,28 @@ function PlanningContext({ context, data, capture, canCapture, refresh }: { cont
       <section aria-labelledby="reporting-sources" className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
           <h3 id="reporting-sources" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sources</h3>
-          {canAddSource ? <Button type="button" size="xs" variant="ghost" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button> : null}
+          {canAddSource && data.sources.length ? <Button type="button" size="xs" variant="ghost" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button> : null}
         </div>
-        {data.sources.length === 0 ? <p className="text-muted-foreground">No sources yet.</p> : (
+        {data.sources.length === 0 ? (
+          <Empty className="gap-2 border py-5">
+            <EmptyHeader><EmptyMedia variant="icon"><Plus /></EmptyMedia><EmptyTitle>No sources yet</EmptyTitle><EmptyDescription>Add the people you’re reporting with so notes and interviews stay attached to the right source.</EmptyDescription></EmptyHeader>
+            {canAddSource ? <EmptyContent><Button type="button" size="sm" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button></EmptyContent> : null}
+          </Empty>
+        ) : (
           <ItemGroup className="gap-0 divide-y border-y" aria-labelledby="reporting-sources">{data.sources.map((source) => <SourceRow key={source.id} context={context} source={source} canEdit={data.capabilities.manage && !context.readOnly} canCapture={canCapture} capture={capture} refresh={refresh} onEdit={sourceRecord(source.id) && writable ? (element) => sourceDialog.openWith(sourceRecord(source.id), element) : undefined} />)}</ItemGroup>
         )}
       </section>
       <section aria-labelledby="reporting-appointments" className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
           <h3 id="reporting-appointments" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Appointments</h3>
-          {canAddAppointment ? <Button type="button" size="xs" variant="ghost" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add</Button> : null}
+          {canAddAppointment && data.appointments.length ? <Button type="button" size="xs" variant="ghost" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add appointment</Button> : null}
         </div>
-        {data.appointments.length === 0 ? <p className="text-muted-foreground">No interviews or events yet.</p> : (
+        {data.appointments.length === 0 ? (
+          <Empty className="gap-2 border py-5">
+            <EmptyHeader><EmptyMedia variant="icon"><CalendarClock /></EmptyMedia><EmptyTitle>No appointments yet</EmptyTitle><EmptyDescription>Schedule an interview, event or reporting window so the next step is visible from the story.</EmptyDescription></EmptyHeader>
+            {canAddAppointment ? <EmptyContent><Button type="button" size="sm" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add appointment</Button></EmptyContent> : null}
+          </Empty>
+        ) : (
           <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked onEdit={appointmentRecord(appointment.id) && writable ? (element) => appointmentDialog.openWith(appointmentRecord(appointment.id), element) : undefined} /></li>)}</ul>
         )}
       </section>
@@ -671,7 +681,7 @@ function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onE
       </ItemContent>
       <ItemActions className="flex-wrap">
         <GroundRulesEditor context={context} source={source} canEdit={canEdit} refresh={refresh} />
-        {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button></> : null}
+        {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button></> : null}
       </ItemActions>
     </Item>
   );
@@ -700,7 +710,7 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     <label className="flex items-center gap-2 text-sm any-pointer-coarse:min-h-11"><Checkbox checked={permission} onCheckedChange={(next) => setPermission(next === true)} />Recording permission confirmed</label>
     <Input value={note} maxLength={600} placeholder="Note (optional)" aria-label="Ground rules note" onChange={(event) => setNote(event.target.value)} />
     <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
-    <Button type="submit" size="sm" disabled={save.isPending}>Save</Button>
+    <Button type="submit" size="sm" disabled={save.isPending}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save ground rules</Button>
   </form>;
   const trigger = <button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11" />;
   const changeOpen = (next: boolean) => {
