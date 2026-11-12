@@ -1,22 +1,16 @@
-import { once } from "node:events";
-import { createServer } from "node:http";
-import path from "node:path";
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readCurrentRevision } from "../../src/db/publication-state";
 import { PUBLIC_COLLECTIONS } from "../../src/public/tracking";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
 import { privateReportingDir } from "../../src/reporting/paths";
-import { fasterWhisperProvider } from "../../src/reporting/transcription/faster-whisper";
-import { PermanentTranscriptionError, TemporaryTranscriptionError, type TranscriptionProvider } from "../../src/reporting/transcription/provider";
-import { recoverQueuedTranscriptions, setTranscriptionProviderForTests } from "../../src/reporting/transcription/queue";
 import type { User } from "../../src/payload-types";
 
 /**
  * Reporting against real PostgreSQL (docs/reporting.md): capture routing and
  * context inheritance, confidentiality, ground-rule snapshots, idempotent
- * capture, transcription jobs (provider stubbed at the boundary), manual
- * import, selections and verification, the off-the-record guard, provenance,
+ * capture, reporter-provided transcript import, selections and verification,
+ * the off-the-record guard, provenance,
  * and that none of it is public.
  */
 let payload: Payload;
@@ -61,17 +55,6 @@ const stubSegments = [
   { id: "s1", startMs: 4000, endMs: 7000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "What changed defensively?" },
   { id: "s2", startMs: 7000, endMs: 12000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We switched to man coverage and trusted our corners." }
 ];
-let providerMode: "ok" | "permanent" | "temporary" = "ok";
-const stub: TranscriptionProvider = {
-  id: "stub-whisper", model: "test-model", private: true,
-  async transcribe() {
-    if (providerMode === "permanent") throw new PermanentTranscriptionError("Unsupported audio codec.");
-    if (providerMode === "temporary") throw new TemporaryTranscriptionError("The transcription service is unavailable (HTTP 503).");
-    return { language: "en", durationMs: 12000, segments: stubSegments };
-  }
-};
-const runReporting = () => payload.jobs.run({ queue: "reporting", limit: 10 });
-
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
   url.pathname = `${url.pathname}_reporting`;
@@ -93,11 +76,9 @@ beforeAll(async () => {
   ids.tipster = (await payload.create({ collection: "sources", data: { story: ids.story, label: "Booster club parent", groundRules: "off-record" }, ...asEditor })).id;
   ids.interview = (await payload.create({ collection: "appointments", data: { story: ids.story, title: "Interview Coach Smith", kind: "interview", source: ids.coach, scheduleMode: "exact", startAt: new Date(Date.now() + 3600_000).toISOString() } as never, ...asEditor })).id;
   ids.assignment = (await payload.create({ collection: "production-assignments", data: { story: ids.story, title: "Game photos", type: "photo", assignees: [accounts.bob.id] } as never, ...asEditor })).id;
-  setTranscriptionProviderForTests(stub);
 }, 300_000);
 
 afterAll(async () => {
-  setTranscriptionProviderForTests(undefined);
   await payload?.db?.destroy?.();
 });
 
@@ -156,7 +137,7 @@ describe("confidential material", () => {
   });
 });
 
-describe("recordings, ground rules and transcription", () => {
+describe("recordings, ground rules and transcripts", () => {
   it("records from an appointment: the file inherits Story, source, appointment, uploader and a ground-rules snapshot", async () => {
     const result = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: { appointmentId: ids.interview, clientKey: "rec-key-00001" }, file: wav("coach-smith.wav") });
     expect(result.status).toBe(200);
@@ -165,10 +146,7 @@ describe("recordings, ground rules and transcription", () => {
     expect(file).toMatchObject({ story: ids.story, source: ids.coach, appointment: ids.interview, createdBy: accounts.alice.id, kind: "audio", originalFilename: "coach-smith.wav" });
     expect(file.groundRules).toMatchObject({ rule: "on-record", recordingPermission: true, sourceId: ids.coach });
     expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
-    // A private provider queues transcription automatically.
-    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: ids.recording } }, depth: 0 })).docs[0];
-    expect(transcript).toMatchObject({ state: "queued", source: ids.coach, appointment: ids.interview, origin: "machine" });
-    ids.transcript = transcript.id;
+    expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: ids.recording } } })).totalDocs).toBe(0);
   });
 
   it("does not let a later Source edit rewrite the captured snapshot", async () => {
@@ -178,427 +156,43 @@ describe("recordings, ground rules and transcription", () => {
     await payload.update({ collection: "sources", id: ids.coach, data: { groundRules: "on-record" }, overrideAccess: true, context: { bylineSystem: true } });
   });
 
-  it("transcribes through an idempotent service job, persists progress and tells the uploader", async () => {
-    // Use the actual multipart provider against a local implementation of the
-    // job contract. Short status requests are what let long interviews run
-    // without Node's response-header timeout.
-    const received: Array<{ path: string; authorization?: string; form: FormData }> = [];
-    const jobs = new Map<string, { bad: boolean; polls: number; dropped: boolean; replayed: boolean }>();
-    const posts = new Map<string, number>();
-    const forgotten = new Set<string>();
-    const drafts: Call[] = [];
-    const serviceSegments = stubSegments.map(({ startMs, endMs, speaker, text }) => ({ start: startMs / 1000, end: endMs / 1000, speaker, text }));
-    const server = createServer(async (request, response) => {
-      const pathname = request.url ?? "";
-      const send = (status: number, body: unknown) => {
-        response.writeHead(status, { "Content-Type": "application/json" });
-        response.end(JSON.stringify(body));
-      };
-      if (request.method === "POST") {
-        const chunks: Buffer[] = [];
-        for await (const chunk of request) chunks.push(chunk);
-        const form = await new Response(Buffer.concat(chunks), { headers: { "Content-Type": request.headers["content-type"]! } }).formData();
-        const upload = form.get("file") as File;
-        const bad = upload.name === "http-broken.wav";
-        received.push({ path: pathname, authorization: request.headers.authorization, form });
-        posts.set(pathname, (posts.get(pathname) ?? 0) + 1);
-        const existing = jobs.get(pathname);
-        if (existing) {
-          if (existing.bad) return send(202, { job: pathname, state: "failed", detail: "Unsupported audio codec.", retryable: false, progress: null });
-          return send(202, { job: pathname, state: "queued", progress: null, message: "Waiting for transcription worker" });
-        }
-        jobs.set(pathname, { bad, polls: 0, dropped: false, replayed: false });
-        if (bad) return send(202, { job: pathname, state: "failed", detail: "Unsupported audio codec.", retryable: false, progress: null });
-        return send(202, { job: pathname, state: "queued", progress: null, message: "Waiting for transcription worker" });
-      }
-      if (request.method === "GET") {
-        const job = jobs.get(pathname);
-        if (!job) return send(404, { detail: "Transcription job not found" });
-        if (pathname.includes("retry-contract") && !job.dropped) {
-          job.dropped = true;
-          request.socket.destroy();
-          return;
-        }
-        if (pathname.includes("restart-contract") && !forgotten.has(pathname)) {
-          forgotten.add(pathname);
-          jobs.delete(pathname);
-          return send(404, { detail: "Transcription job not found" });
-        }
-        const mainRun = pathname.startsWith(`/jobs/transcript-${ids.transcript}-`);
-        if (mainRun && job.polls > 0) {
-          drafts.push(await call("get", "/byline/reporting/transcripts/:id", "alice", { params: { id: ids.transcript } }));
-          if (!job.dropped) {
-            job.dropped = true;
-            request.socket.destroy();
-            return;
-          }
-        }
-        if (mainRun && job.dropped && !job.replayed) job.replayed = true;
-        else job.polls += 1;
-        if (job.polls <= 2) return send(200, {
-          job: pathname, state: "transcribing", duration: 12,
-          // Keep the percentage constant to exercise text-only progress.
-          progress: 0.42, message: "Transcribing audio", segments: serviceSegments.slice(0, job.polls)
-        });
-        return send(200, {
-          job: pathname,
-          state: "ready",
-          progress: 1,
-          message: "Transcript ready",
-          result: {
-            language: "EN", duration: 12,
-            segments: serviceSegments
-          }
-        });
-      }
-      send(405, { detail: "Method not allowed" });
-    });
-    server.listen(0, "127.0.0.1");
-    await once(server, "listening");
-    const address = server.address();
-    if (!address || typeof address === "string") throw new Error("Missing transcription test address");
-    const url = `http://127.0.0.1:${address.port}`;
-    const provider = fasterWhisperProvider({ url, model: "test-model", language: "en", private: true, timeoutMs: 15_000, token: "fixture-token", pollIntervalMs: 10 });
-    setTranscriptionProviderForTests(provider);
-    try {
-      await runReporting();
-      expect(received).toHaveLength(1);
-      expect(received[0].authorization).toBe("Bearer fixture-token");
-      expect(received[0].path).toMatch(/^\/jobs\/transcript-\d+-[0-9a-f-]{36}$/);
-      const form = received[0].form;
-      expect(Object.fromEntries([...form].filter(([key]) => key !== "file"))).toEqual({ model: "test-model", language: "en", vad: "true", word_timestamps: "false" });
-      const upload = form.get("file") as File;
-      expect(upload.name).toBe("coach-smith.wav");
-      expect(Buffer.from(await upload.arrayBuffer())).toEqual(wav("coach-smith.wav").data);
+  it("keeps recordings separate and imports reporter-provided transcripts", async () => {
+    expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: ids.recording } } })).totalDocs).toBe(0);
 
-      const waiting = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-      expect(waiting).toMatchObject({ state: "queued", segments: stubSegments.slice(0, 1) });
-      const retryJob = (await payload.find({ collection: "payload-jobs", where: { queue: { equals: "reporting" } }, depth: 0 })).docs.find((job) =>
-        (job.input as { transcriptId?: number })?.transcriptId === ids.transcript
-      );
-      expect(retryJob).toBeDefined();
-      await payload.update({ collection: "payload-jobs", id: retryJob!.id, data: { waitUntil: new Date(0).toISOString() } });
-      await runReporting();
-      expect(received).toHaveLength(1);
-      expect(drafts.map(({ status }) => status)).toEqual([200, 200, 200, 200]);
-      expect(drafts.map(({ body }) => body.segments)).toEqual([stubSegments.slice(0, 1), stubSegments.slice(0, 1), stubSegments.slice(0, 1), stubSegments.slice(0, 2)]);
-      expect(drafts[0].body).toMatchObject({ state: "processing", progressPercent: 42, durationMs: 12000 });
-
-      const complete = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-      expect(complete).toMatchObject({ state: "ready", progressPercent: 100, progressMessage: "Transcript ready" });
-      expect(complete.transcriptionRunToken).toMatch(/^[0-9a-f-]{36}$/);
-      expect(complete.transcriptionRunToken).toBe(waiting.transcriptionRunToken);
-
-      const recording = await payload.findByID({ collection: "reporting-files", id: ids.recording, depth: 0 });
-      const providerInput = (jobKey: string) => ({
-        path: path.join(privateReportingDir(), path.basename(recording.filename!)),
-        filename: recording.filename!,
-        mimeType: recording.mimeType ?? "audio/wav",
-        language: null,
-        jobKey
-      });
-
-      // A dropped poll does not start Whisper twice. The second provider call
-      // reattaches by the exact same job key and sees the existing service job.
-      const signal = new AbortController().signal;
-      await expect(provider.transcribe(providerInput("retry-contract"), signal)).rejects.toThrow(/connection/i);
-      const retried = await provider.transcribe(providerInput("retry-contract"), signal);
-      expect(retried.segments).toEqual(stubSegments);
-      expect(posts.get("/jobs/retry-contract")).toBe(1);
-
-      // If the service restarted and genuinely forgot an active job, the
-      // provider resubmits the same key and finishes the replacement run.
-      const restarted = await provider.transcribe(providerInput("restart-contract"), signal);
-      expect(restarted.segments).toEqual(stubSegments);
-      expect(posts.get("/jobs/restart-contract")).toBe(2);
-
-      const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, file: wav("http-broken.wav") });
-      await runReporting();
-      const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } }, depth: 0 })).docs[0];
-      expect(failed).toMatchObject({ state: "failed", failure: expect.stringContaining("Unsupported audio codec.") });
-      expect(JSON.stringify(failed)).not.toContain(url);
-    } finally {
-      setTranscriptionProviderForTests(stub);
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    }
-    const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-    expect(transcript).toMatchObject({ state: "ready", provider: "faster-whisper", model: "test-model", language: "en", durationMs: 12000, progressPercent: 100 });
-    expect(transcript.segments).toEqual(stubSegments);
-    expect(JSON.stringify(transcript)).not.toContain(url);
-    expect(transcript.searchText).toContain("man coverage");
-    const notices = await payload.find({ collection: "notifications", where: { and: [{ recipient: { equals: accounts.alice.id } }, { kind: { equals: "transcriptReady" } }] } });
-    expect(notices.totalDocs).toBe(1);
-    // The feed carries progress/summary metadata, never the transcript body.
-    const feed = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
-    const item = feed.body.materials.find((entry: { key: string }) => entry.key === `file:${ids.recording}`);
-    expect(item.transcript).toMatchObject({ id: ids.transcript, state: "ready", origin: "machine", progressPercent: 100, progressMessage: "Transcript ready" });
-    expect(JSON.stringify(feed.body)).not.toContain("man coverage");
-  });
-
-  it("keeps a manual replacement ready while stale machine progress finishes", async () => {
-    let fileId = 0;
-    const racingProvider: TranscriptionProvider = {
-      id: "racing-whisper",
-      model: "test-model",
-      private: true,
-      async transcribe(_input, _signal, onProgress) {
-        await onProgress?.({ state: "transcribing", percent: 25, message: "Transcribing audio", segments: stubSegments.slice(0, 1) });
-        const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
-          params: { id: ids.story },
-          data: { fileId, replace: true },
-          file: text("manual-race.txt", "Coach Smith: This is the manual replacement.")
-        });
-        expect(imported.status).toBe(200);
-        await onProgress?.({ state: "transcribing", percent: 75, message: "Transcribing audio", segments: stubSegments.slice(0, 2) });
-        return { language: "en", durationMs: 12000, segments: stubSegments };
-      }
-    };
-    setTranscriptionProviderForTests(racingProvider);
-    const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
+    const vtt = [
+      "WEBVTT",
+      "",
+      "00:00:00.000 --> 00:00:04.000",
+      "<v SPEAKER_00>We knew going into the second half we had to tackle better.",
+      "",
+      "00:00:04.000 --> 00:00:07.000",
+      "<v SPEAKER_01>What changed defensively?",
+      "",
+      "00:00:07.000 --> 00:00:12.000",
+      "<v SPEAKER_00>We switched to man coverage and trusted our corners.",
+      ""
+    ].join("\n");
+    const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
       params: { id: ids.story },
-      data: {},
-      file: wav("manual-wins.wav")
+      data: { fileId: ids.recording },
+      file: text("interview.vtt", vtt, "text/vtt")
     });
-    fileId = recording.body.id;
-    await runReporting();
-
-    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0 })).docs[0];
-    expect(transcript).toMatchObject({
-      state: "ready",
-      origin: "manual",
-      provider: "manual",
-      progressPercent: 100,
-      progressMessage: "Manual transcript imported",
-      transcriptionRunToken: null
-    });
-    expect(JSON.stringify(transcript.segments)).toContain("manual replacement");
-    expect(JSON.stringify(transcript.segments)).not.toContain("man coverage");
-    setTranscriptionProviderForTests(stub);
-  });
-
-  it("keeps a failed draft private and clears it for a fresh machine run", async () => {
-    setTranscriptionProviderForTests({
-      ...stub,
-      async transcribe(_input, _signal, onProgress) {
-        await onProgress?.({ state: "transcribing", percent: 25, message: "Transcribing audio", segments: stubSegments.slice(0, 1) });
-        throw new PermanentTranscriptionError("The recording could not be decoded.");
-      }
-    });
-    try {
-      const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
-        params: { id: ids.story }, data: { confidential: true }, file: wav("failed-draft.wav")
-      });
-      expect(recording.status).toBe(200);
-      await runReporting();
-      const draft = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: recording.body.id } }, depth: 0 })).docs[0];
-      expect(draft).toMatchObject({ state: "failed", segments: stubSegments.slice(0, 1), searchText: expect.stringContaining("tackle better") });
-      const params = { id: draft.id };
-      const raw = await payload.findByID({ collection: "reporting-transcripts", id: draft.id, req: await reqAs("alice"), overrideAccess: false, depth: 0 });
-      expect(raw.segments).toBeUndefined();
-      expect(raw.searchText).toBeUndefined();
-      expect(await call("get", "/byline/reporting/transcripts/:id", "alice", { params })).toMatchObject({ status: 200, body: { segments: stubSegments.slice(0, 1) } });
-      expect((await call("get", "/byline/reporting/transcripts/:id", "bob", { params })).status).toBe(404);
-      for (const kind of ["highlight", "quote"]) {
-        expect((await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
-          params, data: { kind, segmentIds: ["s0"] }
-        })).status).toBe(409);
-      }
-      await expect(payload.create({
-        collection: "transcript-selections",
-        data: { story: ids.story, transcript: draft.id, text: "Draft quote" } as never,
-        req: await reqAs("alice"),
-        overrideAccess: false
-      })).rejects.toMatchObject({ status: 409 });
-
-      const retried = await call("post", "/byline/reporting/files/:id/transcribe", "alice", { params: { id: recording.body.id } });
-      expect(retried.status).toBe(200);
-      const queued = await payload.findByID({ collection: "reporting-transcripts", id: draft.id, depth: 0 });
-      expect(queued).toMatchObject({ state: "queued", segments: [], searchText: "", attempts: 0 });
-      expect(queued.transcriptionRunToken).not.toBe(draft.transcriptionRunToken);
-      const replacement = [{ ...stubSegments[0], text: "A different transcription of this passage." }];
-      setTranscriptionProviderForTests({
-        ...stub,
-        async transcribe(_input, _signal, onProgress) {
-          await onProgress?.({ state: "transcribing", percent: 30, message: "Transcribing audio", segments: replacement });
-          return { segments: replacement, durationMs: 12000, language: "en" };
-        }
-      });
-      await runReporting();
-      expect(await payload.findByID({ collection: "reporting-transcripts", id: draft.id, depth: 0 })).toMatchObject({ state: "ready", segments: replacement });
-    } finally {
-      setTranscriptionProviderForTests(stub);
-    }
-  });
-
-  it("shows speaker stages and speaker-labelled drafts, and only lets a reporter name voices once the transcript is ready", async () => {
-    const messages: string[] = [];
-    let fileId = 0;
-    const stages: Array<{ status: number; segments: Array<{ speaker?: string; speakerKey?: string; startMs: number | null; text: string }>; message: string | null }> = [];
-    const peek = async () => {
-      const found = await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0, limit: 1 });
-      const row = found.docs[0];
-      const detail = await call("get", "/byline/reporting/transcripts/:id", "alice", { params: { id: row.id } });
-      const rename = await call("patch", "/byline/reporting/transcripts/:id", "alice", {
-        params: { id: row.id }, data: { renameSpeaker: { from: "Speaker 1", to: "Owen Carter", key: "SPEAKER_00" } }
-      });
-      stages.push({ status: rename.status, segments: detail.body.segments, message: row.progressMessage ?? null });
-    };
-    setTranscriptionProviderForTests({
-      ...stub,
-      async transcribe(_input, _signal, onProgress) {
-        for (const progress of [
-          { state: "loading-diarization" as const, percent: null, message: "Loading speaker model" },
-          { state: "diarizing" as const, percent: 40, message: "Identifying speakers" },
-          { state: "loading-model" as const, percent: null, message: "Loading Whisper model" },
-          { state: "transcribing" as const, percent: 20, message: "Transcribing audio", segments: stubSegments.slice(0, 2) }
-        ]) {
-          await onProgress?.(progress);
-          messages.push(progress.message);
-          await peek();
-        }
-        return { language: "en", durationMs: 12000, segments: stubSegments };
-      }
-    });
-    try {
-      const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("two-voices.wav") });
-      fileId = recording.body.id;
-      await runReporting();
-
-      expect(messages).toEqual(["Loading speaker model", "Identifying speakers", "Loading Whisper model", "Transcribing audio"]);
-      expect(stages.map((stage) => stage.message)).toEqual(messages);
-      // Naming is refused for the whole of the run: no alias, no mixed identities.
-      expect(stages.map((stage) => stage.status)).toEqual([409, 409, 409, 409]);
-      // No speaker text before speakers are known; the first text already carries them.
-      expect(stages.slice(0, 3).every((stage) => stage.segments.length === 0)).toBe(true);
-      expect(stages[3].segments.map((segment) => [segment.speaker, segment.speakerKey])).toEqual([["SPEAKER_00", "SPEAKER_00"], ["SPEAKER_01", "SPEAKER_01"]]);
-
-      const ready = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, depth: 0, limit: 1 })).docs[0];
-      expect(ready.state).toBe("ready");
-      const params = { id: ready.id };
-      const renamed = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params, data: { renameSpeaker: { from: "Speaker 1", to: "Owen Carter", key: "SPEAKER_00" } } });
-      expect(renamed.status).toBe(200);
-      const after = renamed.body.segments as Array<{ id: string; speaker?: string; speakerKey?: string; startMs: number; endMs: number; text: string }>;
-      expect(after.map((segment) => segment.speaker)).toEqual(["Owen Carter", "SPEAKER_01", "Owen Carter"]);
-      expect(after.map(({ id, startMs, endMs, text }) => ({ id, startMs, endMs, text }))).toEqual(stubSegments.map(({ id, startMs, endMs, text }) => ({ id, startMs, endMs, text })));
-      // A second rename still reaches every passage of that voice; the search text follows.
-      const again = await call("patch", "/byline/reporting/transcripts/:id", "alice", { params, data: { renameSpeaker: { from: "Owen Carter", to: "Owen R. Carter", key: "SPEAKER_00" } } });
-      expect(again.body.segments.filter((segment: { speaker?: string }) => segment.speaker === "Owen R. Carter")).toHaveLength(2);
-      expect((await payload.findByID({ collection: "reporting-transcripts", id: ready.id, depth: 0 })).searchText).toContain("Owen R. Carter: We knew going into");
-      // Quotes still wait for ready, then snapshot the shown name.
-      const quote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params, data: { kind: "highlight", segmentIds: ["s1"] } });
-      expect(quote.body.speaker).toBe("Speaker 2");
-    } finally {
-      setTranscriptionProviderForTests(stub);
-    }
-  });
-
-  it("fails malformed audio once and retries temporary outages", async () => {
-    providerMode = "permanent";
-    const bad = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("broken.wav") });
-    await runReporting();
-    const failed = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: bad.body.id } }, depth: 0 })).docs[0];
-    expect(failed).toMatchObject({ state: "failed", failure: "Unsupported audio codec." });
-
-    providerMode = "temporary";
-    const flaky = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("flaky.wav") });
-    await runReporting();
-    const queued = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: flaky.body.id } }, depth: 0 })).docs[0];
-    expect(queued.state).toBe("queued");
-    expect(queued.attempts).toBe(1);
-    expect(queued.failure).toContain("503");
-    providerMode = "ok";
-  });
-
-  it("releases a stale claimed job and resets a legacy retry budget on worker startup", async () => {
-    providerMode = "temporary";
-    const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", {
-      params: { id: ids.story },
-      data: {},
-      file: wav("stale-worker.wav")
-    });
-    await runReporting();
-    const transcript = (await payload.find({
-      collection: "reporting-transcripts",
-      where: { file: { equals: recording.body.id } },
-      depth: 0
-    })).docs[0];
-
-    await payload.update({
-      collection: "reporting-transcripts",
-      id: transcript.id,
-      data: {
-        state: "processing",
-        attempts: 5,
-        transcriptionRunToken: null,
-        progressMessage: null,
-        lastProgressAt: null
-      },
-      overrideAccess: true,
-      context: { bylineSystem: true }
-    });
-
-    const jobs = await payload.find({
-      collection: "payload-jobs",
-      where: {
-        and: [
-          { taskSlug: { equals: "transcribe-reporting-file" } },
-          { queue: { equals: "reporting" } },
-          { completedAt: { exists: false } }
-        ]
-      },
-      depth: 0,
-      pagination: false,
-      overrideAccess: true
-    });
-    const job = jobs.docs.find((row) => {
-      const input = row.input && typeof row.input === "object" && !Array.isArray(row.input) ? row.input as Record<string, unknown> : {};
-      return Number(input.transcriptId) === transcript.id;
-    });
-    expect(job).toBeTruthy();
-    await payload.update({
-      collection: "payload-jobs",
-      id: job!.id,
-      data: { processing: true, input: { transcriptId: transcript.id } },
-      overrideAccess: true
-    });
-
-    const recovered = await recoverQueuedTranscriptions(payload);
-    expect(recovered.released).toBeGreaterThanOrEqual(1);
-    expect(recovered.legacyReset).toBeGreaterThanOrEqual(1);
-
-    const fixedTranscript = await payload.findByID({ collection: "reporting-transcripts", id: transcript.id, depth: 0 });
-    expect(fixedTranscript).toMatchObject({
-      state: "queued",
-      attempts: 0,
-      progressMessage: "Waiting to transcribe",
-      transcriptionRunToken: null
-    });
-    const fixedJob = await payload.findByID({ collection: "payload-jobs", id: job!.id, depth: 0, overrideAccess: true });
-    expect(fixedJob.processing).toBe(false);
-    expect(fixedJob.waitUntil).toBeTruthy();
-    providerMode = "ok";
-  });
-
-  it("keeps uploads and manual import working without a provider", async () => {
-    setTranscriptionProviderForTests(null);
-    const plain = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: {}, file: wav("no-provider.wav") });
-    expect(plain.status).toBe(200);
-    expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: plain.body.id } } })).totalDocs).toBe(0);
-    expect((await call("post", "/byline/reporting/files/:id/transcribe", "alice", { params: { id: plain.body.id } })).status).toBe(409);
-    const vtt = "WEBVTT\n\n00:00:01.000 --> 00:00:03.500\n<v Coach Smith>We played hard.\n\n00:00:04.000 --> 00:00:06.000\nThanks, coach.\n";
-    const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", { params: { id: ids.story }, data: { fileId: plain.body.id }, file: text("interview.vtt", vtt, "text/vtt") });
     expect(imported.status).toBe(200);
-    const transcript = await payload.findByID({ collection: "reporting-transcripts", id: imported.body.transcriptId, depth: 0 });
-    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: "manual" });
-    expect((transcript.segments as Array<{ speaker?: string; startMs: number }>)[0]).toMatchObject({ speaker: "Coach Smith", startMs: 1000 });
+    ids.transcript = imported.body.transcriptId;
+    const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
+    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: "manual", source: ids.coach, appointment: ids.interview });
+    expect((transcript.segments as Array<{ speaker?: string; startMs: number }>)[0]).toMatchObject({ speaker: "SPEAKER_00", startMs: 0 });
+
     // A standalone plain-text transcript keeps its file as the private document it belongs to.
-    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", { params: { id: ids.story }, data: { appointmentId: ids.interview }, file: text("notes.txt", "Coach Smith: First paragraph.\n\nSecond paragraph.") });
+    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+      params: { id: ids.story },
+      data: { appointmentId: ids.interview },
+      file: text("notes.txt", "Coach Smith: First paragraph.\n\nSecond paragraph.")
+    });
     expect(standalone.status).toBe(200);
     const doc = await payload.findByID({ collection: "reporting-files", id: standalone.body.fileId, depth: 0 });
     expect(doc).toMatchObject({ kind: "document", source: ids.coach, appointment: ids.interview });
-    setTranscriptionProviderForTests(stub);
   });
-
   it("deletes a recording with its transcript and selections without a foreign-key failure", async () => {
     const uploaded = await call("post", "/byline/stories/:id/reporting/files", "alice", {
       params: { id: ids.story },
@@ -607,38 +201,27 @@ describe("recordings, ground rules and transcription", () => {
     });
     expect(uploaded.status).toBe(200);
 
-    const transcript = (await payload.find({
-      collection: "reporting-transcripts",
-      where: { file: { equals: uploaded.body.id } },
-      depth: 0,
-      limit: 1
-    })).docs[0];
-    expect(transcript).toBeDefined();
-
-    await payload.update({
-      collection: "reporting-transcripts",
-      id: transcript!.id,
-      data: { state: "ready", segments: stubSegments } as never,
-      overrideAccess: true,
-      context: { bylineSystem: true }
+    const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+      params: { id: ids.story },
+      data: { fileId: uploaded.body.id },
+      file: text("delete-me.txt", "Delete this quote.")
     });
+    expect(imported.status).toBe(200);
+    const transcript = await payload.findByID({ collection: "reporting-transcripts", id: imported.body.transcriptId, depth: 0 });
+    const segmentId = (transcript.segments as Array<{ id: string }>)[0]!.id;
 
     const selection = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
-      params: { id: transcript!.id },
-      data: { segmentIds: ["s0"], kind: "highlight" }
+      params: { id: transcript.id },
+      data: { segmentIds: [segmentId], kind: "highlight" }
     });
     expect(selection.status).toBe(200);
 
     const removed = await call("delete", "/byline/reporting/files/:id", "alice", { params: { id: uploaded.body.id } });
     expect(removed.status).toBe(200);
     expect((await payload.count({ collection: "reporting-files", where: { id: { equals: uploaded.body.id } } })).totalDocs).toBe(0);
-    expect((await payload.count({ collection: "reporting-transcripts", where: { id: { equals: transcript!.id } } })).totalDocs).toBe(0);
+    expect((await payload.count({ collection: "reporting-transcripts", where: { id: { equals: transcript.id } } })).totalDocs).toBe(0);
     expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: selection.body.id } } })).totalDocs).toBe(0);
   });
-
-});
-
-describe("quotes, verification and provenance", () => {
   it("saves a quote that inherits source, ground rules, timing and on-record attribution", async () => {
     const created = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params: { id: ids.transcript }, data: { segmentIds: ["s2"], kind: "quote" } });
     expect(created.status).toBe(200);
@@ -661,9 +244,14 @@ describe("quotes, verification and provenance", () => {
 
   it("never offers off-the-record words for insertion, and refuses to publish them by reference without an editor's audited override", async () => {
     const recording = await call("post", "/byline/stories/:id/reporting/files", "alice", { params: { id: ids.story }, data: { sourceId: ids.tipster }, file: wav("tipster.wav") });
-    await runReporting();
-    const transcript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: recording.body.id } }, depth: 0 })).docs[0];
-    const quote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params: { id: transcript.id }, data: { segmentIds: ["s0"] } });
+    const imported = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+      params: { id: ids.story },
+      data: { fileId: recording.body.id },
+      file: text("tipster.txt", "Private tip from the source.")
+    });
+    const transcript = await payload.findByID({ collection: "reporting-transcripts", id: imported.body.transcriptId, depth: 0 });
+    const segmentId = (transcript.segments as Array<{ id: string }>)[0]!.id;
+    const quote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", { params: { id: transcript.id }, data: { segmentIds: [segmentId] } });
     expect(quote.body.use.action).toBe("blocked");
     expect(quote.body.attribution).toBe("");
     const body = (selection: number) => ({ root: { type: "root", version: 1, children: [{ type: "block", version: 2, format: "", fields: { id: "q1", blockName: "", blockType: "reportedQuote", text: "x", attribution: "y", reportingSelection: selection } }], direction: null, format: "", indent: 0 } });
@@ -683,7 +271,7 @@ describe("quotes, verification and provenance", () => {
     expect(provenance.body.source).toMatchObject({ label: "Coach Smith" });
     expect(provenance.body.appointment).toMatchObject({ title: "Interview Coach Smith" });
     expect(provenance.body.recording).toMatchObject({ filename: "coach-smith.wav", capturedBy: "alice Account" });
-    expect(provenance.body.transcript).toMatchObject({ origin: "machine", provider: "faster-whisper" });
+    expect(provenance.body.transcript).toMatchObject({ origin: "manual", provider: "manual" });
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
