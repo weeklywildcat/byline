@@ -1,6 +1,7 @@
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readCurrentRevision } from "../../src/db/publication-state";
+import { inTransaction, lockRow } from "../../src/db/locks";
 import { PUBLIC_COLLECTIONS } from "../../src/public/tracking";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
 import { privateReportingDir } from "../../src/reporting/paths";
@@ -306,6 +307,58 @@ describe("recordings, ground rules and transcripts", () => {
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
+  });
+
+  it("rechecks article use after waiting on the provenance row lock", async () => {
+    const saveReq = await reqAs("alice");
+    const deleteReq = await reqAs("alice");
+    let release!: () => void;
+    let signalLocked!: () => void;
+    const locked = new Promise<void>((resolve) => { signalLocked = resolve; });
+    const continueSave = new Promise<void>((resolve) => { release = resolve; });
+
+    const save = inTransaction(saveReq, async () => {
+      await lockRow(saveReq, "transcript_selections", ids.quote);
+      signalLocked();
+      await continueSave;
+      await payload.update({
+        collection: "transcript-selections",
+        id: ids.quote,
+        data: { usedIn: [ids.story] } as never,
+        overrideAccess: true,
+        depth: 0,
+        context: { ...saveReq.context, bylineSystem: true },
+        req: saveReq
+      });
+    });
+
+    await locked;
+    const deletion = payload.delete({
+      collection: "transcript-selections",
+      id: ids.quote,
+      req: deleteReq,
+      overrideAccess: false
+    }).then(
+      () => ({ error: null as Error | null }),
+      (error: Error) => ({ error })
+    );
+
+    // Let the delete reach the row lock before the simulated article save commits.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    release();
+    await save;
+    const result = await deletion;
+    expect(result.error?.message).toMatch(/used in an article/i);
+    expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: ids.quote } } })).totalDocs).toBe(1);
+
+    await payload.update({
+      collection: "transcript-selections",
+      id: ids.quote,
+      data: { usedIn: [] } as never,
+      overrideAccess: true,
+      depth: 0,
+      context: { bylineSystem: true }
+    });
   });
 
   it("lists the Story's saved quotes for the article editor, verified first", async () => {
