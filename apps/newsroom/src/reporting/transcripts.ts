@@ -398,7 +398,8 @@ export async function verifySelection(ctx: ScreenContext, id: number, verified: 
       data: verified ? { state: "verified", verifiedBy: ctx.user.id as number, verifiedAt: new Date().toISOString(), kind: "quote" } : { state: "saved", verifiedBy: null, verifiedAt: null },
       overrideAccess: true,
       depth: 0,
-      req: ctx.req
+      req: ctx.req,
+      context: { ...ctx.req.context, bylineVerification: true }
     });
   } finally {
     if (previousVerification === undefined) delete requestContext.bylineVerification;
