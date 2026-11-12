@@ -318,7 +318,7 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
   return (
     <InlineForm label="New note" className="grid gap-2" onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} onCancel={onCancel} data-note-composer="">
       <InputGroup>
-        <InputGroupTextareaAutoFocus value={text} onChange={setText} />
+        <InputGroupTextareaAutoFocus value={text} onChange={setText} onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} />
         <InputGroupAddon align="block-end" className="justify-between">
           <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground"><Checkbox checked={confidential} onCheckedChange={(next) => setConfidential(next === true)} />Confidential</label>
           <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="button" size="sm" disabled={!text.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save note</Button></div>
@@ -329,8 +329,8 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
   );
 }
 
-function InputGroupTextareaAutoFocus({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} />;
+function InputGroupTextareaAutoFocus({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: () => void }) {
+  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); onSubmit(); } }} />;
 }
 
 function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenContext; onDone: () => void; onCancel: () => void }) {
@@ -371,7 +371,7 @@ function UploadRow({ upload, onRetry, onDismiss }: { upload: Upload; onRetry: ()
         <AttachmentTitle>{upload.name}</AttachmentTitle>
         {upload.error
           ? <AttachmentDescription role="alert">{upload.error}</AttachmentDescription>
-          : <Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`} className="mt-1.5" />}
+          : <><AttachmentDescription>{upload.progress > 0 ? `Uploading · ${Math.round(upload.progress * 100)}%` : "Preparing upload…"}</AttachmentDescription><Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`} className="mt-1.5" /></>}
       </AttachmentContent>
       {upload.error ? (
         <AttachmentActions className="gap-1 pr-1">
