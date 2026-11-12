@@ -370,19 +370,27 @@ export async function deleteSelection(ctx: ScreenContext, id: number) {
  * a quote; changing the saved words afterwards un-verifies them.
  */
 export async function verifySelection(ctx: ScreenContext, id: number, verified: boolean) {
+  const audience = await audienceOf(ctx);
   const { payload } = ctx.req;
   const found = await payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
   const row = found.docs[0];
   if (!row) throw new APIError("That quote is not available.", 404);
+  // Verification changes protected provenance fields. Authorize against the same
+  // per-record rule as collection update access, then perform only that protected
+  // write with system access so Payload does not strip state/verifiedBy/verifiedAt.
+  if (!canChangeMaterial(audience, row, row.createdBy)) throw new APIError("You cannot verify that quote.", 403);
   if (verified) {
     const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
     if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
   }
-  // Update access is the check (creator, assigned editor, administrators, managers for normal material).
   const updated = await payload.update({
-    collection: "transcript-selections", id,
+    collection: "transcript-selections",
+    id,
     data: verified ? { state: "verified", verifiedBy: ctx.user.id as number, verifiedAt: new Date().toISOString(), kind: "quote" } : { state: "saved", verifiedBy: null, verifiedAt: null },
-    ...as(ctx), context: { ...ctx.req.context, bylineVerification: true }
+    overrideAccess: true,
+    depth: 0,
+    req: ctx.req,
+    context: { ...ctx.req.context, bylineSystem: true, bylineVerification: true }
   });
   if (verified) await recordStoryActivity(ctx.req, row.story, "quote-verified", id);
   return { id, state: updated.state, verifiedAt: updated.verifiedAt ?? null };
