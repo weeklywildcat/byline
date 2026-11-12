@@ -112,7 +112,7 @@ transcript.
 
 The schema still accepts the historical state/origin/provider fields so existing
 machine transcripts remain readable. New imports are saved immediately as **ready**,
-with **manual** origin and **manual** provider. Segment ids are stable: editing words
+with **manual** origin and no transcription provider. Segment ids are stable: editing words
 or renaming a speaker keeps timing and ids; stale edits are a 409.
 
 Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
@@ -120,8 +120,10 @@ Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
 
 Selections (`transcript-selections`) are **snapshots** of the words, timing,
 speaker, attribution and ground rules, never character offsets. They start
-**saved**; a reporter marks a quote **verified** after listening to the audio.
-Changing the words un-verifies it. Uploading a transcript never verifies a quote.
+**saved**; a reporter marks a quote **verified** only after listening to its
+attached recording. Transcript-only material has no audio to verify against, so
+its quotes remain unverified. Changing the words un-verifies a quote. Uploading
+a transcript never verifies one.
 
 The chain stays inspectable (`GET /api/byline/reporting/selections/:id/provenance`):
 
@@ -148,16 +150,25 @@ A reporter adds a transcript deliberately:
   `.txt`, `.srt` or `.vtt`. The transcript attaches to that exact recording
   and inherits its Story, Source, Appointment, confidentiality and ground-rule
   snapshot.
-- **Without a recording:** use **Capture → Upload transcript**. Byline keeps the
+- **Without a recording:** use **Capture → Transcript only**. Byline keeps the
   uploaded transcript file as the private reporting document that owns the
   transcript.
 - **Replace:** an existing transcript can be replaced by uploading a new file
-  from the recording. This also provides a clean escape hatch for any incomplete
-  transcript left by the retired automatic system.
+  from the recording. Saved quotes remain snapshots of what the reporter saved,
+  including verification status; only the transcript text is replaced. This also
+  provides a clean escape hatch for any incomplete transcript left by the retired
+  automatic system.
 
 The old machine-transcription columns and migrations are intentionally retained
 for backward compatibility. They are not an active execution path and can be
 removed only in a future data migration after old records no longer need them.
+
+Reporting provenance is protected from destructive cleanup. A recording cannot be
+deleted while one of its saved quotes is used in an article, and an individual
+saved quote cannot be deleted while it is referenced by an article. Remove the
+Reported Quote from the article first; once `usedIn` is empty, ordinary cleanup
+is allowed. Unused recordings with transcripts or saved quotes require an
+explicit destructive confirmation in the UI.
 
 ## Screens
 
@@ -170,9 +181,11 @@ removed only in a future data migration after old records no longer need them.
   Source's badge. The Interview panel records in the browser or uploads an
   existing audio file (MP3, M4A, WAV, AAC, Ogg, WebM, checked by
   `recordingUploadProblem` before sending); either becomes the same private
-  recording with the bound Source and Appointment. The panel also offers
-  **Upload transcript**, and audio rows expose **Add transcript** or
-  **Replace transcript** so the file is attached to the correct interview.
+  recording with the bound Source and Appointment. Save the recording first;
+  audio rows then expose **Add transcript**, **Upload replacement** or
+  **Replace transcript** so the transcript is always attached to the correct
+  interview. **Capture → Transcript only** is reserved for a transcript that
+  intentionally has no recording.
 - **Transcript** (`?transcript=<id>`, a focused view with Back to Plan): pinned audio, timestamps
   that seek, the active passage following playback, an `InputGroup` search
   with next/previous and a count, in-place speaker and text edits, and a

@@ -171,8 +171,33 @@ test("a transcript opens from Plan as a focused view, with Back to Plan and brow
   await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
 });
 
+test("Reporting links can be edited and removed from the material feed", async ({ page }) => {
+  await open(page, draftId, "?view=plan&section=reporting");
+  const reporting = page.locator("#plan-reporting");
+
+  await reporting.getByRole("button", { name: "Capture" }).click();
+  await page.getByRole("menuitem", { name: "Link" }).click();
+  await reporting.getByRole("textbox", { name: "Link address" }).fill("https://example.com/reporting-notes");
+  await reporting.getByRole("button", { name: "Add link" }).click();
+
+  const row = reporting.locator('[data-material="resource"]').filter({ hasText: "example.com" }).first();
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Actions for example.com" }).click();
+  await page.getByRole("menuitem", { name: "Edit link" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Edit link" });
+  await dialog.getByLabel("Label").fill("Source notes");
+  await dialog.getByRole("button", { name: "Save link" }).click();
+
+  const renamed = reporting.locator('[data-material="resource"]').filter({ hasText: "Source notes" }).first();
+  await expect(renamed).toBeVisible();
+  await renamed.getByRole("button", { name: "Actions for Source notes" }).click();
+  await page.getByRole("menuitem", { name: "Remove link" }).click();
+  await expect(renamed).toBeHidden();
+});
+
 test("an interview recording accepts a transcript upload and attaches it to that recording", async ({ page, request, baseURL }) => {
-  const wav = Buffer.alloc(44 + 8000 * 2);
+  const wav = Buffer.alloc(44 + 8000 * 2 * 5);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
   wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
   wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
@@ -197,9 +222,9 @@ test("an interview recording accepts a transcript upload and attaches it to that
   await row.getByRole("button", { name: "Add transcript" }).click();
   const chooser = await chooserPromise;
   await chooser.setFiles({
-    name: `interview-${stamp}.vtt`,
-    mimeType: "text/vtt",
-    buffer: Buffer.from("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v Principal Smith>Students deserve a hot lunch.\n")
+    name: `interview-${stamp}.txt`,
+    mimeType: "text/plain",
+    buffer: Buffer.from("[00:00] Principal Smith: Students deserve a hot lunch.\n\n[00:03] Principal Smith: The district is reviewing the schedule.")
   });
 
   await expect(row.getByRole("button", { name: "Open transcript" })).toBeVisible();
@@ -207,7 +232,63 @@ test("an interview recording accepts a transcript upload and attaches it to that
   expect(transcript.ok(), await transcript.text()).toBeTruthy();
   const docs = (await transcript.json()).docs;
   expect(docs).toHaveLength(1);
-  expect(docs[0]).toMatchObject({ file: recordingId, state: "ready", origin: "manual", provider: "manual" });
+  expect(docs[0]).toMatchObject({ file: recordingId, state: "ready", origin: "manual", provider: null });
+  expect(docs[0].segments.map(({ startMs, endMs }: { startMs: number | null; endMs: number | null }) => ({ startMs, endMs }))).toEqual([
+    { startMs: 0, endMs: 3000 },
+    { startMs: 3000, endMs: null }
+  ]);
+
+  await row.getByRole("button", { name: "Open transcript" }).click();
+  const transcriptView = page.locator("[data-transcript-view]");
+  const finalPassage = transcriptView.locator('[data-segment="s1"]');
+  await expect(finalPassage).toBeVisible();
+  const player = transcriptView.locator("audio");
+  await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.readyState)).toBeGreaterThanOrEqual(1);
+
+  const transcriptSearch = transcriptView.getByRole("searchbox", { name: "Search this transcript" });
+  await transcriptSearch.fill("district");
+  await transcriptSearch.press("Enter");
+  await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(3);
+  expect(await player.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true);
+
+  const firstPassageText = transcriptView.locator('[data-segment="s0"] [data-segment-text]');
+  await firstPassageText.evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await expect(transcriptView.getByRole("toolbar", { name: "Selected words" })).toBeVisible();
+  await page.evaluate(() => window.getSelection()?.removeAllRanges());
+  await expect(transcriptView.getByRole("toolbar", { name: "Selected words" })).toBeHidden();
+
+  await player.evaluate((audio: HTMLAudioElement) => {
+    audio.currentTime = 3.5;
+    audio.dispatchEvent(new Event("timeupdate", { bubbles: true }));
+  });
+  await expect(finalPassage).toHaveAttribute("data-active", "");
+  await transcriptView.getByRole("button", { name: "Reporting" }).click();
+  await expect(page.locator(`[data-key="file:${recordingId}"]`)).toBeVisible();
+
+  const quote = await request.post(`/api/byline/reporting/transcripts/${docs[0].id}/selections`, {
+    headers: headers(baseURL!),
+    data: { segmentIds: ["s0"], kind: "quote" }
+  });
+  expect(quote.ok(), await quote.text()).toBeTruthy();
+
+  await page.reload();
+  const refreshed = page.locator(`[data-key="file:${recordingId}"]`);
+  await refreshed.getByRole("button", { name: "Replace transcript" }).click();
+  const replace = page.getByRole("alertdialog");
+  await expect(replace).toContainText("The saved quote or highlight stays exactly as saved, including any verification.");
+  await replace.getByRole("button", { name: "Cancel" }).click();
+
+  await refreshed.getByRole("button", { name: `More actions for interview-${stamp}.wav` }).click();
+  await page.getByRole("menuitem", { name: "Remove…" }).click();
+  const remove = page.getByRole("alertdialog");
+  await expect(remove).toContainText("Saved quotes or highlights from that transcript will also be deleted.");
+  await remove.getByRole("button", { name: "Cancel" }).click();
 });
 
 test("switching Write → Plan → Write keeps the same editor, its unsaved words and its undo history", async ({ page, request, baseURL }) => {

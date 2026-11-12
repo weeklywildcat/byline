@@ -225,7 +225,7 @@ export async function editTranscript(ctx: ScreenContext, id: number, input: Tran
 /**
  * Imports a reporter-provided transcript (.txt, .srt, .vtt). Attached to a recording when one is
  * named; otherwise the transcript file itself is kept as the private reporting
- * document the transcript belongs to. Either way it is MANUAL TRANSCRIPT.
+ * document the transcript belongs to. Either way it is an uploaded transcript.
  */
 export async function importTranscript(ctx: ScreenContext, storyId: number, input: { fileId?: unknown; sourceId?: unknown; appointmentId?: unknown; confidential?: unknown; replace?: unknown; clientKey?: unknown }) {
   const upload = ctx.req.file;
@@ -241,16 +241,21 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
   const { payload } = ctx.req;
   let fileId = Number(relationId(input.fileId)) || 0;
   let file: Record<string, unknown> | null = null;
+  let replayedStandalone = false;
   if (fileId) {
     const found = await payload.find({ collection: "reporting-files", where: { id: { equals: fileId } }, limit: 1, ...as(ctx) });
     file = (found.docs[0] ?? null) as unknown as Record<string, unknown> | null;
     if (!file || num(file.story) !== storyId) throw new APIError("That recording is not on this story.", 404);
+    if (file.kind !== "audio") throw new APIError("A transcript can only be attached to an interview recording.", 400);
   } else {
     // A transcript without its recording: the imported file is the reporting document it belongs to.
     const context = await resolveCaptureContext(ctx.req, { storyId, sourceId: input.sourceId, appointmentId: input.appointmentId });
     const existing = await existingCapture(ctx.req, "reporting-files", input.clientKey, "createdBy");
-    if (existing) file = existing;
-    else {
+    if (existing) {
+      if (num(existing.story) !== storyId) throw new APIError("That capture key is already in use.", 409);
+      file = existing;
+      replayedStandalone = true;
+    } else {
       file = (await payload.create({
         collection: "reporting-files",
         data: { story: storyId, source: context.source?.id ?? null, appointment: context.appointment?.id ?? null, confidential: input.confidential === true, groundRules: context.groundRules, ...(typeof input.clientKey === "string" ? { clientKey: input.clientKey } : {}) } as never,
@@ -261,26 +266,31 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
     fileId = Number(file.id);
   }
   const existingTranscript = (await payload.find({ collection: "reporting-transcripts", where: { file: { equals: fileId } }, limit: 1, ...as(ctx) })).docs[0];
+  // A lost-response retry of a standalone upload returns the canonical result,
+  // rather than treating its own earlier success as a replacement conflict.
+  if (replayedStandalone && existingTranscript?.state === "ready") {
+    return { transcriptId: existingTranscript.id, fileId, segments: normalizeSegments(existingTranscript.segments).length };
+  }
   if (existingTranscript && existingTranscript.state === "ready" && input.replace !== true) throw new APIError("This recording already has a transcript. Choose Replace to import over it.", 409);
   const system = { ...as(ctx), context: { ...ctx.req.context, bylineSystem: true } };
   const completedAt = new Date().toISOString();
   const data = {
     state: "ready" as const,
     origin: "manual" as const,
-    provider: "manual",
+    provider: null,
     model: null,
     language: parsed.language,
     durationMs: parsed.durationMs ?? (file?.durationMs as number | null) ?? null,
     segments: parsed.segments,
     completedAt,
     failure: null,
-    // Replacing a legacy machine transcript clears its old run metadata while preserving
-    // the row and any provenance that points at this transcript.
+    // Replacing a legacy machine transcript clears obsolete automatic-run metadata while
+    // preserving the transcript row and quote snapshots that point at it.
     transcriptionRunToken: null,
     transcriptionStartedAt: null,
-    progressPercent: 100,
-    progressMessage: "Manual transcript imported",
-    lastProgressAt: completedAt
+    progressPercent: null,
+    progressMessage: null,
+    lastProgressAt: null
   };
   const saved = existingTranscript
     ? await payload.update({ collection: "reporting-transcripts", id: existingTranscript.id, data, ...system })
@@ -302,7 +312,7 @@ export type SelectionInput = { segmentIds?: unknown; text?: unknown; kind?: unkn
  * recording, Source, ground rules, confidentiality and timing from the
  * transcript; attribution is the Source's name and role only when the
  * material is on the record (Byline never writes attribution for background).
- * Machine transcript selections start unverified.
+ * Every saved quote starts unverified, regardless of where the transcript came from.
  */
 export async function createSelection(ctx: ScreenContext, transcriptId: number, input: SelectionInput): Promise<SelectionView> {
   const audience = await audienceOf(ctx);
@@ -310,7 +320,7 @@ export async function createSelection(ctx: ScreenContext, transcriptId: number, 
   const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: transcriptId } }, limit: 1, ...as(ctx) });
   const transcript = found.docs[0];
   if (!transcript) throw new APIError("That transcript is not available.", 404);
-  if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
+  if (transcript.state !== "ready") throw new APIError("This transcript is not ready for quotes or highlights. Upload a replacement transcript first.", 409);
   const ids = Array.isArray(input.segmentIds) ? (input.segmentIds as unknown[]).filter((id): id is string => typeof id === "string").slice(0, 200) : [];
   const picked = selectionFromSegments(normalizeSegments(transcript.segments), ids, typeof input.text === "string" ? input.text : undefined);
   if (!picked) throw new APIError("Select the words to save.", 400);
@@ -349,20 +359,25 @@ export async function updateSelection(ctx: ScreenContext, id: number, input: Sel
 }
 
 export async function deleteSelection(ctx: ScreenContext, id: number) {
+  // Collection hooks protect article-used provenance for every deletion path.
   await ctx.req.payload.delete({ collection: "transcript-selections", id, ...as(ctx) });
   return { id };
 }
 
 /**
  * Verification is deliberate: the reporter listened to the source audio and
- * says these are the words. Never automatic, never inferred from a machine
- * transcript; changing the words afterwards un-verifies them.
+ * says these are the words. Uploading or editing a transcript never verifies
+ * a quote; changing the saved words afterwards un-verifies them.
  */
 export async function verifySelection(ctx: ScreenContext, id: number, verified: boolean) {
   const { payload } = ctx.req;
   const found = await payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
   const row = found.docs[0];
   if (!row) throw new APIError("That quote is not available.", 404);
+  if (verified) {
+    const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
+    if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
+  }
   // Update access is the check (creator, assigned editor, administrators, managers for normal material).
   const updated = await payload.update({
     collection: "transcript-selections", id,

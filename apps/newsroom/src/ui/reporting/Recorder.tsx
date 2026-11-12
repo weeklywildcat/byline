@@ -1,7 +1,10 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Mic, Square, Upload } from "lucide-react";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { AlertCircle, Mic, Square, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
 import { RECORDING_ACCEPT, recordingMimeType, recordingUploadProblem } from "../../domain/reporting";
@@ -23,7 +26,7 @@ const extension = (mime: string) => (mime.includes("mp4") ? "m4a" : mime.include
  * Reporting File, or the Field outbox). Never uploads by itself.
  */
 export function useRecorder() {
-  const [state, setState] = useState<"idle" | "recording" | "unsupported" | "denied">(() => (typeof window !== "undefined" && (!navigator.mediaDevices?.getUserMedia || pickType() === undefined) ? "unsupported" : "idle"));
+  const [state, setState] = useState<"idle" | "requesting" | "recording" | "unsupported" | "denied">(() => (typeof window !== "undefined" && (!navigator.mediaDevices?.getUserMedia || pickType() === undefined) ? "unsupported" : "idle"));
   const [elapsed, setElapsed] = useState(0);
   // A locked phone suspends the page and cuts the recording short: keep the screen on only while recording.
   useScreenWakeLock(state === "recording");
@@ -32,6 +35,7 @@ export function useRecorder() {
   const startedAt = useRef(0);
   const stream = useRef<MediaStream | null>(null);
   const finish = useRef<((recording: Recording) => void) | null>(null);
+  const requestVersion = useRef(0);
 
   useEffect(() => {
     if (state !== "recording") return undefined;
@@ -39,19 +43,35 @@ export function useRecorder() {
     return () => window.clearInterval(timer);
   }, [state]);
 
-  useEffect(() => () => { stream.current?.getTracks().forEach((track) => track.stop()); }, []);
+  useEffect(() => () => { requestVersion.current += 1; stream.current?.getTracks().forEach((track) => track.stop()); }, []);
 
   const start = useCallback(async () => {
     const type = pickType();
     if (!type || !navigator.mediaDevices?.getUserMedia) { setState("unsupported"); return; }
+    const request = ++requestVersion.current;
+    setState("requesting");
+    let granted: MediaStream;
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      granted = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch {
-      setState("denied");
+      if (request === requestVersion.current) setState("denied");
       return;
     }
+    if (request !== requestVersion.current) {
+      granted.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    stream.current = granted;
     chunks.current = [];
-    const next = new MediaRecorder(stream.current, { mimeType: type });
+    let next: MediaRecorder;
+    try {
+      next = new MediaRecorder(stream.current, { mimeType: type });
+    } catch {
+      stream.current.getTracks().forEach((track) => track.stop());
+      stream.current = null;
+      setState("unsupported");
+      return;
+    }
     next.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
     next.onstop = () => {
       stream.current?.getTracks().forEach((track) => track.stop());
@@ -77,7 +97,19 @@ export function useRecorder() {
     recorder.current?.stop();
   }), []);
 
-  return { state, elapsed, start, stop };
+  /** Cancels an in-flight permission request. A later grant is immediately closed. */
+  const cancelRequest = useCallback(() => {
+    requestVersion.current += 1;
+    setState("idle");
+  }, []);
+
+  /** Stops the active recorder without handing the take to the caller. */
+  const discard = useCallback(() => {
+    finish.current = null;
+    if (recorder.current?.state === "recording") recorder.current.stop();
+  }, []);
+
+  return { state, elapsed, start, stop, discard, cancelRequest };
 }
 
 export const clock = (ms: number) => {
@@ -124,9 +156,9 @@ export function RecordingUploadButton({ onPicked, busy, className }: { onPicked:
   };
   return (
     <>
-      <Button type="button" variant="outline" className={className} disabled={busy || reading} onClick={() => input.current?.click()}><Upload data-icon="inline-start" />Upload a recording</Button>
+      <Button type="button" variant="outline" className={className} disabled={busy || reading} onClick={() => input.current?.click()}>{reading ? <Spinner data-icon="inline-start" /> : <Upload data-icon="inline-start" />}{reading ? "Reading recording…" : "Upload a recording"}</Button>
       <input ref={input} type="file" accept={RECORDING_ACCEPT} hidden aria-label="Upload a recording" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void choose(file); }} />
-      {problem ? <p role="alert" className="basis-full text-sm text-destructive">{problem}</p> : null}
+      {problem ? <Alert variant="destructive" className="basis-full"><AlertCircle /><AlertTitle>Can’t use this recording</AlertTitle><AlertDescription>{problem}</AlertDescription></Alert> : null}
     </>
   );
 }
@@ -136,15 +168,19 @@ export function RecordingUploadButton({ onPicked, busy, className }: { onPicked:
  * `onUploaded`, an existing recording can be uploaded instead (hidden while
  * recording, and the only option where the browser can't record).
  */
-export function RecorderPanel({ label, onRecorded, onUploaded, busy, large }: { label?: string; onRecorded: (recording: Recording) => void; onUploaded?: (recording: Recording) => void; busy?: boolean; large?: boolean }) {
-  const { state, elapsed, start, stop } = useRecorder();
+export function RecorderPanel({ label, onRecorded, onUploaded, onCancel, busy, large }: { label?: string; onRecorded: (recording: Recording) => void; onUploaded?: (recording: Recording) => void; onCancel?: () => void; busy?: boolean; large?: boolean }) {
+  const { state, elapsed, start, stop, discard, cancelRequest } = useRecorder();
   const size = large ? "h-11 px-4 text-base" : undefined;
   const upload = onUploaded ? <RecordingUploadButton onPicked={onUploaded} busy={busy} className={size} /> : null;
   if (state === "unsupported") {
     return (
-      <div className="flex flex-wrap items-center gap-3" data-recorder={state}>
-        <p className="text-sm text-muted-foreground">{upload ? "This browser can't record audio." : "This browser can't record audio. Upload a recording instead."}</p>
-        {upload}
+      <div className="grid gap-2" data-recorder={state}>
+        <Alert>
+          <AlertCircle />
+          <AlertTitle>Recording isn’t available in this browser</AlertTitle>
+          <AlertDescription>{upload ? "You can still upload audio you recorded elsewhere." : "Use a browser that supports microphone recording, or upload audio elsewhere."}</AlertDescription>
+        </Alert>
+        <div className="flex flex-wrap gap-2">{upload}{onCancel ? <Button type="button" variant="ghost" className={size} onClick={onCancel}>Cancel</Button> : null}</div>
       </div>
     );
   }
@@ -152,16 +188,33 @@ export function RecorderPanel({ label, onRecorded, onUploaded, busy, large }: { 
     <div className="flex flex-wrap items-center gap-3" data-recorder={state}>
       {state === "recording" ? (
         <>
-          <Button type="button" variant="destructive" className={size} onClick={() => void stop().then(onRecorded)}><Square data-icon="inline-start" />Stop and save</Button>
+          <Button type="button" className={size} onClick={() => void stop().then(onRecorded)}><Square data-icon="inline-start" />Stop and save</Button>
           <span role="timer" aria-label="Recording time" className="text-sm tabular-nums"><span aria-hidden="true" className="mr-1.5 inline-block size-2 animate-pulse rounded-full bg-destructive motion-reduce:animate-none" />Recording {clock(elapsed)}</span>
+          {onCancel ? (
+            <AlertDialog>
+              <AlertDialogTrigger render={<Button type="button" variant="ghost" className={size} />}>Discard…</AlertDialogTrigger>
+              <AlertDialogContent size="sm">
+                <AlertDialogHeader>
+                  <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+                  <AlertDialogTitle>Discard this recording?</AlertDialogTitle>
+                  <AlertDialogDescription>The current take has not been saved. Discarding it cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep recording</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={() => { discard(); onCancel(); }}>Discard recording</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
         </>
       ) : (
         <>
-          <Button type="button" variant="outline" className={size} disabled={busy} onClick={() => void start()}><Mic data-icon="inline-start" />{label ?? "Record"}</Button>
-          {upload}
+          <Button type="button" variant="outline" className={size} disabled={busy || state === "requesting"} onClick={() => void start()}>{state === "requesting" ? <Spinner data-icon="inline-start" /> : <Mic data-icon="inline-start" />}{state === "requesting" ? "Waiting for microphone…" : label ?? "Record"}</Button>
+          {state === "requesting" ? null : upload}
+          {onCancel ? <Button type="button" variant="ghost" className={size} onClick={() => { if (state === "requesting") cancelRequest(); onCancel(); }}>Cancel</Button> : null}
         </>
       )}
-      {state === "denied" ? <p role="alert" className="basis-full text-sm text-destructive">Microphone access was blocked. Allow it in the browser's site settings, then try again{upload ? ", or upload a recording" : ""}.</p> : null}
+      {state === "denied" ? <Alert variant="destructive" className="basis-full"><AlertCircle /><AlertTitle>Microphone access is blocked</AlertTitle><AlertDescription>Allow microphone access in the browser’s site settings, then try again{upload ? ", or upload a recording instead" : ""}.</AlertDescription></Alert> : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type PayloadRequest } from "payload";
 import { normalizeGroundRules } from "../domain/reporting";
+import { lockRow } from "../db/locks";
 
 /**
  * Quote provenance from the article body (docs/reporting.md#provenance).
@@ -41,9 +42,16 @@ export const guardOffRecordQuotes: CollectionBeforeChangeHook = async ({ data, o
   if (req.context?.bylineImport === true || data.body === undefined) return data;
   const next = referencedSelections(data.body);
   const before = new Set(referencedSelections(originalDoc?.body));
-  const added = next.filter((id) => !before.has(id));
+  const added = next.filter((id) => !before.has(id)).sort((a, b) => a - b);
   if (!added.length) return data;
+
+  // Hold each newly referenced quote row until this Story transaction finishes.
+  // Deletion takes the same lock before checking usedIn, so a save cannot add a
+  // provenance link in the gap between a deletion check and the delete itself.
+  for (const id of added) await lockRow(req, "transcript_selections", id);
+
   const rows = await req.payload.find({ collection: "transcript-selections", where: { id: { in: added } }, pagination: false, depth: 0, overrideAccess: true, select: { groundRules: true, offRecordOverride: true }, req });
+  if (rows.docs.length !== added.length) throw new APIError("A saved quote in this story is no longer available. Remove it from the article and try again.", 409);
   for (const row of rows.docs) {
     if (normalizeGroundRules(row.groundRules).rule === "off-record" && !row.offRecordOverride?.at) {
       throw new APIError("A quote in this story is off the record. Remove it, or ask an editor to approve its public use.", 400);

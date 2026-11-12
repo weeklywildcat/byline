@@ -129,13 +129,82 @@ const describeUpload: CollectionBeforeChangeHook = ({ data, operation, req }) =>
   return data;
 };
 
-/** Remove derived rows before the recording itself so PostgreSQL relationship constraints cannot block the parent delete. */
+const isUsedSelection = (row: { usedIn?: unknown }) => Array.isArray(row.usedIn) && row.usedIn.length > 0;
+
+async function selectionsForTranscripts(req: PayloadRequest, transcriptIds: number[]) {
+  if (!transcriptIds.length) return [];
+  return (await req.payload.find({
+    collection: "transcript-selections",
+    where: { transcript: { in: transcriptIds } },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true,
+    select: { usedIn: true },
+    req
+  })).docs;
+}
+
+async function lockSelectionRows(req: PayloadRequest, ids: number[]) {
+  for (const id of [...new Set(ids)].sort((a, b) => a - b)) await lockRow(req, "transcript_selections", id);
+}
+
+async function lockedSelectionsForTranscripts(req: PayloadRequest, transcriptIds: number[]) {
+  const initial = await selectionsForTranscripts(req, transcriptIds);
+  await lockSelectionRows(req, initial.map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0));
+  return selectionsForTranscripts(req, transcriptIds);
+}
+
+function assertNoUsedSelections(rows: Array<{ usedIn?: unknown }>, noun: "recording" | "transcript") {
+  const used = rows.filter(isUsedSelection);
+  if (!used.length) return;
+  const quotes = used.length === 1 ? "A saved quote" : `${used.length} saved quotes`;
+  throw new APIError(`${quotes} from this ${noun} ${used.length === 1 ? "is" : "are"} used in an article. Remove ${used.length === 1 ? "it" : "them"} from the article before deleting the ${noun}.`, 409);
+}
+
+/**
+ * Remove derived rows before the recording itself so PostgreSQL relationship
+ * constraints cannot block the parent delete. A quote already used in an
+ * article is provenance, not disposable scratch data: refuse to orphan it.
+ *
+ * A permanent Story delete removes selections/transcripts first, so this hook
+ * sees no derived rows in that cascade and does not block the Story deletion.
+ */
 const removeDerived: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const transcripts = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: id } }, depth: 0, pagination: false, overrideAccess: true, select: {}, req });
-  const ids = transcripts.docs.map((row) => row.id);
+  const ids = transcripts.docs.map((row) => Number(row.id)).filter((value) => Number.isSafeInteger(value) && value > 0).sort((a, b) => a - b);
   if (!ids.length) return;
+
+  // Selection creation locks its transcript first. Take the same parent locks so
+  // no new quote can appear after we enumerate the children, then lock every
+  // child before re-reading usedIn and deleting.
+  for (const transcriptId of ids) await lockRow(req, "reporting_transcripts", transcriptId);
+  const selections = await lockedSelectionsForTranscripts(req, ids);
+  assertNoUsedSelections(selections, "recording");
   await req.payload.delete({ collection: "transcript-selections", where: { transcript: { in: ids } }, overrideAccess: true, req });
   await req.payload.delete({ collection: "reporting-transcripts", where: { id: { in: ids } }, overrideAccess: true, req });
+};
+
+/** Direct transcript deletion follows the same provenance rule as deleting its recording. */
+const removeTranscriptSelections: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const transcriptId = Number(id);
+  if (!Number.isInteger(transcriptId) || transcriptId <= 0) return;
+  await lockRow(req, "reporting_transcripts", transcriptId);
+  const selections = await lockedSelectionsForTranscripts(req, [transcriptId]);
+  assertNoUsedSelections(selections, "transcript");
+  if (selections.length) {
+    await req.payload.delete({ collection: "transcript-selections", where: { transcript: { equals: transcriptId } }, overrideAccess: true, req });
+  }
+};
+
+/** A selection referenced by an article is immutable provenance until that reference is removed. */
+const protectUsedSelectionDelete: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const selectionId = Number(id);
+  if (!Number.isSafeInteger(selectionId) || selectionId <= 0) return;
+  await lockRow(req, "transcript_selections", selectionId);
+  const found = await req.payload.find({ collection: "transcript-selections", where: { id: { equals: selectionId } }, limit: 1, depth: 0, overrideAccess: true, select: { usedIn: true }, req });
+  if (found.docs[0] && isUsedSelection(found.docs[0])) {
+    throw new APIError("This saved quote is used in an article. Remove it from the article before deleting it.", 409);
+  }
 };
 
 export const ReportingFiles: CollectionConfig = {
@@ -213,7 +282,7 @@ export const ReportingTranscripts: CollectionConfig = {
   admin: { ...reportingAdmin, useAsTitle: "id", defaultColumns: ["id", "story", "state", "origin", "updatedAt"] },
   lockDocuments: false,
   access: { read: readReporting(), create: createReporting, update: changeReporting(), delete: changeReporting() },
-  hooks: { beforeChange: [stampCreator, projectSearchText] },
+  hooks: { beforeChange: [stampCreator, projectSearchText], beforeDelete: [removeTranscriptSelections] },
   fields: [
     storyField,
     { name: "file", type: "relationship", relationTo: "reporting-files", required: true, unique: true, index: true, access: { update: () => false } },
@@ -273,9 +342,33 @@ export const TranscriptSelections: CollectionConfig = {
             req
           });
           if (!transcript) throw new APIError("That transcript is not available.", 404);
-          if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
+          if (transcript.state !== "ready") throw new APIError("This transcript is not ready for quotes or highlights. Upload a replacement transcript first.", 409);
         }
         if (operation === "update" && originalDoc && data.transcript !== undefined && relationChanged(data.transcript, originalDoc.transcript)) throw new APIError("A selection cannot move to another transcript.", 400);
+        if (operation === "update" && originalDoc) {
+          const changesSnapshot =
+            (data.text !== undefined && data.text !== originalDoc.text) ||
+            (data.attribution !== undefined && data.attribution !== originalDoc.attribution) ||
+            (data.kind !== undefined && data.kind !== originalDoc.kind);
+          if (changesSnapshot) {
+            const selectionId = Number(originalDoc.id);
+            if (Number.isSafeInteger(selectionId) && selectionId > 0) {
+              await lockRow(req, "transcript_selections", selectionId);
+              const fresh = await req.payload.findByID({
+                collection: "transcript-selections",
+                id: selectionId,
+                overrideAccess: true,
+                disableErrors: true,
+                depth: 0,
+                select: { usedIn: true },
+                req
+              });
+              if (fresh && isUsedSelection(fresh)) {
+                throw new APIError("This saved quote is used in an article. Remove it from the article before changing its words or attribution.", 409);
+              }
+            }
+          }
+        }
         // Changing the words un-verifies them: verification is of exact words against the audio.
         if (operation === "update" && originalDoc?.state === "verified" && data.text !== undefined && data.text !== originalDoc.text) {
           data.state = "saved";
@@ -284,7 +377,8 @@ export const TranscriptSelections: CollectionConfig = {
         }
         return data;
       }
-    ]
+    ],
+    beforeDelete: [protectUsedSelectionDelete]
   },
   fields: [
     storyField,

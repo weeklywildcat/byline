@@ -3,18 +3,23 @@
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
-import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
-import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { useAnyCoarsePointer, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/newsroom-ui/ui/resizable";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Play, Search } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
@@ -100,6 +105,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const [matchIndex, setMatchIndex] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const contextTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const refresh = useCallback(() => Promise.all([cache.invalidateQueries({ queryKey: transcriptKey(transcriptId) }), cache.invalidateQueries({ queryKey: reportingKey(storyId) }), cache.invalidateQueries({ queryKey: ["byline", "story-quotes", storyId] })]), [cache, transcriptId, storyId]);
   const canEdit = detail?.canEdit === true && !context.readOnly;
@@ -112,19 +118,22 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const profiles = useMemo(() => speakerProfiles(segments), [segments]);
   // Once any passage has a voice, a passage without one is shown as unknown, never as someone.
   const diarized = profiles.length > 0;
-  const lastEnd = segments.at(-1)?.endMs;
-  const active = lastEnd != null && position <= lastEnd ? activeSegmentAt(segments, position) : null;
+  const active = ready ? activeSegmentAt(segments, position) : null;
 
   const matches = useMemo(() => searchTranscript(segments, query), [segments, query]);
   const current = matches.length ? matches[Math.min(matchIndex, matches.length - 1)] : null;
 
-  const seek = useCallback((ms: number | null) => {
+  const positionAt = useCallback((ms: number | null) => {
     const audio = audioRef.current;
     if (!audio || ms === null) return;
     stopAt.current = null;
     audio.currentTime = ms / 1000;
-    void audio.play().catch(() => undefined);
+    setPosition(ms);
   }, []);
+  const seek = useCallback((ms: number | null) => {
+    positionAt(ms);
+    if (ms !== null) void audioRef.current?.play().catch(() => undefined);
+  }, [positionAt]);
   const playSample = useCallback((startMs: number, endMs: number | null) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -140,7 +149,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
     }
   }, []);
 
-  // A new search starts at its first result; stepping scrolls and seeks to it.
+  // A new search starts at its first result; stepping scrolls and positions playback without starting audio.
   const changeQuery = (value: string) => {
     setQuery(value);
     setMatchIndex(0);
@@ -159,8 +168,18 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
       });
     }
-    if (segment) seek(segment.startMs);
+    if (segment) positionAt(segment.startMs);
   };
+
+  useEffect(() => {
+    if (!ready) {
+      setDraft(null);
+      return undefined;
+    }
+    const syncSelection = () => setDraft(readSelection(streamRef.current));
+    document.addEventListener("selectionchange", syncSelection);
+    return () => document.removeEventListener("selectionchange", syncSelection);
+  }, [ready]);
 
   const save = useMutation({
     mutationFn: (kind: "highlight" | "quote") => saveSelection(context.api, transcriptId, { segmentIds: draft?.ids, text: draft?.text, kind }),
@@ -175,8 +194,8 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   });
   const detailError = detailQuery.error;
   const accessLost = detailError instanceof ApiError && detailError.status >= 400 && detailError.status < 500;
-  if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
-  if (!detail) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
+  if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={accessLost ? onBack : () => void detailQuery.refetch()} actionLabel={accessLost ? "Back to Reporting" : "Try again"}>{(detailQuery.error as Error).message}</InlineAlert></div>;
+  if (!detail) return <TranscriptSkeleton hideBack={hideBack} onBack={onBack} />;
 
   const contextPanel = <TranscriptContext context={context} detail={detail} profiles={profiles} canEdit={canEdit} seek={seek} playSample={playSample} refresh={refresh} />;
   const searchBar = (
@@ -186,7 +205,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   );
   const stream = (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TranscriptState detail={detail} />
+      <TranscriptState detail={detail} onBack={onBack} />
       {segmentCount > 0 ? (
         <div
           ref={streamRef}
@@ -194,8 +213,6 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
           role="region"
           aria-label="Transcript passages"
           tabIndex={0}
-          onMouseUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
-          onKeyUp={ready ? () => setDraft(readSelection(streamRef.current)) : undefined}
         >
           {turns.map((turn) => (
             <div key={turn.id} data-turn={turn.identity ?? ""} className="border-t pt-1 first:border-t-0 first:pt-0">
@@ -224,6 +241,15 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
             </div>
           ))}
         </div>
+      ) : ready ? (
+        <Empty className="my-4 border py-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><FileText /></EmptyMedia>
+            <EmptyTitle>No transcript text</EmptyTitle>
+            <EmptyDescription>This transcript does not contain any readable passages. Replace it from the recording in Reporting.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent><Button type="button" variant="outline" onClick={onBack}>Go to recording</Button></EmptyContent>
+        </Empty>
       ) : null}
       {ready && draft ? (
         // A bar in the layout, docked under the transcript: it never covers the words being selected.
@@ -255,7 +281,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
             {detail.editedAt ? <span>Edited</span> : null}
           </p>
         </div>
-        {!wide ? <Button type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Source & quotes{detail.selections.length ? ` (${detail.selections.length})` : ""}</Button> : null}
+        {!wide ? <Button ref={contextTriggerRef} type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Details{detail.selections.length ? <Badge variant="secondary" className="ml-1">{detail.selections.length}</Badge> : null}</Button> : null}
       </div>
       <GroundRulesBanner detail={detail} />
       {wide ? (
@@ -278,11 +304,25 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         </div>
       )}
       <Sheet open={contextOpen && !wide} onOpenChange={setContextOpen}>
-        <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
-          <SheetHeader><SheetTitle>Source & quotes</SheetTitle><SheetDescription>Who is speaking, the ground rules, and the quotes saved from this recording.</SheetDescription></SheetHeader>
+        <SheetContent side="right" finalFocus={contextTriggerRef} className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{detail.file.kind === "audio" ? "Interview details" : "Transcript details"}</SheetTitle>
+            <SheetDescription>Source, speakers, ground rules, and saved material for this transcript.</SheetDescription>
+          </SheetHeader>
           <div className="px-4 pb-6">{contextPanel}</div>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function TranscriptSkeleton({ hideBack, onBack }: { hideBack: boolean; onBack: () => void }) {
+  return (
+    <div className="grid gap-3" role="status" aria-label="Loading transcript">
+      {hideBack ? null : <BackButton onBack={onBack} />}
+      <div className="flex items-center gap-3"><div className="grid flex-1 gap-2"><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-72 max-w-full" /></div><Skeleton className="h-8 w-32" /></div>
+      <div className="rounded-lg border p-4"><Skeleton className="h-10 w-full" /><Skeleton className="mt-3 h-8 w-full" /><div className="mt-4 grid gap-4">{[0, 1, 2, 3].map((item) => <div key={item} className="grid grid-cols-[3rem_1fr] gap-3"><Skeleton className="h-4 w-10" /><div className="grid gap-2"><Skeleton className="h-4 w-28" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div></div>)}</div></div>
+      <span className="sr-only">Loading transcript…</span>
     </div>
   );
 }
@@ -293,10 +333,13 @@ function BackButton({ onBack }: { onBack: () => void }) {
 
 /** Audio stays pinned above the transcript while reviewing. */
 function Player({ detail, audioRef, onTime }: { detail: TranscriptDetail; audioRef: React.RefObject<HTMLAudioElement | null>; onTime: (ms: number) => void }) {
-  if (!detail.file.url) return <p className="py-2 text-sm text-muted-foreground">No recording is attached to this transcript, so there is nothing to play. Timestamps still show where each passage was said.</p>;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [detail.file.url]);
+  if (!detail.file.url) return <div className="py-2"><Alert><AlertCircle /><AlertTitle>No recording attached</AlertTitle><AlertDescription>Playback is unavailable, but timestamped passages still keep their original positions.</AlertDescription></Alert></div>;
   return (
-    <div className="sticky top-0 z-10 -mx-1 bg-background px-1 py-2">
-      <audio ref={audioRef} controls preload="metadata" src={detail.file.url} aria-label={`Recording: ${detail.file.filename}`} className="h-10 w-full" onTimeUpdate={(event) => onTime(event.currentTarget.currentTime * 1000)} />
+    <div className="sticky top-0 z-10 -mx-1 grid gap-2 bg-background px-1 py-2">
+      <audio ref={audioRef} controls preload="metadata" src={detail.file.url} aria-label={`Recording: ${detail.file.filename}`} className="h-10 w-full" onCanPlay={() => setFailed(false)} onError={() => setFailed(true)} onTimeUpdate={(event) => onTime(event.currentTarget.currentTime * 1000)} />
+      {failed ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Recording could not be loaded</AlertTitle><AlertDescription>The transcript is still available. Return to Reporting if the recording needs to be replaced.</AlertDescription></Alert> : null}
     </div>
   );
 }
@@ -317,11 +360,12 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
             if (event.key === "Escape") onQuery("");
           }}
         />
-        {query.trim().length >= 2 ? (
+        {query ? (
           <InputGroupAddon align="inline-end">
-            <span role="status" className="text-xs tabular-nums text-muted-foreground">{count ? `${index + 1} of ${count}` : "No results"}</span>
-            <InputGroupButton type="button" size="icon-xs" aria-label="Previous result" disabled={!count} onClick={() => onStep(-1)}><ChevronUp /></InputGroupButton>
-            <InputGroupButton type="button" size="icon-xs" aria-label="Next result" disabled={!count} onClick={() => onStep(1)}><ChevronDown /></InputGroupButton>
+            {query.trim().length >= 2 ? <span role="status" className="text-xs tabular-nums text-muted-foreground">{count ? `${index + 1} of ${count}` : "No results"}</span> : null}
+            {query.trim().length >= 2 ? <InputGroupButton type="button" size="icon-xs" aria-label="Previous result" disabled={!count} onClick={() => onStep(-1)}><ChevronUp /></InputGroupButton> : null}
+            {query.trim().length >= 2 ? <InputGroupButton type="button" size="icon-xs" aria-label="Next result" disabled={!count} onClick={() => onStep(1)}><ChevronDown /></InputGroupButton> : null}
+            <InputGroupButton type="button" size="icon-xs" aria-label="Clear transcript search" onClick={() => onQuery("")}><X /></InputGroupButton>
           </InputGroupAddon>
         ) : null}
       </InputGroup>
@@ -329,13 +373,16 @@ function SearchBar({ query, onQuery, count, index, onStep }: { query: string; on
   );
 }
 
-function TranscriptState({ detail }: { detail: TranscriptDetail }) {
+function TranscriptState({ detail, onBack }: { detail: TranscriptDetail; onBack: () => void }) {
   if (detail.state === "ready") return null;
   return (
     <div className="py-3">
-      <InlineAlert title="This legacy transcript is incomplete">
-        Automatic transcription has been retired. Go back to Reporting and upload a .txt, .srt or .vtt transcript for this recording to replace it.
-      </InlineAlert>
+      <Alert>
+        <AlertCircle />
+        <AlertTitle>This legacy transcript is incomplete</AlertTitle>
+        <AlertDescription>Automatic transcription has been retired. Upload a .txt, .srt or .vtt replacement from the recording in Reporting.</AlertDescription>
+        <AlertAction><Button type="button" size="xs" variant="outline" onClick={onBack}>Go to recording</Button></AlertAction>
+      </Alert>
     </div>
   );
 }
@@ -379,7 +426,7 @@ function Segment({ segment, heading, diarized, profiles, sourceName, isActive, r
         {editing ? (
           <div className="grid gap-2">
             <Textarea value={text} rows={3} aria-label="Passage text" onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") onDone(); if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); save.mutate(); } }} autoFocus />
-            <div className="flex gap-2"><Button type="button" size="sm" disabled={save.isPending || !text.trim()} onClick={() => save.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={onDone}>Cancel</Button></div>
+            <div className="flex gap-2"><Button type="button" size="sm" disabled={save.isPending || !text.trim()} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save</Button><Button type="button" size="sm" variant="ghost" disabled={save.isPending} onClick={onDone}>Cancel</Button></div>
           </div>
         ) : (
           <p data-segment-text={segment.id} className="text-[0.95rem] leading-relaxed [overflow-wrap:anywhere]">{marked(segment.text, ranges, currentRange)}</p>
@@ -396,6 +443,7 @@ const machineKeyOf = (key: string | undefined) => (key && /^SPEAKER_\d{2,3}$/.te
 /** A speaker is edited where it is shown: this passage, or everywhere. */
 function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, transcriptId, api, updatedAt, refresh }: { segment: TranscriptSegment; diarized: boolean; profiles: SpeakerProfile[]; sourceName: string | null; canEdit: boolean; transcriptId: number; api: string; updatedAt: string; refresh: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
+  const touch = useAnyCoarsePointer();
   const [name, setName] = useState(givenName(segment));
   useEffect(() => { if (open) setName(givenName(segment)); }, [open, segment]);
   const shown = speakerLabel(segment);
@@ -411,20 +459,30 @@ function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, trans
   const label = shown ?? (diarized ? "Unknown speaker" : "Add speaker");
   const plain = shown ? "" : "text-muted-foreground";
   if (!canEdit) return <span data-speaker-label="" className={`select-none text-sm font-medium ${plain}`}>{label}</span>;
-  return (
+  const trigger = <button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${plain}`} aria-label={shown ? `Speaker: ${shown}. Change` : "Add speaker"} />;
+  const form = (
+    <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
+      <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
+      <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
+      {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={apply.isPending || !name.trim()}>{apply.isPending ? <Spinner data-icon="inline-start" /> : null}This passage</Button>
+        {segment.speaker ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || !name.trim()} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
+      </div>
+    </form>
+  );
+  return touch ? (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger render={trigger}>{label}</DrawerTrigger>
+      <DrawerContent keyboardAware>
+        <DrawerHeader><DrawerTitle>Name speaker</DrawerTitle><DrawerDescription>{shown ? `Currently ${shown}` : "Choose who is speaking in this passage."}</DrawerDescription></DrawerHeader>
+        <div className="px-4 pb-4">{form}</div>
+      </DrawerContent>
+    </Drawer>
+  ) : (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${plain}`} aria-label={shown ? `Speaker: ${shown}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
-          <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
-          <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
-          {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" size="sm" disabled={apply.isPending}>This passage</Button>
-            {segment.speaker ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || !name.trim()} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
-          </div>
-        </form>
-      </PopoverContent>
+      <PopoverTrigger render={trigger}>{label}</PopoverTrigger>
+      <PopoverContent align="start" className="w-72">{form}</PopoverContent>
     </Popover>
   );
 }
@@ -476,7 +534,7 @@ function NameSpeaker({ api, detail, profile, profiles, onDone, onCancel }: { api
       <Input value={name} maxLength={120} aria-label={`Name for ${profile.label}`} placeholder="Name this speaker" autoFocus onChange={(event) => setName(event.target.value)} />
       {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 5).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
       <div className="flex gap-2">
-        <Button type="button" size="xs" disabled={rename.isPending || (!name.trim() && !profile.named)} onClick={() => rename.mutate()}>{name.trim() || !profile.named ? "Save name" : "Clear name"}</Button>
+        <Button type="button" size="xs" disabled={rename.isPending || (!name.trim() && !profile.named)} onClick={() => rename.mutate()}>{rename.isPending ? <Spinner data-icon="inline-start" /> : null}{name.trim() || !profile.named ? "Save name" : "Clear name"}</Button>
         <Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </InlineForm>
@@ -490,7 +548,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
     <div className="grid gap-5 p-4 text-sm" data-transcript-context="">
       <section aria-label="Source" className="grid gap-1.5">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Source</h3>
-        {detail.source ? <p className="font-medium">{detail.source.label}{detail.source.role ? <span className="font-normal text-muted-foreground">, {detail.source.role}</span> : null}</p> : <p className="text-muted-foreground">No source on this recording.</p>}
+        {detail.source ? <p className="font-medium">{detail.source.label}{detail.source.role ? <span className="font-normal text-muted-foreground">, {detail.source.role}</span> : null}</p> : <p className="text-muted-foreground">No source attached.</p>}
         {detail.appointment ? <p className="text-muted-foreground">{detail.appointment.title}</p> : null}
         <p className="flex flex-wrap items-center gap-2"><Badge variant={rules.rule === "off-record" ? "destructive" : "outline"}>{groundRuleLabel(rules.rule)}</Badge>{rules.recordingPermission ? <span className="text-xs text-muted-foreground">Recording permission confirmed</span> : null}</p>
         {rules.note ? <p className="text-xs text-muted-foreground">{rules.note}</p> : null}
@@ -498,8 +556,8 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
         <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Uploaded transcript" : `Legacy machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
       </section>
       {profiles.length ? <SpeakersPanel api={context.api} detail={detail} profiles={profiles} canEdit={canEdit} playSample={playSample} refresh={refresh} /> : null}
-      {detail.state === "ready" ? <section aria-label="Saved quotes" className="grid gap-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this recording</h3>
+      {detail.state === "ready" ? <section aria-label="Saved transcript material" className="grid gap-2">
+        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this transcript</h3>
         {detail.selections.length === 0 ? <p className="text-muted-foreground">Select words in the transcript to save a highlight or a quote.</p> : (
           <ul className="grid gap-3">{detail.selections.map((selection) => <li key={selection.id}><SelectionCard context={context} selection={selection} detail={detail} seek={seek} refresh={refresh} /></li>)}</ul>
         )}
@@ -510,6 +568,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
 
 function SelectionCard({ context, selection, detail, seek, refresh }: { context: StoryScreenContext; selection: SelectionView; detail: TranscriptDetail; seek: (ms: number | null) => void; refresh: () => Promise<unknown> }) {
   const [overriding, setOverriding] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [reason, setReason] = useState("");
   const run = useMutation({
     mutationFn: async (action: "verify" | "unverify" | "remove" | "promote" | "override") => {
@@ -521,7 +580,7 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
     },
     onSuccess: async (_result, action) => {
       if (action === "override") { setOverriding(false); setReason(""); toast.success("Public use approved. It is recorded in the story's activity."); }
-      if (action === "remove") toast.success("Removed.");
+      if (action === "remove") { setRemoveOpen(false); toast.success("Removed."); }
       await refresh();
     },
     onError: (error: Error) => toast.error(error.message)
@@ -540,8 +599,31 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.usedIn.length ? <p className="text-xs text-muted-foreground">Used in {selection.usedIn.map((story) => story.headline).join(", ")}</p> : null}
       {selection.canEdit && !context.readOnly ? (
         <div className="flex flex-wrap gap-1.5">
-          {selection.kind === "highlight" ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button> : selection.state === "saved" ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button> : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
-          <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => run.mutate("remove")}>Remove</Button>
+          {selection.kind === "highlight"
+            ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button>
+            : selection.state === "saved"
+              ? detail.file.url
+                ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button>
+                : <Badge variant="outline">No recording to verify</Badge>
+              : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
+          {selection.usedIn.length ? null : (
+            <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+              <AlertDialogTrigger render={<Button type="button" size="xs" variant="ghost" disabled={run.isPending} />}>Remove</AlertDialogTrigger>
+              <AlertDialogContent size="sm">
+                <AlertDialogHeader>
+                  <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+                  <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <Button type="button" size="xs" variant="outline" onClick={() => setOverriding(true)}>Editor override…</Button> : null}
         </div>
       ) : null}

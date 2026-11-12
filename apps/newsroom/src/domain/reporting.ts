@@ -237,8 +237,12 @@ export type TranscriptSummary = {
   origin: "machine" | "manual";
   language: string | null;
   durationMs: number | null;
+  /** All saved quotes and highlights from this transcript. */
+  selectionCount: number;
   quoteCount: number;
   verifiedCount: number;
+  /** Saved selections from this transcript that are currently referenced by an article. */
+  usedSelectionCount: number;
 };
 
 export type ReportingFileMaterial = MaterialBase & {
@@ -263,7 +267,7 @@ export type MediaMaterial = MaterialBase & {
   via: "assignment" | "capture";
 };
 
-export type ResourceMaterial = MaterialBase & { kind: "resource"; label: string; url: string; purpose: string };
+export type ResourceMaterial = MaterialBase & { kind: "resource"; resourceId: string; label: string; url: string; purpose: string };
 
 export type LiveUpdateMaterial = MaterialBase & { kind: "live"; text: string; state: "draft" | "published" };
 

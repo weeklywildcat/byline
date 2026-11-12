@@ -4,35 +4,40 @@ import { PHOTO_FILE_ACCEPT } from "@byline/core";
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
+import { ResourceDialog } from "@byline/newsroom-screens/workspace/ResourcesSection";
 import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
 import { useDialogTarget } from "@byline/newsroom-screens/workspace/dialog-target";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
-import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { StoryAppointment, StoryResource, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { FieldError } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Kbd, KbdGroup } from "@byline/newsroom-ui/ui/kbd";
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, PanelRight, Plus, Radio, Search, StickyNote, Upload, X } from "lucide-react";
+import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, LockOpen, Mic, MoreHorizontal, PanelRight, Pencil, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
+import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type ResourceMaterial, type StoryMaterialItem } from "../../domain/reporting";
 import type { ReportingAppointment, ReportingSource } from "../../reporting/material";
 import { postJson } from "../story/api";
 import { formatDay } from "../story/parts";
@@ -90,6 +95,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const [panel, setPanel] = useState<null | "note" | "link" | "record">(null);
   const [bound, setBound] = useState<Bound | null>(null);
   const [railOpen, setRailOpen] = useState(false);
+  const railTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [localTranscript, setLocalTranscript] = useState<number | null>(transcriptId ?? null);
   const openTranscript = onTranscript ? transcriptId ?? null : localTranscript;
   const setOpenTranscript = (id: number | null) => (onTranscript ? onTranscript(id) : setLocalTranscript(id));
@@ -100,6 +106,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const pendingBound = useRef<Bound | null>(null);
   const data = query.data;
   const wide = width >= RAIL_AT;
+  const compactFilters = width < 620;
   const refresh = useCallback(() => cache.invalidateQueries({ queryKey: reportingKey(storyId) }), [cache, storyId]);
   const canCapture = !context.readOnly && data?.capabilities.capture === true;
 
@@ -141,12 +148,12 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   };
 
   const capture = (from?: Bound) => ({
-    note: () => { setBound(from ?? null); setPanel("note"); },
-    record: () => { setBound(from ?? null); setPanel("record"); },
+    note: () => { pendingBound.current = null; setBound(from ?? null); setPanel("note"); },
+    record: () => { pendingBound.current = null; setBound(from ?? null); setPanel("record"); },
     file: () => pick(fileInput, from),
     photo: () => pick(photoInput, from),
     transcript: () => pick(transcriptInput, from),
-    link: () => { setBound(from ?? null); setPanel("link"); }
+    link: () => { pendingBound.current = null; setBound(from ?? null); setPanel("link"); }
   });
 
   // Story Context's capture shortcuts and appointment links land here once, after the notebook loads.
@@ -172,7 +179,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
     return <TranscriptView context={context} transcriptId={openTranscript} onBack={() => { setOpenTranscript(null); void refresh(); }} />;
   }
   if (query.isError) return <InlineAlert title="Reporting isn't available" onAction={() => void query.refetch()}>{(query.error as Error).message}</InlineAlert>;
-  if (!data) return <p role="status" className="text-sm text-muted-foreground">Loading reporting…</p>;
+  if (!data) return <ReportingSkeleton />;
 
   const visible = sortMaterial(data.materials).filter((item) => materialMatchesFilter(item, filter) && materialMatchesSearch(item, needle));
   const groups = materialDayGroups(visible, data.timeZone);
@@ -190,22 +197,21 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
             <InputGroup className="min-w-48 flex-1">
               <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
               <InputGroupInput type="search" value={search} placeholder="Search this story…" aria-label="Search this story's reporting" onChange={(event) => setSearch(event.target.value)} />
+              {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear reporting search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
             </InputGroup>
             {canCapture ? <CaptureMenu capture={capture()} /> : null}
-            {!wide ? <Button type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
+            {!wide ? <Button ref={railTriggerRef} type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
           </div>
 
-          {bound?.label && panel ? <p className="text-sm text-muted-foreground" data-capture-context="">For <span className="font-medium text-foreground">{bound.label}</span> <button type="button" className="touch-hit underline underline-offset-2" onClick={() => setBound(null)}>Clear</button></p> : null}
+          {bound?.label && panel ? <div className="flex items-center gap-2" data-capture-context=""><span className="text-xs text-muted-foreground">Filing with</span><Badge variant="secondary" className="gap-1 pr-1"><span className="max-w-64 truncate">{bound.label}</span><button type="button" className="touch-hit rounded-sm p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Clear " + bound.label} onClick={() => setBound(null)}><X className="size-3" /></button></Badge></div> : null}
           {panel === "note" ? <NoteComposer context={context} bound={bound} onDone={() => { setPanel(null); setBound(null); void refresh(); }} onCancel={() => { setPanel(null); setBound(null); }} /> : null}
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
             <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
               <p className="text-sm font-medium">Interview</p>
-              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Add a .txt, .srt or .vtt transcript when you have one{bound?.label ? ` for ${bound.label}` : ""}.</p>
+              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
               <div className="flex flex-wrap items-center gap-3">
-                <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} />
-                <Button type="button" variant="outline" size="sm" onClick={() => pick(transcriptInput, bound ?? undefined)}><FileText data-icon="inline-start" />Upload transcript</Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setPanel(null); setBound(null); }}>Cancel</Button>
+                <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} onCancel={() => { setPanel(null); setBound(null); }} />
               </div>
             </div>
           ) : null}
@@ -222,23 +228,36 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
           <section aria-label="Material" className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Material</h3>
-              <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Show" value={[filter]} onValueChange={(next: unknown[]) => { const value = next[0]; if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
-                {MATERIAL_FILTERS.map((entry) => <ToggleGroupItem key={entry.value} value={entry.value}>{entry.label}</ToggleGroupItem>)}
-              </ToggleGroup>
+              {compactFilters ? (
+                <Select value={filter} onValueChange={(value) => { if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
+                  <SelectTrigger size="sm" aria-label="Filter material"><SelectValue /></SelectTrigger>
+                  <SelectContent align="end">{MATERIAL_FILTERS.map((entry) => <SelectItem key={entry.value} value={entry.value}>{entry.label}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Show" value={[filter]} onValueChange={(next: unknown[]) => { const value = next[0]; if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
+                  {MATERIAL_FILTERS.map((entry) => <ToggleGroupItem key={entry.value} value={entry.value}>{entry.label}</ToggleGroupItem>)}
+                </ToggleGroup>
+              )}
             </div>
             {uploads.length ? <ul className="grid gap-2" aria-label="Uploads">{uploads.map((upload) => <li key={upload.id}><UploadRow upload={upload} onRetry={() => void send(upload)} onDismiss={() => setUploads((list) => list.filter((item) => item.id !== upload.id))} /></li>)}</ul> : null}
             {groups.length === 0 && !uploads.length ? (
               <Empty className="border border-dashed py-10">
                 <EmptyHeader>
+                  <EmptyMedia variant="icon">{data.materials.length ? <Search /> : <StickyNote />}</EmptyMedia>
                   <EmptyTitle>{data.materials.length ? "Nothing matches" : "Nothing captured yet"}</EmptyTitle>
-                  <EmptyDescription>{data.materials.length ? "Try another filter or search." : canCapture ? "Add an interview, note, transcript, photo, document or link. It all lands here, on this story." : "Material captured for this story will appear here."}</EmptyDescription>
+                  <EmptyDescription>{data.materials.length ? "No reporting material matches the current search and filter." : canCapture ? "Interviews, notes, transcripts, photos, files and links all land here on the story." : "Material captured for this story will appear here."}</EmptyDescription>
                 </EmptyHeader>
+                {data.materials.length || canCapture ? (
+                  <EmptyContent>
+                    {data.materials.length ? <Button type="button" variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear search & filters</Button> : <CaptureMenu capture={capture()} />}
+                  </EmptyContent>
+                ) : null}
               </Empty>
             ) : groups.map((group) => (
               <div key={group.label} className="grid gap-1">
                 <h4 className="pt-2 text-sm font-medium">{group.label}</h4>
                 <ul className="divide-y border-y">
-                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => item.kind === "file" ? capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id, fileId: item.id, replaceTranscript: true }).transcript() : capture().transcript()} /></li>)}
+                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => item.kind === "file" ? capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id, fileId: item.id, replaceTranscript: Boolean(item.transcript) }).transcript() : capture().transcript()} /></li>)}
                 </ul>
               </div>
             ))}
@@ -248,7 +267,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
       </div>
       {workspace ? appointmentEditor : null}
       <Sheet open={railOpen && !wide} onOpenChange={setRailOpen}>
-        <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
+        <SheetContent side="right" finalFocus={railTriggerRef} className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-sm">
           <SheetHeader><SheetTitle>Sources & appointments</SheetTitle><SheetDescription>Who the story is reporting on, and when. Capture from one and it is filed with it.</SheetDescription></SheetHeader>
           <div className="px-4 pb-6">{planning}</div>
         </SheetContent>
@@ -257,17 +276,36 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   );
 }
 
+function ReportingSkeleton() {
+  return (
+    <div className="grid gap-4" role="status" aria-label="Loading reporting">
+      <div className="flex gap-2"><Skeleton className="h-8 flex-1" /><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-36" /></div>
+      <div className="flex items-center justify-between gap-3"><Skeleton className="h-4 w-20" /><Skeleton className="h-7 w-56" /></div>
+      <div className="grid gap-3">
+        {[0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 border-y py-3"><Skeleton className="size-8 shrink-0" /><div className="grid flex-1 gap-2"><Skeleton className="h-4 w-2/5" /><Skeleton className="h-3 w-3/5" /></div></div>)}
+      </div>
+      <span className="sr-only">Loading reporting…</span>
+    </div>
+  );
+}
 function CaptureMenu({ capture }: { capture: CaptureActions }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Capture</DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.record}><Mic />Interview</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.file}><Upload />Upload file</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.photo}><ImageIcon />Upload photo</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.link}><Link2 />Add link</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.transcript}><FileText />Upload transcript</DropdownMenuItem>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Reporting</DropdownMenuLabel>
+          <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.record}><Mic />Interview</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.transcript}><FileText />Transcript only</DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Files & references</DropdownMenuLabel>
+          <DropdownMenuItem onClick={capture.photo}><ImageIcon />Photo</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.file}><Upload />File</DropdownMenuItem>
+          <DropdownMenuItem onClick={capture.link}><Link2 />Link</DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -285,19 +323,19 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
   return (
     <InlineForm label="New note" className="grid gap-2" onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} onCancel={onCancel} data-note-composer="">
       <InputGroup>
-        <InputGroupTextareaAutoFocus value={text} onChange={setText} />
+        <InputGroupTextareaAutoFocus value={text} onChange={setText} onSubmit={() => { if (text.trim() && !save.isPending) save.mutate(); }} />
         <InputGroupAddon align="block-end" className="justify-between">
           <label className="flex items-center gap-2 text-xs font-normal text-muted-foreground"><Checkbox checked={confidential} onCheckedChange={(next) => setConfidential(next === true)} />Confidential</label>
           <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="button" size="sm" disabled={!text.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save note</Button></div>
         </InputGroupAddon>
       </InputGroup>
-      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">⌘/Ctrl+Enter saves.</span></p>
+      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">Press <KbdGroup><Kbd>⌘/Ctrl</Kbd><Kbd>Enter</Kbd></KbdGroup> to save.</span></p>
     </InlineForm>
   );
 }
 
-function InputGroupTextareaAutoFocus({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} />;
+function InputGroupTextareaAutoFocus({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: () => void }) {
+  return <Textarea autoFocus value={value} rows={3} maxLength={8000} placeholder="What do you want to remember?" aria-label="Note" className="min-h-20 resize-y border-0 shadow-none focus-visible:ring-0" onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); onSubmit(); } }} />;
 }
 
 function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenContext; onDone: () => void; onCancel: () => void }) {
@@ -324,7 +362,7 @@ function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenConte
         <InputGroupInput autoFocus type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
         <InputGroupAddon align="inline-end"><Button type="button" size="xs" disabled={!url.trim() || save.isPending} onClick={submit}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
       </InputGroup>
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? <FieldError>{error}</FieldError> : null}
     </InlineForm>
   );
 }
@@ -338,7 +376,7 @@ function UploadRow({ upload, onRetry, onDismiss }: { upload: Upload; onRetry: ()
         <AttachmentTitle>{upload.name}</AttachmentTitle>
         {upload.error
           ? <AttachmentDescription role="alert">{upload.error}</AttachmentDescription>
-          : <Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`} className="mt-1.5" />}
+          : <><AttachmentDescription>{upload.progress > 0 ? `Uploading · ${Math.round(upload.progress * 100)}%` : "Preparing upload…"}</AttachmentDescription><Progress value={Math.round(upload.progress * 100)} aria-label={`Uploading ${upload.name}`} className="mt-1.5" /></>}
       </AttachmentContent>
       {upload.error ? (
         <AttachmentActions className="gap-1 pr-1">
@@ -360,10 +398,12 @@ function iconFor(item: StoryMaterialItem): ReactNode {
 
 function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
   const [editing, setEditing] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const actionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [text, setText] = useState(item.kind === "note" ? item.text : "");
   const remove = useMutation({
     mutationFn: () => (item.kind === "note" ? removeNote(context.api, item.id) : removeFile(context.api, item.id)),
-    onSuccess: async () => { toast.success("Removed."); await refresh(); },
+    onSuccess: async () => { setRemoveOpen(false); toast.success("Removed."); await refresh(); },
     onError: (error: Error) => toast.error(error.message)
   });
   const toggle = useMutation({
@@ -382,14 +422,36 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
   const file = item.kind === "file" ? item : null;
   const transcript = file?.transcript ?? null;
 
+  const removalBlocked = Boolean(file?.transcript?.usedSelectionCount);
   const actions = (
     <>
       {file && transcript?.state === "ready" ? <Button type="button" size="xs" variant="default" onClick={() => onOpenTranscript(transcript.id)}>Open transcript</Button> : null}
-      {file && file.fileKind === "audio" && editable ? <Button type="button" size="xs" variant="outline" onClick={onImport}>{transcript ? "Replace transcript" : "Add transcript"}</Button> : null}
-      {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
-      {editable ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
+      {file && file.fileKind === "audio" && editable
+        ? !transcript
+          ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Add transcript</Button>
+          : transcript.state !== "ready"
+            ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Upload replacement</Button>
+            : transcript.selectionCount
+              ? <ConfirmReplaceTranscriptButton selectionCount={transcript.selectionCount} onReplace={onImport} />
+              : <Button type="button" size="xs" variant="outline" onClick={onImport}>Replace transcript</Button>
+        : null}
+      {transcript?.usedSelectionCount ? <Badge variant="secondary">{transcript.usedSelectionCount === 1 ? "Used in article" : `${transcript.usedSelectionCount} saved items in articles`}</Badge> : null}
+      {item.kind === "resource" ? <ResourceMaterialActions context={context} resource={item} refresh={refresh} /> : null}
+      {editable && !(item.kind === "note" && editing) ? (
+        <MaterialActionsMenu
+          triggerRef={actionsTriggerRef}
+          title={item.kind === "note" ? "note" : title}
+          confidential={item.confidential}
+          toggling={toggle.isPending}
+          canRemove={!removalBlocked}
+          removing={remove.isPending}
+          onToggle={() => toggle.mutate()}
+          onRemove={() => setRemoveOpen(true)}
+        />
+      ) : null}
     </>
   );
+  const removeDialog = editable ? <ConfirmRemoveMaterialDialog item={item} open={removeOpen} onOpenChange={setRemoveOpen} removing={remove.isPending} onRemove={() => remove.mutate()} finalFocus={actionsTriggerRef} /> : null;
 
   // A true file (recording, document, image, photo) is an Attachment; notes, links and live posts are not.
   if (item.kind === "file" || item.kind === "media") {
@@ -406,6 +468,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
           {href ? <AttachmentTrigger render={<a href={href} target="_blank" rel="noreferrer noopener" aria-label={`Open ${title}`} />} /> : null}
         </Attachment>
         <div className="flex flex-wrap items-center gap-1.5 empty:hidden">{actions}</div>
+        {removeDialog}
       </div>
     );
   }
@@ -416,7 +479,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
       <div className="min-w-0">
         {editing && item.kind === "note" ? (
           <InlineForm label="Edit note" className="grid gap-2" onSubmit={() => { if (text.trim() && !saveNoteText.isPending) saveNoteText.mutate(); }} onCancel={() => { setEditing(false); setText(item.text); }}>
-            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} />
+            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && text.trim() && !saveNoteText.isPending) { event.preventDefault(); saveNoteText.mutate(); } }} />
             <div className="flex gap-2"><Button type="button" size="sm" disabled={saveNoteText.isPending || !text.trim()} onClick={() => saveNoteText.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.text); }}>Cancel</Button></div>
           </InlineForm>
         ) : (
@@ -436,7 +499,111 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
         {item.kind === "note" && editable && !editing ? <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(true)}>Edit</Button> : null}
         {actions}
       </div>
+      {removeDialog}
     </div>
+  );
+}
+
+function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selectionCount: number; onReplace: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
+      <AlertDialogContent size="sm" finalFocus={finalFocus}>
+        <AlertDialogHeader>
+          <AlertDialogMedia><RefreshCw /></AlertDialogMedia>
+          <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
+          <AlertDialogDescription>
+            The transcript text will be replaced. {selectionCount === 1 ? "The saved quote or highlight stays exactly as saved, including any verification." : `All ${selectionCount} saved quotes and highlights stay exactly as saved, including verification.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="default" onClick={() => { setOpen(false); onReplace(); }}>Choose transcript</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function ResourceMaterialActions({ context, resource, refresh }: { context: StoryScreenContext; resource: ResourceMaterial; refresh: () => Promise<unknown> }) {
+  const workspace = useOptionalWorkspace();
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const dialog = useDialogTarget<StoryResource>("[data-reporting-resource-action]");
+  const record = workspace?.data.resources.find((entry) => entry.id === resource.resourceId) ?? null;
+  const canManage = Boolean(record && resource.canEdit && !context.readOnly && workspace?.caps.manageResources);
+  const remove = useMutation({
+    mutationFn: async () => {
+      if (!workspace || !record) throw new Error("This link is no longer available.");
+      return workspace.client.removeResource(Number(context.storyId), record.id);
+    },
+    onSuccess: async (_result) => {
+      if (!workspace || !record) return;
+      toast.success("Link removed.", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void workspace.client.addResource(Number(context.storyId), { label: record.label, url: record.url, purpose: record.purpose })
+              .then(async () => { await Promise.all([workspace.reload(), refresh()]); toast.success("Link restored."); })
+              .catch((error: Error) => toast.error(error.message));
+          }
+        }
+      });
+      await Promise.all([workspace.reload(), refresh()]);
+    },
+    onError: (error: Error) => toast.error(error.message)
+  });
+  if (!canManage || !workspace || !record) return null;
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button ref={trigger} type="button" size="icon-xs" variant="ghost" aria-label={`Actions for ${resource.label}`} data-reporting-resource-action="" />}><MoreHorizontal /></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-44">
+          <DropdownMenuItem onClick={() => dialog.openWith(record, trigger.current)}><Pencil />Edit link</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate()}><Trash2 />Remove link</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ResourceDialog key={`reporting-resource-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={() => { dialog.close(); void refresh(); }} finalFocus={dialog.finalFocus} />
+    </>
+  );
+}
+
+function MaterialActionsMenu({ triggerRef, title, confidential, toggling, canRemove, removing, onToggle, onRemove }: { triggerRef: React.RefObject<HTMLButtonElement | null>; title: string; confidential: boolean; toggling: boolean; canRemove: boolean; removing: boolean; onToggle: () => void; onRemove: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button ref={triggerRef} type="button" size="icon-xs" variant="ghost" aria-label={`More actions for ${title}`} />}><MoreHorizontal /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuItem disabled={toggling} onClick={onToggle}>{confidential ? <LockOpen /> : <Lock />}{confidential ? "Make visible to story team" : "Make confidential"}</DropdownMenuItem>
+        {canRemove ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" disabled={removing} onClick={onRemove}><Trash2 />Remove…</DropdownMenuItem></> : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRemove, finalFocus }: { item: StoryMaterialItem; open: boolean; onOpenChange: (open: boolean) => void; removing: boolean; onRemove: () => void; finalFocus: React.RefObject<HTMLButtonElement | null> }) {
+  const file = item.kind === "file" ? item : null;
+  const transcript = file?.transcript ?? null;
+  const interview = file?.fileKind === "audio";
+  const title = item.kind === "note" ? "Remove this note?" : interview ? "Remove this interview?" : "Remove this file?";
+  const transcriptPart = transcript ? " and its transcript" : "";
+  const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader>
+          <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {item.kind === "note" ? "This permanently deletes the private reporting note." : <>This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{savedMaterialPart}</>} This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={removing} onClick={onRemove}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -482,10 +649,11 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   const source = data.sources.find((entry) => entry.id === appointment.sourceId);
   const from: Bound = { appointmentId: appointment.id, ...(source ? { sourceId: source.id } : {}), label: appointment.title };
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
-  const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
+  const captureActions = canCapture && appointment.kind !== "photo" ? <><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></> : null;
+  const editAction = onEdit ? <Button type="button" size="icon-xs" variant="ghost" aria-label={`Edit appointment: ${appointment.title}`} onClick={(event) => onEdit(event.currentTarget)}><Pencil /></Button> : null;
+  const actions = captureActions || editAction ? <div className="flex flex-wrap items-center gap-1.5">{captureActions}{editAction}</div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
-  const name = onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
-  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;
+  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{appointment.title}</p><p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><span>{time}</span>{appointment.status === "cancelled" ? <Badge variant="secondary">Cancelled</Badge> : null}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <CalendarClock aria-hidden="true" className="size-4 text-muted-foreground" />
@@ -516,18 +684,28 @@ function PlanningContext({ context, data, capture, canCapture, refresh }: { cont
       <section aria-labelledby="reporting-sources" className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
           <h3 id="reporting-sources" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sources</h3>
-          {canAddSource ? <Button type="button" size="xs" variant="ghost" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button> : null}
+          {canAddSource && data.sources.length ? <Button type="button" size="xs" variant="ghost" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button> : null}
         </div>
-        {data.sources.length === 0 ? <p className="text-muted-foreground">No sources yet.</p> : (
+        {data.sources.length === 0 ? (
+          <Empty className="gap-2 border py-5">
+            <EmptyHeader><EmptyMedia variant="icon"><Plus /></EmptyMedia><EmptyTitle>No sources yet</EmptyTitle><EmptyDescription>Add the people you’re reporting with so notes and interviews stay attached to the right source.</EmptyDescription></EmptyHeader>
+            {canAddSource ? <EmptyContent><Button type="button" size="sm" data-reporting-add="source" onClick={(event) => sourceDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add source</Button></EmptyContent> : null}
+          </Empty>
+        ) : (
           <ItemGroup className="gap-0 divide-y border-y" aria-labelledby="reporting-sources">{data.sources.map((source) => <SourceRow key={source.id} context={context} source={source} canEdit={data.capabilities.manage && !context.readOnly} canCapture={canCapture} capture={capture} refresh={refresh} onEdit={sourceRecord(source.id) && writable ? (element) => sourceDialog.openWith(sourceRecord(source.id), element) : undefined} />)}</ItemGroup>
         )}
       </section>
       <section aria-labelledby="reporting-appointments" className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
           <h3 id="reporting-appointments" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Appointments</h3>
-          {canAddAppointment ? <Button type="button" size="xs" variant="ghost" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add</Button> : null}
+          {canAddAppointment && data.appointments.length ? <Button type="button" size="xs" variant="ghost" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add appointment</Button> : null}
         </div>
-        {data.appointments.length === 0 ? <p className="text-muted-foreground">No interviews or events yet.</p> : (
+        {data.appointments.length === 0 ? (
+          <Empty className="gap-2 border py-5">
+            <EmptyHeader><EmptyMedia variant="icon"><CalendarClock /></EmptyMedia><EmptyTitle>No appointments yet</EmptyTitle><EmptyDescription>Schedule an interview, event or reporting window so the next step is visible from the story.</EmptyDescription></EmptyHeader>
+            {canAddAppointment ? <EmptyContent><Button type="button" size="sm" data-reporting-add="appointment" onClick={(event) => appointmentDialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" />Add appointment</Button></EmptyContent> : null}
+          </Empty>
+        ) : (
           <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked onEdit={appointmentRecord(appointment.id) && writable ? (element) => appointmentDialog.openWith(appointmentRecord(appointment.id), element) : undefined} /></li>)}</ul>
         )}
       </section>
@@ -544,12 +722,13 @@ function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onE
   return (
     <Item size="xs" className="flex-col items-stretch gap-1 rounded-none px-0 py-2">
       <ItemContent>
-        <ItemTitle>{onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{source.label}</button> : source.label}</ItemTitle>
+        <ItemTitle>{source.label}</ItemTitle>
         {source.role ? <ItemDescription>{source.role}</ItemDescription> : null}
       </ItemContent>
       <ItemActions className="flex-wrap">
         <GroundRulesEditor context={context} source={source} canEdit={canEdit} refresh={refresh} />
-        {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button></> : null}
+        {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button></> : null}
+        {onEdit ? <Button type="button" size="icon-xs" variant="ghost" aria-label={`Edit source: ${source.label}`} onClick={(event) => onEdit(event.currentTarget)}><Pencil /></Button> : null}
       </ItemActions>
     </Item>
   );
@@ -578,7 +757,7 @@ function GroundRulesEditor({ context, source, canEdit, refresh }: { context: Sto
     <label className="flex items-center gap-2 text-sm any-pointer-coarse:min-h-11"><Checkbox checked={permission} onCheckedChange={(next) => setPermission(next === true)} />Recording permission confirmed</label>
     <Input value={note} maxLength={600} placeholder="Note (optional)" aria-label="Ground rules note" onChange={(event) => setNote(event.target.value)} />
     <p className="text-xs text-muted-foreground">Byline only carries this forward; it doesn't decide what it means. Off the record material can't be inserted as a quote.</p>
-    <Button type="submit" size="sm" disabled={save.isPending}>Save</Button>
+    <Button type="submit" size="sm" disabled={save.isPending}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save ground rules</Button>
   </form>;
   const trigger = <button type="button" aria-label={`Ground rules for ${source.label}: ${groundRuleLabel(source.groundRules)}. Change`} className="rounded-full focus-visible:ring-3 focus-visible:ring-ring/50 any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11" />;
   const changeOpen = (next: boolean) => {

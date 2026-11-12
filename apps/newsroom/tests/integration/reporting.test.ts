@@ -1,6 +1,7 @@
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readCurrentRevision } from "../../src/db/publication-state";
+import { inTransaction, lockRow } from "../../src/db/locks";
 import { PUBLIC_COLLECTIONS } from "../../src/public/tracking";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
 import { privateReportingDir } from "../../src/reporting/paths";
@@ -176,18 +177,45 @@ describe("recordings, ground rules and transcripts", () => {
     expect(imported.status).toBe(200);
     ids.transcript = imported.body.transcriptId;
     const transcript = await payload.findByID({ collection: "reporting-transcripts", id: ids.transcript, depth: 0 });
-    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: "manual", source: ids.coach, appointment: ids.interview });
+    expect(transcript).toMatchObject({ origin: "manual", state: "ready", provider: null, progressPercent: null, progressMessage: null, source: ids.coach, appointment: ids.interview });
     expect((transcript.segments as Array<{ speaker?: string; startMs: number }>)[0]).toMatchObject({ speaker: "SPEAKER_00", startMs: 0 });
 
     // A standalone plain-text transcript keeps its file as the private document it belongs to.
-    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+    const standaloneInput = {
       params: { id: ids.story },
-      data: { appointmentId: ids.interview },
+      data: { appointmentId: ids.interview, clientKey: "standalone-transcript-0001" },
       file: text("notes.txt", "Coach Smith: First paragraph.\n\nSecond paragraph.")
-    });
+    };
+    const standalone = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", standaloneInput);
     expect(standalone.status).toBe(200);
     const doc = await payload.findByID({ collection: "reporting-files", id: standalone.body.fileId, depth: 0 });
     expect(doc).toMatchObject({ kind: "document", source: ids.coach, appointment: ids.interview });
+
+    const replay = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", standaloneInput);
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({ transcriptId: standalone.body.transcriptId, fileId: standalone.body.fileId });
+    expect((await payload.count({ collection: "reporting-files", where: { clientKey: { equals: "standalone-transcript-0001" } } })).totalDocs).toBe(1);
+    expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: standalone.body.fileId } } })).totalDocs).toBe(1);
+
+    const standaloneQuote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
+      params: { id: standalone.body.transcriptId },
+      data: { segmentIds: ["s0"], kind: "quote" }
+    });
+    expect(standaloneQuote.status).toBe(200);
+    const cannotVerifyWithoutAudio = await call("post", "/byline/reporting/selections/:id/verify", "alice", {
+      params: { id: standaloneQuote.body.id },
+      data: { verified: true }
+    });
+    expect(cannotVerifyWithoutAudio.status).toBe(409);
+    expect(cannotVerifyWithoutAudio.body.message).toMatch(/recording is required/i);
+
+    const wrongParent = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
+      params: { id: ids.story },
+      data: { fileId: standalone.body.fileId, replace: true },
+      file: text("replacement.txt", "This must not silently replace a standalone document.")
+    });
+    expect(wrongParent.status).toBe(400);
+    expect(wrongParent.body.message).toMatch(/interview recording/i);
   });
   it("deletes a recording with its transcript and selections without a foreign-key failure", async () => {
     const uploaded = await call("post", "/byline/stories/:id/reporting/files", "alice", {
@@ -267,10 +295,82 @@ describe("recordings, ground rules and transcripts", () => {
     expect(provenance.body.source).toMatchObject({ label: "Coach Smith" });
     expect(provenance.body.appointment).toMatchObject({ title: "Interview Coach Smith" });
     expect(provenance.body.recording).toMatchObject({ filename: "coach-smith.wav", capturedBy: "alice Account" });
-    expect(provenance.body.transcript).toMatchObject({ origin: "manual", provider: "manual" });
+    expect(provenance.body.transcript).toMatchObject({ origin: "manual", provider: null });
+
+    const reporting = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
+    const recording = reporting.body.materials.find((item: { key: string }) => item.key === `file:${ids.recording}`);
+    expect(recording.transcript).toMatchObject({ id: ids.transcript, selectionCount: 1, quoteCount: 1, verifiedCount: 1, usedSelectionCount: 1 });
+
+    // A recording that is the provenance for an article quote cannot be removed.
+    const blocked = await call("delete", "/byline/reporting/files/:id", "alice", { params: { id: ids.recording } });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.message).toMatch(/used in an article/i);
+    expect((await payload.count({ collection: "reporting-files", where: { id: { equals: ids.recording } } })).totalDocs).toBe(1);
+    expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: ids.quote } } })).totalDocs).toBe(1);
+
+    const blockedQuote = await call("delete", "/byline/reporting/selections/:id", "alice", { params: { id: ids.quote } });
+    expect(blockedQuote.status).toBe(409);
+    expect(blockedQuote.body.message).toMatch(/used in an article/i);
+
+    const blockedEdit = await call("patch", "/byline/reporting/selections/:id", "alice", { params: { id: ids.quote }, data: { text: "Changed after publication" } });
+    expect(blockedEdit.status).toBe(409);
+    expect(blockedEdit.body.message).toMatch(/used in an article/i);
+
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
+  });
+
+  it("rechecks article use after waiting on the provenance row lock", async () => {
+    const saveReq = await reqAs("alice");
+    const deleteReq = await reqAs("alice");
+    let release!: () => void;
+    let signalLocked!: () => void;
+    const locked = new Promise<void>((resolve) => { signalLocked = resolve; });
+    const continueSave = new Promise<void>((resolve) => { release = resolve; });
+
+    const save = inTransaction(saveReq, async () => {
+      await lockRow(saveReq, "transcript_selections", ids.quote);
+      signalLocked();
+      await continueSave;
+      await payload.update({
+        collection: "transcript-selections",
+        id: ids.quote,
+        data: { usedIn: [ids.story] } as never,
+        overrideAccess: true,
+        depth: 0,
+        context: { ...saveReq.context, bylineSystem: true },
+        req: saveReq
+      });
+    });
+
+    await locked;
+    const deletion = payload.delete({
+      collection: "transcript-selections",
+      id: ids.quote,
+      req: deleteReq,
+      overrideAccess: false
+    }).then(
+      () => ({ error: null as Error | null }),
+      (error: Error) => ({ error })
+    );
+
+    // Let the delete reach the row lock before the simulated article save commits.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    release();
+    await save;
+    const result = await deletion;
+    expect(result.error?.message).toMatch(/used in an article/i);
+    expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: ids.quote } } })).totalDocs).toBe(1);
+
+    await payload.update({
+      collection: "transcript-selections",
+      id: ids.quote,
+      data: { usedIn: [] } as never,
+      overrideAccess: true,
+      depth: 0,
+      context: { bylineSystem: true }
+    });
   });
 
   it("lists the Story's saved quotes for the article editor, verified first", async () => {
