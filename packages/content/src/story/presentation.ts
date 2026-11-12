@@ -21,6 +21,22 @@ export type ArticleImageView = {
   credit?: string;
   /** CSS object-position from the editor's focal point; absent when centred or already cropped. */
   objectPosition?: string;
+  /**
+   * Art-directed alternatives for the lead photograph of a Feature, Immersive
+   * or Split opening: the editor's explicit phone and tablet crops, in the
+   * order a `<picture>` tries them. Absent when the editor made no crop, in
+   * which case `src` and `objectPosition` serve every viewport.
+   */
+  sources?: ArticleImageSourceView[];
+};
+
+export type ArticleImageSourceView = {
+  /** A media query, for example `(max-width: 640px)`. */
+  media: string;
+  srcSet: string;
+  sizes?: string;
+  width?: number | null;
+  height?: number | null;
 };
 
 export type ArticleLinkView = {
@@ -161,9 +177,24 @@ export type ArticleLiveView = {
   feedUrl: string;
 };
 
-/** The two built-in openings an author chooses between. Absent means standard. */
-export type StoryPresentationChoice = "standard" | "immersive";
+/**
+ * The built-in openings an author chooses between ("how should this story
+ * begin?"). Absent means standard. A repository custom presentation is keyed by
+ * story ID in the registry and never uses this field, so it always overrides it.
+ */
+export const STORY_PRESENTATION_CHOICES = ["standard", "feature", "immersive", "split"] as const;
+export type StoryPresentationChoice = (typeof STORY_PRESENTATION_CHOICES)[number];
+/** Immersive: where the headline sits over the photograph. */
 export type ImmersiveAlignment = "bottom-left" | "center";
+/** Feature: how far the lead photograph runs across the page. */
+export type FeatureImageWidth = "wide" | "full";
+/** Split: which side of a desktop opening carries the photograph. */
+export type SplitImageSide = "left" | "right";
+/**
+ * The site chrome around a story, chosen separately from its opening.
+ * `minimal` keeps only menu, logo and search over the story opening.
+ */
+export type StorySiteNavigation = "standard" | "minimal";
 
 export type ArticlePresentation = {
   id: number | string;
@@ -183,6 +214,12 @@ export type ArticlePresentation = {
   storyPresentation?: StoryPresentationChoice;
   /** Headline position for an immersive story. Absent means bottom-left. */
   immersiveAlignment?: ImmersiveAlignment;
+  /** Image width for a feature story. Absent means wide. */
+  featureWidth?: FeatureImageWidth;
+  /** Image side for a split story. Absent means right. */
+  splitImageSide?: SplitImageSide;
+  /** The site chrome around the story. Absent means standard. */
+  siteNavigation?: StorySiteNavigation;
   /** A video story's primary video; absent for an article, even one with embeds in its body. */
   video?: ArticleVideoView | null;
   contributors: ArticleContributorView[];

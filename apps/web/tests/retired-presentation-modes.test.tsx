@@ -91,10 +91,11 @@ describe("the custom article hero is gone", () => {
     // renders the shared ArticleView.
     expect(articleRoute).toContain("<StoryArticle");
     expect(astroArticleRoute).toContain("<StoryArticle");
-    // The one resolver picks ArticleView unless the author chose Immersive (and it is valid) or a repository entry exists.
+    // The one resolver picks ArticleView unless the author chose Feature, Immersive or Split (and it is valid) or a repository entry exists.
     const storyArticle = readSource("../../../packages/story-presentations/src/StoryArticle.tsx");
     expect(storyArticle).toContain("resolveStoryPresentation(presentation, registry)");
-    expect(storyArticle).toContain("<ArticleView");
+    expect(storyArticle).toContain("<PresentedArticleView");
+    expect(readSource("../../../packages/ui/src/immersive-article-view.tsx")).toContain("<ArticleView");
     expect(articleRenderer.match(/className="article-header"/g)).toHaveLength(1);
     expect(articleRenderer.match(/<article className="article-story"/g)).toHaveLength(1);
   });

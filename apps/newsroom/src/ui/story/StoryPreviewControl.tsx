@@ -1,6 +1,7 @@
 "use client";
 
 import { parseYouTubeVideoId } from "@byline/core";
+import { requestedPresentation } from "@byline/content/story";
 // The metadata-only resolver: importing the full package here would load every story's React code
 // (and @byline/ui) into the admin bundle, which keeps Payload's Lexical field from mounting.
 import { resolveStoryPresentation, type StoryPresentationIdentity, type StoryPresentationResolution } from "@byline/story-presentations/resolve";
@@ -82,7 +83,7 @@ export function useStoryPresentationResolution(): StoryPresentationResolution {
     () => resolveStoryPresentation(
       {
         id: id ?? 0,
-        storyPresentation: presentation === "immersive" ? "immersive" : "standard",
+        storyPresentation: requestedPresentation(presentation),
         image: relationIdOf(featuredMedia) !== null ? { src: "lead" } : null,
         video: isVideo ? true : null
       },
@@ -92,9 +93,11 @@ export function useStoryPresentationResolution(): StoryPresentationResolution {
   );
 }
 
-const REASONS: Record<string, string> = {
-  "missing-lead-image": "Immersive requires a lead image.",
-  "video-story": "Immersive isn't used for video stories."
+const OPENING_LABELS: Record<string, string> = { standard: "Standard", feature: "Feature", immersive: "Immersive", split: "Split" };
+
+const REASONS: Record<string, (opening: string) => string> = {
+  "missing-lead-image": (opening) => `${opening} requires a lead image.`,
+  "video-story": (opening) => `${opening} isn't used for video stories.`
 };
 
 /** What the story will open as, and why, from the shared resolver (never a second copy of the rule). */
@@ -111,11 +114,11 @@ export function PresentationStatus({ resolution }: { resolution: StoryPresentati
   const fellBack = resolution.requested !== resolution.resolved;
   return (
     <div className="flex flex-wrap items-center gap-x-2" data-presentation-status={resolution.reason}>
-      <dt className="text-muted-foreground">Presentation</dt>
-      <dd>{resolution.resolved === "immersive" ? "Immersive" : "Standard"}</dd>
+      <dt className="text-muted-foreground">Story opening</dt>
+      <dd>{OPENING_LABELS[resolution.resolved] ?? "Standard"}</dd>
       {fellBack ? (
         <dd className="text-xs text-muted-foreground">
-          Previewing as Standard. {REASONS[resolution.reason]}
+          Previewing as Standard. {REASONS[resolution.reason]?.(OPENING_LABELS[resolution.requested] ?? "This opening")}
         </dd>
       ) : null}
     </div>

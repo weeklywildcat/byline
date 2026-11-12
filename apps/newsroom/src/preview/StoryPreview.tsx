@@ -2,8 +2,9 @@
 
 import { buildArticlePresentation, type ArticlePresentation, type PublicSeriesInput } from "@byline/content/story";
 import { useLivePreview } from "@payloadcms/live-preview-react";
-import { ArticleShareActionsView, NewsletterSignupView, ReaderFeedbackView, type ArticleViewSlots } from "@byline/ui";
-import { StoryArticle, renderRepositoryInteractive, renderRepositoryTracker, repositoryInteractiveRegistry, repositoryTrackerRegistry, resolveStoryPresentation, storyPresentationRegistry, type RepositoryInteractiveClient, type RepositoryInteractiveRegistry, type RepositoryTrackerRegistry } from "@byline/story-presentations";
+import { ArticleShareActionsView, NewsletterSignupView, ReaderFeedbackView, StoryNavigation, type ArticleViewSlots } from "@byline/ui";
+import { startStoryNavigation } from "@byline/ui/story-navigation-client";
+import { StoryArticle, renderRepositoryInteractive, renderRepositoryTracker, repositoryInteractiveRegistry, repositoryTrackerRegistry, resolveStoryChrome, resolveStoryLogoAlign, resolveStoryPresentation, storyPresentationRegistry, type RepositoryInteractiveClient, type RepositoryInteractiveRegistry, type RepositoryTrackerRegistry } from "@byline/story-presentations";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { STORY_LIVE_PREVIEW_DEPTH } from "./config";
 import { payloadPresentationContext, payloadPublicStory, payloadStorySummary, type PayloadImage } from "./payload-story";
@@ -284,6 +285,16 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   useKeepPreviewInPlace(publication.publicSite);
   useArticleEnhancements(presentation, interactives, trackers);
 
+  // The same rule the public page uses: the layout (here, this page) resolves the story's Site navigation
+  // before it renders, and draws the same minimal bar. A repository presentation keeps the Standard header,
+  // which Preview has never drawn.
+  const minimalNavigation = presentation ? resolveStoryChrome(presentation, registry) === "minimal" : false;
+  const navigationReady = Boolean(presentation) && assets.ready;
+  useEffect(() => {
+    if (!minimalNavigation || !navigationReady) return;
+    return startStoryNavigation(document);
+  }, [minimalNavigation, navigationReady, resolution?.resolved]);
+
   const slots = useMemo(() => inertSlots(publication, interactives, trackers), [publication, interactives, trackers]);
   const onRetry = useCallback(() => reload(), []);
 
@@ -306,6 +317,17 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   return (
     <div className="byline-preview-page" data-presentation={resolution?.resolved} data-presentation-reason={resolution?.reason}>
       {stale || renderFailed ? <p className="byline-preview-stale" role="status">Preview may be out of date</p> : null}
+      {minimalNavigation ? (
+        <StoryNavigation
+          logoAlign={presentation ? resolveStoryLogoAlign(presentation, registry) : "center"}
+          publicationName={publication.siteNavigation.name}
+          logoUrl={publication.siteNavigation.logoUrl}
+          homeHref={publication.siteNavigation.homeHref}
+          searchHref={publication.siteNavigation.searchHref}
+          sections={publication.siteNavigation.sections}
+          secondary={publication.siteNavigation.secondary}
+        />
+      ) : null}
       <StoryArticle presentation={presentation} slots={slots} registry={registry} host={assets.host} />
     </div>
   );

@@ -24,7 +24,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, ChevronLeft, Ellipsis, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
 import { editorialReadiness } from "../../domain/story-readiness";
 import { LiveBadge } from "../live/LiveCoverageSection";
 import { useLiveCoverage } from "../live/LiveCoverageProvider";
@@ -39,6 +38,7 @@ import { PhaseBadge } from "./PhaseBadge";
 import { usePublicationActions } from "./PublicationActions";
 import { blockingLines } from "./publication-readiness-model";
 import { StoryMediaReadinessNotice, useStoryMediaReadiness } from "./publication-readiness";
+import { StoryOpeningSettings } from "./StoryOpening";
 import { PresentationStatus, StoryPreviewButton, useStoryPresentationResolution, useStoryPreview } from "./StoryPreviewControl";
 import type { StoryScreenContext } from "./StoryScreen";
 import { StoryURL, useStoryURL } from "./StoryURL";
@@ -107,8 +107,6 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
   const contributors = useStoryField<unknown>("contributors");
   const format = useStoryField<string>("format");
   const videoUrl = useStoryField<string>("video.url");
-  const presentation = useStoryField<string>("presentation");
-  const alignment = useStoryField<string>("immersiveAlignment");
   const liveCoverage = useLiveCoverage();
   const editorial = editorialReadiness({ headline: headline.value, section: section.value, contributors: contributors.value, format: format.value, videoUrl: videoUrl.value });
   const [readinessOpen, setReadinessOpen] = useState(false);
@@ -450,14 +448,9 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
             <section className="grid gap-3" aria-labelledby="details-appearance">
               <DetailsHeading id="details-appearance">Appearance</DetailsHeading>
               <FieldGroup className="gap-1">
-                <Property label="Presentation">
-                  <SettingSelect label="Presentation" options={STORY_PRESENTATION_OPTIONS} value={(presentation.value ?? "standard") as (typeof STORY_PRESENTATION_OPTIONS)[number]["value"]} onChange={(next) => presentation.setValue(next)} disabled={context.readOnly} />
+                <Property label="Story opening">
+                  <StoryOpeningSettings disabled={context.readOnly} />
                 </Property>
-                {presentation.value === "immersive" ? (
-                  <Property label="Headline position">
-                    <SettingSelect label="Headline position" options={IMMERSIVE_ALIGNMENT_OPTIONS} value={(alignment.value ?? "bottom-left") as (typeof IMMERSIVE_ALIGNMENT_OPTIONS)[number]["value"]} onChange={(next) => alignment.setValue(next)} disabled={context.readOnly} />
-                  </Property>
-                ) : null}
               </FieldGroup>
               {presentationResolution.custom || presentationResolution.requested !== presentationResolution.resolved
                 ? <dl className="text-sm"><PresentationStatus resolution={presentationResolution} /></dl>

@@ -13,6 +13,17 @@
   background: rgba(14, 17, 22, 0.52);
 }
 
+/* Minimal site navigation draws over the photograph: a soft veil at the top keeps the logo and controls
+   legible on a bright or mid-gray sky (`difference` alone fails on midtones). Absent under Standard navigation, so older stories look exactly as they did. */
+.immersive-article[data-site-navigation="minimal"] .immersive-article-hero::after {
+  background: linear-gradient(to bottom, rgba(14, 17, 22, 0.66), rgba(14, 17, 22, 0) calc(170px + env(safe-area-inset-top, 0px)));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
 .immersive-article .hero-reveal-copy {
   gap: 14px;
   margin: 0 auto;
@@ -111,6 +122,7 @@
 
 /* The surface always covers the pinned photograph completely. */
 .immersive-article .immersive-article-surface {
+  min-height: 100vh;
   min-height: 100svh;
 }
 
@@ -142,9 +154,30 @@
   margin: 0;
 }
 
+/* Safe areas: the words clear a notch, the Dynamic Island and the home indicator. */
+.immersive-article .hero-reveal-copy {
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+.immersive-article .hero-reveal-copy-end {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Under Minimal site navigation the photograph runs to the top edge; the words start below the bar. */
+.immersive-article[data-site-navigation="minimal"] .hero-reveal-copy {
+  padding-top: calc(56px + env(safe-area-inset-top, 0px));
+}
+
 @media (max-width: 640px) {
   .immersive-article .hero-reveal-copy {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* A phone gets the larger share of its screen for the photograph. */
+  .immersive-article .hero-reveal-copy-end {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   }
 }
+

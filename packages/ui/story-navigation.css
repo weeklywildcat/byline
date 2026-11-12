@@ -1,0 +1,284 @@
+/* Minimal site navigation for a visually led story (StoryNavigation). Hosts provide
+   --paper, --ink, --rule and --font-*. The bar is transparent over the story opening,
+   so every control carries its own legibility; the logo blends as a bonus on top. */
+
+.story-nav {
+  --story-nav-bar: 56px;
+  --story-nav-h: calc(var(--story-nav-bar) + env(safe-area-inset-top, 0px));
+  --story-nav-edge: 12px;
+  --story-nav-ink: #111;
+  /* Every child is fixed: the header itself takes no space in the page. */
+  height: 0;
+}
+
+/* The solid layer: invisible over the opening, a publication surface after it. */
+.story-nav__surface {
+  background: var(--paper, #fff);
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  height: var(--story-nav-h);
+  inset: 0 0 auto;
+  opacity: 0;
+  pointer-events: none;
+  position: fixed;
+  transition: opacity 0.2s ease;
+  z-index: 40;
+}
+
+.story-nav[data-solid="true"] .story-nav__surface {
+  opacity: 1;
+}
+
+/* Every layer fills the bar's row so the controls share one baseline. */
+.story-nav__layer {
+  align-items: center;
+  display: flex;
+  height: var(--story-nav-h);
+  inset: 0 0 auto;
+  padding: env(safe-area-inset-top, 0px) max(var(--story-nav-edge), env(safe-area-inset-right, 0px)) 0 max(var(--story-nav-edge), env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  position: fixed;
+  z-index: 41;
+}
+
+.story-nav__layer--start {
+  justify-content: flex-start;
+}
+
+.story-nav__layer--end {
+  justify-content: flex-end;
+}
+
+/* The logo is centred on the viewport itself, not in the space the buttons leave. */
+.story-nav__layer--logo {
+  justify-content: center;
+  /* Its own stacking context against the page: the blend only works here. */
+  mix-blend-mode: normal;
+}
+
+/* Hit target 44px; the icon itself is bare: no disc, no pill. Legibility comes from a dual-tone halo
+   (a dark icon with a soft white edge), which reads on white sky, dark photographs, midtones and busy
+   foliage alike without drawing a surface. */
+.story-nav__control {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--story-nav-ink);
+  cursor: pointer;
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  pointer-events: auto;
+  position: relative;
+  text-decoration: none;
+  width: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.story-nav__control svg {
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255, 255, 255, 0.85));
+  transition: filter 0.2s ease;
+}
+
+/* On the publication surface there is nothing to separate the icon from. */
+.story-nav[data-solid="true"] .story-nav__control svg,
+.story-nav__control--plain svg {
+  filter: none;
+}
+
+.story-nav__control:hover {
+  color: var(--accent, #0969da);
+}
+
+/* A focus ring that holds on any background: a white ring inside a dark one. */
+.story-nav__control:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 0;
+  box-shadow: 0 0 0 4px #111;
+}
+
+.story-nav__logo {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 6px;
+  pointer-events: auto;
+  text-decoration: none;
+}
+
+.story-nav__logo:focus-visible {
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 4px #111;
+  border-radius: 2px;
+}
+
+/* A Split opening on a wide screen has its seam in the middle of the viewport, so the logo
+   sits at the left, beside the menu, instead of straddling it. */
+@media (min-width: 1024px) {
+  .story-nav[data-logo-align="start"] .story-nav__layer--logo {
+    justify-content: flex-start;
+    padding-left: calc(max(var(--story-nav-edge), env(safe-area-inset-left, 0px)) + 44px + 8px);
+  }
+}
+
+/* The masthead artwork is one dark asset (no black/white pair to maintain). Where blending exists it
+   is inverted to white and combined with `difference`, so it inverts against what is behind it.
+   An <img> plus a filter, not a CSS mask: a mask image must be CORS-readable, and Live Preview
+   shows this artwork from the public site's origin. */
+.story-nav__logo-mark {
+  display: block;
+  height: clamp(15px, 4.4vw, 24px);
+  width: auto;
+}
+
+@supports (mix-blend-mode: difference) {
+  .story-nav__layer--logo {
+    mix-blend-mode: difference;
+  }
+
+  .story-nav__logo-mark {
+    filter: brightness(0) invert(1);
+  }
+
+  /* The publication surface is opaque, so the logo returns to its own colours rather than blending. */
+  .story-nav[data-solid="true"] .story-nav__layer--logo {
+    mix-blend-mode: normal;
+  }
+
+  .story-nav[data-solid="true"] .story-nav__logo-mark {
+    filter: none;
+  }
+}
+
+/* The menu: a native modal dialog laid out as a left sheet. */
+.story-nav__sheet {
+  background: var(--paper, #fff);
+  border: 0;
+  border-right: 1px solid var(--rule, #d0d7de);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.28);
+  color: var(--ink, #1f2328);
+  height: 100%;
+  inset: 0 auto 0 0;
+  margin: 0;
+  max-height: none;
+  max-width: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  position: fixed;
+  width: min(360px, calc(100vw - 48px));
+}
+
+.story-nav__sheet::backdrop {
+  background: rgba(14, 17, 22, 0.5);
+}
+
+.story-nav__sheet[open] {
+  animation: story-nav-sheet-in 0.2s ease-out;
+}
+
+@keyframes story-nav-sheet-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+.story-nav__sheet-header {
+  align-items: center;
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  display: flex;
+  justify-content: space-between;
+  padding: 8px var(--story-nav-edge);
+  padding-left: 20px;
+}
+
+.story-nav__sheet-header form {
+  margin: 0;
+}
+
+.story-nav__sheet-title {
+  color: var(--ink, #1f2328);
+  font-family: var(--font-headline, Georgia, serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.story-nav__sheet-nav {
+  padding: 8px 20px 28px;
+}
+
+.story-nav__sections,
+.story-nav__secondary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.story-nav__sections a {
+  border-bottom: 1px solid var(--rule, #d0d7de);
+  color: var(--ink, #1f2328);
+  display: block;
+  font-family: var(--font-headline, Georgia, serif);
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 14px 0;
+  text-decoration: none;
+}
+
+.story-nav__secondary {
+  margin-top: 18px;
+}
+
+.story-nav__secondary a {
+  color: var(--muted, #59636e);
+  display: block;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.95rem;
+  padding: 10px 0;
+  text-decoration: none;
+}
+
+.story-nav__sections a:hover,
+.story-nav__secondary a:hover,
+.story-nav__sections a:focus-visible,
+.story-nav__secondary a:focus-visible {
+  color: var(--accent, #0969da);
+  outline: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* A modal sheet holds the page still behind it. */
+body:has(.story-nav__sheet[open]) {
+  overflow: hidden;
+}
+
+/* Text zoom: the bar never wraps; the sheet scrolls. At 390px the logo is the flexible part. */
+@media (max-width: 420px) {
+  .story-nav {
+    --story-nav-edge: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-nav__surface,
+  .story-nav__control svg {
+    transition: none;
+  }
+
+  .story-nav__sheet[open] {
+    animation: none;
+  }
+}
+
+/* The page's content clears the bar's safe-area on pages that opt into viewport-fit=cover. */
+html:has(.story-nav) .article-shell,
+html:has(.story-nav) .byline-article-view.article-shell {
+  --byline-article-gutter: max(20px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}

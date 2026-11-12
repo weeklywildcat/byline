@@ -33,7 +33,7 @@ async function readStories(payload: Payload) {
     collection: "stories", draft: false, where: published, ...publicRead,
     select: { headline: true, kicker: true, deck: true, section: true, topics: true, contributors: true, featuredMedia: true,
       featuredCaption: true, contentFormat: true, body: true, legacyHtml: true, format: true, video: true, presentation: true,
-      immersiveAlignment: true, reportingNote: true, slug: true, publishedAt: true, updatedAt: true, deletedAt: true }
+      immersiveAlignment: true, featureWidth: true, splitImageSide: true, siteNavigation: true, reportingNote: true, slug: true, publishedAt: true, updatedAt: true, deletedAt: true }
   });
   return docs.filter((row) => !row.deletedAt).sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
 }
@@ -65,6 +65,7 @@ function collectStoryFacts(row: Omit<Story, "createdAt">, sectionRow: Datasets["
     contributors, contributorKeys: contributors.flatMap((person) => person.keys), corrections,
     image: id(row.featuredMedia), leadCaption: text(row.featuredCaption), listed: true, athleteMeta: [], format: row.format,
     presentation: row.presentation, immersiveAlignment: row.immersiveAlignment ?? "bottom-left",
+    featureWidth: row.featureWidth ?? "wide", splitImageSide: row.splitImageSide ?? "right", siteNavigation: row.siteNavigation ?? "standard",
     primaryVideo, video: row.format === "video" ? { duration: primaryVideo?.duration ?? null } : null, videoMetadata,
     reportingNote: text(row.reportingNote).split(/\n\s*\n/).filter(Boolean), live: null
   };

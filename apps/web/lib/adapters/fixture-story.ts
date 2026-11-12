@@ -84,7 +84,8 @@ export function archiveImage(image: ArchiveMedia | null, sizes?: string, priorit
   };
 }
 
-export const projectWordPressImage = (image: ArchiveImage, usage: StoryImageUsage) => archiveImage(image, usage.sizes, usage.priority, usage.searchVisibility, usage.shape);
+// The archive has no editor crops, so an art-directed alternative (`cropOnly`) never exists there.
+export const projectWordPressImage = (image: ArchiveImage, usage: StoryImageUsage) => usage.cropOnly ? null : archiveImage(image, usage.sizes, usage.priority, usage.searchVisibility, usage.shape);
 
 /** A post as another story's card, relatedness and coverage facts. */
 export function archiveStorySummary(post: ArchivePost): PublicStorySummary<ArchiveImage> {
@@ -153,6 +154,9 @@ export function archivePublicStory(post: ArchivePost, contributors: ArchiveContr
     athleteMeta: isAthleteSpotlightPost(post) ? [getAthleteSpotlightLabel(post), getAthleteSportLabel(post)].filter((value): value is string => Boolean(value)) : [],
     presentation: storyPresentation.presentation,
     immersiveAlignment: storyPresentation.immersiveAlignment,
+    featureWidth: storyPresentation.featureWidth,
+    splitImageSide: storyPresentation.splitImageSide,
+    siteNavigation: storyPresentation.siteNavigation,
     primaryVideo: getArticleVideoView(post),
     contributors: contributors.map(contributor),
     modifiedAt: post.modified,

@@ -1,4 +1,4 @@
-import type { BylinePublicationConfig } from "@byline/core";
+import { getPublicationNavigation, type BylinePublicationConfig } from "@byline/core";
 import { WEEKLY_WILDCAT_PUBLICATION } from "@byline/theme-weekly-wildcat/publication";
 import type { Payload } from "payload";
 import { publicationConfigFromGlobal, readPublishedPublication } from "../public/publication-config";
@@ -17,14 +17,35 @@ export type PreviewPublication = {
   locale: string;
   publicSite: string;
   timeZone: string;
+  /** The Minimal site navigation Live Preview draws for a story that asks for it, from the same configuration the public header reads. */
+  siteNavigation: {
+    name: string;
+    /** Absolute: Preview runs on the newsroom's origin, the artwork lives on the public site. */
+    homeHref: string;
+    logoUrl: string;
+    searchHref: string;
+    sections: Array<{ label: string; url: string }>;
+    secondary: Array<{ label: string; url: string }>;
+  };
 };
 
 export function previewPublicationFrom(config: BylinePublicationConfig): PreviewPublication {
+  const publicSite = config.urls.publicSite.replace(/\/$/, "");
+  const absolute = (path: string) => (/^https?:\/\//.test(path) ? path : `${publicSite}${path}`);
+  const link = ({ label, url }: { label: string; url: string }) => ({ label, url: absolute(url) });
   return {
+    siteNavigation: {
+      name: config.identity.name,
+      homeHref: `${publicSite}/`,
+      logoUrl: absolute(config.branding.masthead.url),
+      searchHref: `${publicSite}/search/`,
+      sections: getPublicationNavigation(config, "header").map(link),
+      secondary: getPublicationNavigation(config, "footer").filter((item) => item.group === "About").map(link)
+    },
     shortName: config.identity.shortName,
     contactHref: config.urls.contact,
     locale: config.locale,
-    publicSite: config.urls.publicSite.replace(/\/$/, ""),
+    publicSite,
     timeZone: config.timezone
   };
 }

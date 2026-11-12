@@ -52,18 +52,56 @@ export const STORY_FORMAT_OPTIONS = options<StoryFormat>([
   ["audio", "Audio"]
 ]);
 
-export const STORY_PRESENTATIONS = ["standard", "immersive"] as const;
+/**
+ * How a story begins. The built-in openings; a repository custom presentation
+ * is keyed by story ID in code and overrides this choice, so it is not a value
+ * here. The first two values existed before Feature and Split, so every older
+ * story reads the same.
+ */
+export const STORY_PRESENTATIONS = ["standard", "feature", "immersive", "split"] as const;
 export type StoryPresentationChoice = (typeof STORY_PRESENTATIONS)[number];
 export const STORY_PRESENTATION_OPTIONS = options<StoryPresentationChoice>([
   ["standard", "Standard"],
-  ["immersive", "Immersive"]
+  ["feature", "Feature"],
+  ["immersive", "Immersive"],
+  ["split", "Split"]
 ]);
+
+/** What each opening is for, in a few words (the picker shows it under the name). */
+export const STORY_PRESENTATION_SUMMARIES: Record<StoryPresentationChoice, string> = {
+  standard: "Headline, then the photo at article width. For most daily stories.",
+  feature: "Headline on the page, then a large photograph. For profiles and narrative features.",
+  immersive: "The photograph fills the first screen with the headline over it.",
+  split: "Headline on one side, photograph on the other. For profiles and visual features."
+};
 
 export const IMMERSIVE_ALIGNMENTS = ["bottom-left", "center"] as const;
 export type ImmersiveAlignment = (typeof IMMERSIVE_ALIGNMENTS)[number];
 export const IMMERSIVE_ALIGNMENT_OPTIONS = options<ImmersiveAlignment>([
   ["bottom-left", "Bottom left"],
   ["center", "Center"]
+]);
+
+export const FEATURE_IMAGE_WIDTHS = ["wide", "full"] as const;
+export type FeatureImageWidth = (typeof FEATURE_IMAGE_WIDTHS)[number];
+export const FEATURE_IMAGE_WIDTH_OPTIONS = options<FeatureImageWidth>([
+  ["wide", "Wide"],
+  ["full", "Full"]
+]);
+
+export const SPLIT_IMAGE_SIDES = ["right", "left"] as const;
+export type SplitImageSide = (typeof SPLIT_IMAGE_SIDES)[number];
+export const SPLIT_IMAGE_SIDE_OPTIONS = options<SplitImageSide>([
+  ["left", "Left"],
+  ["right", "Right"]
+]);
+
+/** The site chrome around a story. A designed choice, never "hide the header". */
+export const STORY_SITE_NAVIGATIONS = ["standard", "minimal"] as const;
+export type StorySiteNavigation = (typeof STORY_SITE_NAVIGATIONS)[number];
+export const STORY_SITE_NAVIGATION_OPTIONS = options<StorySiteNavigation>([
+  ["standard", "Standard"],
+  ["minimal", "Minimal"]
 ]);
 
 /** `legacy-html` is an imported WordPress body; `byline-v1` is the structured Byline editor. */

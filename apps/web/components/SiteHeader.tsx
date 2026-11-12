@@ -1,7 +1,10 @@
+import { StoryNavigation } from "@byline/ui";
 import { getNavigation, getPublicationConfig } from "@/lib/publication";
 
 const publication = getPublicationConfig();
 const headerNavigation = getNavigation("header");
+// The menu's secondary links come from the same configuration: the footer's "About" group, never a second hard-coded list.
+const secondaryNavigation = getNavigation("footer").filter((item) => item.group === "About");
 // Placeholder destination until the newsroom has a dedicated donation page.
 const DONATE_URL = "/contact/";
 const headerNow = new Date();
@@ -25,6 +28,12 @@ const dateTime = `${dateParts.find((part) => part.type === "year")?.value}-${
 }-${dateParts.find((part) => part.type === "day")?.value}`;
 
 type SiteHeaderProps = {
+  // "standard" is the publication header. "story-overlay" is the Minimal site navigation
+  // a visually led story asks for: menu, logo and search over the story opening, and none
+  // of the utility strip, masthead or section row. The layout chooses it before render.
+  mode?: "standard" | "story-overlay";
+  // Where the minimal bar's logo sits on a wide screen; the layout chooses it from the story's opening.
+  logoAlign?: "center" | "start";
   // "nav" pins the section nav (homepage); "logo" pins and shrinks the masthead
   // logo (articles). Both lift the header's children into the body so
   // position: sticky can last the whole page.
@@ -36,7 +45,18 @@ type SiteHeaderProps = {
   homepage?: boolean;
 };
 
-export function SiteHeader({ sticky, showDate = true, homepage = false }: SiteHeaderProps) {
+export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, showDate = true, homepage = false }: SiteHeaderProps) {
+  if (mode === "story-overlay") {
+    return (
+      <StoryNavigation
+        logoAlign={logoAlign}
+        publicationName={publication.identity.name}
+        logoUrl={publication.branding.masthead.url}
+        sections={headerNavigation.map(({ label, url }) => ({ label, url }))}
+        secondary={secondaryNavigation.map(({ label, url }) => ({ label, url }))}
+      />
+    );
+  }
   const mastheadImage = <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />;
 
   return (

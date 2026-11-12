@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { EMPTY_ARTICLE_BODY } from "@byline/content/story";
-import { ArticleView, ImmersiveArticleView, type ArticleViewProps } from "@byline/ui";
+import { PresentedArticleView, type ArticleViewProps } from "@byline/ui";
 import { storyPresentations } from "./registry";
 import { resolveStoryPresentation } from "./resolve";
 import type { StoryPresentationHost, StoryPresentationRegistry } from "./types";
@@ -20,7 +20,8 @@ export type StoryArticleProps = ArticleViewProps & {
  *  1. a repository entry registered for its story ID (always wins): a
  *     presentation arranges the CMS body; a visual story replaces it with the
  *     narrative in its folder;
- *  2. the author's Immersive choice, when the story has a lead image;
+ *  2. the author's Feature, Immersive or Split choice, when the story has a
+ *     lead image (and is not a video story);
  *  3. the normal `ArticleView`.
  *
  * Structured data stays the public route's job: for a repository entry it is
@@ -30,11 +31,7 @@ export type StoryArticleProps = ArticleViewProps & {
 export function StoryArticle({ presentation, slots = {}, className, registry = storyPresentations, host }: StoryArticleProps): ReactNode {
   const resolution = resolveStoryPresentation(presentation, registry);
   const entry = resolution.entry;
-  if (!entry) {
-    return resolution.resolved === "immersive"
-      ? <ImmersiveArticleView presentation={presentation} slots={slots} className={className} />
-      : <ArticleView presentation={presentation} slots={slots} className={className} />;
-  }
+  if (!entry) return <PresentedArticleView presentation={presentation} slots={slots} className={className} />;
 
   const { metadata, ...rest } = slots;
   const styles = host?.styles?.(entry.name) ?? null;

@@ -16,7 +16,8 @@ import {
   type ArticleViewProps
 } from "./article-view";
 import { HeroReveal, HeroRevealContent } from "./HeroReveal";
-import { usesImmersivePresentation } from "@byline/content/story";
+import { resolveBuiltInPresentation, resolveSiteNavigation } from "@byline/content/story";
+import { FeatureArticleView, SplitArticleView } from "./story-opening-views";
 
 const SURFACE_ID = "immersive-article-surface";
 
@@ -37,9 +38,10 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
   const rootClassName = ["immersive-article", centered ? "immersive-article-center" : "immersive-article-bottom-left", className].filter(Boolean).join(" ");
 
   return (
-    <main className={rootClassName}>
+    <main className={rootClassName} data-opening="immersive" data-site-navigation={resolveSiteNavigation(presentation)}>
       {slots.metadata}
       <HeroReveal
+        navZone
         target={SURFACE_ID}
         align={centered ? "center" : "end"}
         scrim={0.5}
@@ -55,7 +57,7 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
         <ArticleExcerpt presentation={presentation} className="immersive-article-excerpt" />
       </HeroReveal>
 
-      <HeroRevealContent id={SURFACE_ID} className="immersive-article-surface">
+      <HeroRevealContent id={SURFACE_ID} className="immersive-article-surface" navSurface>
         <ArticleShell as="div">
           <article className="article-story">
             <div className="immersive-article-meta">
@@ -85,7 +87,20 @@ export function ImmersiveArticleView({ presentation, slots = {}, className }: Ar
  */
 export { resolveBuiltInPresentation, usesImmersivePresentation } from "@byline/content/story";
 
-/** The built-in presentation the author chose: Immersive (when valid), or the normal `ArticleView`. */
+/**
+ * The built-in opening the author chose (Standard, Feature, Immersive or
+ * Split, when valid for the story), rendered. `StoryArticle` does this after
+ * the repository registry; hosts that have no registry use this directly.
+ */
 export function PresentedArticleView(props: ArticleViewProps): ReactNode {
-  return usesImmersivePresentation(props.presentation) ? <ImmersiveArticleView {...props} /> : <ArticleView {...props} />;
+  switch (resolveBuiltInPresentation(props.presentation).resolved) {
+    case "feature":
+      return <FeatureArticleView {...props} />;
+    case "immersive":
+      return <ImmersiveArticleView {...props} />;
+    case "split":
+      return <SplitArticleView {...props} />;
+    default:
+      return <ArticleView {...props} />;
+  }
 }

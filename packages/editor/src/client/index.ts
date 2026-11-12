@@ -8,3 +8,7 @@ export { BylineEditorHostProvider, type BylineEditorHost, type StoryBlockInserte
 export { BlockInserterCommand } from "./inserter";
 export { MediaPlaceholder } from "./blocks/media";
 export { useMediaAsset, useOptionalEditorHost, usePickMedia } from "./host";
+// The responsive settings surface (Popover with a mouse, bottom Sheet on touch) and the preset picker,
+// shared with the newsroom's Story opening control.
+export { SettingsSurface } from "./chrome";
+export { PresentationNote, PresetField } from "./blocks/presentation";

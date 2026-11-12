@@ -1,11 +1,11 @@
-import { resolveBuiltInPresentation, type BuiltInPresentationInput, type BuiltInPresentationReason, type StoryPresentationChoice } from "@byline/content/story";
+import { resolveBuiltInPresentation, resolveSiteNavigation, type BuiltInPresentationInput, type BuiltInPresentationReason, type StoryPresentationChoice, type StorySiteNavigation } from "@byline/content/story";
 
 /**
  * The one presentation resolver. In order:
  *
  *  1. a repository entry registered for the story's ID (always wins);
- *  2. Immersive, when the author chose it and the story has a lead image
- *     (and is not a video story);
+ *  2. Feature, Immersive or Split, when the author chose it and the story has
+ *     a lead image (and is not a video story);
  *  3. Standard.
  *
  * `StoryArticle` renders from this, and the newsroom explains it from the same
@@ -53,4 +53,22 @@ export function resolveStoryPresentation<Entry extends StoryPresentationIdentity
     };
   }
   return { requested: builtIn.requested, resolved: builtIn.resolved, reason: builtIn.reason, custom: null, entry: null };
+}
+
+/**
+ * The site chrome around a story: the author's Site navigation choice, except
+ * that a repository entry (a custom presentation or a visual story) keeps the
+ * Standard header exactly as it always has. The page layer reads this before it
+ * renders the header, so no article component ever reaches up to change it.
+ */
+export function resolveStoryChrome(presentation: { id: number | string; siteNavigation?: StorySiteNavigation | null }, registry: Readonly<Record<number, StoryPresentationIdentity>>): StorySiteNavigation {
+  return findStoryPresentation(registry, presentation.id) ? "standard" : resolveSiteNavigation(presentation);
+}
+
+/**
+ * Where the Minimal site navigation puts the logo on a wide screen: "start" for a Split opening (whose seam is
+ * mid-viewport), "center" otherwise. Read by the layout alongside `resolveStoryChrome`.
+ */
+export function resolveStoryLogoAlign<Entry extends StoryPresentationIdentity>(presentation: BuiltInPresentationInput & { id: number | string }, registry: Readonly<Record<number, Entry>>): "center" | "start" {
+  return resolveStoryPresentation(presentation, registry).resolved === "split" ? "start" : "center";
 }

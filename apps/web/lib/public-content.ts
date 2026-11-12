@@ -1,3 +1,4 @@
+import { requestedPresentation, type StoryPresentationChoice } from "@byline/content/story";
 import { nativeStory, nativeStoryRoute } from "./native-snapshot";
 import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, normalizeStoryFormat, type ImageArtDirection, type LiveCoverage as ArchiveLiveCoverage, type PrimaryVideo } from "@byline/core";
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
@@ -215,6 +216,9 @@ export type ArchivePostSettings = {
   gameScoreGameIds?: number[];
   presentation?: unknown;
   immersiveAlignment?: unknown;
+  featureWidth?: unknown;
+  splitImageSide?: unknown;
+  siteNavigation?: unknown;
   reportingNote?: unknown;
   /** "standard" or "video"; see packages/core/src/story-video.ts. */
   format?: unknown;
@@ -1324,12 +1328,21 @@ export function getPostLiveCoverage(post: ArchivePost): ArchiveLiveCoverage | nu
   return normalizeLiveCoverage([post.live, post.byline?.live, post.weeklyWildcat?.live].find(isRecord));
 }
 
-/** Missing presentation settings use the standard layout, bottom left. */
-export function getPostStoryPresentation(post: ArchivePost): { presentation: "standard" | "immersive"; immersiveAlignment: "bottom-left" | "center" } {
+/** Missing presentation settings use the standard layout, bottom left, standard navigation. */
+export function getPostStoryPresentation(post: ArchivePost): {
+  presentation: StoryPresentationChoice;
+  immersiveAlignment: "bottom-left" | "center";
+  featureWidth: "wide" | "full";
+  splitImageSide: "left" | "right";
+  siteNavigation: "standard" | "minimal";
+} {
   const settings = post.byline ?? post.weeklyWildcat;
   return {
-    presentation: settings?.presentation === "immersive" ? "immersive" : "standard",
-    immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left"
+    presentation: requestedPresentation(settings?.presentation),
+    immersiveAlignment: settings?.immersiveAlignment === "center" ? "center" : "bottom-left",
+    featureWidth: settings?.featureWidth === "full" ? "full" : "wide",
+    splitImageSide: settings?.splitImageSide === "left" ? "left" : "right",
+    siteNavigation: settings?.siteNavigation === "minimal" ? "minimal" : "standard"
   };
 }
 
