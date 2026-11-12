@@ -3,10 +3,12 @@
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
-import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
+import { useAnyCoarsePointer, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Input } from "@byline/newsroom-ui/ui/input";
@@ -16,7 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
@@ -237,6 +239,15 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
             </div>
           ))}
         </div>
+      ) : ready ? (
+        <Empty className="my-4 border py-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><FileText /></EmptyMedia>
+            <EmptyTitle>No transcript text</EmptyTitle>
+            <EmptyDescription>This transcript does not contain any readable passages. Replace it from the recording in Reporting.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent><Button type="button" variant="outline" onClick={onBack}>Go to recording</Button></EmptyContent>
+        </Empty>
       ) : null}
       {ready && draft ? (
         // A bar in the layout, docked under the transcript: it never covers the words being selected.
@@ -424,6 +435,7 @@ const machineKeyOf = (key: string | undefined) => (key && /^SPEAKER_\d{2,3}$/.te
 /** A speaker is edited where it is shown: this passage, or everywhere. */
 function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, transcriptId, api, updatedAt, refresh }: { segment: TranscriptSegment; diarized: boolean; profiles: SpeakerProfile[]; sourceName: string | null; canEdit: boolean; transcriptId: number; api: string; updatedAt: string; refresh: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
+  const touch = useAnyCoarsePointer();
   const [name, setName] = useState(givenName(segment));
   useEffect(() => { if (open) setName(givenName(segment)); }, [open, segment]);
   const shown = speakerLabel(segment);
@@ -439,20 +451,30 @@ function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, trans
   const label = shown ?? (diarized ? "Unknown speaker" : "Add speaker");
   const plain = shown ? "" : "text-muted-foreground";
   if (!canEdit) return <span data-speaker-label="" className={`select-none text-sm font-medium ${plain}`}>{label}</span>;
-  return (
+  const trigger = <button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${plain}`} aria-label={shown ? `Speaker: ${shown}. Change` : "Add speaker"} />;
+  const form = (
+    <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
+      <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
+      <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
+      {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={apply.isPending || !name.trim()}>This passage</Button>
+        {segment.speaker ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || !name.trim()} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
+      </div>
+    </form>
+  );
+  return touch ? (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger render={trigger}>{label}</DrawerTrigger>
+      <DrawerContent keyboardAware>
+        <DrawerHeader><DrawerTitle>Name speaker</DrawerTitle><DrawerDescription>{shown ? `Currently ${shown}` : "Choose who is speaking in this passage."}</DrawerDescription></DrawerHeader>
+        <div className="px-4 pb-4">{form}</div>
+      </DrawerContent>
+    </Drawer>
+  ) : (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<button type="button" className={`touch-hit select-none rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:underline ${plain}`} aria-label={shown ? `Speaker: ${shown}. Change` : "Add speaker"} />}>{label}</PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); apply.mutate(false); }}>
-          <label className="text-sm font-medium" htmlFor={`speaker-${segment.id}`}>Who is speaking?</label>
-          <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
-          {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" size="sm" disabled={apply.isPending}>This passage</Button>
-            {segment.speaker ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || !name.trim()} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
-          </div>
-        </form>
-      </PopoverContent>
+      <PopoverTrigger render={trigger}>{label}</PopoverTrigger>
+      <PopoverContent align="start" className="w-72">{form}</PopoverContent>
     </Popover>
   );
 }
