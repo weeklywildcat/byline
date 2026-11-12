@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { ArticleImageView } from "@byline/content/story";
 import { resolveSiteNavigation } from "@byline/content/story";
 import {
@@ -49,12 +49,15 @@ export function OpeningImage({ image, className, loading = "eager" }: { image: A
       loading={loading}
       fetchPriority={loading === "eager" ? "high" : "auto"}
       decoding="async"
-      style={image.objectPosition ? { objectPosition: image.objectPosition } : undefined}
+      style={image.objectPosition ? ({ "--byline-image-natural-position": image.objectPosition } as CSSProperties) : undefined}
     />
   );
   if (!image.sources?.length) return img;
   return (
-    <picture>
+    <picture
+      data-phone-crop={image.sources.some((source) => source.media === "(max-width: 640px)") ? "" : undefined}
+      data-tablet-crop={image.sources.some((source) => source.media === "(max-width: 1023px)") ? "" : undefined}
+    >
       {image.sources.map((source) => (
         <source key={source.media} media={source.media} srcSet={source.srcSet} sizes={source.sizes} width={source.width ?? undefined} height={source.height ?? undefined} />
       ))}

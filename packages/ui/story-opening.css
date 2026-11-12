@@ -86,8 +86,24 @@
   height: 100%;
   inset: 0;
   object-fit: cover;
+  object-position: var(--byline-image-natural-position, center);
   position: absolute;
   width: 100%;
+}
+
+/* An explicit crop is already framed in the newsroom; do not apply the
+   natural image's focal point to it again. The original keeps its focal point
+   wherever no matching crop exists (including wide screens). */
+@media (max-width: 640px) {
+  .story-opening .story-opening-media picture:is([data-phone-crop], [data-tablet-crop]) img {
+    object-position: center;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023.98px) {
+  .story-opening .story-opening-media picture[data-tablet-crop] img {
+    object-position: center;
+  }
 }
 
 /* ---------------------------------------------------------------- Feature */

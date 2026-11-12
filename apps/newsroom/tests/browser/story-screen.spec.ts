@@ -145,6 +145,28 @@ test("Plan's Reporting holds the notebook; interviews show in To do; a source is
   await expect(page.locator("#plan-todo-title")).toBeFocused();
 });
 
+test("Plan media assignments can be checked off and reopened without opening the edit dialog", async ({ page }) => {
+  await open(page, draftId, "?view=plan");
+  await page.getByRole("navigation", { name: "Plan sections" }).getByRole("button", { name: /^To do/ }).click();
+  const todo = page.locator("#plan-todo");
+  await todo.getByRole("button", { name: "Add media assignment" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Add assignment" });
+  const title = `Homepage photo ${stamp}`;
+  await dialog.getByRole("textbox", { name: "Title" }).fill(title);
+  await dialog.getByRole("button", { name: "Add assignment" }).click();
+
+  const row = todo.locator("[data-plan-media-assignment]").filter({ hasText: title });
+  await expect(row).toBeVisible();
+  const complete = row.getByRole("checkbox", { name: `Mark ${title} done` });
+  await complete.click();
+  await expect(row.getByRole("checkbox", { name: `Reopen ${title}` })).toBeChecked();
+  await expect(row).toContainText("Done");
+
+  await row.getByRole("checkbox", { name: `Reopen ${title}` }).click();
+  await expect(row.getByRole("checkbox", { name: `Mark ${title} done` })).not.toBeChecked();
+});
+
 test("Cancel discards an unfinished story note instead of reopening stale text", async ({ page }) => {
   await open(page, pitchId, "?view=plan");
   const notes = page.locator("#plan-story-notes");

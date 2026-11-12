@@ -101,6 +101,7 @@ export function PresentedArticleView(props: ArticleViewProps): ReactNode {
     case "split":
       return <SplitArticleView {...props} />;
     default:
-      return <ArticleView {...props} />;
+      // Standard (including missing-image fallbacks) needs clearance under the fixed Minimal bar.
+      return <ArticleView {...props} className={[props.className, resolveSiteNavigation(props.presentation) === "minimal" && "article-standard-minimal-nav"].filter(Boolean).join(" ")} />;
   }
 }

@@ -22,9 +22,18 @@
   height: 100%;
   inset: 0;
   object-fit: cover;
+  object-position: var(--hero-reveal-natural-position, center);
   position: absolute;
   width: 100%;
   z-index: 0;
+}
+
+/* A prepared portrait crop is already framed; only the uncropped fallback
+   should use the original photograph's focal-point position. */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .hero-reveal picture[data-portrait-crop] > .hero-reveal-image {
+    object-position: center;
+  }
 }
 
 .hero-reveal::before {

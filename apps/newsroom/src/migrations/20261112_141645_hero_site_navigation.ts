@@ -23,12 +23,15 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
 export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
    ALTER TABLE "stories" ALTER COLUMN "presentation" SET DATA TYPE text;
+  -- Feature and Split are not values in the old enum; normalize both live stories and saved versions before casting back.
+  UPDATE "stories" SET "presentation" = 'standard' WHERE "presentation" IN ('feature', 'split');
   ALTER TABLE "stories" ALTER COLUMN "presentation" SET DEFAULT 'standard'::text;
   DROP TYPE "public"."enum_stories_presentation";
   CREATE TYPE "public"."enum_stories_presentation" AS ENUM('standard', 'immersive');
   ALTER TABLE "stories" ALTER COLUMN "presentation" SET DEFAULT 'standard'::"public"."enum_stories_presentation";
   ALTER TABLE "stories" ALTER COLUMN "presentation" SET DATA TYPE "public"."enum_stories_presentation" USING "presentation"::"public"."enum_stories_presentation";
   ALTER TABLE "_stories_v" ALTER COLUMN "version_presentation" SET DATA TYPE text;
+  UPDATE "_stories_v" SET "version_presentation" = 'standard' WHERE "version_presentation" IN ('feature', 'split');
   ALTER TABLE "_stories_v" ALTER COLUMN "version_presentation" SET DEFAULT 'standard'::text;
   DROP TYPE "public"."enum__stories_v_version_presentation";
   CREATE TYPE "public"."enum__stories_v_version_presentation" AS ENUM('standard', 'immersive');

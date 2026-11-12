@@ -354,8 +354,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
           {due ? <span className="text-sm text-muted-foreground">{due}</span> : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-end gap-2 max-sm:w-full">
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground max-sm:order-last max-sm:w-full max-sm:justify-end" role="status" aria-live="polite">
             {saving ? <Spinner className="size-3" /> : saveLabel === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveLabel}
           </span>
@@ -388,14 +388,14 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           {primary ? (
-            <Button type="button" size="sm" onClick={primary.run} disabled={busy} data-primary-action="">
+            <Button type="button" size="sm" className="max-sm:flex-1" onClick={primary.run} disabled={busy} data-primary-action="">
               {busy ? <Spinner data-icon="inline-start" /> : null}
               {primary.label}
               {busy ? null : <ArrowRight data-icon="inline-end" aria-hidden="true" />}
             </Button>
           ) : null}
           {showPublish ? (
-            <Button ref={publishTrigger} type="button" size="sm" onClick={startPublish} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
+            <Button ref={publishTrigger} type="button" size="sm" className="max-sm:flex-1" onClick={startPublish} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
               {publishing ? <Spinner /> : null}
               {hasPublishedDoc ? "Publish changes" : "Publish"}
             </Button>

@@ -65,6 +65,19 @@ test.describe('Site navigation', () => {
     expect((await box(page, '.article-header h1')).y).toBeGreaterThan(56);
   });
 
+  test('Standard with Minimal clears the entire fixed bar, while ordinary Standard keeps its spacing', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, stories.standardMinimal);
+    const bar = await box(page, '.story-nav__layer--start');
+    const label = await box(page, '.article-section-label');
+    expect(label.y).toBeGreaterThanOrEqual(bar.y + bar.height + 10);
+    const minimalPadding = await page.locator('.byline-article-view.article-shell').first().evaluate((el) => parseFloat(getComputedStyle(el).paddingTop));
+
+    await open(page, stories.ordinary);
+    const ordinaryPadding = await page.locator('.byline-article-view.article-shell').first().evaluate((el) => parseFloat(getComputedStyle(el).paddingTop));
+    expect(minimalPadding - ordinaryPadding).toBeGreaterThanOrEqual(56);
+  });
+
   test('the minimal header omits the utility strip, donate, date, location and section row', async ({ page }) => {
     await open(page, stories.featureFull);
     await expect(page.locator('.site-utility')).toHaveCount(0);
@@ -140,6 +153,21 @@ test.describe('Site navigation', () => {
     await expect(page.locator('[data-story-nav]').getByRole('link', { name: 'Weekly Wildcat home' })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect(nav).toHaveAttribute('data-solid', 'false');
+  });
+
+  test('switches exactly at the top edge on phones and after a viewport resize', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, stories.immersive);
+    const nav = page.locator('[data-story-nav]');
+    for (const size of [{ width: 390, height: 844 }, { width: 1440, height: 700 }]) {
+      await page.setViewportSize(size);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const boundary = await page.locator('[data-story-nav-surface]').evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+      await page.evaluate((y) => window.scrollTo(0, y - 6), boundary);
+      await expect(nav).toHaveAttribute('data-solid', 'false');
+      await page.evaluate((y) => window.scrollTo(0, y + 6), boundary);
+      await expect(nav).toHaveAttribute('data-solid', 'true');
+    }
   });
 
   test('reduced motion removes the bar transition, and the sheet animation', async ({ page }) => {

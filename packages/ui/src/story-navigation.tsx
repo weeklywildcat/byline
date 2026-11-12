@@ -96,7 +96,9 @@ export function StoryNavigation({ publicationName, logoUrl, homeHref = "/", sect
 
       <dialog className="story-nav__sheet" id="story-nav-menu" aria-labelledby="story-nav-menu-title" data-story-nav-sheet>
         <div className="story-nav__sheet-header">
-          <a className="story-nav__sheet-title" id="story-nav-menu-title" href={homeHref}>{publicationName}</a>
+          <a className="story-nav__sheet-title" id="story-nav-menu-title" href={homeHref} aria-label={publicationName}>
+            <img className="story-nav__sheet-logo" src={logoUrl} alt="" aria-hidden="true" decoding="async" />
+          </a>
           <form method="dialog">
             <button type="submit" className="story-nav__control story-nav__control--plain" aria-label="Close site navigation" data-story-nav-close>
               <CloseIcon />

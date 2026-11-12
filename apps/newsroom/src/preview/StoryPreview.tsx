@@ -325,7 +325,7 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
           homeHref={publication.siteNavigation.homeHref}
           searchHref={publication.siteNavigation.searchHref}
           sections={publication.siteNavigation.sections}
-          secondary={publication.siteNavigation.secondary}
+          secondary={publication.siteNavigation.secondary.filter((link) => !link.url.endsWith("/diversity-inclusion/"))}
         />
       ) : null}
       <StoryArticle presentation={presentation} slots={slots} registry={registry} host={assets.host} />

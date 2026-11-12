@@ -186,12 +186,17 @@
 }
 
 .story-nav__sheet-title {
-  color: var(--ink, #1f2328);
-  font-family: var(--font-headline, Georgia, serif);
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  align-items: center;
+  display: inline-flex;
+  min-height: 44px;
   text-decoration: none;
+}
+
+/* The masthead artwork in its own colours on the paper sheet. */
+.story-nav__sheet-logo {
+  display: block;
+  height: 22px;
+  width: auto;
 }
 
 .story-nav__sheet-nav {
@@ -268,4 +273,10 @@ body:has(.story-nav__sheet[open]) {
 html:has(.story-nav) .article-shell,
 html:has(.story-nav) .byline-article-view.article-shell {
   --byline-article-gutter: max(20px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}
+
+/* Standard and fallback openings have no photo behind the fixed Minimal bar.
+   Feature, Split and Immersive supply their own opening geometry. */
+.byline-article-view.article-shell.article-standard-minimal-nav {
+  padding-top: calc(38px + 56px + env(safe-area-inset-top, 0px));
 }

@@ -1,13 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
-import { ChevronRight, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { ItemButton } from "@byline/newsroom-ui/components/item-button";
 import { PeopleAvatars, anyPicture } from "@byline/newsroom-ui/components/people-avatars";
 import { WorkStatusBadge, mediaIntensity } from "@byline/newsroom-ui/components/work-status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { mediaTypeIcons } from "../story/media-icons";
 import { MediaDialog } from "./MediaDialog";
 import { AddButton, Meta, SectionFailed } from "./parts";
@@ -23,50 +23,55 @@ import type { ContributorEntry } from "../editorial/editorial-model";
 const STATUS_OPTIONS = MEDIA_ASSIGNMENT_STATUSES.map((value) => ({ value, label: labelFor(MEDIA_STATUS_LABELS, value) }));
 import { MEDIA_ASSIGNMENT_STATUSES, type MediaAssignmentStatus, type StoryMediaAssignment } from "./workspace-types";
 
-function MediaRow({ assignment, people, timezone, now, onOpen, onStatus, busy }: { assignment: StoryMediaAssignment; people: ContributorEntry[]; timezone: string; now: Date; onOpen: (element: HTMLElement) => void; onStatus: (status: MediaAssignmentStatus) => void; busy: boolean }) {
+function MediaRow({ assignment, people, timezone, now, onOpen, onStatus, busy, canUpdateStatus }: { assignment: StoryMediaAssignment; people: ContributorEntry[]; timezone: string; now: Date; onOpen: (element: HTMLElement) => void; onStatus: (status: MediaAssignmentStatus) => void; busy: boolean; canUpdateStatus: boolean }) {
   const Icon = mediaTypeIcons[assignment.type] || mediaTypeIcons.other;
-  const done = assignment.status === "done";
+  const done = assignment.status === "done" || assignment.status === "selected";
   const due = done ? "" : dueText(assignment.dueAt, timezone, now);
   const files = assignment.attachmentIds.length;
   const hints = mediaReadinessHints(assignment);
   const detail = [files ? fileCountLabel(files) : "", ...hints];
+  const completionLabel = done ? `Reopen ${assignment.title}` : `Mark ${assignment.title} done`;
   return <ContextMenu>
-    <ContextMenuTrigger render={<div className="contents" />}><ItemButton size="sm" onClick={(event) => onOpen(event.currentTarget)}>
-
-    {assignment.assignee && anyPicture(assigneeAvatars([assignment.assignee], people)) ? <ItemMedia><PeopleAvatars people={assigneeAvatars([assignment.assignee], people)} /></ItemMedia> : <ItemMedia variant="icon" className="size-6 rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></ItemMedia>}
-    <ItemContent>
-      <ItemTitle>{assignment.title}</ItemTitle>
-      <ItemDescription>
-        {labelFor(MEDIA_TYPE_LABELS, assignment.type)} · {assignment.assignee?.name || "Unassigned"}{due ? <> · <span className={isOverdue(assignment.dueAt, timezone, now) ? "text-warning" : undefined}>{due}</span></> : null}
-      </ItemDescription>
-      {detail.some(Boolean) ? <ItemDescription><Meta parts={detail} flag={(index) => (files ? index > 0 : true)} /></ItemDescription> : null}
-    </ItemContent>
-    <ItemActions>
-      <WorkStatusBadge kind="production" intensity={mediaIntensity(assignment.status)}>{labelFor(MEDIA_STATUS_LABELS, assignment.status)}</WorkStatusBadge>
-      <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
-    </ItemActions>
-
-    </ItemButton></ContextMenuTrigger>
+    <ContextMenuTrigger render={<Item size="sm" data-media-assignment={assignment.id} />}>
+      <ItemMedia>
+        {canUpdateStatus
+          ? <Checkbox aria-label={completionLabel} checked={done} disabled={busy} onCheckedChange={(checked) => onStatus(checked ? "done" : "in-progress")} />
+          : assignment.assignee && anyPicture(assigneeAvatars([assignment.assignee], people))
+            ? <PeopleAvatars people={assigneeAvatars([assignment.assignee], people)} />
+            : <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon aria-hidden="true" /></span>}
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle><button type="button" className={done ? "touch-hit text-left text-muted-foreground line-through hover:underline" : "touch-hit text-left hover:underline"} onClick={(event) => onOpen(event.currentTarget)}>{assignment.title}</button></ItemTitle>
+        <ItemDescription>
+          {labelFor(MEDIA_TYPE_LABELS, assignment.type)} · {assignment.assignee?.name || "Unassigned"}{due ? <> · <span className={isOverdue(assignment.dueAt, timezone, now) ? "text-warning" : undefined}>{due}</span></> : null}
+        </ItemDescription>
+        {detail.some(Boolean) ? <ItemDescription><Meta parts={detail} flag={(index) => (files ? index > 0 : true)} /></ItemDescription> : null}
+      </ItemContent>
+      <ItemActions>
+        <WorkStatusBadge kind="production" intensity={mediaIntensity(assignment.status)}>{labelFor(MEDIA_STATUS_LABELS, assignment.status)}</WorkStatusBadge>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={`Edit assignment: ${assignment.title}`} onClick={(event) => onOpen(event.currentTarget)}><Pencil /></Button>
+      </ItemActions>
+    </ContextMenuTrigger>
     <ContextMenuContent className="w-52">
       <ContextMenuGroup>
         <ContextMenuLabel className="max-w-48 truncate">{assignment.title}</ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={(event) => onOpen(event.currentTarget as HTMLElement)}><Pencil aria-hidden="true" />Edit assignment</ContextMenuItem>
-        <ContextMenuSub>
+        {canUpdateStatus ? <ContextMenuSub>
           <ContextMenuSubTrigger disabled={busy}>Status</ContextMenuSubTrigger>
           <ContextMenuSubContent className="min-w-44">
             <ContextMenuRadioGroup value={assignment.status} onValueChange={(value) => { if (value && value !== assignment.status) onStatus(value as MediaAssignmentStatus); }}>
               {STATUS_OPTIONS.map((option) => <ContextMenuRadioItem key={option.value} value={option.value}>{option.label}</ContextMenuRadioItem>)}
             </ContextMenuRadioGroup>
           </ContextMenuSubContent>
-        </ContextMenuSub>
+        </ContextMenuSub> : null}
       </ContextMenuGroup>
     </ContextMenuContent>
   </ContextMenu>;
 }
 
 export function MediaSection() {
-  const { storyId, client, data, timezone, now, caps, sectionError, reload, announce } = useWorkspace();
+  const { storyId, client, data, timezone, now, caps, currentUserId, sectionError, reload, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const dialog = useDialogTarget<StoryMediaAssignment>("[data-ws-add=media]");
   const failed = sectionError("media");
@@ -78,7 +83,24 @@ export function MediaSection() {
       cache.write((current) => current ? { ...current, mediaAssignments: current.mediaAssignments.map((item) => item.id === assignment.id ? { ...item, status } : item) } : current);
       return { previous };
     },
-    onSuccess: (response) => { cache.write((current) => applyMedia(current, response)); announce("Production status updated."); },
+    onSuccess: (response, { assignment, status }) => {
+      cache.write((current) => applyMedia(current, response));
+      const completed = status === "done";
+      const message = completed ? `Marked ${assignment.title} done.` : `Reopened ${assignment.title}.`;
+      announce(message);
+      toast.success(message, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void client.saveMediaAssignment(storyId, { status: assignment.status }, assignment.id).then((restored) => {
+              cache.write((current) => applyMedia(current, restored));
+              announce(`Restored ${assignment.title}.`);
+              void cache.invalidate();
+            }).catch((failure) => toast.error(workspaceError(failure, "The media status change couldn’t be undone.").message));
+          }
+        }
+      });
+    },
     onError: (failure, _variables, context) => { if (context?.previous) cache.write(() => context.previous); const message = workspaceError(failure, "Production status couldn’t be saved. Try again.").message; toast.error(message); announce(message); },
     onSettled: () => { void cache.invalidate(); }
   });
@@ -93,7 +115,7 @@ export function MediaSection() {
     </CardHeader>
     <CardContent className="px-0">
       {failed ? <div className="px-3"><SectionFailed what="production assignments" onRetry={() => void reload()} /></div> : data.mediaAssignments.length
-        ? <ItemGroup role="group" aria-label="Production assignments" className="gap-0">{data.mediaAssignments.map((assignment) => <MediaRow key={assignment.id} assignment={assignment} people={data.people} timezone={timezone} now={now} busy={quickStatus.isPending && quickStatus.variables?.assignment.id === assignment.id} onOpen={(element) => dialog.openWith(assignment, element)} onStatus={(status) => quickStatus.mutate({ assignment, status })} />)}</ItemGroup>
+        ? <ItemGroup role="group" aria-label="Production assignments" className="gap-0">{data.mediaAssignments.map((assignment) => <MediaRow key={assignment.id} assignment={assignment} people={data.people} timezone={timezone} now={now} busy={quickStatus.isPending && quickStatus.variables?.assignment.id === assignment.id} canUpdateStatus={caps.manageMedia || assignment.assigneeId === currentUserId} onOpen={(element) => dialog.openWith(assignment, element)} onStatus={(status) => quickStatus.mutate({ assignment, status })} />)}</ItemGroup>
         : <div className="px-3"><Empty className="py-5"><EmptyHeader><EmptyTitle>No photo, graphic, video or audio work yet.</EmptyTitle></EmptyHeader>{add ? <EmptyContent>{add}</EmptyContent> : null}</Empty></div>}
     </CardContent>
     <MediaDialog key={`media-${dialog.session}`} open={dialog.open} assignment={dialog.target} onClose={dialog.close} finalFocus={dialog.finalFocus} />

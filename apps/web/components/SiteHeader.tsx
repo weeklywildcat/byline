@@ -5,6 +5,8 @@ const publication = getPublicationConfig();
 const headerNavigation = getNavigation("header");
 // The menu's secondary links come from the same configuration: the footer's "About" group, never a second hard-coded list.
 const secondaryNavigation = getNavigation("footer").filter((item) => item.group === "About");
+// The compact menu keeps the About links short: Diversity & Inclusion stays in the footer only.
+const menuSecondaryNavigation = secondaryNavigation.filter((item) => item.url !== "/diversity-inclusion/");
 // Placeholder destination until the newsroom has a dedicated donation page.
 const DONATE_URL = "/contact/";
 const headerNow = new Date();
@@ -53,7 +55,7 @@ export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, sh
         publicationName={publication.identity.name}
         logoUrl={publication.branding.masthead.url}
         sections={headerNavigation.map(({ label, url }) => ({ label, url }))}
-        secondary={secondaryNavigation.map(({ label, url }) => ({ label, url }))}
+        secondary={menuSecondaryNavigation.map(({ label, url }) => ({ label, url }))}
       />
     );
   }
