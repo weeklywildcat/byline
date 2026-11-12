@@ -374,6 +374,10 @@ export async function verifySelection(ctx: ScreenContext, id: number, verified: 
   const found = await payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
   const row = found.docs[0];
   if (!row) throw new APIError("That quote is not available.", 404);
+  if (verified) {
+    const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
+    if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
+  }
   // Update access is the check (creator, assigned editor, administrators, managers for normal material).
   const updated = await payload.update({
     collection: "transcript-selections", id,
