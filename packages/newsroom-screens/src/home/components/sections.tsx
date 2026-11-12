@@ -81,7 +81,7 @@ function WeekItem({ event, timezone, onOpen }: { event: AgendaEvent; timezone: s
   </>;
   const className = "flex w-full items-start gap-1.5 rounded-sm px-1 py-0.5 text-left text-xs leading-4 text-foreground";
   const item = onOpen
-    ? <button type="button" data-week-event={event.category} className={cn(className, "hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring")} aria-label={label} title={label} onClick={onOpen}>{body}</button>
+    ? <Button type="button" variant="ghost" size="sm" data-week-event={event.category} className={cn(className, "h-auto min-h-0 justify-start font-normal shadow-none hover:bg-muted")} aria-label={label} title={label} onClick={onOpen}>{body}</Button>
     : <span data-week-event={event.category} className={className} title={label}>{body}</span>;
   return <li>{event.storyId ? <StoryHoverCard storyId={event.storyId} title={event.detail || event.title}>{item}</StoryHoverCard> : item}</li>;
 }
@@ -178,8 +178,8 @@ export function SiteRows({ rows }: { rows: SiteRow[] }) {
       const content = <><Icon className={cn("size-4 shrink-0", row.iconClassName ?? "text-muted-foreground")} aria-hidden="true" /><span className="min-w-0 flex-1 truncate text-sm">{row.label}</span><span className="max-w-[60%] truncate text-right text-sm tabular-nums" title={row.title}>{row.value}</span></>;
       const className = "flex h-10 w-full items-center gap-3 px-4.5 text-left";
       return <li key={row.key} data-site-row={row.key} className="border-border/50 not-first:border-t">
-        {row.href ? <a href={row.href} className={cn(className, "hover:bg-muted/40")}>{content}</a>
-          : row.onOpen ? <button type="button" className={cn(className, "hover:bg-muted/40")} onClick={row.onOpen}>{content}</button>
+        {row.href ? <a href={row.href} className={cn(buttonVariants({ variant: "ghost" }), className, "h-10 justify-start rounded-none px-4.5 font-normal shadow-none hover:bg-muted/40")}>{content}</a>
+          : row.onOpen ? <Button type="button" variant="ghost" className={cn(className, "h-10 justify-start rounded-none px-4.5 font-normal shadow-none hover:bg-muted/40")} onClick={row.onOpen}>{content}</Button>
             : <div className={className}>{content}</div>}
       </li>;
     })}
