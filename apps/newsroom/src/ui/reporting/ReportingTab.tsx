@@ -16,6 +16,7 @@ import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
@@ -207,13 +208,18 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
           {panel === "note" ? <NoteComposer context={context} bound={bound} onDone={() => { setPanel(null); setBound(null); void refresh(); }} onCancel={() => { setPanel(null); setBound(null); }} /> : null}
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
-            <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
-              <p className="text-sm font-medium">Interview</p>
-              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
-              <div className="flex flex-wrap items-center gap-3">
+            <Card size="sm" data-record-panel="">
+              <CardHeader>
+                <CardTitle>Interview</CardTitle>
+                <CardDescription>Record here or upload audio you already have. Byline keeps the recording private and does not transcribe it.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">MP3, M4A, WAV, AAC, Ogg or WebM. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
+              </CardContent>
+              <CardFooter className="flex-wrap gap-3">
                 <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} onCancel={() => { setPanel(null); setBound(null); }} />
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           ) : null}
 
           {data.upNext.length ? (
