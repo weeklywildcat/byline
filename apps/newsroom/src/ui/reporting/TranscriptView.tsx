@@ -566,14 +566,14 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia><Trash2 /></AlertDialogMedia>
-            <AlertDialogTitle>Remove this saved ${selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
+            <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the saved ${selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
+              This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>${run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
+            <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
