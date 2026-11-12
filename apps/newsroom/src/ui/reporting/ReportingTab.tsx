@@ -509,7 +509,7 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
-      <AlertDialogContent size="sm" finalFocus={finalFocus}>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia><RefreshCw /></AlertDialogMedia>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
@@ -590,7 +590,7 @@ function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRem
   const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent size="sm">
+      <AlertDialogContent size="sm" finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogMedia><Trash2 /></AlertDialogMedia>
           <AlertDialogTitle>{title}</AlertDialogTitle>
