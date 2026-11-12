@@ -30,6 +30,24 @@ export function startStoryNavigation(scope: ParentNode = document): () => void {
     const onBackdrop = (event: MouseEvent) => {
       if (event.target === sheet) sheet.close();
     };
+    // Chromium can move focus to the document after the last tabbable in a
+    // native modal dialog. Keep keyboard focus cycling inside the sheet.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusable = [...sheet.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => element.getClientRects().length > 0);
+      if (!focusable.length) return;
+      const active = sheet.ownerDocument.activeElement;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (active === first || !sheet.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !sheet.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     // Following a link inside the sheet closes it first, so a same-page or bfcache return never shows it open.
     const onLink = (event: MouseEvent) => {
       if ((event.target as Element | null)?.closest("a[href]")) sheet.close();
@@ -37,11 +55,13 @@ export function startStoryNavigation(scope: ParentNode = document): () => void {
     opener.addEventListener("click", open);
     sheet.addEventListener("close", onClose);
     sheet.addEventListener("click", onBackdrop);
+    sheet.addEventListener("keydown", onKeyDown);
     sheet.addEventListener("click", onLink);
     stops.push(() => {
       opener.removeEventListener("click", open);
       sheet.removeEventListener("close", onClose);
       sheet.removeEventListener("click", onBackdrop);
+      sheet.removeEventListener("keydown", onKeyDown);
       sheet.removeEventListener("click", onLink);
       if (sheet.open) sheet.close();
     });
