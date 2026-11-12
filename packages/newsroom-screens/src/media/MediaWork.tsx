@@ -19,7 +19,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, Dr
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@byline/newsroom-ui/ui/context-menu";
 import { Input } from "@byline/newsroom-ui/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
@@ -205,7 +205,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
   const assigneeItems = [{ value: "0", label: "Unassigned" }, ...assignees.map((person) => ({ value: String(person.id), label: person.name }))];
 
   const cells = (row: MediaDeskRow) => {
-    const editable = canManage && canUpdate(row);
+    const editable = canUpdate(row) && (canManage || (currentUserId !== null && row.assignee?.id === currentUserId));
     const saving = savingKey === rowKey(row);
     return {
       editable, saving,
@@ -246,8 +246,9 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
   return <div ref={ref} className="flex flex-col gap-3">
     <div className="flex items-center gap-2" role="search" aria-label={"Filter assignments"}>
       <InputGroup className="min-w-0 flex-1 sm:max-w-sm">
-        <InputGroupInput type="search" aria-label={"Find a story or assignment"} placeholder={"Find a story or assignment…"} value={filters.story} onChange={(event) => set("story", event.target.value)} />
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+        <InputGroupInput type="search" aria-label={"Find a story or assignment"} placeholder={"Find a story or assignment…"} value={filters.story} onChange={(event) => set("story", event.target.value)} />
+        {filters.story ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear assignment search" onClick={() => set("story", "")}><X /></InputGroupButton></InputGroupAddon> : null}
       </InputGroup>
       {compactFilters ? (
         <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
