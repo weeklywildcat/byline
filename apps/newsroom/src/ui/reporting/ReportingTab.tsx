@@ -456,9 +456,10 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
 }
 
 function ConfirmReplaceTranscriptButton({ quoteCount, onReplace }: { quoteCount: number; onReplace: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <AlertDialog>
-      <Button type="button" size="xs" variant="outline" onClick={() => undefined} render={<AlertDialogTriggerShim />}>Replace transcript</Button>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <Button type="button" size="xs" variant="outline" onClick={() => setOpen(true)}>Replace transcript</Button>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
@@ -468,18 +469,15 @@ function ConfirmReplaceTranscriptButton({ quoteCount, onReplace }: { quoteCount:
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="default" onClick={onReplace}>Choose transcript</AlertDialogAction>
+          <AlertDialogAction variant="default" onClick={() => { setOpen(false); onReplace(); }}>Choose transcript</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
 }
 
-function AlertDialogTriggerShim(props: React.ComponentProps<"button">) {
-  return <button {...props} data-slot="alert-dialog-trigger" />;
-}
-
 function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: ReportingFileMaterial; removing: boolean; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
   const transcript = file.transcript;
   const interview = file.fileKind === "audio";
   const title = interview ? "Remove this interview?" : "Remove this file?";
@@ -490,8 +488,8 @@ function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: Reporting
       : ` All ${transcript.quoteCount} saved quotes will also be deleted.`
     : "";
   return (
-    <AlertDialog>
-      <Button type="button" size="xs" variant="ghost" render={<AlertDialogTriggerShim />}>Remove</Button>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <Button type="button" size="xs" variant="ghost" disabled={removing} onClick={() => setOpen(true)}>Remove</Button>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -501,7 +499,7 @@ function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: Reporting
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={removing} onClick={onRemove}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
+          <AlertDialogAction variant="destructive" disabled={removing} onClick={() => { setOpen(false); onRemove(); }}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
