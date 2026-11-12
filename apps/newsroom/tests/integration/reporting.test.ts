@@ -284,6 +284,10 @@ describe("recordings, ground rules and transcripts", () => {
     expect(blockedQuote.status).toBe(409);
     expect(blockedQuote.body.message).toMatch(/used in an article/i);
 
+    const blockedEdit = await call("patch", "/byline/reporting/selections/:id", "alice", { params: { id: ids.quote }, data: { text: "Changed after publication" } });
+    expect(blockedEdit.status).toBe(409);
+    expect(blockedEdit.body.message).toMatch(/used in an article/i);
+
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
