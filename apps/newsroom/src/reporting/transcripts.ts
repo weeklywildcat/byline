@@ -1,3 +1,4 @@
+import { sql, type PostgresAdapter } from "@payloadcms/db-postgres";
 import { APIError, type Where } from "payload";
 import { canChangeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
 import { atLeast, relationId } from "../access/user";
@@ -375,36 +376,41 @@ export async function verifySelection(ctx: ScreenContext, id: number, verified: 
   const found = await payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, ...as(ctx) });
   const row = found.docs[0];
   if (!row) throw new APIError("That quote is not available.", 404);
-  // Verification changes protected provenance fields. Authorize against the same
-  // per-record rule as collection update access, then perform only that protected
-  // write with system access so Payload does not strip state/verifiedBy/verifiedAt.
   if (!canChangeMaterial(audience, row, row.createdBy)) throw new APIError("You cannot verify that quote.", 403);
   if (verified) {
     const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
     if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
   }
-  // Field access receives the existing request object. When a Local API call
-  // also supplies `req`, a separate `context` option does not replace
-  // `req.context`, so set this request-local flag for the protected write
-  // and restore it immediately afterwards.
-  const requestContext = ctx.req.context as Record<string, unknown>;
-  const previousVerification = requestContext.bylineVerification;
-  requestContext.bylineVerification = true;
-  let updated;
-  try {
-    updated = await payload.update({
-      collection: "transcript-selections",
-      id,
-      data: verified ? { state: "verified", verifiedBy: ctx.user.id as number, verifiedAt: new Date().toISOString(), kind: "quote" } : { state: "saved", verifiedBy: null, verifiedAt: null },
-      overrideAccess: true,
-      depth: 0,
-      req: ctx.req,
-      context: { ...ctx.req.context, bylineVerification: true }
-    });
-  } finally {
-    if (previousVerification === undefined) delete requestContext.bylineVerification;
-    else requestContext.bylineVerification = previousVerification;
-  }
+
+  const verifiedAt = verified ? new Date().toISOString() : null;
+  await inTransaction(ctx.req, async () => {
+    await lockRow(ctx.req, "transcript_selections", id);
+    const transactionID = await ctx.req.transactionID;
+    const session = transactionID ? (ctx.req.payload.db as unknown as PostgresAdapter).sessions[String(transactionID)] : null;
+    if (!session) throw new Error("Reporting verification transaction unavailable.");
+    if (verified) {
+      await session.db.execute(sql`
+        update "transcript_selections"
+        set "state" = 'verified',
+            "kind" = 'quote',
+            "verified_by_id" = ${ctx.user.id as number},
+            "verified_at" = ${verifiedAt},
+            "updated_at" = now()
+        where "id" = ${id}
+      `);
+    } else {
+      await session.db.execute(sql`
+        update "transcript_selections"
+        set "state" = 'saved',
+            "verified_by_id" = null,
+            "verified_at" = null,
+            "updated_at" = now()
+        where "id" = ${id}
+      `);
+    }
+  });
+
+  const updated = await payload.findByID({ collection: "transcript-selections", id, overrideAccess: true, depth: 0, req: ctx.req });
   if (verified) await recordStoryActivity(ctx.req, row.story, "quote-verified", id);
   return { id, state: updated.state, verifiedAt: updated.verifiedAt ?? null };
 }
