@@ -158,7 +158,7 @@ export function RecorderPanel({ label, onRecorded, onUploaded, onCancel, busy, l
           <AlertTitle>Recording isn’t available in this browser</AlertTitle>
           <AlertDescription>{upload ? "You can still upload audio you recorded elsewhere." : "Use a browser that supports microphone recording, or upload audio elsewhere."}</AlertDescription>
         </Alert>
-        {upload}
+        <div className="flex flex-wrap gap-2">{upload}{onCancel ? <Button type="button" variant="ghost" className={size} onClick={onCancel}>Cancel</Button> : null}</div>
       </div>
     );
   }
