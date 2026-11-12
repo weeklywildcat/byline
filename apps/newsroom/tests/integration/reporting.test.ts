@@ -280,6 +280,10 @@ describe("recordings, ground rules and transcripts", () => {
     expect((await payload.count({ collection: "reporting-files", where: { id: { equals: ids.recording } } })).totalDocs).toBe(1);
     expect((await payload.count({ collection: "transcript-selections", where: { id: { equals: ids.quote } } })).totalDocs).toBe(1);
 
+    const blockedQuote = await call("delete", "/byline/reporting/selections/:id", "alice", { params: { id: ids.quote } });
+    expect(blockedQuote.status).toBe(409);
+    expect(blockedQuote.body.message).toMatch(/used in an article/i);
+
     // Removing the block removes the use.
     await payload.update({ collection: "stories", id: ids.story, draft: true, data: { body: { root: { ...body.root, children: [] } } } as never, req: await reqAs("alice"), overrideAccess: false });
     expect((await payload.findByID({ collection: "transcript-selections", id: ids.quote, depth: 0 })).usedIn).toEqual([]);
