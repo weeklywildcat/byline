@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { ItemButton } from "@byline/newsroom-ui/components/item-button";
 import { PeopleAvatars, anyPicture } from "@byline/newsroom-ui/components/people-avatars";
 import { WorkStatusBadge, mediaIntensity } from "@byline/newsroom-ui/components/work-status-badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@byline/newsroom-ui/ui/card";
