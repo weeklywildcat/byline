@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   editSegment,
@@ -15,21 +12,21 @@ import {
   transcriptSearchText,
   type TranscriptSegment
 } from "../src/domain/transcript";
-import { fasterWhisperProvider, fromFasterWhisper, speakerHints } from "../src/reporting/transcription/faster-whisper";
-import { transcriptionStatus, type TranscriptionProgress } from "../src/reporting/transcription/provider";
 
-/** What the service returns for a two-person interview (seconds; machine labels). */
-const service = [
-  { start: 0.4, end: 3.0, speaker: "SPEAKER_00", text: "What did you think when you got the call?" },
-  { start: 3.2, end: 7.0, speaker: "SPEAKER_01", text: "At first I honestly thought somebody was joking." },
-  { start: 7.2, end: 8.0, speaker: "SPEAKER_01", text: "Really." },
-  { start: 8.4, end: 11.0, speaker: "SPEAKER_00", text: "When did it start feeling real?" },
-  { start: 11.4, end: 12.0, text: "(unclear)" }
-];
+/** Legacy machine labels stay understandable on transcripts created before automatic transcription was retired. */
+const transcript = () => ({
+  language: "en",
+  durationMs: 12_000,
+  segments: normalizeSegments([
+    { id: "s0", startMs: 400, endMs: 3000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "What did you think when you got the call?" },
+    { id: "s1", startMs: 3200, endMs: 7000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "At first I honestly thought somebody was joking." },
+    { id: "s2", startMs: 7200, endMs: 8000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "Really." },
+    { id: "s3", startMs: 8400, endMs: 11000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "When did it start feeling real?" },
+    { id: "s4", startMs: 11400, endMs: 12000, text: "(unclear)" }
+  ])
+});
 
-const transcript = () => fromFasterWhisper({ language: "en", duration: 12, segments: service });
-
-describe("machine speaker labels", () => {
+describe("legacy speaker labels", () => {
   it("keeps stable machine keys and shows Speaker N until a reporter names the voice", () => {
     const { segments } = transcript();
     expect(segments.map((segment) => segment.speakerKey)).toEqual(["SPEAKER_00", "SPEAKER_01", "SPEAKER_01", "SPEAKER_00", undefined]);
@@ -56,31 +53,12 @@ describe("machine speaker labels", () => {
 
   it("scopes SPEAKER_00 to one transcript: renaming one never touches another", () => {
     const first = transcript().segments;
-    const second = fromFasterWhisper({ segments: [{ start: 0, end: 2, speaker: "SPEAKER_00", text: "A different recording." }] }).segments;
+    const second = normalizeSegments([{ id: "s0", startMs: 0, endMs: 2000, speaker: "SPEAKER_00", text: "A different recording." }]);
     const renamed = renameSpeaker(first, "Speaker 1", "Owen Carter", "SPEAKER_00");
     expect(renamed[0].speaker).toBe("Owen Carter");
     expect(second[0].speaker).toBe("SPEAKER_00");
     expect(speakerProfiles(second)[0].key).toBe("SPEAKER_00");
     expect(speakerProfiles(second)[0].named).toBe(false);
-  });
-});
-
-describe("progressive speaker-labelled text", () => {
-  it("keeps ids and speakers identical as the prefix grows into the final transcript", () => {
-    const prefix = fromFasterWhisper({ segments: service.slice(0, 2) }).segments;
-    const longer = fromFasterWhisper({ segments: service.slice(0, 4) }).segments;
-    const final = transcript().segments;
-    expect(longer.slice(0, prefix.length)).toEqual(prefix);
-    expect(final.slice(0, longer.length)).toEqual(longer);
-    expect(final.map((segment) => segment.id)).toEqual(["s0", "s1", "s2", "s3", "s4"]);
-  });
-
-  it("replays a retried run as the same segments, not duplicate speaker turns", () => {
-    const once = fromFasterWhisper({ segments: service }).segments;
-    const replay = fromFasterWhisper({ segments: service }).segments;
-    expect(replay).toEqual(once);
-    expect(replay).toHaveLength(service.length);
-    expect(speakerTurns(replay).map((turn) => turn.identity)).toEqual(["SPEAKER_00", "SPEAKER_01", "SPEAKER_00", null]);
   });
 });
 
@@ -158,82 +136,5 @@ describe("naming speakers after the transcript is ready", () => {
   it("snapshots the shown speaker into a selection, never a raw model label", () => {
     expect(selectionFromSegments(transcript().segments, ["s1"])?.speaker).toBe("Speaker 2");
     expect(selectionFromSegments(transcript().segments, ["s0", "s1"])?.speaker).toBeNull();
-  });
-});
-
-describe("speaker-count hints", () => {
-  it("sends nothing for automatic detection and drops contradictory or out-of-range hints", () => {
-    expect(speakerHints(undefined)).toEqual({});
-    expect(speakerHints({})).toEqual({});
-    expect(speakerHints({ exact: 2 })).toEqual({ num_speakers: 2 });
-    expect(speakerHints({ exact: 3, min: 2, max: 4 })).toEqual({ num_speakers: 3 });
-    expect(speakerHints({ min: 2, max: 4 })).toEqual({ min_speakers: 2, max_speakers: 4 });
-    expect(speakerHints({ min: 5, max: 2 })).toEqual({});
-    expect(speakerHints({ exact: 0, max: 99 })).toEqual({});
-  });
-});
-
-describe("service credentials", () => {
-  it("never reach the screens: status exposes neither the service address nor a token", () => {
-    const status = JSON.stringify(transcriptionStatus({
-      BYLINE_TRANSCRIPTION_PROVIDER: "faster-whisper",
-      BYLINE_TRANSCRIPTION_URL: "http://asr.internal:9000",
-      BYLINE_TRANSCRIPTION_TOKEN: "hf_secret",
-      WHISPER_DIARIZATION_TOKEN: "hf_secret"
-    }));
-    expect(status).not.toContain("hf_secret");
-    expect(status).not.toContain("asr.internal");
-  });
-});
-
-describe("provider speaker stages", () => {
-  it("reports loading and identifying speakers before any text, then speaker-labelled drafts, and passes hints through", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "byline-speaker-"));
-    const file = path.join(dir, "interview.wav");
-    writeFileSync(file, "RIFF");
-    const polls = [
-      { state: "queued", progress: null, message: "Waiting for transcription worker" },
-      { state: "loading-diarization", progress: null, message: "Loading speaker model" },
-      { state: "diarizing", progress: 0.42, message: "Identifying speakers" },
-      { state: "loading-model", progress: null, message: "Loading Whisper model" },
-      { state: "transcribing", progress: 0.18, duration: 12, message: "Transcribing audio", segments: service.slice(0, 2) },
-      { state: "ready", progress: 1, result: { language: "en", duration: 12, segments: service } }
-    ];
-    let index = 0;
-    const posted: FormData[] = [];
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
-      if (init.method === "POST") {
-        posted.push(init.body as FormData);
-        return Response.json(polls[0], { status: 202 });
-      }
-      if (init.method === "GET" && index === 0 && posted.length === 0) return Response.json({ detail: "not found" }, { status: 404 });
-      return Response.json(polls[Math.min(++index, polls.length - 1)]);
-    }) as unknown as typeof fetch;
-    const seen: TranscriptionProgress[] = [];
-    try {
-      const provider = fasterWhisperProvider({ url: "http://asr.test", model: null, language: null, private: true, timeoutMs: 15_000, fetchImpl, pollIntervalMs: 10 });
-      const result = await provider.transcribe(
-        { path: file, filename: "interview.wav", mimeType: "audio/wav", jobKey: "job-1", speakers: { min: 2, max: 4 } },
-        new AbortController().signal,
-        (progress) => { seen.push(progress); }
-      );
-      expect(seen.map((progress) => [progress.state, progress.message, progress.percent])).toEqual([
-        ["queued", "Waiting for transcription worker", null],
-        ["loading-diarization", "Loading speaker model", null],
-        ["diarizing", "Identifying speakers", 42],
-        ["loading-model", "Loading Whisper model", null],
-        ["transcribing", "Transcribing audio", 18]
-      ]);
-      // Nothing is shown as text until speakers are known, and the first text already carries them.
-      expect(seen.slice(0, 4).every((progress) => progress.segments === undefined)).toBe(true);
-      expect(seen[4].segments?.map(speakerLabel)).toEqual(["Speaker 1", "Speaker 2"]);
-      expect(result.segments.map(speakerLabel)).toEqual(["Speaker 1", "Speaker 2", "Speaker 2", "Speaker 1", undefined]);
-      expect(posted).toHaveLength(1);
-      expect(posted[0].get("min_speakers")).toBe("2");
-      expect(posted[0].get("max_speakers")).toBe("4");
-      expect(posted[0].get("num_speakers")).toBeNull();
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });
