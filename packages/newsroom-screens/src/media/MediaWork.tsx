@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, Search, SlidersHorizontal, Star, X } from "lucide-react";
+import { CheckCheck, Eye, Image as ImageIcon, ImagePlus, LayoutDashboard, MoreHorizontal, Paperclip, RotateCcw, Search, SlidersHorizontal, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { DateRangeButton } from "@byline/newsroom-ui/components/date-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
@@ -13,6 +13,7 @@ import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@byline/newsroom-ui/ui/attachment";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
@@ -102,7 +103,7 @@ function RowMenu({ row, editable, saving, workspaceUrl, update, navigate }: { ro
     <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`${"Actions for"} ${row.title || mediaTypeLabel(row.type)}`} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-52">
       <DropdownMenuItem render={workspaceLink(workspaceUrl(row.story.id), navigate)}><LayoutDashboard aria-hidden="true" />{"Open story workspace"}</DropdownMenuItem>
-      {row.status !== "done" ? <DropdownMenuItem disabled={!editable || saving} onClick={() => update(row, { status: "done" })}><CheckCheck aria-hidden="true" />{"Mark complete"}</DropdownMenuItem> : null}
+      {editable ? <DropdownMenuItem disabled={saving} onClick={() => update(row, { status: row.status === "done" ? "in-progress" : "done" })}>{row.status === "done" ? <RotateCcw aria-hidden="true" /> : <CheckCheck aria-hidden="true" />}{row.status === "done" ? "Reopen assignment" : "Mark complete"}</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
 }
@@ -128,7 +129,7 @@ function MediaRowContext({ row, editable, saving, workspaceUrl, onOpenStory, upd
             </ContextMenuRadioGroup>
           </ContextMenuSubContent>
         </ContextMenuSub>
-        {row.status !== "done" ? <ContextMenuItem disabled={saving} onClick={() => update(row, { status: "done" })}><CheckCheck aria-hidden="true" />{"Mark complete"}</ContextMenuItem> : null}
+        <ContextMenuItem disabled={saving} onClick={() => update(row, { status: row.status === "done" ? "in-progress" : "done" })}>{row.status === "done" ? <RotateCcw aria-hidden="true" /> : <CheckCheck aria-hidden="true" />}{row.status === "done" ? "Reopen assignment" : "Mark complete"}</ContextMenuItem>
       </> : null}
     </ContextMenuContent>
   </ContextMenu>;
@@ -301,14 +302,18 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
             const c = cells(row);
             return <MediaRowContext key={rowKey(row)} row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory} update={update} navigate={navigate}>
               <Item size="sm" className="rounded-none border-b last:border-b-0" aria-busy={c.saving || undefined}>
-                <ItemMedia variant="icon" aria-hidden="true"><ImageIcon /></ItemMedia>
+                <ItemMedia>
+                  {c.editable
+                    ? <Checkbox aria-label={row.status === "done" ? `Reopen ${row.title || mediaTypeLabel(row.type)}` : `Mark ${row.title || mediaTypeLabel(row.type)} complete`} checked={row.status === "done"} disabled={c.saving} onCheckedChange={(checked) => update(row, { status: checked ? "done" : "in-progress" })} />
+                    : <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground"><ImageIcon className="size-4" aria-hidden="true" /></span>}
+                </ItemMedia>
                 <ItemContent>
-                  <ItemTitle>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
+                  <ItemTitle className={row.status === "done" ? "text-muted-foreground line-through" : undefined}>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
                   <div className="text-sm text-muted-foreground">{story(row)} · {mediaTypeLabel(row.type)}</div>
-                  <div className="flex flex-wrap items-center gap-x-3 text-sm">{c.assignee}{c.due}</div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">{c.assignee}{c.due}<WorkStatusBadge kind="production" intensity={mediaIntensity(row.status)}>{MEDIA_STATUS_OPTIONS.find((item) => item.value === row.status)?.label || row.status}</WorkStatusBadge></div>
                   <MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} media={media} canFeature={canFeature} />
                 </ItemContent>
-                <ItemActions>{c.status}<RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} navigate={navigate} /></ItemActions>
+                <ItemActions><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} navigate={navigate} /></ItemActions>
               </Item>
             </MediaRowContext>;
           })}</ItemGroup>}
