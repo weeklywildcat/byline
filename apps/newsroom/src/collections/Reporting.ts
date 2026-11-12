@@ -222,8 +222,8 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "appointment", type: "relationship", relationTo: "appointments", index: true, access: { update: systemWrite } },
     { ...confidentialField, access: { update: systemWrite } } as Field,
     groundRulesField,
-    { name: "state", type: "select", required: true, defaultValue: "queued", index: true, options: transcriptState, access: { update: systemWrite } },
-    { name: "origin", type: "select", required: true, defaultValue: "machine", options: [{ value: "machine", label: "Machine transcript" }, { value: "manual", label: "Manual transcript" }], access: { update: systemWrite } },
+    { name: "state", type: "select", required: true, defaultValue: "ready", index: true, options: transcriptState, access: { update: systemWrite } },
+    { name: "origin", type: "select", required: true, defaultValue: "manual", options: [{ value: "machine", label: "Legacy machine transcript" }, { value: "manual", label: "Uploaded transcript" }], access: { update: systemWrite } },
     { name: "provider", type: "text", maxLength: 80, access: { update: systemWrite } },
     { name: "model", type: "text", maxLength: 120, access: { update: systemWrite } },
     { name: "language", type: "text", maxLength: 16 },
@@ -233,9 +233,9 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "searchText", type: "textarea", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite, read: readTranscriptText } },
     { name: "failure", type: "text", maxLength: 400, access: { update: systemWrite } },
     { name: "attempts", type: "number", defaultValue: 0, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
-    // One logical run keeps the same token across Payload retries, so Whisper can reattach instead of duplicating CPU work.
+    // Legacy automatic-transcription metadata stays only so pre-retirement rows remain readable and replaceable.
     { name: "transcriptionRunToken", type: "text", maxLength: 64, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
-    // Persist lightweight progress so every newsroom screen can explain what the background worker is doing.
+    // These progress fields are legacy compatibility data; new uploaded transcripts are immediately ready.
     { name: "progressPercent", type: "number", min: 0, max: 100, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "progressMessage", type: "text", maxLength: 160, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "transcriptionStartedAt", type: "date", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
