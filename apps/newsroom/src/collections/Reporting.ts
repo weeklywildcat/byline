@@ -1,4 +1,4 @@
-import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FieldAccess, type PayloadRequest } from "payload";
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeDeleteHook, type CollectionConfig, type Field, type FieldAccess, type PayloadRequest } from "payload";
 import { changeReporting, createReporting, readReporting } from "../access/reporting-context";
 import { atLeast, newsroomUser, relationChanged, relationId, requestUser, sameId } from "../access/user";
 import { lockRow } from "../db/locks";
@@ -130,9 +130,9 @@ const describeUpload: CollectionBeforeChangeHook = ({ data, operation, req }) =>
   return data;
 };
 
-/** Removing a recording removes what was derived from it (its transcript and selections). */
-const removeDerived = async ({ doc, req }: { doc: { id: unknown }; req: PayloadRequest }) => {
-  const transcripts = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: doc.id } }, depth: 0, pagination: false, overrideAccess: true, select: {}, req });
+/** Remove derived rows before the recording itself so PostgreSQL relationship constraints cannot block the parent delete. */
+const removeDerived: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const transcripts = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: id } }, depth: 0, pagination: false, overrideAccess: true, select: {}, req });
   const ids = transcripts.docs.map((row) => row.id);
   if (!ids.length) return;
   await req.payload.delete({ collection: "transcript-selections", where: { transcript: { in: ids } }, overrideAccess: true, req });
@@ -165,7 +165,7 @@ export const ReportingFiles: CollectionConfig = {
   hooks: {
     beforeChange: [stampCreator, sameStoryContext, describeUpload],
     afterChange: [logConfidentiality("reporting-files"), queueTranscriptionAfterUpload],
-    afterDelete: [removeDerived]
+    beforeDelete: [removeDerived]
   },
   fields: [
     storyField,
