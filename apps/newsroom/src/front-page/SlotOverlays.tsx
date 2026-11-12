@@ -9,7 +9,9 @@ type Box = { id: string; top: number; left: number; width: number; height: numbe
  * Editor-only slot overlays over the real homepage rendering: "LEAD · PINNED"
  * or "LEAD · AUTO", drawn around the Story each slot resolved to. Choosing one
  * tells the desk (same-origin postMessage); the desk tells it which slot is
- * selected. Overlays are outlines with a small tab: they never cover a Story.
+ * selected. Overlays are outlines with a small tab that sits outside the
+ * outline, above its top-right corner: it never covers the Story's kicker,
+ * date or headline.
  */
 export function FrontPageSlotOverlays({ slots, issues }: { slots: Slot[]; issues: number }) {
   const [boxes, setBoxes] = useState<Box[]>([]);
@@ -55,7 +57,7 @@ export function FrontPageSlotOverlays({ slots, issues }: { slots: Slot[]; issues
               type="button"
               onClick={() => choose(box.id)}
               aria-pressed={active}
-              style={{ position: "absolute", top: -11, left: 6, pointerEvents: "auto", font: "600 10px/1 system-ui, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "#fff", background: color, border: 0, borderRadius: 3, padding: "4px 6px", cursor: "pointer" }}
+              style={{ position: "absolute", top: 0, right: 6, transform: "translateY(-100%)", pointerEvents: "auto", font: "600 10px/1 system-ui, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap", color: "#fff", background: color, border: 0, borderRadius: "3px 3px 0 0", padding: "3px 6px", cursor: "pointer" }}
             >
               {slot.label} · {slot.pinned ? "Pinned" : "Auto"}
             </button>

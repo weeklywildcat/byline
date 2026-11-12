@@ -134,7 +134,10 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const changeBoardLayout = useCallback((next: BoardLayout) => { setBoardLayout(next); writeBoardLayoutPreference(next, browserStorage()); }, []);
   const [people, setPeople] = useState<{ writers: PlanningPerson[]; editors: PlanningPerson[] }>({ writers: [], editors: [] });
 
-  const planning = usePlanningStories(fetchers, useDebouncedValue(filters, 200));
+  // Board and List read only working stories unless published ones are asked for; Calendar shows everything it schedules.
+  const askedForPublished = Boolean(filters.publicationState) || filters.workflow === "published";
+  const readAll = view === "calendar" || showPublished || askedForPublished;
+  const planning = usePlanningStories(fetchers, useDebouncedValue(filters, 200), { working: !readAll });
   const data = planning.data;
   const statuses = data?.workflowStatuses?.length ? data.workflowStatuses : DEFAULT_WORKFLOW_STATUSES;
   const userId = currentUserId ?? data?.currentUser?.id ?? null;
@@ -145,7 +148,8 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   const { update, updatingStoryId, available: canUpdateStories } = useUpdatePlanningStory(fetchers);
   // The pane counts every story in scope (its Collection), not only the current view's: one more read only while filtered.
   const countScope = useMemo(() => normalizePlanningFilters({ collectionId: filters.collectionId }), [filters.collectionId]);
-  const counted = usePlanningStories(fetchers, countScope, { enabled: Boolean(workspace) });
+  // Every pane count is over active stories, so the working read is enough.
+  const counted = usePlanningStories(fetchers, countScope, { enabled: Boolean(workspace), working: true });
   const stories = useMemo(() => sortPlanningStories(filterPlanningStories(data?.stories || [], filters, userId ?? undefined), sort), [data, filters, sort, userId]);
 
   // Board and List are work-in-progress views. Finished published stories stay
@@ -154,7 +158,8 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
     showPublished,
     publicationState: filters.publicationState || (filters.workflow === "published" ? "published" : "")
   }), [filters.publicationState, filters.workflow, showPublished, stories]);
-  const hiddenPublished = stories.length - workingStories.length;
+  // Hosts that filter on the server report what they left out; the page still hides any it was given (hosts that do not).
+  const hiddenPublished = (readAll ? 0 : (data?.hiddenPublished ?? 0)) + (stories.length - workingStories.length);
   const visibleCount = view === "calendar" ? stories.length : workingStories.length;
 
   useEffect(() => {

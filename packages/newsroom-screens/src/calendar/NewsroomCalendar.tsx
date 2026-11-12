@@ -18,6 +18,7 @@ import { describePlanningError, planningCalendarEvents, type PlanningCalendarEve
 import { CALENDAR_COMPONENTS, CATEGORY_DOT_CLASSES } from "./calendar-events";
 import { CalendarDragPolicyContext, useCalendarDrop } from "./calendar-drag";
 import { calendarHeading, createCalendarController } from "./calendar-controller";
+import { SCHEDULE_X_FIRST_DAY } from "@byline/newsroom-ui/lib/week";
 import { compareCalendarEvents, mergeCalendarEvents, needsSchedulingItems, scheduleCalendarEvents, scheduleRangeFor, type CalendarLinks } from "./calendar-model";
 import { describeReschedule, moveEvent, rescheduleChange, type RescheduleChange, type RescheduleHost } from "./calendar-reschedule";
 import { selectedDay, viewForPreference } from "./calendar-workspace";
@@ -98,6 +99,8 @@ function CalendarSurface({ collectionId, stories, timezone, getSchedule, current
     // Order matters: on a narrow screen Schedule-X falls back to the first small-screen view, which should be the month agenda.
     views: [createViewMonthGrid(), createViewMonthAgenda(), createViewWeek(), createViewWeekAgenda(), createViewDay(), createViewList()],
     calendars: SCHEDULE_X_CALENDARS,
+    // The newsroom week (Home, the mini calendar, the date pickers) starts on Sunday; Schedule-X defaults to Monday.
+    firstDayOfWeek: SCHEDULE_X_FIRST_DAY,
     monthGridOptions: { nEventsPerDay: 4 },
     weekOptions: { gridHeight: 1100 },
     events: [],

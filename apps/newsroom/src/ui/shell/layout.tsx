@@ -2,9 +2,9 @@
 
 import { useIsMobile, useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { usePathname, useSearchParams } from "next/navigation";
-import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createContext, use, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { isCalendarPath, isCollectionsPath, isMediaPath, isStoriesPath, primaryLocationFor, storyIdFromPath } from "../../domain/navigation";
-import { ADAPTIVE_NAVIGATION_QUERY, CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORIES_WORKSPACE_QUERY, STORY_WORKSPACE_QUERY } from "./shell-config";
+import { ADAPTIVE_NAVIGATION_QUERY, CALENDAR_WORKSPACE_MIN_WIDTH, CALENDAR_WORKSPACE_QUERY, COLLECTION_WORKSPACE_MIN_WIDTH, MEDIA_WORKSPACE_MIN_WIDTH, STORIES_WORKSPACE_MIN_WIDTH, STORY_WORKSPACE_MIN_WIDTH, COLLECTION_WORKSPACE_QUERY, MEDIA_WORKSPACE_QUERY, SIDEBAR_WIDTH, STORIES_WORKSPACE_QUERY, STORY_WORKSPACE_QUERY } from "./shell-config";
 
 /**
  * Which composition the one sidebar has on this screen:
@@ -71,16 +71,45 @@ export function shellLayoutFor(pathname: string, adminRoute: string, viewport: S
  * width (rail + contextual pane); changing it animates the one sidebar's
  * existing gap and container, never a second layout.
  */
-export function shellSidebarStyle(layout: Pick<ShellLayout, "composition">): CSSProperties {
+export function shellSidebarStyle(layout: Pick<ShellLayout, "composition">, options: { fromRoute?: boolean } = {}): CSSProperties {
   return {
     display: "contents",
-    "--sidebar-width": `${SIDEBAR_WIDTH[COMPOSITION_WIDTH[layout.composition]]}px`,
+    // Before hydration the viewport is unknown in JavaScript; the route's own media rule (`routeSidebarWidthRule`) picks the width.
+    "--sidebar-width": options.fromRoute ? `var(${ROUTE_SIDEBAR_WIDTH_VAR}, ${SIDEBAR_WIDTH.default}px)` : `${SIDEBAR_WIDTH[COMPOSITION_WIDTH[layout.composition]]}px`,
     "--sidebar-width-icon": `${SIDEBAR_WIDTH.icon}px`,
     "--sidebar-width-mobile": `${SIDEBAR_WIDTH.mobile}px`
   } as CSSProperties;
 }
 
 const COMPOSITION_WIDTH: Record<ShellComposition, keyof typeof SIDEBAR_WIDTH> = { default: "default", "story-workspace": "storyWorkspace", "calendar-workspace": "calendarWorkspace", "media-workspace": "mediaWorkspace", "stories-workspace": "storiesWorkspace", "collection-workspace": "collectionWorkspace" };
+
+const ROUTE_SIDEBAR_WIDTH_VAR = "--byline-route-sidebar-width";
+const WORKSPACE_MIN_WIDTH: Record<Exclude<ShellComposition, "default">, number> = {
+  "story-workspace": STORY_WORKSPACE_MIN_WIDTH,
+  "calendar-workspace": CALENDAR_WORKSPACE_MIN_WIDTH,
+  "media-workspace": MEDIA_WORKSPACE_MIN_WIDTH,
+  "stories-workspace": STORIES_WORKSPACE_MIN_WIDTH,
+  "collection-workspace": COLLECTION_WORKSPACE_MIN_WIDTH
+};
+/** Below this the header's adaptive navigation forces the ordinary sidebar (ADAPTIVE_NAVIGATION_QUERY). */
+const ADAPTIVE_NAVIGATION_MAX = 1200;
+
+/**
+ * The CSS that gives the server-rendered page the sidebar width its route
+ * will have once JavaScript knows the viewport, so a story (or the Calendar,
+ * Media, Stories, a Collection) opened by a full page load does not paint at
+ * 256px and then slide its content sideways. Null for routes without a workspace.
+ */
+export function routeSidebarWidthRule(route: ShellRoute): string | null {
+  const composition = shellCompositionFor(route, { storyWorkspace: true, calendarWorkspace: true, mediaWorkspace: true, storiesWorkspace: true, collectionWorkspace: true });
+  if (composition === "default") return null;
+  const minWidth = Math.max(WORKSPACE_MIN_WIDTH[composition], ADAPTIVE_NAVIGATION_MAX);
+  return `@media (min-width: ${minWidth}px) { :root { ${ROUTE_SIDEBAR_WIDTH_VAR}: ${SIDEBAR_WIDTH[COMPOSITION_WIDTH[composition]]}px; } }`;
+}
+
+const subscribeNothing = () => () => {};
+/** False while rendering on the server and hydrating; true afterwards. */
+export const useHydrated = () => useSyncExternalStore(subscribeNothing, () => true, () => false);
 
 const ShellLayoutContext = createContext<ShellLayout>({ storyId: null, stories: false, calendar: false, media: false, collections: false, collectionId: null, composition: "default" });
 
@@ -123,10 +152,17 @@ export function useCurrentShellLayout(adminRoute: string, adaptive: boolean): Sh
  * so the sidebar's own width transition runs, as it does for collapsing.
  * BylineSidebar calls `sync` when it mounts.
  */
-export function useSidebarWidthLayout(layout: ShellLayout): { applied: ShellLayout; sync: () => void } {
+export function useSidebarWidthLayout(layout: ShellLayout): { applied: ShellLayout; sync: () => void; fromRoute: boolean } {
+  const hydrated = useHydrated();
   const [applied, setApplied] = useState(layout);
   const latest = useRef(layout);
   latest.current = layout;
+  // The first layout after hydration is what the route's CSS already painted: take it as is, with nothing to animate.
+  const settled = useRef(false);
+  if (hydrated && !settled.current && applied !== layout) {
+    settled.current = true;
+    setApplied(layout);
+  } else if (hydrated) settled.current = true;
   // Phones have no desktop sidebar to animate (or to wait for).
   const phone = useIsMobile();
   const sync = useCallback(() => {
@@ -135,8 +171,8 @@ export function useSidebarWidthLayout(layout: ShellLayout): { applied: ShellLayo
     else if (!phone) return;
     setApplied(latest.current);
   }, [phone]);
-  useLayoutEffect(() => { if (applied !== layout) sync(); }, [applied, layout, sync]);
-  return { applied, sync };
+  useLayoutEffect(() => { if (hydrated && applied !== layout) sync(); }, [hydrated, applied, layout, sync]);
+  return { applied, sync, fromRoute: !hydrated };
 }
 
 const SidebarWidthSyncContext = createContext<() => void>(() => {});

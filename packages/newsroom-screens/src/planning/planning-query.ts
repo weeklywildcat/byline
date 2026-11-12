@@ -20,11 +20,12 @@ import {
   type PlanningWorkflowStatus
 } from "../planning/planning-model";
 
-export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters, options: { enabled?: boolean } = {}) {
+export function usePlanningStories(fetchers: PlanningFetchers, filters: PlanningFilters, options: { enabled?: boolean; working?: boolean } = {}) {
+  const working = options.working ?? false;
   return useQuery({
-    queryKey: planningKey(planningFilterParams(filters)),
+    queryKey: planningKey({ ...planningFilterParams(filters), ...(working ? { scope: "working" } : {}) }),
     enabled: options.enabled ?? true,
-    queryFn: () => fetchers.getPlanning(filters),
+    queryFn: () => fetchers.getPlanning(filters, working ? { working } : undefined),
     // Typing in search or changing a filter keeps the current stories on screen until the new ones arrive.
     placeholderData: keepPreviousData,
     // WordPress texturizes headlines into HTML entities; every Planning view shows them as the characters they are.

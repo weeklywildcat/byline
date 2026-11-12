@@ -1,4 +1,4 @@
-import { filterPlanningStories, type PlanningFilters, type PlanningResponse, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
+import { filterPlanningStories, hideFinishedPublished, type PlanningFilters, type PlanningReadOptions, type PlanningResponse, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import type { Where } from "payload";
 import { inIds } from "../access/story-context";
 import { atLeast, relationId, relationIds } from "../access/user";
@@ -64,7 +64,7 @@ export function filterInNewsroomTime(stories: PlanningStory[], filters: Planning
   });
 }
 
-export async function planningResponse(ctx: ScreenContext, filters: PlanningFilters): Promise<PlanningResponse> {
+export async function planningResponse(ctx: ScreenContext, filters: PlanningFilters, options: PlanningReadOptions = {}): Promise<PlanningResponse> {
   const where: Where[] = [];
   if (filters.collectionId) where.push(inIds("story", await collectionStoryIds(ctx, filters.collectionId)));
   const [people, plans] = await Promise.all([
@@ -78,7 +78,9 @@ export async function planningResponse(ctx: ScreenContext, filters: PlanningFilt
   }
   const { stories, extras } = await storiesWithExtras(ctx, [...planByStory.keys()]);
   const rows: PlanningStory[] = stories.map((story) => planningStory(ctx, people, story, planByStory.get(story.id) ?? null, extras.get(story.id)!));
-  const matching = filterInNewsroomTime(rows, filters, ctx);
+  const all = filterInNewsroomTime(rows, filters, ctx);
+  // A working read keeps finished published stories on the server; asking for a publication state (or Published) always returns them.
+  const matching = options.working ? hideFinishedPublished(all, { publicationState: filters.publicationState || (filters.workflow === "published" ? "published" : "") }) : all;
   const editor = atLeast(ctx.user, "editor");
   return {
     stories: matching,
@@ -87,6 +89,7 @@ export async function planningResponse(ctx: ScreenContext, filters: PlanningFilt
     capabilities: { canMoveStories: true, canAssign: editor, canManageSavedViews: true, canManageMedia: false, canManageFeedback: false },
     currentUser: userPerson(people, ctx.user.id),
     total: matching.length,
-    nextPage: null
+    nextPage: null,
+    ...(options.working ? { hiddenPublished: all.length - matching.length } : {})
   };
 }

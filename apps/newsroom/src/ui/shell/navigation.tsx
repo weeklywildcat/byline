@@ -2,6 +2,7 @@
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { useRouteTransition } from "@payloadcms/ui";
+import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
@@ -142,18 +143,50 @@ export function useLeaveGuard(read: LeaveGuard) {
 
 export const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>) => event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
+/** How long a pointer rests on a link before its screen is fetched: long enough to skip links swept past on the way elsewhere. */
+export const PREFETCH_INTENT_MS = 80;
+
+/**
+ * Fetches a Byline screen when the reader shows intent to open it (a
+ * resting pointer, keyboard focus, a touch), so the click renders from
+ * the router cache. Viewport prefetch stays off: every admin screen is
+ * dynamic, and prefetching every visible link would render each of them
+ * on the server for nothing.
+ */
+export function usePrefetchOnIntent(href: string) {
+  const router = useRouter();
+  const timer = useRef<number | null>(null);
+  const prefetch = useCallback(() => {
+    // "full": the dynamic screen itself, not only its loading shell (Next's PrefetchKind.FULL).
+    router.prefetch(href, { kind: "full" } as unknown as PrefetchOptions);
+  }, [router, href]);
+  const cancel = useCallback(() => { if (timer.current !== null) window.clearTimeout(timer.current); timer.current = null; }, []);
+  useEffect(() => cancel, [cancel]);
+  return {
+    onPointerEnter: () => { cancel(); timer.current = window.setTimeout(prefetch, PREFETCH_INTENT_MS); },
+    onPointerLeave: cancel,
+    onFocus: prefetch,
+    onTouchStart: prefetch
+  };
+}
+
 /**
  * A Next `Link` for shell navigation. A plain click with unsaved work open
  * goes through `navigate` (wait, or ask); a new-tab click, or a click with
- * nothing pending, is an ordinary Link.
+ * nothing pending, is an ordinary Link. Its screen is prefetched on intent.
  */
-export function ShellLink({ href, onClick, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
+export function ShellLink({ href, onClick, onPointerEnter, onPointerLeave, onFocus, onTouchStart, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
   const { navigate, hasPendingWork } = useShellNavigation();
+  const intent = usePrefetchOnIntent(href);
   return (
     <Link
       href={href}
       prefetch={false}
       {...props}
+      onPointerEnter={(event) => { onPointerEnter?.(event); intent.onPointerEnter(); }}
+      onPointerLeave={(event) => { onPointerLeave?.(event); intent.onPointerLeave(); }}
+      onFocus={(event) => { onFocus?.(event); intent.onFocus(); }}
+      onTouchStart={(event) => { onTouchStart?.(event); intent.onTouchStart(); }}
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented || opensElsewhere(event) || !hasPendingWork()) return;

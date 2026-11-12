@@ -9,7 +9,7 @@ import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { SidebarTrigger, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { ChevronLeft, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 import { locationFor, storyIdFromPath } from "../../domain/navigation";
 import type { Role } from "../../domain/vocabulary";
 import { HeaderCreate } from "./CreateMenu";
@@ -52,6 +52,11 @@ function HeaderBar({ role, hasProfile, loginHref }: { role: Role; hasProfile: bo
   const story = useStoryCrumb(storyIdFromPath(pathname, routes.admin));
   // On a Story the last crumb is the Story itself (its live headline), and a focused mode adds its own name after it.
   const crumbs: Array<{ label: string; path?: string; action?: () => void }> = locationFor(pathname, routes.admin).map((crumb) => (story && crumb.label === "Story" ? { label: story.title.trim() || "Untitled story" } : crumb));
+  // The browser tab names the open Story (Payload's own title is "Editing - Story"), with its focused mode when there is one.
+  const storyTitle = story ? `${story.mode ? `${story.mode} · ` : ""}${story.title.trim() || "Untitled story"} · Byline` : null;
+  useEffect(() => {
+    if (storyTitle) document.title = storyTitle;
+  }, [storyTitle, pathname]);
   if (story?.mode && crumbs.length) {
     const last = crumbs[crumbs.length - 1]!;
     crumbs[crumbs.length - 1] = { ...last, ...(story.openStory ? { action: story.openStory } : {}) };

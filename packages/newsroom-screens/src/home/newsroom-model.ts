@@ -1,3 +1,4 @@
+import { WEEK_STARTS_ON } from "@byline/newsroom-ui/lib/week";
 import type { CollectionHref } from "../collections/collection-model";
 import type { EditorialTask, ContributorEntry } from "../editorial/editorial-model";
 import type { EditorialActivityRecord } from "../editorial/activity-model";
@@ -222,7 +223,8 @@ export function addDays(day: string, days: number): string {
 }
 
 /** 0 (Sunday) to 6 (Saturday) for a site day. */
-export const weekdayOf = (day: string) => new Date(`${day}T12:00:00Z`).getUTCDay();
+/** Days since the newsroom week started (`WEEK_STARTS_ON`), 0–6. */
+export const weekdayOf = (day: string) => (new Date(`${day}T12:00:00Z`).getUTCDay() - WEEK_STARTS_ON + 7) % 7;
 
 /** The ISO 8601 week number of a site day ("Week 45"). */
 export function isoWeek(day: string): number {

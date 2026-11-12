@@ -7,6 +7,7 @@ import {
   type FeedbackResponse,
   type MediaDeskResponse,
   type PlanningFilters,
+  type PlanningReadOptions,
   type PlanningResponse,
   type SavedPlanningView
 } from "./planning-model";
@@ -146,7 +147,7 @@ export function normalizeContentHealthResponse(payload: unknown): ContentHealthR
 
 export type PlanningFetchers = {
   /** Required protected collection request used by Board, List, and Calendar. */
-  getPlanning: (filters?: Partial<PlanningFilters>) => Promise<PlanningResponse>;
+  getPlanning: (filters?: Partial<PlanningFilters>, options?: PlanningReadOptions) => Promise<PlanningResponse>;
   /** Optional so read-only installs can still render the collection. */
   moveStory?: (storyId: number, status: string) => Promise<unknown>;
   /** Ordinary planning edits use the same protected story domain endpoint. */

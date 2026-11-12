@@ -3,7 +3,7 @@
  * in the workflow), the Budget (what publishes when) and the reader's scope
  * preference. Presentation-free; HomeApp renders it.
  */
-import { DEFAULT_WORKFLOW_STATUSES, type PlanningStory } from "../planning/planning-model";
+import type { PlanningStory } from "../planning/planning-model";
 import { activeStory, addDays, dayDistance, myActiveStories, myStory, siteDay, weekdayOf, type HomeBootstrap, type HomeScope } from "./newsroom-model";
 
 /** The stories a scope covers: the reader's own, or every visible active newsroom story. */
@@ -27,7 +27,12 @@ export type DeskStage = {
   stale: boolean;
 };
 
-const DESK_ORDER = DEFAULT_WORKFLOW_STATUSES.map((status) => status.id).filter((id) => id !== "published" && id !== "dropped");
+/**
+ * Lifecycle order (story/lifecycle.ts), with the stored legacy stages a
+ * WordPress install still reports placed where they fall in that lifecycle.
+ * Sidelined stages come last.
+ */
+const DESK_ORDER = ["pitch", "assigned", "reporting", "writing", "drafting", "editing", "review", "ready", "on-hold"];
 
 /** Active stories by workflow stage, in workflow order. Only stages that hold stories are returned. */
 export function deskStages(stories: PlanningStory[], timezone: string, now = new Date()): DeskStage[] {
