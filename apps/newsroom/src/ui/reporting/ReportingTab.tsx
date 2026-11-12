@@ -4,6 +4,7 @@ import { PHOTO_FILE_ACCEPT } from "@byline/core";
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
 import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
@@ -385,9 +386,23 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
   const actions = (
     <>
       {file && transcript?.state === "ready" ? <Button type="button" size="xs" variant="default" onClick={() => onOpenTranscript(transcript.id)}>Open transcript</Button> : null}
-      {file && file.fileKind === "audio" && editable ? <Button type="button" size="xs" variant="outline" onClick={onImport}>{transcript ? "Replace transcript" : "Add transcript"}</Button> : null}
+      {file && file.fileKind === "audio" && editable
+        ? !transcript
+          ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Add transcript</Button>
+          : transcript.state !== "ready"
+            ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Upload replacement</Button>
+            : transcript.quoteCount
+              ? <ConfirmReplaceTranscriptButton quoteCount={transcript.quoteCount} onReplace={onImport} />
+              : <Button type="button" size="xs" variant="outline" onClick={onImport}>Replace transcript</Button>
+        : null}
       {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
-      {editable ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
+      {editable && file
+        ? transcript?.usedQuoteCount
+          ? <span className="px-2 text-xs text-muted-foreground">{transcript.usedQuoteCount === 1 ? "Quote used in article" : `${transcript.usedQuoteCount} quotes used in articles`}</span>
+          : <ConfirmRemoveFileButton file={file} removing={remove.isPending} onRemove={() => remove.mutate()} />
+        : editable
+          ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button>
+          : null}
     </>
   );
 
@@ -437,6 +452,59 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
         {actions}
       </div>
     </div>
+  );
+}
+
+function ConfirmReplaceTranscriptButton({ quoteCount, onReplace }: { quoteCount: number; onReplace: () => void }) {
+  return (
+    <AlertDialog>
+      <Button type="button" size="xs" variant="outline" onClick={() => undefined} render={<AlertDialogTriggerShim />}>Replace transcript</Button>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
+          <AlertDialogDescription>
+            The transcript text will be replaced. {quoteCount === 1 ? "The saved quote stays exactly as saved, including its verification status." : `All ${quoteCount} saved quotes stay exactly as saved, including their verification status.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="default" onClick={onReplace}>Choose transcript</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function AlertDialogTriggerShim(props: React.ComponentProps<"button">) {
+  return <button {...props} data-slot="alert-dialog-trigger" />;
+}
+
+function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: ReportingFileMaterial; removing: boolean; onRemove: () => void }) {
+  const transcript = file.transcript;
+  const interview = file.fileKind === "audio";
+  const title = interview ? "Remove this interview?" : "Remove this file?";
+  const transcriptPart = transcript ? " and its transcript" : "";
+  const quotePart = transcript?.quoteCount
+    ? transcript.quoteCount === 1
+      ? " The saved quote will also be deleted."
+      : ` All ${transcript.quoteCount} saved quotes will also be deleted.`
+    : "";
+  return (
+    <AlertDialog>
+      <Button type="button" size="xs" variant="ghost" render={<AlertDialogTriggerShim />}>Remove</Button>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{quotePart} This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={removing} onClick={onRemove}>{removing ? "Removing…" : "Remove"}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
