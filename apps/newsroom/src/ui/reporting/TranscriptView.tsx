@@ -540,7 +540,7 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.canEdit && !context.readOnly ? (
         <div className="flex flex-wrap gap-1.5">
           {selection.kind === "highlight" ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button> : selection.state === "saved" ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button> : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
-          <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => run.mutate("remove")}>Remove</Button>
+          {selection.usedIn.length ? null : <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => run.mutate("remove")}>Remove</Button>}
           {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <Button type="button" size="xs" variant="outline" onClick={() => setOverriding(true)}>Editor override…</Button> : null}
         </div>
       ) : null}
