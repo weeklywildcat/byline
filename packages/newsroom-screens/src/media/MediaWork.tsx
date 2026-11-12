@@ -307,11 +307,19 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
                     ? <Checkbox aria-label={row.status === "done" ? `Reopen ${row.title || mediaTypeLabel(row.type)}` : `Mark ${row.title || mediaTypeLabel(row.type)} complete`} checked={row.status === "done"} disabled={c.saving} onCheckedChange={(checked) => update(row, { status: checked ? "done" : "in-progress" })} />
                     : <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground"><ImageIcon className="size-4" aria-hidden="true" /></span>}
                 </ItemMedia>
-                <ItemContent>
-                  <ItemTitle className={row.status === "done" ? "text-muted-foreground line-through" : undefined}>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
-                  <div className="text-sm text-muted-foreground">{story(row)} · {mediaTypeLabel(row.type)}</div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">{c.assignee}{c.due}<WorkStatusBadge kind="production" intensity={mediaIntensity(row.status)}>{MEDIA_STATUS_OPTIONS.find((item) => item.value === row.status)?.label || row.status}</WorkStatusBadge></div>
-                  <MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} media={media} canFeature={canFeature} />
+                <ItemContent className="gap-2">
+                  <div>
+                    <ItemTitle className={row.status === "done" ? "text-muted-foreground line-through" : undefined}>{row.title || mediaTypeLabel(row.type)}</ItemTitle>
+                    <div className="text-sm text-muted-foreground">{story(row)} · {mediaTypeLabel(row.type)}</div>
+                  </div>
+                  <div className="grid gap-2 min-[480px]:grid-cols-2">
+                    <div className="grid min-w-0 gap-1"><span className="text-xs font-medium text-muted-foreground">Assignee</span>{c.assignee}</div>
+                    <div className="grid min-w-0 gap-1"><span className="text-xs font-medium text-muted-foreground">Due</span>{c.due}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <WorkStatusBadge kind="production" intensity={mediaIntensity(row.status)}>{MEDIA_STATUS_OPTIONS.find((item) => item.value === row.status)?.label || row.status}</WorkStatusBadge>
+                    <MediaFiles row={row} editable={c.editable} saving={c.saving} update={update} media={media} canFeature={canFeature} />
+                  </div>
                 </ItemContent>
                 <ItemActions><RowMenu row={row} editable={c.editable} saving={c.saving} workspaceUrl={workspaceUrl} update={update} navigate={navigate} /></ItemActions>
               </Item>
