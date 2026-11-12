@@ -193,21 +193,21 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
             <InputGroup className="min-w-48 flex-1">
               <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
               <InputGroupInput type="search" value={search} placeholder="Search this story…" aria-label="Search this story's reporting" onChange={(event) => setSearch(event.target.value)} />
+              {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear reporting search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
             </InputGroup>
             {canCapture ? <CaptureMenu capture={capture()} /> : null}
             {!wide ? <Button type="button" variant="outline" onClick={() => setRailOpen(true)}><PanelRight data-icon="inline-start" />Sources & appointments</Button> : null}
           </div>
 
-          {bound?.label && panel ? <p className="text-sm text-muted-foreground" data-capture-context="">For <span className="font-medium text-foreground">{bound.label}</span> <button type="button" className="touch-hit underline underline-offset-2" onClick={() => setBound(null)}>Clear</button></p> : null}
+          {bound?.label && panel ? <div className="flex items-center gap-2" data-capture-context=""><span className="text-xs text-muted-foreground">Filing with</span><Badge variant="secondary" className="gap-1 pr-1"><span className="max-w-64 truncate">{bound.label}</span><button type="button" className="touch-hit rounded-sm p-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Clear " + bound.label} onClick={() => setBound(null)}><X className="size-3" /></button></Badge></div> : null}
           {panel === "note" ? <NoteComposer context={context} bound={bound} onDone={() => { setPanel(null); setBound(null); void refresh(); }} onCancel={() => { setPanel(null); setBound(null); }} /> : null}
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
             <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
               <p className="text-sm font-medium">Interview</p>
-              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Add a .txt, .srt or .vtt transcript when you have one{bound?.label ? ` for ${bound.label}` : ""}.</p>
+              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Save the recording first, then add its .txt, .srt or .vtt transcript from the recording row{bound?.label ? ` for ${bound.label}` : ""}.</p>
               <div className="flex flex-wrap items-center gap-3">
                 <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} />
-                <Button type="button" variant="outline" size="sm" onClick={() => pick(transcriptInput, bound ?? undefined)}><FileText data-icon="inline-start" />Upload transcript</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => { setPanel(null); setBound(null); }}>Cancel</Button>
               </div>
             </div>
@@ -225,9 +225,16 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
           <section aria-label="Material" className="grid gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Material</h3>
-              <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Show" value={[filter]} onValueChange={(next: unknown[]) => { const value = next[0]; if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
-                {MATERIAL_FILTERS.map((entry) => <ToggleGroupItem key={entry.value} value={entry.value}>{entry.label}</ToggleGroupItem>)}
-              </ToggleGroup>
+              {compactFilters ? (
+                <Select value={filter} onValueChange={(value) => { if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
+                  <SelectTrigger size="sm" aria-label="Filter material"><SelectValue /></SelectTrigger>
+                  <SelectContent align="end">{MATERIAL_FILTERS.map((entry) => <SelectItem key={entry.value} value={entry.value}>{entry.label}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <ToggleGroup variant="outline" size="sm" spacing={0} aria-label="Show" value={[filter]} onValueChange={(next: unknown[]) => { const value = next[0]; if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
+                  {MATERIAL_FILTERS.map((entry) => <ToggleGroupItem key={entry.value} value={entry.value}>{entry.label}</ToggleGroupItem>)}
+                </ToggleGroup>
+              )}
             </div>
             {uploads.length ? <ul className="grid gap-2" aria-label="Uploads">{uploads.map((upload) => <li key={upload.id}><UploadRow upload={upload} onRetry={() => void send(upload)} onDismiss={() => setUploads((list) => list.filter((item) => item.id !== upload.id))} /></li>)}</ul> : null}
             {groups.length === 0 && !uploads.length ? (
