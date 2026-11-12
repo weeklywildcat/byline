@@ -22,7 +22,7 @@ import { TaskDialog } from "../workspace/TasksSection";
 import { useDialogTarget } from "../workspace/dialog-target";
 import { BRIEF_MAX, MEDIA_STATUS_LABELS, labelFor } from "../workspace/reporting-model";
 import { appointmentTiming, splitAppointments } from "../workspace/schedule-model";
-import { applyBrief, applyTask } from "../workspace/workspace-cache";
+import { applyBrief, applyMedia, applyTask } from "../workspace/workspace-cache";
 import { useWorkspace, useWorkspaceCache } from "../workspace/workspace-context";
 import { workspaceError, type WorkspaceError } from "../workspace/workspace-errors";
 import { completedTasks, dueText, isOverdue, openTasks } from "../workspace/workspace-model";
@@ -261,8 +261,42 @@ function mediaDone(assignment: StoryMediaAssignment): boolean {
 }
 
 export function MediaContext({ leadImage, title = "Media", level = 2, id = "context-media" }: { leadImage: { url: string | null; alt: string | null } | null; title?: string; level?: 2 | 3; id?: string }) {
-  const { data, timezone, now, caps } = useWorkspace();
+  const { storyId, client, data, timezone, now, caps, currentUserId, announce } = useWorkspace();
+  const cache = useWorkspaceCache();
   const dialog = useDialogTarget<StoryMediaAssignment>("[data-context-add=media]");
+  const complete = useMutation({
+    mutationFn: ({ assignment, status }: { assignment: StoryMediaAssignment; status: "done" | "in-progress" }) => client.saveMediaAssignment(storyId, { status, expectedUpdatedAt: assignment.updatedAt }, assignment.id),
+    onMutate: async ({ assignment, status }) => {
+      await cache.cancel();
+      const previous = cache.read();
+      cache.write((current) => current ? { ...current, mediaAssignments: current.mediaAssignments.map((item) => item.id === assignment.id ? { ...item, status } : item) } : current);
+      return { previous };
+    },
+    onSuccess: (response, { assignment, status }) => {
+      cache.write((current) => applyMedia(current, response));
+      const message = status === "done" ? `Marked ${assignment.title} done.` : `Reopened ${assignment.title}.`;
+      announce(message);
+      toast.success(message, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void client.saveMediaAssignment(storyId, { status: assignment.status }, assignment.id).then((restored) => {
+              cache.write((current) => applyMedia(current, restored));
+              announce(`Restored ${assignment.title}.`);
+              void cache.invalidate();
+            }).catch((failure) => toast.error(workspaceError(failure, "The media status change couldn’t be undone.").message));
+          }
+        }
+      });
+    },
+    onError: (failure, _variables, context) => {
+      if (context?.previous) cache.write(() => context.previous);
+      const message = workspaceError(failure, "The media status couldn’t be saved. Try again.").message;
+      announce(message);
+      toast.error(message);
+    },
+    onSettled: () => { void cache.invalidate(); }
+  });
   const assignments = [...data.mediaAssignments].sort((a, b) => a.order - b.order);
   return (
     <ContextSection id={id} title={title} level={level}>
@@ -278,15 +312,22 @@ export function MediaContext({ leadImage, title = "Media", level = 2, id = "cont
             const done = mediaDone(assignment);
             const due = done ? "" : dueText(assignment.dueAt, timezone, now);
             return (
-              <Item key={assignment.id} size="xs" className="px-0" render={<button type="button" onClick={(event) => dialog.openWith(assignment, event.currentTarget)} />}>
-                <ItemMedia variant="icon" className="text-muted-foreground [&_svg]:size-4">{done ? <Check aria-label="Done" /> : <Circle aria-label="Open" />}</ItemMedia>
+              <Item key={assignment.id} size="xs" className="px-0" data-plan-media-assignment={assignment.id}>
+                <ItemMedia>
+                  {caps.manageMedia || assignment.assigneeId === currentUserId
+                    ? <Checkbox aria-label={done ? `Reopen ${assignment.title}` : `Mark ${assignment.title} done`} checked={done} disabled={complete.isPending && complete.variables?.assignment.id === assignment.id} onCheckedChange={(checked) => complete.mutate({ assignment, status: checked ? "done" : "in-progress" })} />
+                    : done ? <Check aria-label="Done" className="size-4 text-muted-foreground" /> : <Circle aria-label="Open" className="size-4 text-muted-foreground" />}
+                </ItemMedia>
                 <ItemContent>
-                  <ItemTitle className="font-normal">{assignment.title}</ItemTitle>
+                  <ItemTitle><button type="button" className={done ? "touch-hit text-left font-normal text-muted-foreground line-through hover:underline" : "touch-hit text-left font-normal hover:underline"} onClick={(event) => dialog.openWith(assignment, event.currentTarget)}>{assignment.title}</button></ItemTitle>
                   <ItemDescription>
                     {[assignment.assignee?.name ?? "No one assigned", done ? labelFor(MEDIA_STATUS_LABELS, assignment.status) : due].filter(Boolean).join(" · ")}
                   </ItemDescription>
                 </ItemContent>
-                {!done && isOverdue(assignment.dueAt, timezone, now) ? <ItemActions><span className="text-xs text-warning">Late</span></ItemActions> : null}
+                <ItemActions>
+                  {!done && isOverdue(assignment.dueAt, timezone, now) ? <span className="text-xs text-warning">Late</span> : null}
+                  <Button type="button" variant="ghost" size="icon-xs" aria-label={`Edit media assignment: ${assignment.title}`} onClick={(event) => dialog.openWith(assignment, event.currentTarget)}><Pencil /></Button>
+                </ItemActions>
               </Item>
             );
           })}
