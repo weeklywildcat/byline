@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { articleCanvas, openStory, routeStoryFixtures } from './story-fixtures';
+import { openStory, routeStoryFixtures } from './story-fixtures';
 
 /**
  * Story presentation presets (docs/story-presentation.md) in the built public
@@ -12,6 +12,7 @@ const block = (page: Page, id: string) => page.locator(`[data-block-type]:has(#$
 const byType = (page: Page, type: string, index = 0) => page.locator(`[data-block-type="${type}"]`).nth(index);
 const box = async (locator: Locator) => (await locator.boundingBox())!;
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+const layoutBounds = (page: Page) => page.evaluate(() => { const rect = document.body.getBoundingClientRect(); return { left: rect.left, right: rect.right, width: rect.width, center: (rect.left + rect.right) / 2 }; });
 const css = (locator: Locator, property: string) => locator.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property);
 
 async function open(page: Page, width: number, height = 900) {
@@ -47,17 +48,17 @@ test.describe('on a phone (390px)', () => {
   test.beforeEach(async ({ page }) => open(page, 390, 844));
 
   test('a full-width photo reaches both screen edges while its caption stays inset', async ({ page }) => {
-    const canvas = await articleCanvas(page);
+    const layout = await layoutBounds(page);
     const image = await box(photoFull(page).locator('img'));
     expect(image.x).toBe(0);
-    expect(image.width).toBe(canvas.width);
+    expect(image.width).toBe(layout.width);
     const caption = await box(photoFull(page).locator('figcaption .byline-caption'));
     expect(caption.x).toBeGreaterThanOrEqual(16);
-    expect(caption.x + caption.width).toBeLessThanOrEqual(canvas.right - 16);
+    expect(caption.x + caption.width).toBeLessThanOrEqual(layout.right - 16);
     // A column photo keeps the story's margins.
     const inset = await box(photoColumn(page).locator('img'));
     expect(inset.x).toBeGreaterThanOrEqual(16);
-    expect(inset.x + inset.width).toBeLessThanOrEqual(canvas.right - 16);
+    expect(inset.x + inset.width).toBeLessThanOrEqual(layout.right - 16);
   });
 
   test('Split becomes one column, photo then passage', async ({ page }) => {
@@ -68,11 +69,11 @@ test.describe('on a phone (390px)', () => {
   });
 
   test('Breakout and Spotlight bleed the photo and keep their words inset below it, on the page', async ({ page }) => {
-    const canvas = await articleCanvas(page);
+    const layout = await layoutBounds(page);
     for (const moment of [breakout(page), spotlight(page)]) {
       const image = await box(moment.locator('img'));
       expect(image.x).toBe(0);
-      expect(image.width).toBe(canvas.width);
+      expect(image.width).toBe(layout.width);
       const passage = await box(moment.locator('.byline-portrait-text-body'));
       expect(passage.y).toBeGreaterThanOrEqual(image.y + image.height);
       // The words themselves (not their padded container) keep the gutter.
@@ -94,7 +95,7 @@ test.describe('on a phone (390px)', () => {
 
   test('a full-screen chapter fills the small viewport and keeps its words clear of the photo credit', async ({ page }) => {
     const rect = await box(chapter(page));
-    expect(rect.width).toBe((await articleCanvas(page)).width);
+    expect(rect.width).toBe((await layoutBounds(page)).width);
     expect(rect.height).toBeGreaterThanOrEqual(844 - 1);
     const dek = await box(chapter(page).locator('.byline-visual-chapter-dek'));
     const credit = await box(chapter(page).locator('.byline-visual-chapter-credit'));
@@ -110,7 +111,7 @@ test.describe('on a phone (390px)', () => {
   });
 
   test('pull quotes gain room without absurd type, and stay in the column', async ({ page }) => {
-    const canvas = await articleCanvas(page);
+    const layout = await layoutBounds(page);
     for (const presentation of ['breakout', 'full']) {
       const element = quote(page, presentation);
       const size = parseFloat(await css(element.locator('blockquote'), 'font-size'));
@@ -118,17 +119,17 @@ test.describe('on a phone (390px)', () => {
       expect(size).toBeLessThan(36);
       const rect = await box(element);
       expect(rect.x).toBeGreaterThanOrEqual(16);
-      expect(rect.x + rect.width).toBeLessThanOrEqual(canvas.right - 16);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(layout.right - 16);
     }
   });
 
   test('a Photo Essay bleeds each photograph with inset captions; an even grid keeps two tiles per row', async ({ page }) => {
-    const canvas = await articleCanvas(page);
+    const layout = await layoutBounds(page);
     const essay = page.locator('.byline-gallery.is-essay');
     for (const item of await essay.locator('.byline-gallery-item').all()) {
       const image = await box(item.locator('img'));
       expect(image.x).toBe(0);
-      expect(image.width).toBe(canvas.width);
+      expect(image.width).toBe(layout.width);
       expect((await box(item.locator('figcaption .byline-caption'))).x).toBeGreaterThanOrEqual(16);
     }
     const tiles = page.locator('.byline-gallery.is-cropped > .byline-gallery-item');
