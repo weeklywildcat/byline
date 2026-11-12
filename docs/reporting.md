@@ -148,7 +148,7 @@ A reporter adds a transcript deliberately:
   `.txt`, `.srt` or `.vtt`. The transcript attaches to that exact recording
   and inherits its Story, Source, Appointment, confidentiality and ground-rule
   snapshot.
-- **Without a recording:** use **Capture → Upload transcript**. Byline keeps the
+- **Without a recording:** use **Capture → Transcript only**. Byline keeps the
   uploaded transcript file as the private reporting document that owns the
   transcript.
 - **Replace:** an existing transcript can be replaced by uploading a new file
@@ -179,9 +179,11 @@ explicit destructive confirmation in the UI.
   Source's badge. The Interview panel records in the browser or uploads an
   existing audio file (MP3, M4A, WAV, AAC, Ogg, WebM, checked by
   `recordingUploadProblem` before sending); either becomes the same private
-  recording with the bound Source and Appointment. The panel also offers
-  **Upload transcript**, and audio rows expose **Add transcript** or
-  **Replace transcript** so the file is attached to the correct interview.
+  recording with the bound Source and Appointment. Save the recording first;
+  audio rows then expose **Add transcript**, **Upload replacement** or
+  **Replace transcript** so the transcript is always attached to the correct
+  interview. **Capture → Transcript only** is reserved for a transcript that
+  intentionally has no recording.
 - **Transcript** (`?transcript=<id>`, a focused view with Back to Plan): pinned audio, timestamps
   that seek, the active passage following playback, an `InputGroup` search
   with next/previous and a count, in-place speaker and text edits, and a
