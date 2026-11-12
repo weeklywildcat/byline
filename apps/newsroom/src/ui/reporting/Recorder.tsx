@@ -157,7 +157,7 @@ export function RecorderPanel({ label, onRecorded, onUploaded, busy, large }: { 
     <div className="flex flex-wrap items-center gap-3" data-recorder={state}>
       {state === "recording" ? (
         <>
-          <Button type="button" variant="destructive" className={size} onClick={() => void stop().then(onRecorded)}><Square data-icon="inline-start" />Stop and save</Button>
+          <Button type="button" className={size} onClick={() => void stop().then(onRecorded)}><Square data-icon="inline-start" />Stop and save</Button>
           <span role="timer" aria-label="Recording time" className="text-sm tabular-nums"><span aria-hidden="true" className="mr-1.5 inline-block size-2 animate-pulse rounded-full bg-destructive motion-reduce:animate-none" />Recording {clock(elapsed)}</span>
         </>
       ) : (
