@@ -33,7 +33,7 @@ import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, MoreHorizontal, PanelRight, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, LockOpen, Mic, MoreHorizontal, PanelRight, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
@@ -436,7 +436,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
       {transcript?.usedSelectionCount ? <Badge variant="secondary">{transcript.usedSelectionCount === 1 ? "Used in article" : `${transcript.usedSelectionCount} saved items in articles`}</Badge> : null}
       {editable && !(item.kind === "note" && editing) ? (
         <MaterialActionsMenu
-          title={title}
+          title={item.kind === "note" ? "note" : title}
           confidential={item.confidential}
           toggling={toggle.isPending}
           canRemove={!removalBlocked}
@@ -527,7 +527,7 @@ function MaterialActionsMenu({ title, confidential, toggling, canRemove, removin
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button type="button" size="icon-xs" variant="ghost" aria-label={`More actions for ${title}`} />}><MoreHorizontal /></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuItem disabled={toggling} onClick={onToggle}><Lock />{confidential ? "Make visible to story team" : "Make confidential"}</DropdownMenuItem>
+        <DropdownMenuItem disabled={toggling} onClick={onToggle}>{confidential ? <LockOpen /> : <Lock />}{confidential ? "Make visible to story team" : "Make confidential"}</DropdownMenuItem>
         {canRemove ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" disabled={removing} onClick={onRemove}><Trash2 />Remove…</DropdownMenuItem></> : null}
       </DropdownMenuContent>
     </DropdownMenu>
