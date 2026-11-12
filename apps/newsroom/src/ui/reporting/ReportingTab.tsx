@@ -497,8 +497,9 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
+          <AlertDialogMedia><RefreshCw /></AlertDialogMedia>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
           <AlertDialogDescription>
             The transcript text will be replaced. {selectionCount === 1 ? "The saved quote or highlight stays exactly as saved, including any verification." : `All ${selectionCount} saved quotes and highlights stay exactly as saved, including verification.`}
