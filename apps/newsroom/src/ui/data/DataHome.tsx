@@ -4,6 +4,7 @@ import { DisabledReason } from "@byline/newsroom-ui/components/disabled-reason";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
@@ -109,7 +110,7 @@ function openable(onOpen: () => void) {
 function ProjectList({ data, onOpen }: { data: DataOverview; onOpen: (id: number) => void }) {
   const titles = new Map(data.datasets.map((dataset) => [dataset.key, dataset.title]));
   return (
-    <div className="rounded-lg border">
+    <Card className="gap-0 py-0">
       <Table>
         <TableHeader>
           <TableRow>
@@ -124,7 +125,7 @@ function ProjectList({ data, onOpen }: { data: DataOverview; onOpen: (id: number
           {data.projects.map((project: ProjectSummary) => (
             <TableRow key={project.id} {...openable(() => onOpen(project.id))} data-data-project-row={project.slug}>
               <TableCell className="max-w-0 whitespace-normal">
-                <button type="button" className="text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:underline" onClick={() => onOpen(project.id)}>{project.title}</button>
+                <Button type="button" variant="ghost" size="sm" className="h-auto min-h-0 justify-start rounded-none p-0 text-left font-medium whitespace-normal hover:bg-transparent hover:underline any-pointer-coarse:min-h-0" onClick={() => onOpen(project.id)}>{project.title}</Button>
                 {project.deck ? <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{project.deck}</p> : null}
               </TableCell>
               <TableCell>
@@ -148,7 +149,7 @@ function ProjectList({ data, onOpen }: { data: DataOverview; onOpen: (id: number
           ))}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }
 
@@ -170,7 +171,7 @@ function DatasetList({ data, onOpen }: { data: DataOverview; onOpen: (id: number
           {data.datasets.map((dataset: DatasetSummary) => (
             <TableRow key={dataset.id} {...openable(() => onOpen(dataset.id))} data-data-dataset-row={dataset.key}>
               <TableCell className="max-w-0 whitespace-normal">
-                <button type="button" className="text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:underline" onClick={() => onOpen(dataset.id)}>{dataset.title}</button>
+                <Button type="button" variant="ghost" size="sm" className="h-auto min-h-0 justify-start rounded-none p-0 text-left font-medium whitespace-normal hover:bg-transparent hover:underline any-pointer-coarse:min-h-0" onClick={() => onOpen(dataset.id)}>{dataset.title}</Button>
                 <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{dataset.key}</p>
               </TableCell>
               <TableCell className="text-right tabular-nums">{dataset.records.toLocaleString("en-US")}</TableCell>
