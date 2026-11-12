@@ -286,7 +286,7 @@ describe("recordings, ground rules and transcripts", () => {
 
     const reporting = await call("get", "/byline/stories/:id/reporting", "alice", { params: { id: ids.story } });
     const recording = reporting.body.materials.find((item: { key: string }) => item.key === `file:${ids.recording}`);
-    expect(recording.transcript).toMatchObject({ id: ids.transcript, quoteCount: 1, verifiedCount: 1, usedQuoteCount: 1 });
+    expect(recording.transcript).toMatchObject({ id: ids.transcript, quoteCount: 1, verifiedCount: 1, usedSelectionCount: 1 });
 
     // A recording that is the provenance for an article quote cannot be removed.
     const blocked = await call("delete", "/byline/reporting/files/:id", "alice", { params: { id: ids.recording } });
