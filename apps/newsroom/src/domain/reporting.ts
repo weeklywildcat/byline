@@ -239,8 +239,8 @@ export type TranscriptSummary = {
   durationMs: number | null;
   quoteCount: number;
   verifiedCount: number;
-  /** Saved quotes from this transcript that are currently referenced by an article. */
-  usedQuoteCount: number;
+  /** Saved selections from this transcript that are currently referenced by an article. */
+  usedSelectionCount: number;
 };
 
 export type ReportingFileMaterial = MaterialBase & {
