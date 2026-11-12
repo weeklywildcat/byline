@@ -398,6 +398,7 @@ function iconFor(item: StoryMaterialItem): ReactNode {
 function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
   const [editing, setEditing] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const actionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [text, setText] = useState(item.kind === "note" ? item.text : "");
   const remove = useMutation({
     mutationFn: () => (item.kind === "note" ? removeNote(context.api, item.id) : removeFile(context.api, item.id)),
@@ -436,6 +437,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
       {transcript?.usedSelectionCount ? <Badge variant="secondary">{transcript.usedSelectionCount === 1 ? "Used in article" : `${transcript.usedSelectionCount} saved items in articles`}</Badge> : null}
       {editable && !(item.kind === "note" && editing) ? (
         <MaterialActionsMenu
+          triggerRef={actionsTriggerRef}
           title={item.kind === "note" ? "note" : title}
           confidential={item.confidential}
           toggling={toggle.isPending}
@@ -447,7 +449,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
       ) : null}
     </>
   );
-  const removeDialog = editable ? <ConfirmRemoveMaterialDialog item={item} open={removeOpen} onOpenChange={setRemoveOpen} removing={remove.isPending} onRemove={() => remove.mutate()} /> : null;
+  const removeDialog = editable ? <ConfirmRemoveMaterialDialog item={item} open={removeOpen} onOpenChange={setRemoveOpen} removing={remove.isPending} onRemove={() => remove.mutate()} finalFocus={actionsTriggerRef} /> : null;
 
   // A true file (recording, document, image, photo) is an Attachment; notes, links and live posts are not.
   if (item.kind === "file" || item.kind === "media") {
@@ -505,7 +507,7 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button type="button" size="xs" variant="outline" />}>Replace transcript</AlertDialogTrigger>
-      <AlertDialogContent size="sm">
+      <AlertDialogContent size="sm" finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogMedia><RefreshCw /></AlertDialogMedia>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
@@ -522,10 +524,10 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
   );
 }
 
-function MaterialActionsMenu({ title, confidential, toggling, canRemove, removing, onToggle, onRemove }: { title: string; confidential: boolean; toggling: boolean; canRemove: boolean; removing: boolean; onToggle: () => void; onRemove: () => void }) {
+function MaterialActionsMenu({ triggerRef, title, confidential, toggling, canRemove, removing, onToggle, onRemove }: { triggerRef: React.RefObject<HTMLButtonElement | null>; title: string; confidential: boolean; toggling: boolean; canRemove: boolean; removing: boolean; onToggle: () => void; onRemove: () => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button type="button" size="icon-xs" variant="ghost" aria-label={`More actions for ${title}`} />}><MoreHorizontal /></DropdownMenuTrigger>
+      <DropdownMenuTrigger render={<Button ref={triggerRef} type="button" size="icon-xs" variant="ghost" aria-label={`More actions for ${title}`} />}><MoreHorizontal /></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
         <DropdownMenuItem disabled={toggling} onClick={onToggle}>{confidential ? <LockOpen /> : <Lock />}{confidential ? "Make visible to story team" : "Make confidential"}</DropdownMenuItem>
         {canRemove ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" disabled={removing} onClick={onRemove}><Trash2 />Remove…</DropdownMenuItem></> : null}
@@ -534,7 +536,7 @@ function MaterialActionsMenu({ title, confidential, toggling, canRemove, removin
   );
 }
 
-function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRemove }: { item: StoryMaterialItem; open: boolean; onOpenChange: (open: boolean) => void; removing: boolean; onRemove: () => void }) {
+function ConfirmRemoveMaterialDialog({ item, open, onOpenChange, removing, onRemove, finalFocus }: { item: StoryMaterialItem; open: boolean; onOpenChange: (open: boolean) => void; removing: boolean; onRemove: () => void; finalFocus: React.RefObject<HTMLButtonElement | null> }) {
   const file = item.kind === "file" ? item : null;
   const transcript = file?.transcript ?? null;
   const interview = file?.fileKind === "audio";
