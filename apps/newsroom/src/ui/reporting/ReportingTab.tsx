@@ -18,11 +18,13 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { FieldError } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Kbd, KbdGroup } from "@byline/newsroom-ui/ui/kbd";
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
@@ -324,7 +326,7 @@ function NoteComposer({ context, bound, onDone, onCancel }: { context: StoryScre
           <div className="flex gap-2"><Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button><Button type="button" size="sm" disabled={!text.trim() || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save note</Button></div>
         </InputGroupAddon>
       </InputGroup>
-      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">⌘/Ctrl+Enter saves.</span></p>
+      <p className="text-xs text-muted-foreground">A private reporting note. {confidential ? "Only you, the story's editor and administrators can see it." : "Visible to the people on this story."} <span className="max-sm:hidden">Press <KbdGroup><Kbd>⌘/Ctrl</Kbd><Kbd>Enter</Kbd></KbdGroup> to save.</span></p>
     </InlineForm>
   );
 }
@@ -357,7 +359,7 @@ function LinkComposer({ context, onDone, onCancel }: { context: StoryScreenConte
         <InputGroupInput autoFocus type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={url} placeholder="Paste a link" aria-label="Link address" aria-invalid={error ? true : undefined} onChange={(event) => setUrl(event.target.value)} />
         <InputGroupAddon align="inline-end"><Button type="button" size="xs" disabled={!url.trim() || save.isPending} onClick={submit}>Add link</Button><Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button></InputGroupAddon>
       </InputGroup>
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? <FieldError>{error}</FieldError> : null}
     </InlineForm>
   );
 }
@@ -471,7 +473,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
       <div className="min-w-0">
         {editing && item.kind === "note" ? (
           <InlineForm label="Edit note" className="grid gap-2" onSubmit={() => { if (text.trim() && !saveNoteText.isPending) saveNoteText.mutate(); }} onCancel={() => { setEditing(false); setText(item.text); }}>
-            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} />
+            <Textarea value={text} rows={3} aria-label="Note" autoFocus onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && text.trim() && !saveNoteText.isPending) { event.preventDefault(); saveNoteText.mutate(); } }} />
             <div className="flex gap-2"><Button type="button" size="sm" disabled={saveNoteText.isPending || !text.trim()} onClick={() => saveNoteText.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setText(item.text); }}>Cancel</Button></div>
           </InlineForm>
         ) : (
