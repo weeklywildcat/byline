@@ -44,7 +44,6 @@ import { activateFrontPageTask } from "./front-page/server";
 import { FrontPageRevisions } from "./collections/FrontPage";
 import { DistributionItems, DistributionSettings } from "./collections/Distribution";
 import { distributionEndpoints } from "./distribution/endpoints";
-import { transcribeReportingFileTask } from "./reporting/transcription/queue";
 import { Publication } from "./globals/Publication";
 import { withPublicTracking } from "./public/tracking";
 import { preparePublicSnapshotTask } from "./public/snapshot/task";
@@ -246,14 +245,13 @@ export default buildConfig({
       admin: { ...defaultJobsCollection.admin, group: "System", hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator") }
     }),
     // Queue ownership: `media` → `jobs:media` (Phase 5), `publication` → `jobs:publication`
-    // (public snapshots + deploy hook), `default` → `jobs:scheduled` (Payload's scheduled publish),
-    // `reporting` → `jobs:reporting` (long transcriptions, kept apart so they never delay publication).
+    // (public snapshots + deploy hook), and `default` → `jobs:scheduled` (Payload's scheduled publish).
     tasks: [
       withFailureNotice(preparePublicationMediaTask, "Media preparation"),
       withFailureNotice(preparePublicSnapshotTask, "Public snapshot preparation"),
       withFailureNotice(deployPublicSiteTask, "Public site deployment"),
       advancePublicRevisionTask, contentHealthTask, refreshVideoFactsTask, deliverNotificationTask, sendDueDigestTask,
-      transcribeReportingFileTask, withFailureNotice(activateFrontPageTask, "Front Page activation")
+      withFailureNotice(activateFrontPageTask, "Front Page activation")
     ]
   },
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
