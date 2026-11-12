@@ -21,7 +21,6 @@ import {
 } from "../domain/reporting";
 import { lexicalToPlainText } from "../newsroom/live-text";
 import type { ScreenContext } from "../newsroom/screen-models";
-import { transcriptionStatus } from "./transcription/provider";
 
 /**
  * The Story Material read model (docs/reporting.md#story-material).
@@ -64,7 +63,6 @@ export type ReportingWorkspace = {
     manage: boolean;
     postLive: boolean;
     overrideOffRecord: boolean;
-    transcription: { available: boolean; automatic: boolean; message: string };
   };
   /** Appointments still to happen (or without a time yet), soonest first. */
   upNext: ReportingAppointment[];
@@ -206,8 +204,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
       capture: true,
       manage: manager,
       postLive,
-      overrideOffRecord: atLeast(ctx.user, "editor"),
-      transcription: transcriptionStatus()
+      overrideOffRecord: atLeast(ctx.user, "editor")
     },
     upNext,
     sources,
