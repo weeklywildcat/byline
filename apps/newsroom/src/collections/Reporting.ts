@@ -129,11 +129,34 @@ const describeUpload: CollectionBeforeChangeHook = ({ data, operation, req }) =>
   return data;
 };
 
-/** Remove derived rows before the recording itself so PostgreSQL relationship constraints cannot block the parent delete. */
+/**
+ * Remove derived rows before the recording itself so PostgreSQL relationship
+ * constraints cannot block the parent delete. A quote already used in an
+ * article is provenance, not disposable scratch data: refuse to orphan it.
+ *
+ * A permanent Story delete removes selections/transcripts first, so this hook
+ * sees no derived rows in that cascade and does not block the Story deletion.
+ */
 const removeDerived: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const transcripts = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: id } }, depth: 0, pagination: false, overrideAccess: true, select: {}, req });
   const ids = transcripts.docs.map((row) => row.id);
   if (!ids.length) return;
+
+  const selections = await req.payload.find({
+    collection: "transcript-selections",
+    where: { transcript: { in: ids } },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true,
+    select: { usedIn: true, kind: true },
+    req
+  });
+  const used = selections.docs.filter((row) => Array.isArray(row.usedIn) && row.usedIn.length > 0);
+  if (used.length) {
+    const label = used.length === 1 ? "A saved quote from this recording is" : `${used.length} saved quotes from this recording are`;
+    throw new APIError(`${label} used in an article. Remove the quote from the article before deleting the recording.`, 409);
+  }
+
   await req.payload.delete({ collection: "transcript-selections", where: { transcript: { in: ids } }, overrideAccess: true, req });
   await req.payload.delete({ collection: "reporting-transcripts", where: { id: { in: ids } }, overrideAccess: true, req });
 };
@@ -273,7 +296,7 @@ export const TranscriptSelections: CollectionConfig = {
             req
           });
           if (!transcript) throw new APIError("That transcript is not available.", 404);
-          if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
+          if (transcript.state !== "ready") throw new APIError("This transcript is not ready for quotes or highlights. Upload a replacement transcript first.", 409);
         }
         if (operation === "update" && originalDoc && data.transcript !== undefined && relationChanged(data.transcript, originalDoc.transcript)) throw new APIError("A selection cannot move to another transcript.", 400);
         // Changing the words un-verifies them: verification is of exact words against the audio.
