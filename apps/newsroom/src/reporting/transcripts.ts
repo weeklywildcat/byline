@@ -267,20 +267,20 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
   const data = {
     state: "ready" as const,
     origin: "manual" as const,
-    provider: "manual",
+    provider: null,
     model: null,
     language: parsed.language,
     durationMs: parsed.durationMs ?? (file?.durationMs as number | null) ?? null,
     segments: parsed.segments,
     completedAt,
     failure: null,
-    // Replacing a legacy machine transcript clears its old run metadata while preserving
-    // the row and any provenance that points at this transcript.
+    // Replacing a legacy machine transcript clears obsolete automatic-run metadata while
+    // preserving the transcript row and quote snapshots that point at it.
     transcriptionRunToken: null,
     transcriptionStartedAt: null,
-    progressPercent: 100,
-    progressMessage: "Manual transcript imported",
-    lastProgressAt: completedAt
+    progressPercent: null,
+    progressMessage: null,
+    lastProgressAt: null
   };
   const saved = existingTranscript
     ? await payload.update({ collection: "reporting-transcripts", id: existingTranscript.id, data, ...system })
@@ -310,7 +310,7 @@ export async function createSelection(ctx: ScreenContext, transcriptId: number, 
   const found = await payload.find({ collection: "reporting-transcripts", where: { id: { equals: transcriptId } }, limit: 1, ...as(ctx) });
   const transcript = found.docs[0];
   if (!transcript) throw new APIError("That transcript is not available.", 404);
-  if (transcript.state !== "ready") throw new APIError("Wait for transcription to finish before saving quotes or highlights.", 409);
+  if (transcript.state !== "ready") throw new APIError("This transcript is not ready for quotes or highlights. Upload a replacement transcript first.", 409);
   const ids = Array.isArray(input.segmentIds) ? (input.segmentIds as unknown[]).filter((id): id is string => typeof id === "string").slice(0, 200) : [];
   const picked = selectionFromSegments(normalizeSegments(transcript.segments), ids, typeof input.text === "string" ? input.text : undefined);
   if (!picked) throw new APIError("Select the words to save.", 400);
