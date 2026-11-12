@@ -33,14 +33,13 @@ import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, PanelRig
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
-import { transcriptFormat } from "../../domain/transcript";
 import type { ReportingAppointment, ReportingSource } from "../../reporting/material";
 import { postJson } from "../story/api";
 import { formatDay } from "../story/parts";
 import type { StoryScreenContext } from "../story/StoryScreen";
 import type { CaptureIntent } from "../story/story-view";
 import { clock, RecorderPanel, type Recording } from "./Recorder";
-import { editNote, editFile, loadReporting, newClientKey, positionLabel, removeFile, removeNote, reportingKey, saveGroundRules, saveNote, startTranscription, uploadFile } from "./api";
+import { editNote, editFile, loadReporting, newClientKey, positionLabel, removeFile, removeNote, reportingKey, saveGroundRules, saveNote, uploadFile } from "./api";
 import { TranscriptView } from "./TranscriptView";
 
 /** Width of the Reporting area above which Sources and Appointments sit beside the feed (measured: feed rows need ~520px, the rail ~280px). */
@@ -48,7 +47,7 @@ const RAIL_AT = 880;
 type ReportingData = Awaited<ReturnType<typeof loadReporting>>;
 
 type CaptureActions = { note: () => void; record: () => void; file: () => void; photo: () => void; link: () => void; transcript: () => void };
-type Bound = { sourceId?: number; appointmentId?: number; label?: string };
+type Bound = { sourceId?: number; appointmentId?: number; fileId?: number; replaceTranscript?: boolean; label?: string };
 type Upload = { id: string; name: string; kind: "file" | "photo" | "transcript"; progress: number; error: string | null; blob: Blob; extra: Record<string, unknown> };
 
 const when = (iso: string, timeZone: string) => new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
@@ -83,11 +82,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const query = useQuery({
     queryKey: reportingKey(storyId),
     queryFn: () => loadReporting(context.api, storyId),
-    refetchInterval: (current) => {
-      const snapshot = current.state.data as ReportingData | undefined;
-      const transcribing = snapshot?.materials.some((item) => item.kind === "file" && item.transcript && (item.transcript.state === "queued" || item.transcript.state === "processing"));
-      return transcribing ? 5_000 : 20_000;
-    }
+    refetchInterval: 20_000
   });
   const [filter, setFilter] = useState<MaterialFilter>("all");
   const [search, setSearch] = useState("");
@@ -123,7 +118,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
 
   const enqueue = useCallback((kind: Upload["kind"], blob: Blob, name: string, extra: Record<string, unknown> = {}) => {
     const context = pendingBound.current ?? bound;
-    const entry: Upload = { id: newClientKey(), name, kind, progress: 0, error: null, blob, extra: { ...(context?.sourceId ? { sourceId: context.sourceId } : {}), ...(context?.appointmentId ? { appointmentId: context.appointmentId } : {}), ...extra } };
+    const entry: Upload = { id: newClientKey(), name, kind, progress: 0, error: null, blob, extra: { ...(context?.sourceId ? { sourceId: context.sourceId } : {}), ...(context?.appointmentId ? { appointmentId: context.appointmentId } : {}), ...(context?.fileId ? { fileId: context.fileId } : {}), ...(context?.replaceTranscript ? { replace: true } : {}), ...extra } };
     setUploads((list) => [entry, ...list]);
     void send(entry);
   }, [bound, send]);
@@ -134,10 +129,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   };
   const onFiles = (kind: "file" | "photo", files: FileList | null) => {
     if (!files) return;
-    for (const file of Array.from(files)) {
-      if (kind === "file" && transcriptFormat(file.name, file.type) && /\.(srt|vtt)$/i.test(file.name)) enqueue("transcript", file, file.name);
-      else enqueue(kind, file, file.name);
-    }
+    for (const file of Array.from(files)) enqueue(kind, file, file.name);
     pendingBound.current = null;
   };
 
@@ -186,13 +178,12 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const groups = materialDayGroups(visible, data.timeZone);
   const planning = <PlanningContext context={context} data={data} capture={capture} canCapture={canCapture} refresh={refresh} />;
   const appointmentEditor = <AppointmentDialog key={`deep-appointment-${appointmentDialog.session}`} open={appointmentDialog.open} appointment={appointmentDialog.target} onClose={() => { appointmentDialog.close(); void refresh(); }} finalFocus={appointmentDialog.finalFocus} />;
-  const transcription = data.capabilities.transcription;
 
   return (
     <div className="flex min-w-0 flex-col gap-4" data-reporting="">
       <input ref={fileInput} type="file" multiple hidden onChange={(event) => { onFiles("file", event.target.files); event.target.value = ""; }} aria-label="Upload a file" />
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} multiple hidden onChange={(event) => { onFiles("photo", event.target.files); event.target.value = ""; }} aria-label="Upload a photo" />
-      <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) enqueue("transcript", file, file.name); pendingBound.current = null; event.target.value = ""; }} aria-label="Import a transcript" />
+      <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { enqueue("transcript", file, file.name); setPanel(null); setBound(null); } pendingBound.current = null; event.target.value = ""; }} aria-label="Upload a transcript" />
       <div className="grid gap-4" style={wide ? { gridTemplateColumns: "minmax(0, 1fr) 17.5rem" } : undefined}>
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -209,10 +200,11 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
           {panel === "link" ? <LinkComposer context={context} onDone={() => { setPanel(null); void refresh(); }} onCancel={() => setPanel(null)} /> : null}
           {panel === "record" ? (
             <div className="grid gap-2 rounded-lg border p-3" data-record-panel="">
-              <p className="text-sm font-medium">Record or upload an interview</p>
-              <p className="text-xs text-muted-foreground">Record here or upload an audio file you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Saved as a private recording on this story{bound?.label ? `, for ${bound.label}` : ""}. {transcription.available ? transcription.message : "Transcription is not configured; you can import a transcript later."}</p>
+              <p className="text-sm font-medium">Interview</p>
+              <p className="text-xs text-muted-foreground">Record here or upload audio you already have (MP3, M4A, WAV, AAC, Ogg or WebM). Byline keeps the recording private and does not transcribe it. Add a .txt, .srt or .vtt transcript when you have one{bound?.label ? ` for ${bound.label}` : ""}.</p>
               <div className="flex flex-wrap items-center gap-3">
                 <RecorderPanel onRecorded={keepRecording} onUploaded={keepRecording} />
+                <Button type="button" variant="outline" size="sm" onClick={() => pick(transcriptInput, bound ?? undefined)}><FileText data-icon="inline-start" />Upload transcript</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => { setPanel(null); setBound(null); }}>Cancel</Button>
               </div>
             </div>
@@ -239,14 +231,14 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               <Empty className="border border-dashed py-10">
                 <EmptyHeader>
                   <EmptyTitle>{data.materials.length ? "Nothing matches" : "Nothing captured yet"}</EmptyTitle>
-                  <EmptyDescription>{data.materials.length ? "Try another filter or search." : canCapture ? "Capture a note, record an interview, add a photo, a document or a link. It all lands here, on this story." : "Material captured for this story will appear here."}</EmptyDescription>
+                  <EmptyDescription>{data.materials.length ? "Try another filter or search." : canCapture ? "Add an interview, note, transcript, photo, document or link. It all lands here, on this story." : "Material captured for this story will appear here."}</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             ) : groups.map((group) => (
               <div key={group.label} className="grid gap-1">
                 <h4 className="pt-2 text-sm font-medium">{group.label}</h4>
                 <ul className="divide-y border-y">
-                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} data={data} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id }).transcript()} /></li>)}
+                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => item.kind === "file" ? capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id, fileId: item.id, replaceTranscript: true }).transcript() : capture().transcript()} /></li>)}
                 </ul>
               </div>
             ))}
@@ -271,11 +263,11 @@ function CaptureMenu({ capture }: { capture: CaptureActions }) {
       <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Capture</DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
         <DropdownMenuItem onClick={capture.note}><StickyNote />Note</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.record}><Mic />Record or upload interview</DropdownMenuItem>
+        <DropdownMenuItem onClick={capture.record}><Mic />Interview</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.file}><Upload />Upload file</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.photo}><ImageIcon />Upload photo</DropdownMenuItem>
         <DropdownMenuItem onClick={capture.link}><Link2 />Add link</DropdownMenuItem>
-        <DropdownMenuItem onClick={capture.transcript}><FileText />Import transcript</DropdownMenuItem>
+        <DropdownMenuItem onClick={capture.transcript}><FileText />Upload transcript</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -366,7 +358,7 @@ function iconFor(item: StoryMaterialItem): ReactNode {
   return item.fileKind === "audio" ? <Mic aria-hidden="true" /> : item.fileKind === "image" ? <ImageIcon aria-hidden="true" /> : <FileText aria-hidden="true" />;
 }
 
-function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; data: ReportingData; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
+function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { context: StoryScreenContext; item: StoryMaterialItem; onOpenTranscript: (id: number) => void; refresh: () => Promise<unknown>; onImport: () => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.kind === "note" ? item.text : "");
   const remove = useMutation({
@@ -384,11 +376,6 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
     onSuccess: async () => { setEditing(false); await refresh(); },
     onError: (error: Error) => toast.error(error.message)
   });
-  const startMachine = useMutation({
-    mutationFn: () => startTranscription(context.api, item.id),
-    onSuccess: async (result) => { await refresh(); onOpenTranscript(result.transcriptId); },
-    onError: (error: Error) => toast.error(error.message)
-  });
   const editable = item.canEdit && !context.readOnly && (item.kind === "note" || item.kind === "file");
   const title = rowTitle(item);
   const sub = rowSub(item, context.timeZone);
@@ -397,31 +384,19 @@ function MaterialRow({ context, item, data, onOpenTranscript, refresh, onImport 
 
   const actions = (
     <>
-      {file && transcript ? <Button type="button" size="xs" variant={transcript.state === "ready" ? "default" : "outline"} onClick={() => onOpenTranscript(transcript.id)}>
-        {transcript.state === "ready"
-          ? "Open transcript"
-          : transcript.state === "failed"
-            ? "Transcript failed"
-            : transcript.progressPercent !== null
-              ? `${transcript.progressMessage ?? "Transcribing"} · ${Math.round(transcript.progressPercent)}%`
-              : transcript.progressMessage ?? "Transcribing…"}
-      </Button> : null}
-      {file && !transcript && file.fileKind === "audio" && editable ? <>
-        {data.capabilities.transcription.available ? <Button type="button" size="xs" variant="outline" disabled={startMachine.isPending} onClick={() => startMachine.mutate()}>Transcribe</Button> : null}
-        <Button type="button" size="xs" variant="outline" onClick={onImport}>Import transcript</Button>
-      </> : null}
+      {file && transcript?.state === "ready" ? <Button type="button" size="xs" variant="default" onClick={() => onOpenTranscript(transcript.id)}>Open transcript</Button> : null}
+      {file && file.fileKind === "audio" && editable ? <Button type="button" size="xs" variant="outline" onClick={onImport}>{transcript ? "Replace transcript" : "Add transcript"}</Button> : null}
       {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
-      {editable && !(file && transcript) ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
+      {editable ? <Button type="button" size="xs" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove</Button> : null}
     </>
   );
 
   // A true file (recording, document, image, photo) is an Attachment; notes, links and live posts are not.
   if (item.kind === "file" || item.kind === "media") {
     const href = item.kind === "media" ? item.previewUrl : item.fileKind !== "audio" ? item.url : null;
-    const processing = Boolean(transcript && transcript.state !== "ready" && transcript.state !== "failed");
     return (
       <div className="grid gap-1.5 py-2" data-material={item.kind} data-key={item.key}>
-        <Attachment state={transcript?.state === "failed" ? "error" : processing ? "processing" : "done"} className="w-full">
+        <Attachment state={transcript && transcript.state !== "ready" ? "error" : "done"} className="w-full">
           <AttachmentMedia>{item.kind === "media" && item.previewUrl ? <img src={item.previewUrl} alt={item.alt} /> : iconFor(item)}</AttachmentMedia>
           <AttachmentContent className="flex-1">
             <AttachmentTitle className="flex items-center gap-1.5">{title}{item.confidential ? <Lock aria-label="Confidential" className="size-3.5 shrink-0 text-muted-foreground" /> : null}</AttachmentTitle>
@@ -497,12 +472,8 @@ function FileFacts({ file }: { file: ReportingFileMaterial }) {
   return (
     <p className="text-xs text-muted-foreground">
       {bits.join(" · ")}
-      {transcript?.state === "ready" ? ` · ${transcript.origin === "manual" ? "Manual transcript" : "Transcript ready"}${transcript.quoteCount ? ` · ${transcript.verifiedCount} of ${transcript.quoteCount} quote${transcript.quoteCount === 1 ? "" : "s"} verified` : ""}` : ""}
-      {transcript && transcript.state !== "ready"
-        ? ` · ${transcript.state === "failed"
-          ? `Transcript failed: ${transcript.failure ?? "unknown error"}`
-          : `${transcript.progressMessage ?? (transcript.state === "queued" ? "Waiting to transcribe" : "Transcribing")}${transcript.progressPercent !== null ? ` · ${Math.round(transcript.progressPercent)}%` : ""}${transcript.failure ? ` · Last attempt: ${transcript.failure}` : ""}`}`
-        : ""}
+      {transcript?.state === "ready" ? ` · ${transcript.origin === "manual" ? "Uploaded transcript" : "Legacy machine transcript"}${transcript.quoteCount ? ` · ${transcript.verifiedCount} of ${transcript.quoteCount} quote${transcript.quoteCount === 1 ? "" : "s"} verified` : ""}` : ""}
+      {transcript && transcript.state !== "ready" ? " · Incomplete legacy transcript — upload a replacement" : ""}
     </p>
   );
 }
@@ -511,7 +482,7 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   const source = data.sources.find((entry) => entry.id === appointment.sourceId);
   const from: Bound = { appointmentId: appointment.id, ...(source ? { sourceId: source.id } : {}), label: appointment.title };
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
-  const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Record</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
+  const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
   const name = onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
   if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{time}{appointment.status === "cancelled" ? " · Cancelled" : ""}</p>{actions}</div>;

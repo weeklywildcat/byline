@@ -196,10 +196,10 @@ function ReferenceContent({ context, insert, onLeave }: Props & { onLeave: () =>
 function transcriptLine(file: ReportingFileMaterial): string {
   const transcript = file.transcript;
   if (!transcript) return "Recording · no transcript";
-  if (transcript.state === "failed") return "Transcription failed";
-  if (transcript.state !== "ready") return "Transcribing…";
+  if (transcript.state !== "ready") return "Recording · incomplete legacy transcript";
   const quotes = transcript.quoteCount ? ` · ${transcript.quoteCount} ${transcript.quoteCount === 1 ? "quote" : "quotes"} (${transcript.verifiedCount} verified)` : "";
-  return `Transcript${transcript.durationMs ? ` · ${formatPosition(transcript.durationMs)}` : ""}${quotes}`;
+  const label = transcript.origin === "manual" ? "Uploaded transcript" : "Legacy machine transcript";
+  return `${label}${transcript.durationMs ? ` · ${formatPosition(transcript.durationMs)}` : ""}${quotes}`;
 }
 
 function QuoteItem({ context, quote, playing, onPlay, onStop, onCopy, onInsert, onVerify }: { context: StoryScreenContext; quote: SelectionView; playing: boolean; onPlay: () => void; onStop: () => void; onCopy: () => void; onInsert: () => void; onVerify: () => void }) {

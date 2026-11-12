@@ -9,7 +9,6 @@ import {
   importTranscript,
   overrideOffRecord,
   quoteProvenance,
-  requestTranscription,
   storyQuotes,
   transcriptDetail,
   updateSelection,
@@ -39,7 +38,6 @@ export const reportingEndpoints: Endpoint[] = [
   { path: "/byline/reporting/notes/:id", method: "delete", handler: handle((ctx, req) => deleteReportingMaterial(ctx, "reporting-notes", idParam(req))) },
   { path: "/byline/reporting/files/:id", method: "patch", handler: handle(async (ctx, req) => updateReportingFile(ctx, idParam(req), await body(req))) },
   { path: "/byline/reporting/files/:id", method: "delete", handler: handle((ctx, req) => deleteReportingMaterial(ctx, "reporting-files", idParam(req))) },
-  { path: "/byline/reporting/files/:id/transcribe", method: "post", handler: handle((ctx, req) => requestTranscription(ctx, idParam(req))) },
   { path: "/byline/reporting/sources/:id/ground-rules", method: "patch", handler: handle(async (ctx, req) => setSourceGroundRules(ctx, idParam(req), await body(req))) },
   // Transcripts load only when opened.
   { path: "/byline/reporting/transcripts/:id", method: "get", handler: handle((ctx, req) => transcriptDetail(ctx, idParam(req))) },

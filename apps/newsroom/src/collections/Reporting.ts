@@ -5,7 +5,6 @@ import { lockRow } from "../db/locks";
 import { normalizeGroundRules, REPORTING_FILE_MIME_TYPES, REPORTING_LIMITS, reportingFileKind } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { privateReportingDir } from "../reporting/paths";
-import { queueTranscriptionAfterUpload } from "../reporting/transcription/queue";
 import { transcriptSearchText } from "../domain/transcript";
 
 /**
@@ -19,7 +18,7 @@ import { transcriptSearchText } from "../domain/transcript";
  * - `reporting-files`: private uploads (interview recordings, PDFs,
  *   documents), stored apart from Media and served only through Payload's
  *   access-checked file route.
- * - `reporting-transcripts`: one transcript per recording, provider-neutral.
+ * - `reporting-transcripts`: one uploaded transcript per recording (legacy machine transcripts remain readable).
  * - `transcript-selections`: highlights and quotes, stored as snapshots.
  *
  * Access is `access/reporting-context.ts`: normal material follows the
@@ -164,7 +163,7 @@ export const ReportingFiles: CollectionConfig = {
   access: { read: readReporting(), create: createReporting, update: changeReporting(), delete: changeReporting() },
   hooks: {
     beforeChange: [stampCreator, sameStoryContext, describeUpload],
-    afterChange: [logConfidentiality("reporting-files"), queueTranscriptionAfterUpload],
+    afterChange: [logConfidentiality("reporting-files")],
     beforeDelete: [removeDerived]
   },
   fields: [
@@ -223,8 +222,8 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "appointment", type: "relationship", relationTo: "appointments", index: true, access: { update: systemWrite } },
     { ...confidentialField, access: { update: systemWrite } } as Field,
     groundRulesField,
-    { name: "state", type: "select", required: true, defaultValue: "queued", index: true, options: transcriptState, access: { update: systemWrite } },
-    { name: "origin", type: "select", required: true, defaultValue: "machine", options: [{ value: "machine", label: "Machine transcript" }, { value: "manual", label: "Manual transcript" }], access: { update: systemWrite } },
+    { name: "state", type: "select", required: true, defaultValue: "ready", index: true, options: transcriptState, access: { update: systemWrite } },
+    { name: "origin", type: "select", required: true, defaultValue: "manual", options: [{ value: "machine", label: "Legacy machine transcript" }, { value: "manual", label: "Uploaded transcript" }], access: { update: systemWrite } },
     { name: "provider", type: "text", maxLength: 80, access: { update: systemWrite } },
     { name: "model", type: "text", maxLength: 120, access: { update: systemWrite } },
     { name: "language", type: "text", maxLength: 16 },
@@ -234,9 +233,9 @@ export const ReportingTranscripts: CollectionConfig = {
     { name: "searchText", type: "textarea", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite, read: readTranscriptText } },
     { name: "failure", type: "text", maxLength: 400, access: { update: systemWrite } },
     { name: "attempts", type: "number", defaultValue: 0, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
-    // One logical run keeps the same token across Payload retries, so Whisper can reattach instead of duplicating CPU work.
+    // Legacy automatic-transcription metadata stays only so pre-retirement rows remain readable and replaceable.
     { name: "transcriptionRunToken", type: "text", maxLength: 64, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
-    // Persist lightweight progress so every newsroom screen can explain what the background worker is doing.
+    // These progress fields are legacy compatibility data; new uploaded transcripts are immediately ready.
     { name: "progressPercent", type: "number", min: 0, max: 100, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "progressMessage", type: "text", maxLength: 160, admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },
     { name: "transcriptionStartedAt", type: "date", admin: { hidden: true }, access: { create: systemWrite, update: systemWrite } },

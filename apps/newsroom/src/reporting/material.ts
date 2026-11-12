@@ -21,7 +21,6 @@ import {
 } from "../domain/reporting";
 import { lexicalToPlainText } from "../newsroom/live-text";
 import type { ScreenContext } from "../newsroom/screen-models";
-import { transcriptionStatus } from "./transcription/provider";
 
 /**
  * The Story Material read model (docs/reporting.md#story-material).
@@ -64,7 +63,6 @@ export type ReportingWorkspace = {
     manage: boolean;
     postLive: boolean;
     overrideOffRecord: boolean;
-    transcription: { available: boolean; automatic: boolean; message: string };
   };
   /** Appointments still to happen (or without a time yet), soonest first. */
   upNext: ReportingAppointment[];
@@ -123,7 +121,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   // Transcript summaries: the fields the feed needs, never segments or search text.
   const fileIds = filesPage.docs.map((row) => row.id);
   const transcripts = fileIds.length
-    ? (await payload.find({ collection: "reporting-transcripts", where: { file: { in: fileIds } }, pagination: false, select: { file: true, state: true, origin: true, language: true, durationMs: true, failure: true, progressPercent: true, progressMessage: true }, ...as(ctx) })).docs
+    ? (await payload.find({ collection: "reporting-transcripts", where: { file: { in: fileIds } }, pagination: false, select: { file: true, state: true, origin: true, language: true, durationMs: true }, ...as(ctx) })).docs
     : [];
   const selections = transcripts.length
     ? (await payload.find({ collection: "transcript-selections", where: { and: [{ transcript: { in: transcripts.map((row) => row.id) } }, { kind: { equals: "quote" } }] }, pagination: false, select: { transcript: true, state: true }, ...as(ctx) })).docs
@@ -138,9 +136,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
   }
   const transcriptFor = new Map<number, TranscriptSummary>(transcripts.map((row) => [num(row.file), {
     id: row.id, state: row.state, origin: row.origin, language: row.language ?? null, durationMs: row.durationMs ?? null,
-    quoteCount: quoteCounts.get(row.id)?.total ?? 0, verifiedCount: quoteCounts.get(row.id)?.verified ?? 0, failure: row.failure ?? null,
-    progressPercent: typeof row.progressPercent === "number" ? row.progressPercent : null,
-    progressMessage: row.progressMessage ?? null
+    quoteCount: quoteCounts.get(row.id)?.total ?? 0, verifiedCount: quoteCounts.get(row.id)?.verified ?? 0
   }]));
 
   // Media linked through production assignments, plus Media captured for the Story; one asset appears once.
@@ -206,8 +202,7 @@ export async function storyReporting(ctx: ScreenContext, storyId: number): Promi
       capture: true,
       manage: manager,
       postLive,
-      overrideOffRecord: atLeast(ctx.user, "editor"),
-      transcription: transcriptionStatus()
+      overrideOffRecord: atLeast(ctx.user, "editor")
     },
     upNext,
     sources,

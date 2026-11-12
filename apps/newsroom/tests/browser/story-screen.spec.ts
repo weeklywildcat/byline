@@ -171,99 +171,44 @@ test("a transcript opens from Plan as a focused view, with Back to Plan and brow
   await expect(tab(page, "Plan")).toHaveAttribute("aria-selected", "true");
 });
 
-test("a transcript grows in place while reporters read and search", async ({ page, request, baseURL }) => {
-  const url = `/api/byline/reporting/transcripts/${transcriptId}`;
-  const response = await request.get(url, { headers: headers(baseURL!) });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  const detail = await response.json();
-  const passages = Array.from({ length: 42 }, (_, index) => ({
-    id: `s${index}`, startMs: index * 1000, endMs: (index + 1) * 1000, text: `Interview passage ${index + 1}.`
-  }));
-  let state: "processing" | "ready" = "processing";
-  let count = 0;
-  const wav = Buffer.alloc(44 + 8000 * 2 * 3);
+test("an interview recording accepts a transcript upload and attaches it to that recording", async ({ page, request, baseURL }) => {
+  const wav = Buffer.alloc(44 + 8000 * 2);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
   wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
   wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
   wav.write("data", 36); wav.writeUInt32LE(wav.length - 44, 40);
-  const audioUrl = `data:audio/wav;base64,${wav.toString("base64")}`;
-  await page.route(`**${url}`, async (route) => {
-    if (route.request().method() !== "GET") return route.continue();
-    await route.fulfill({ json: {
-      ...detail, state, origin: "machine", model: "test-model",
-      progressPercent: state === "ready" ? 100 : count ? 27 : null,
-      progressMessage: count ? "Transcribing audio" : "Loading Whisper model",
-      file: { ...detail.file, kind: "audio", url: audioUrl },
-      segments: passages.slice(0, count)
-    } });
+
+  const uploaded = await request.post(`/api/byline/stories/${draftId}/reporting/files`, {
+    headers: headers(baseURL!),
+    multipart: {
+      file: { name: `interview-${stamp}.wav`, mimeType: "audio/wav", buffer: wav },
+      _payload: JSON.stringify({ clientKey: `interview-audio-${stamp}` })
+    }
+  });
+  expect(uploaded.ok(), await uploaded.text()).toBeTruthy();
+  const recordingId = (await uploaded.json()).id;
+
+  await open(page, draftId, "?view=plan&section=reporting");
+  const row = page.locator(`[data-key="file:${recordingId}"]`);
+  await expect(row).toContainText(`interview-${stamp}.wav`);
+  await expect(row.getByRole("button", { name: "Add transcript" })).toBeVisible();
+
+  const chooserPromise = page.waitForEvent("filechooser");
+  await row.getByRole("button", { name: "Add transcript" }).click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name: `interview-${stamp}.vtt`,
+    mimeType: "text/vtt",
+    buffer: Buffer.from("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v Principal Smith>Students deserve a hot lunch.\n")
   });
 
-  await open(page, draftId, `?transcript=${transcriptId}`);
-  const transcript = page.locator("[data-transcript-view]");
-  const stream = transcript.getByRole("region", { name: "Transcript passages" });
-  await expect(transcript.getByText("Loading Whisper model…")).toBeVisible();
-  await expect(stream).toHaveCount(0);
-  count = 30;
-  await expect(transcript.getByText("Draft transcript")).toBeVisible();
-  await expect(transcript.getByRole("progressbar")).toHaveAccessibleName("Transcribing audio, 27% complete");
-  const distanceFromBottom = () => stream.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight);
-  await expect(stream.getByText("Interview passage 30.")).toBeVisible();
-  await expect.poll(distanceFromBottom).toBeLessThanOrEqual(1);
-  await expect(stream.getByText("Transcribing the rest of the recording…")).toBeVisible();
-  await expect(stream.getByRole("button", { name: "Edit this passage" })).toHaveCount(0);
-  await expect(transcript.getByRole("button", { name: "Unverify" })).toHaveCount(0);
-
-  const search = transcript.getByRole("searchbox");
-  await search.fill("passage");
-  await transcript.getByRole("button", { name: "Next result" }).click();
-  await expect(transcript.getByText("2 of 30", { exact: true })).toBeVisible();
-  const second = stream.locator("[data-segment=s1]");
-  await second.getByRole("button", { name: "Play from 0:01" }).click();
-  await expect(second).toHaveAttribute("data-active", "");
-  await expect.poll(() => transcript.locator("audio").evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(1);
-  const first = stream.locator("[data-segment=s0]");
-  await first.evaluate((element) => {
-    const range = document.createRange();
-    const words = element.querySelector("[data-segment-text]")!;
-    range.selectNodeContents(words);
-    window.getSelection()?.addRange(range);
-    words.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  });
-  await expect(transcript.getByRole("button", { name: "Save quote" })).toHaveCount(0);
-
-  count = 40;
-  const jump = transcript.getByRole("button", { name: "Jump to latest" });
-  await expect(jump).toBeVisible();
-  await expect(first).toBeInViewport();
-  await expect(search).toHaveValue("passage");
-  await expect(transcript.getByText("2 of 40", { exact: true })).toBeVisible();
-  await jump.click();
-  await expect.poll(distanceFromBottom).toBeLessThanOrEqual(1);
-  await expect(jump).toHaveCount(0);
-
-  const passage = stream.locator("[data-segment=s39]");
-  await passage.evaluate((element) => { element.setAttribute("data-browser-test-original", ""); });
-  count = 42;
-  state = "ready";
-  await expect(transcript.getByText("Draft transcript")).toHaveCount(0);
-  await expect(stream.getByText("Transcribing the rest of the recording…")).toHaveCount(0);
-  await expect(passage).toHaveAttribute("data-browser-test-original", "");
-  await expect(passage.getByRole("button", { name: "Edit this passage" })).toBeVisible();
-  await expect(transcript.getByText("2 of 42", { exact: true })).toBeVisible();
-
-  await passage.evaluate((element) => {
-    const range = document.createRange();
-    const words = element.querySelector("[data-segment-text]")!;
-    range.selectNodeContents(words);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-    words.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  });
-  await expect(transcript.getByRole("button", { name: "Save quote" })).toBeEnabled();
-  await transcript.getByRole("button", { name: /Source & quotes/ }).click();
-  await expect(page.getByRole("dialog", { name: "Source & quotes" }).getByRole("button", { name: "Unverify" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Open transcript" })).toBeVisible();
+  const transcript = await request.get(`/api/reporting-transcripts?where[file][equals]=${recordingId}&depth=0`, { headers: headers(baseURL!) });
+  expect(transcript.ok(), await transcript.text()).toBeTruthy();
+  const docs = (await transcript.json()).docs;
+  expect(docs).toHaveLength(1);
+  expect(docs[0]).toMatchObject({ file: recordingId, state: "ready", origin: "manual", provider: "manual" });
 });
-
 
 test("switching Write → Plan → Write keeps the same editor, its unsaved words and its undo history", async ({ page, request, baseURL }) => {
   await open(page, draftId, "?view=write");

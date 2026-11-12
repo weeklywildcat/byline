@@ -52,28 +52,27 @@ for service in "${required_services[@]}"; do
   grep -Fxq "$service" <<<"$compose_services" || fail "Compose project in $deploy_root is missing required service: $service"
 done
 
-# Reporting/transcription is optional in Byline, but when those services exist
-# they must deploy with the newsroom image/service contract. Leaving an old
-# reporting-worker or Whisper container running can strand new transcript jobs
-# in "Waiting to transcribe" or make the worker call an obsolete endpoint.
-has_reporting_worker=0
-has_whisper=0
-if grep -Fxq "reporting-worker" <<<"$compose_services"; then
-  has_reporting_worker=1
-fi
-if grep -Fxq "whisper" <<<"$compose_services"; then
-  has_whisper=1
-fi
+# Automatic transcription was retired. Some existing production Compose files may
+# still define the old services until the host config is cleaned up; stop and
+# remove those containers so they cannot keep consuming CPU or accepting jobs.
+retired_services=()
+for service in reporting-worker whisper; do
+  if grep -Fxq "$service" <<<"$compose_services"; then
+    retired_services+=("$service")
+  fi
+done
 
 commit="$(git rev-parse --short HEAD)"
 printf 'Deploying Byline %s using Compose project %s\n' "$commit" "$deploy_root"
 
+if (( ${#retired_services[@]} )); then
+  printf '\nStopping retired transcription services: %s\n' "${retired_services[*]}"
+  compose stop "${retired_services[@]}" || true
+  compose rm -f "${retired_services[@]}" || true
+fi
+
 printf '\n[1/5] Building service images...\n'
 compose build newsroom
-if (( has_whisper )); then
-  printf 'Building transcription service...\n'
-  compose build whisper
-fi
 
 printf '\n[2/5] Running Payload migrations...\n'
 compose run --rm migrate
@@ -95,12 +94,6 @@ services_to_recreate=(
   scheduled-worker
   maintenance-worker
 )
-if (( has_reporting_worker )); then
-  services_to_recreate+=(reporting-worker)
-fi
-if (( has_whisper )); then
-  services_to_recreate+=(whisper)
-fi
 compose up -d --no-deps --force-recreate "${services_to_recreate[@]}"
 
 printf '\nByline %s deployed successfully.\n' "$commit"

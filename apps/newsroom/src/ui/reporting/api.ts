@@ -22,7 +22,6 @@ export const editNote = (api: string, id: number, data: Record<string, unknown>)
 export const removeNote = (api: string, id: number) => deleteJson<{ id: number }>(api, `/byline/reporting/notes/${id}`, {});
 export const editFile = (api: string, id: number, data: Record<string, unknown>) => patchJson<{ id: number }>(api, `/byline/reporting/files/${id}`, data);
 export const removeFile = (api: string, id: number) => deleteJson<{ id: number }>(api, `/byline/reporting/files/${id}`, {});
-export const startTranscription = (api: string, fileId: number) => postJson<{ transcriptId: number }>(api, `/byline/reporting/files/${fileId}/transcribe`, {});
 export const saveGroundRules = (api: string, sourceId: number, data: Record<string, unknown>) => patchJson<unknown>(api, `/byline/reporting/sources/${sourceId}/ground-rules`, data);
 export const editTranscript = (api: string, id: number, data: Record<string, unknown>) => patchJson<{ updatedAt: string; segments: TranscriptDetail["segments"] }>(api, `/byline/reporting/transcripts/${id}`, data);
 export const saveSelection = (api: string, transcriptId: number, data: Record<string, unknown>) => postJson<SelectionView>(api, `/byline/reporting/transcripts/${transcriptId}/selections`, data);

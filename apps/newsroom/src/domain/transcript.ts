@@ -1,6 +1,6 @@
 /**
  * Transcripts (docs/reporting.md#transcripts): Byline's own provider-neutral
- * representation. A provider (faster-whisper, a manual import) produces a
+ * representation. Reporter-provided transcript imports produce these segments;
  * `NormalizedTranscript`; nothing provider-shaped is stored as the canonical
  * record or reaches the screens.
  *

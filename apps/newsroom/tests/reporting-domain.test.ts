@@ -12,8 +12,6 @@ import {
   selectionFromSegments,
   TranscriptImportError
 } from "../src/domain/transcript";
-import { fromFasterWhisper } from "../src/reporting/transcription/faster-whisper";
-import { PermanentTranscriptionError, transcriptionConfig, transcriptionStatus } from "../src/reporting/transcription/provider";
 import { referencedSelections } from "../src/reporting/provenance";
 
 describe("capture routing", () => {
@@ -144,25 +142,6 @@ describe("transcript editing and search", () => {
   it("snapshots a selection's words, timing and single speaker", () => {
     expect(selectionFromSegments(segments, ["a"], "tackled better")).toEqual({ text: "tackled better", startMs: 0, endMs: 1000, speaker: "Speaker 1", segmentIds: ["a"] });
     expect(selectionFromSegments(segments, ["a", "ax"])?.speaker).toBeNull();
-  });
-});
-
-describe("transcription provider boundary", () => {
-  it("is off unless configured, and never exposes the service URL", () => {
-    expect(transcriptionConfig({}).enabled).toBe(false);
-    expect(transcriptionStatus({}).message).toBe("Transcription is not configured.");
-    expect(transcriptionConfig({ BYLINE_TRANSCRIPTION_PROVIDER: "faster-whisper", BYLINE_TRANSCRIPTION_URL: "https://u:p@asr.local" }).enabled).toBe(false);
-    const config = transcriptionConfig({ BYLINE_TRANSCRIPTION_PROVIDER: "faster-whisper", BYLINE_TRANSCRIPTION_URL: "http://asr.internal:9000/", BYLINE_TRANSCRIPTION_MODEL: "small.en" });
-    expect(config).toMatchObject({ enabled: true, url: "http://asr.internal:9000", model: "small.en", autoQueue: true });
-    // A provider that leaves the newsroom is never queued automatically.
-    expect(transcriptionConfig({ BYLINE_TRANSCRIPTION_PROVIDER: "faster-whisper", BYLINE_TRANSCRIPTION_URL: "https://asr.example", BYLINE_TRANSCRIPTION_PRIVATE: "0" })).toMatchObject({ autoQueue: false });
-    expect(JSON.stringify(transcriptionStatus({ BYLINE_TRANSCRIPTION_PROVIDER: "faster-whisper", BYLINE_TRANSCRIPTION_URL: "http://asr.internal:9000" }))).not.toContain("asr.internal");
-  });
-  it("normalizes faster-whisper's seconds into Byline segments", () => {
-    const transcript = fromFasterWhisper({ language: "EN", duration: 12.5, segments: [{ start: 0.2, end: 4.01, text: " Hello there. " }] });
-    expect(transcript).toEqual({ language: "en", durationMs: 12500, segments: [{ id: "s0", startMs: 200, endMs: 4010, text: "Hello there." }] });
-    expect(() => fromFasterWhisper({ segments: [] })).toThrow(PermanentTranscriptionError);
-    expect(() => fromFasterWhisper("<html>")).toThrow(PermanentTranscriptionError);
   });
 });
 

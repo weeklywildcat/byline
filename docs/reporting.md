@@ -104,17 +104,16 @@ provider-neutral segments (`domain/transcript.ts`):
 type TranscriptSegment = { id: string; startMs: number | null; endMs: number | null; speaker?: string; speakerKey?: string; text: string };
 ```
 
-`speaker` is what the transcript shows: a machine label (`SPEAKER_00`) until a
-reporter names the person. `speakerKey` is the stable machine identity of a
-diarized voice **within this one transcript**; renaming changes `speaker` and
-never the key, so a later rename still reaches every passage of that voice.
-`SPEAKER_00` in one recording is never the same person as `SPEAKER_00` in
-another. Screens show `SPEAKER_00` as **Speaker 1**.
+New transcripts are reporter-provided. `speaker` is the name or label present in the
+uploaded transcript. `speakerKey` remains supported for transcripts created by the
+retired machine-transcription system so those records can still be edited and reviewed.
+Legacy `SPEAKER_00` labels are displayed as **Speaker 1** and stay scoped to one
+transcript.
 
-plus state (`queued | processing | ready | failed`), origin (**MACHINE** or
-**MANUAL TRANSCRIPT**), provider, model, language, duration, a plain-text search
-projection and a failure summary. Segment ids are stable: editing words or
-renaming a speaker keeps timing and ids; stale edits are a 409.
+The schema still accepts the historical state/origin/provider fields so existing
+machine transcripts remain readable. New imports are saved immediately as **ready**,
+with **manual** origin and **manual** provider. Segment ids are stable: editing words
+or renaming a speaker keeps timing and ids; stale edits are a 409.
 
 Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
 `Name:` speakers), `.srt` and `.vtt` (`<v Speaker>` voices).
@@ -122,7 +121,7 @@ Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
 Selections (`transcript-selections`) are **snapshots** of the words, timing,
 speaker, attribution and ground rules, never character offsets. They start
 **saved**; a reporter marks a quote **verified** after listening to the audio.
-Changing the words un-verifies it. Machine transcription never verifies.
+Changing the words un-verifies it. Uploading a transcript never verifies a quote.
 
 The chain stays inspectable (`GET /api/byline/reporting/selections/:id/provenance`):
 
@@ -136,118 +135,44 @@ article body never includes it (tested), so it never reaches Live Preview, a
 snapshot or the public site. Each Story save maintains the indexed reverse
 relationship `transcript-selections.usedIn`; no rich text is scanned on reads.
 
-## Transcription
+## Transcript workflow
 
-The provider boundary is `reporting/transcription/provider.ts`. The initial
-provider is self-hosted **faster-whisper** (`services/faster-whisper`, with VAD
-and segment timestamps; word timing is used inside the service only when it
-needs it to place a speaker change, and is never stored. The model and inference
-tuning are configuration and nothing assumes a GPU):
+Byline does **not** run speech-to-text, Whisper, PyTorch, CUDA or speaker
+diarization. Uploading or recording interview audio only saves the private
+recording. It never starts a background job and never sends the audio to a
+transcription service.
 
-| Variable | Meaning |
-| --- | --- |
-| `BYLINE_TRANSCRIPTION_PROVIDER` | `faster-whisper`, or unset (not configured) |
-| `BYLINE_TRANSCRIPTION_URL` | the service's address (no credentials in the URL) |
-| `BYLINE_TRANSCRIPTION_MODEL` | optional model name |
-| `BYLINE_TRANSCRIPTION_LANGUAGE` | optional language hint |
-| `BYLINE_TRANSCRIPTION_TIMEOUT_MS` | total processing limit; default 2 hours (max 4 hours) |
-| `BYLINE_TRANSCRIPTION_PRIVATE` | default `1`: the newsroom's own service, so recordings queue automatically after upload. `0` for anything that leaves the newsroom: never queued automatically |
-| `BYLINE_TRANSCRIPTION_TOKEN` | optional bearer token |
+A reporter adds a transcript deliberately:
 
-Jobs run on their own `reporting` queue (`npm run jobs:reporting`), so a long
-interview never delays publication, snapshots or maintenance. The self-hosted
-service also owns the expensive Whisper work as an idempotent background job:
-Byline submits the recording once, then polls short status responses. A stable
-run key means an automatic Payload retry reattaches to work that is still
-running instead of starting a second transcription.
+- **For a recording:** use **Add transcript** on the audio item and upload
+  `.txt`, `.srt` or `.vtt`. The transcript attaches to that exact recording
+  and inherits its Story, Source, Appointment, confidentiality and ground-rule
+  snapshot.
+- **Without a recording:** use **Capture → Upload transcript**. Byline keeps the
+  uploaded transcript file as the private reporting document that owns the
+  transcript.
+- **Replace:** an existing transcript can be replaced by uploading a new file
+  from the recording. This also provides a clean escape hatch for any incomplete
+  transcript left by the retired automatic system.
 
-The service reports **Waiting for transcription worker → Loading speaker model →
-Identifying speakers (percent) → Loading Whisper model → Transcribing audio
-(percent) → Transcript ready** (the two speaker steps only when diarization is
-on). Byline persists that
-progress and the completed segment prefix on the private transcript. The
-Reporting feed polls the summary, and the focused transcript view polls the
-draft so reporters can read, search and seek while more passages arrive. Editing,
-quotes and highlights become available when the transcript is ready. If a run
-fails, its draft stays readable. An automatic retry retains that draft until
-Whisper supplies a prefix, and a fresh retry clears it.
-The service runs one Whisper job at a time by default
-(`WHISPER_MAX_WORKERS=1`) to avoid several CPU-heavy interviews competing on
-a newsroom server. CPU installs can tune `WHISPER_COMPUTE_TYPE=int8`,
-`WHISPER_CPU_THREADS` and `WHISPER_BATCH_SIZE`; batch sizes above 1 use
-faster-whisper's batched inference pipeline. `WHISPER_WORD_TIMESTAMPS=1`
-exists only for deployments that explicitly need per-word alignment even
-without speaker identification. Its
-`/health` endpoint remains responsive while Whisper is working and reports
-the active inference settings.
-
-### Speaker diarization
-
-A transcript of an interview must show who is speaking. With
-`WHISPER_DIARIZATION=1` the service runs a **local** pyannote stage
-(`pyannote/speaker-diarization-community-1`, `services/faster-whisper/diarization.py`)
-and keeps faster-whisper as the ASR engine:
-
-```
-recording → pyannote diarization (once, whole recording) → speaker timeline
-          → faster-whisper (word timing) → words matched to the timeline
-          → Byline segments with a speaker
-```
-
-- **Whole recording first.** Separately diarized chunks would not agree on who
-  `SPEAKER_00` is, so the recording is diarized once and the labels are
-  renumbered by first appearance (`SPEAKER_00` speaks first).
-- **Sequential.** Diarization and Whisper run one after the other by default so
-  they do not compete for the same CPU cores.
-- **Exclusive diarization.** The timeline uses the model's
-  `exclusive_speaker_diarization`; pyannote objects never leave
-  `diarization.py`.
-- **Word attribution** (`speakers.py`, pure and fixture-tested). Each word goes
-  to the speaker whose turn overlaps it most (a tie goes to the speaker at the
-  word's midpoint). A speaker change inside a Whisper segment splits it into two
-  Byline segments, with timing from the first and last word of each. A word far
-  from any turn has **no speaker** and is shown as *Unknown speaker*; it is never
-  attributed to a person.
-- **Progressive text already has speakers.** Segments are only published after
-  the timeline exists, so the first draft a reporter sees is labelled; a partial
-  prefix and the final transcript give the same words the same speaker and id.
-- **No biometrics.** Byline distinguishes voices; it never says whose voice
-  one is. A reporter supplies the name (the Source's name is only a suggestion
-  to pick).
-- **Speaker count** is automatic. The service also accepts `num_speakers`,
-  `min_speakers` and `max_speakers` per job (the provider's `speakers` input) and
-  `WHISPER_MIN_SPEAKERS` / `WHISPER_MAX_SPEAKERS` defaults, so a future
-  `Auto / 2 / 3 / 4+` control needs no service redesign.
-
-The transcript screen groups consecutive passages by one speaker into a turn
-(each passage keeps its own id and timestamp). The **Speakers** area in the
-context panel lists each voice with a representative passage, **Play sample**,
-and **Name speaker**. Naming opens when the transcript is **ready**, never while
-machine text is still arriving: the rename runs under the transcript's row lock,
-the same lock machine writes take, so it cannot mix identities or be overwritten
-by a stale run. Renaming changes `speaker` on every passage of that voice and
-nothing else: timestamps, ids and words are untouched.
-
-Temporary failures (network, 5xx, 429, model-loading failures and processing
-timeouts) retry with backoff up to five attempts; a retry uses the same
-service job where possible. Malformed or unsupported audio fails once with its
-reason. Without a provider uploads and manual import work, and the screens say
-"Transcription is not configured". The uploader is notified when a transcript
-is ready.
+The old machine-transcription columns and migrations are intentionally retained
+for backward compatibility. They are not an active execution path and can be
+removed only in a future data migration after old records no longer need them.
 
 ## Screens
 
-- **Plan → Reporting**: search, `+ Capture` (Note, Record or upload interview,
-  Upload file, Upload photo, Add link, Import transcript), Up next, a single Material feed with
+- **Plan → Reporting**: search, `+ Capture` (Note, Interview, Upload file,
+  Upload photo, Add link, Upload transcript), Up next, a single Material feed with
   view filters (All, Audio, Documents, Photos, Notes), and Sources and
   Appointments (a rail at ≥880px of the section, otherwise a Sheet), then the
   Story's saved quotes and whether each is verified. Capturing from
   a Source or Appointment pre-binds it. Ground rules are edited from the
-  Source's badge. The interview panel records in the browser or uploads an
+  Source's badge. The Interview panel records in the browser or uploads an
   existing audio file (MP3, M4A, WAV, AAC, Ogg, WebM, checked by
   `recordingUploadProblem` before sending); either becomes the same private
-  recording with the bound Source and Appointment, and queues for
-  transcription like any other.
+  recording with the bound Source and Appointment. The panel also offers
+  **Upload transcript**, and audio rows expose **Add transcript** or
+  **Replace transcript** so the file is attached to the correct interview.
 - **Transcript** (`?transcript=<id>`, a focused view with Back to Plan): pinned audio, timestamps
   that seek, the active passage following playback, an `InputGroup` search
   with next/previous and a count, in-place speaker and text edits, and a

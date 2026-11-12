@@ -1,5 +1,5 @@
 import { APIError, type Where } from "payload";
-import { canChangeMaterial, canSeeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
+import { canChangeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
 import { atLeast, relationId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
 import { groundRuleLabel, normalizeGroundRules, quoteUse, REPORTING_LIMITS, type GroundRulesSnapshot, type QuoteUse } from "../domain/reporting";
@@ -17,8 +17,6 @@ import {
 import { recordStoryActivity } from "../newsroom/story-activity";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { existingCapture, resolveCaptureContext } from "./context";
-import { queueTranscription } from "./transcription/queue";
-import { transcriptionStatus } from "./transcription/provider";
 
 /**
  * Transcripts, selections and verified quotes on the server
@@ -76,9 +74,6 @@ export type TranscriptDetail = {
   model: string | null;
   language: string | null;
   durationMs: number | null;
-  failure: string | null;
-  progressPercent: number | null;
-  progressMessage: string | null;
   updatedAt: string;
   editedAt: string | null;
   segments: TranscriptSegment[];
@@ -90,7 +85,6 @@ export type TranscriptDetail = {
   selections: SelectionView[];
   canEdit: boolean;
   canOverrideOffRecord: boolean;
-  transcription: { available: boolean; automatic: boolean; message: string };
 };
 
 async function namesFor(ctx: ScreenContext, ids: number[]) {
@@ -171,9 +165,6 @@ export async function transcriptDetail(ctx: ScreenContext, id: number): Promise<
     model: row.model ?? null,
     language: row.language ?? null,
     durationMs: row.durationMs ?? file.durationMs ?? null,
-    failure: row.failure ?? null,
-    progressPercent: typeof row.progressPercent === "number" ? row.progressPercent : null,
-    progressMessage: row.progressMessage ?? null,
     updatedAt: row.updatedAt,
     editedAt: row.editedAt ?? null,
     segments,
@@ -184,8 +175,7 @@ export async function transcriptDetail(ctx: ScreenContext, id: number): Promise<
     groundRules: normalizeGroundRules(row.groundRules),
     selections: await selectionViews(ctx, audience, selections.docs as unknown as SelectionRow[], new Map([[file.id, { url: file.kind === "audio" ? file.url ?? null : null }]])),
     canEdit: canChangeMaterial(audience, row, row.createdBy),
-    canOverrideOffRecord: atLeast(ctx.user, "editor"),
-    transcription: transcriptionStatus()
+    canOverrideOffRecord: atLeast(ctx.user, "editor")
   };
 }
 
@@ -232,18 +222,8 @@ export async function editTranscript(ctx: ScreenContext, id: number, input: Tran
   });
 }
 
-/** Starts (or retries) machine transcription for a recording the person may change. */
-export async function requestTranscription(ctx: ScreenContext, fileId: number) {
-  const audience = await audienceOf(ctx);
-  const found = await ctx.req.payload.find({ collection: "reporting-files", where: { id: { equals: fileId } }, limit: 1, ...as(ctx) });
-  const file = found.docs[0];
-  if (!file) throw new APIError("That recording is not available.", 404);
-  if (!canSeeMaterial(audience, file, file.createdBy)) throw new APIError("That recording is not available.", 404);
-  return { transcriptId: await queueTranscription(ctx.req, fileId, { requestedBy: ctx.user.id }) };
-}
-
 /**
- * Imports a transcript (.txt, .srt, .vtt). Attached to a recording when one is
+ * Imports a reporter-provided transcript (.txt, .srt, .vtt). Attached to a recording when one is
  * named; otherwise the transcript file itself is kept as the private reporting
  * document the transcript belongs to. Either way it is MANUAL TRANSCRIPT.
  */
@@ -294,8 +274,8 @@ export async function importTranscript(ctx: ScreenContext, storyId: number, inpu
     segments: parsed.segments,
     completedAt,
     failure: null,
-    // A manual replacement owns the row immediately. Clearing the machine run
-    // token makes any worker that is still finishing the old recording stale.
+    // Replacing a legacy machine transcript clears its old run metadata while preserving
+    // the row and any provenance that points at this transcript.
     transcriptionRunToken: null,
     transcriptionStartedAt: null,
     progressPercent: 100,

@@ -204,7 +204,6 @@ export interface Config {
       'refresh-video-facts': TaskRefreshVideoFacts;
       'deliver-notification': TaskDeliverNotification;
       'send-due-digest': TaskSendDueDigest;
-      'transcribe-reporting-file': TaskTranscribeReportingFile;
       'activate-front-page': TaskActivateFrontPage;
       schedulePublish: TaskSchedulePublish;
       inline: {
@@ -1727,7 +1726,6 @@ export interface PayloadJob {
           | 'refresh-video-facts'
           | 'deliver-notification'
           | 'send-due-digest'
-          | 'transcribe-reporting-file'
           | 'activate-front-page'
           | 'schedulePublish';
         taskID: string;
@@ -1773,7 +1771,6 @@ export interface PayloadJob {
         | 'refresh-video-facts'
         | 'deliver-notification'
         | 'send-due-digest'
-        | 'transcribe-reporting-file'
         | 'activate-front-page'
         | 'schedulePublish'
       )
@@ -3381,17 +3378,6 @@ export interface TaskSendDueDigest {
     reminderTarget?: ('story' | 'task' | 'production' | 'appointment') | null;
     recordId?: number | null;
     expectedAt?: string | null;
-  };
-  output?: unknown;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "TaskTranscribe-reporting-file".
- */
-export interface TaskTranscribeReportingFile {
-  input: {
-    transcriptId: number;
-    runToken?: string | null;
   };
   output?: unknown;
 }
