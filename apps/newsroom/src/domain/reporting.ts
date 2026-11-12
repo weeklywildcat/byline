@@ -267,7 +267,7 @@ export type MediaMaterial = MaterialBase & {
   via: "assignment" | "capture";
 };
 
-export type ResourceMaterial = MaterialBase & { kind: "resource"; label: string; url: string; purpose: string };
+export type ResourceMaterial = MaterialBase & { kind: "resource"; resourceId: string; label: string; url: string; purpose: string };
 
 export type LiveUpdateMaterial = MaterialBase & { kind: "live"; text: string; state: "draft" | "published" };
 
