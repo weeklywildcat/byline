@@ -74,7 +74,7 @@ try {
   ];
   const transcript = await payload.create({
     collection: "reporting-transcripts", ...system,
-    data: { story, file: file.id, source: coach, appointment: interview, createdBy: alice.id, state: "ready", origin: "manual", provider: "manual", model: null, language: "en", durationMs: 60_000, segments, searchText: segments.map((s) => `${s.speaker}: ${s.text}`).join("\n"), groundRules: file.groundRules, completedAt: new Date().toISOString(), capturedAt: new Date().toISOString() } as never
+    data: { story, file: file.id, source: coach, appointment: interview, createdBy: alice.id, state: "ready", origin: "manual", provider: null, model: null, language: "en", durationMs: 60_000, segments, searchText: segments.map((s) => `${s.speaker}: ${s.text}`).join("\n"), groundRules: file.groundRules, completedAt: new Date().toISOString(), capturedAt: new Date().toISOString() } as never
   });
   await payload.create({
     collection: "transcript-selections", ...system,
