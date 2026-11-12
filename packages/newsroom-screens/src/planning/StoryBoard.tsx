@@ -200,12 +200,12 @@ function LaneColumn({ status, stories, collapsed, onCollapsedChange, ...items }:
   const headingId = `board-column-${status.id}`;
 
   if (collapsed) {
-    return <button ref={setElement} type="button" aria-expanded="false" aria-label={`${status.label}, ${storyCount(stories.length)}. Expand`} data-status={status.id} data-over={over} data-collapsed="true" data-moved={items.movedStatusId === status.id}
+    return <Button ref={setElement} type="button" variant="ghost" size="sm" aria-expanded="false" aria-label={`${status.label}, ${storyCount(stories.length)}. Expand`} data-status={status.id} data-over={over} data-collapsed="true" data-moved={items.movedStatusId === status.id}
       onClick={() => onCollapsedChange(status.id, false)}
-      className={cn("flex w-10 shrink-0 flex-col items-center gap-2.5 rounded-xl bg-muted py-3 outline-none hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:snap-start", overRing, movedFlash)}>
+      className={cn("h-auto w-10 shrink-0 flex-col gap-2.5 rounded-xl bg-muted px-0 py-3 hover:bg-muted/70 max-sm:snap-start", overRing, movedFlash)}>
       <span className="text-xs font-medium text-muted-foreground tabular-nums">{stories.length}</span>
       <WorkflowBadge workflow={status} className="h-auto max-h-48 w-5 max-w-none px-0 py-2 [writing-mode:vertical-rl]" />
-    </button>;
+    </Button>;
   }
 
   return <section ref={setElement} aria-labelledby={headingId} data-status={status.id} data-over={over} data-collapsed="false"
