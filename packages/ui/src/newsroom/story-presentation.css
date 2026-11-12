@@ -1,0 +1,274 @@
+/*
+ * Story presentation (docs/story-presentation.md): how strongly a block
+ * interrupts or expands the reading column. Each block keeps one semantic
+ * structure; these rules give its few newsroom presets their geometry on every
+ * canvas width. Loaded last, so a preset refines the base block rules in
+ * story-blocks.css and article-tools.css without restating them.
+ *
+ * Absent attributes are the original look of every block, so stories saved
+ * before presets existed render as they did.
+ *
+ * Widths are the article canvas (`byline-content` container, the article
+ * shell's content box), never the viewport, so the editor canvas, Live
+ * Preview and the public page agree at any size. No script, no scroll
+ * listeners: sticky is CSS position: sticky, and every preset reads in source
+ * order on a phone.
+ *
+ * One scope, shared by the public article, Live Preview and the newsroom
+ * editor canvas, which all draw `.byline-article-view .article-body`.
+ */
+
+/* ------------------------------------------------------------ Edge to edge */
+/*
+ * On a phone-width canvas a bleeding frame escapes the article's side padding
+ * (`--byline-article-gutter`, set by the shell) to reach the screen edges.
+ * Captions, credits and passages come back to the gutter, and clear a
+ * landscape iPhone's safe areas, so no text ever touches the glass.
+ */
+.byline-article-view {
+  --byline-bleed-inset-start: max(var(--byline-article-gutter, 20px), var(--byline-safe-left, 0px));
+  --byline-bleed-inset-end: max(var(--byline-article-gutter, 20px), var(--byline-safe-right, 0px));
+}
+@container byline-content (max-width: 600px) {
+  /* Beats the shared .alignwide/.alignfull breakout geometry (story-base.css) by specificity, without !important. */
+  :is(.byline-article-view .article-story .article-body, .editor-styles-wrapper .is-root-container) > .byline-block.byline-frame-bleed {
+    box-sizing: border-box;
+    margin-inline: calc((100% - 100cqw) / 2 - var(--byline-article-gutter, 20px));
+    max-width: none;
+    width: calc(100cqw + 2 * var(--byline-article-gutter, 20px));
+  }
+  .byline-article-view .article-body > .byline-frame-bleed {
+    & :is(.byline-photo, .byline-portrait-text-figure) > figcaption,
+    & .byline-portrait-text-body,
+    & .byline-gallery.is-essay > .byline-gallery-item > figcaption,
+    & .byline-gallery.is-featured > .byline-gallery-item:first-child > figcaption,
+    & .byline-visual-chapter[data-kind="split"] > :is(.byline-visual-chapter-text, .byline-visual-chapter-credit) {
+      box-sizing: border-box;
+      padding-inline: var(--byline-bleed-inset-start) var(--byline-bleed-inset-end);
+    }
+    /* A bled photograph is never framed by a max-height letterbox: it is the whole width. */
+    & .byline-photo img { max-height: none; }
+    /* Featured: the lead photograph bleeds; the rest stay a grid inside the margins. */
+    & .byline-gallery.is-featured { padding-inline: var(--byline-bleed-inset-start) var(--byline-bleed-inset-end); }
+    & .byline-gallery.is-featured > .byline-gallery-item:first-child { margin-inline: calc(-1 * var(--byline-bleed-inset-start)) calc(-1 * var(--byline-bleed-inset-end)) !important; }
+  }
+}
+
+/* -------------------------------------------------------------- Pull Quote */
+.byline-article-view .article-body {
+  /* Breakout: larger, with room around it, reaching a little past the reading column. Never a card, never centred. */
+  & .byline-pull-quote[data-presentation="breakout"] {
+    border-block-start-width: 3px;
+    margin-block: calc(var(--story-moment-space) * 1.15);
+    margin-inline: auto;
+    max-width: min(54rem, 100%);
+    padding-block: clamp(1.4rem, 3cqi, 2.25rem);
+  }
+  & .byline-pull-quote[data-presentation="breakout"] blockquote { font-size: clamp(1.7rem, 1.15rem + 2.3cqi, 2.6rem); line-height: 1.16; text-wrap: balance; }
+  /* Full: a major typographic pause across the article, centred, a double rule above. */
+  & .byline-pull-quote[data-presentation="full"] {
+    border-block-start: 4px double var(--ink, #121212);
+    border-block-end: var(--story-rule);
+    margin-block: calc(var(--story-moment-space) * 1.4);
+    padding-block: clamp(1.75rem, 5cqi, 3.5rem);
+    text-align: center;
+  }
+  & .byline-pull-quote[data-presentation="full"] blockquote { font-size: clamp(1.85rem, 1.1rem + 3.4cqi, 3.4rem); letter-spacing: -.018em; line-height: 1.1; margin-inline: auto; max-width: 24em; text-wrap: balance; }
+  & .byline-pull-quote[data-presentation="full"] cite { margin-top: .9em; }
+}
+
+/* ----------------------------------------------------------- Feature Media */
+.byline-article-view .article-body {
+  & .byline-portrait-text[data-presentation] { margin-block: var(--story-moment-space); }
+  /* On a narrow canvas every preset is one column in source order; the passage keeps the reading measure. */
+  & .byline-portrait-text[data-presentation] .byline-portrait-text-body { margin-inline: auto; max-width: var(--article-width, 760px); width: 100%; }
+  & .byline-portrait-text[data-presentation] .byline-portrait-text-figure img { display: block; height: auto; width: 100%; }
+  & .byline-portrait-text[data-presentation="breakout"] .byline-portrait-text-body > h3,
+  & .byline-portrait-text[data-presentation="spotlight"] .byline-portrait-text-body > h3 { font-size: clamp(1.5rem, 1.1rem + 1.6cqi, 2.2rem); line-height: 1.1; }
+  /* Spotlight's caption reads in the column under the photograph. */
+  & .byline-portrait-text[data-presentation="spotlight"] .byline-portrait-text-figure > figcaption { margin-inline: auto; max-width: var(--article-width, 760px); }
+}
+
+/* Split, side by side. Source order is the phone order; the grid puts the photo on its side. */
+@container byline-content (min-width: 700px) {
+  .byline-article-view .article-body .byline-portrait-text[data-phone-order="text"]:not([data-side="right"]) .byline-portrait-text-figure { order: -1; }
+  /* Breakout and Spotlight stay one column until the canvas can carry them (860px). */
+  .byline-article-view .article-body .byline-portrait-text:is([data-presentation="breakout"], [data-presentation="spotlight"]) { grid-template-columns: minmax(0, 1fr); }
+  .byline-article-view .article-body .byline-portrait-text:is([data-presentation="breakout"], [data-presentation="spotlight"]) .byline-portrait-text-figure { order: 0; }
+}
+
+/* Breakout: the photograph carries roughly two thirds; the passage attaches at its foot. */
+@container byline-content (min-width: 860px) {
+  .byline-article-view .article-body .byline-portrait-text[data-presentation="breakout"] {
+    align-items: end;
+    column-gap: clamp(1.75rem, 3cqi, 3rem);
+    grid-template-columns: minmax(0, 7fr) minmax(15rem, 3fr);
+    & .byline-portrait-text-figure { grid-column: 1; grid-row: 1; order: 0; }
+    & .byline-portrait-text-body { grid-column: 2; grid-row: 1; margin-inline: 0; padding-block-end: 2.25rem; }
+    &[data-side="right"] { grid-template-columns: minmax(15rem, 3fr) minmax(0, 7fr); }
+    &[data-side="right"] .byline-portrait-text-figure { grid-column: 2; }
+    &[data-side="right"] .byline-portrait-text-body { grid-column: 1; }
+  }
+}
+
+/* Sticky: the photograph stays in view while the passage beside it is read. Never on a narrow canvas. */
+@container byline-content (min-width: 700px) {
+  .byline-article-view .article-body .byline-portrait-text[data-presentation="sticky"] {
+    align-items: start;
+    column-gap: clamp(1.75rem, 4cqi, 3.5rem);
+    grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
+    & .byline-portrait-text-figure {
+      grid-column: 1;
+      grid-row: 1;
+      order: 0;
+      position: sticky;
+      top: calc(var(--sticky-header-h, 64px) + 1.25rem);
+    }
+    & .byline-portrait-text-figure img { max-height: calc(100svh - var(--sticky-header-h, 64px) - 6rem); object-fit: contain; object-position: left top; }
+    & .byline-portrait-text-body { grid-column: 2; grid-row: 1; margin-inline: 0; padding-block: .25rem 1rem; }
+    &[data-side="right"] { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); }
+    &[data-side="right"] .byline-portrait-text-figure { grid-column: 2; }
+    &[data-side="right"] .byline-portrait-text-figure img { object-position: right top; }
+    &[data-side="right"] .byline-portrait-text-body { grid-column: 1; }
+  }
+}
+
+/*
+ * Spotlight on a wide canvas: a few words over the photograph's lower edge,
+ * on a publication-safe scrim. The figure spans two rows (subgrid), so the
+ * words cover the photograph and never its caption. On a narrow canvas a
+ * portrait crop could not carry them: photo, caption, then words.
+ */
+@container byline-content (min-width: 860px) {
+  .byline-article-view .article-body .byline-portrait-text[data-presentation="spotlight"] {
+    --spotlight-scrim: rgb(0 0 0 / .76), rgb(0 0 0 / .5) 55%, rgb(0 0 0 / 0);
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    & .byline-portrait-text-figure { display: grid; grid-column: 1; grid-row: 1 / span 2; grid-template-rows: subgrid; row-gap: 0; }
+    & .byline-portrait-text-figure img { height: min(80svh, 54rem); object-fit: cover; }
+    & .byline-portrait-text-figure > figcaption { grid-row: 2; padding-inline: clamp(1.25rem, 4cqi, 3rem); }
+    & .byline-portrait-text-body {
+      align-self: end;
+      background: linear-gradient(to top, var(--spotlight-scrim));
+      box-sizing: border-box;
+      color: #fff;
+      grid-column: 1;
+      grid-row: 1;
+      max-width: none;
+      padding: clamp(5rem, 14cqi, 10rem) clamp(1.25rem, 4cqi, 3rem) clamp(1.5rem, 4cqi, 3rem);
+      position: relative;
+      text-shadow: 0 1px 2px rgb(0 0 0 / .35);
+      z-index: 1;
+    }
+    & .byline-portrait-text-body > * { max-width: 36rem; }
+    & .byline-portrait-text-body :is(h3, p, a) { color: inherit; }
+    & .byline-portrait-text-body p { font-size: clamp(1.05rem, .95rem + .4cqi, 1.25rem); line-height: 1.5; }
+    &[data-scrim="subtle"] { --spotlight-scrim: rgb(0 0 0 / .64), rgb(0 0 0 / .36) 55%, rgb(0 0 0 / 0); }
+    &[data-scrim="strong"] { --spotlight-scrim: rgb(0 0 0 / .88), rgb(0 0 0 / .66) 55%, rgb(0 0 0 / .3) 82%, rgb(0 0 0 / 0); }
+    /* Dark text: the photograph is lightened behind the words instead. */
+    &[data-tone="dark"] { --spotlight-scrim: rgb(255 255 255 / .86), rgb(255 255 255 / .6) 55%, rgb(255 255 255 / 0); }
+    &[data-tone="dark"][data-scrim="subtle"] { --spotlight-scrim: rgb(255 255 255 / .74), rgb(255 255 255 / .44) 55%, rgb(255 255 255 / 0); }
+    &[data-tone="dark"][data-scrim="strong"] { --spotlight-scrim: rgb(255 255 255 / .93), rgb(255 255 255 / .76) 55%, rgb(255 255 255 / .34) 82%, rgb(255 255 255 / 0); }
+    &[data-tone="dark"] .byline-portrait-text-body { color: var(--ink, #121212); text-shadow: none; }
+  }
+}
+
+/* ----------------------------------------------------------------- Chapter */
+.byline-article-view .article-body {
+  & .byline-visual-chapter { scroll-margin-top: calc(var(--sticky-header-h, 64px) + .75rem); }
+
+  /* Heights. `svh` is the small viewport, so a phone's browser bars never make a chapter jump. */
+  & .byline-visual-chapter[data-height="short"] { min-height: clamp(15rem, 36svh, 24rem); }
+  & .byline-visual-chapter[data-height="half"] { min-height: max(20rem, 50svh); }
+  & .byline-visual-chapter[data-height="full"] { min-height: max(24rem, 100svh); }
+
+  /* Scrims for a photo chapter (Standard is the original gradient). */
+  & .byline-visual-chapter[data-scrim="subtle"]::before { background: linear-gradient(to top, rgb(0 0 0 / .66), rgb(0 0 0 / .22) 55%, rgb(0 0 0 / .04)); }
+  & .byline-visual-chapter[data-scrim="strong"]::before { background: linear-gradient(to top, rgb(0 0 0 / .88), rgb(0 0 0 / .55) 55%, rgb(0 0 0 / .32)); }
+  & .byline-visual-chapter[data-align="center"][data-scrim]::before { background: rgb(0 0 0 / .5); }
+  & .byline-visual-chapter[data-align="center"][data-scrim="subtle"]::before { background: rgb(0 0 0 / .38); }
+  & .byline-visual-chapter[data-align="center"][data-scrim="strong"]::before { background: rgb(0 0 0 / .66); }
+
+  /* Dark words over a lightened photograph. */
+  & .byline-visual-chapter:not([data-kind])[data-tone="dark"] { color: var(--ink, #121212); }
+  & .byline-visual-chapter:not([data-kind])[data-tone="dark"]::before { background: linear-gradient(to top, rgb(255 255 255 / .9), rgb(255 255 255 / .55) 55%, rgb(255 255 255 / .18)); }
+  & .byline-visual-chapter:not([data-kind])[data-tone="dark"][data-scrim="subtle"]::before { background: linear-gradient(to top, rgb(255 255 255 / .78), rgb(255 255 255 / .4) 55%, rgb(255 255 255 / .06)); }
+  & .byline-visual-chapter:not([data-kind])[data-tone="dark"][data-scrim="strong"]::before { background: linear-gradient(to top, rgb(255 255 255 / .94), rgb(255 255 255 / .74) 55%, rgb(255 255 255 / .4)); }
+  & .byline-visual-chapter:not([data-kind])[data-tone="dark"] :is(h2, .byline-visual-chapter-eyebrow, .byline-visual-chapter-dek, .byline-visual-chapter-credit) { color: var(--ink, #121212); }
+
+  /* Text and split chapters sit on the page: no photograph behind the words, no scrim. */
+  & .byline-visual-chapter[data-kind] { color: var(--ink, #121212); isolation: auto; overflow: visible; }
+  & .byline-visual-chapter[data-kind]::before { content: none; }
+  & .byline-visual-chapter[data-kind] h2 { color: inherit; }
+  & .byline-visual-chapter[data-kind] .byline-visual-chapter-eyebrow { color: var(--story-muted); }
+  & .byline-visual-chapter[data-kind] .byline-visual-chapter-dek { color: var(--story-muted); }
+
+  /* Text chapter: a typographic break aligned to the reading column. A double rule, a kicker, a large heading. */
+  & .byline-visual-chapter[data-kind="text"] { border-block-start: 4px double var(--ink, #121212); min-height: 0; padding-block: clamp(2rem, 7cqi, 4.5rem) clamp(1.25rem, 4cqi, 2.5rem); }
+  & .byline-visual-chapter[data-kind="text"] .byline-visual-chapter-text { align-self: start; justify-self: center; margin-inline: auto; max-width: var(--article-width, 760px); padding: 0; width: 100%; }
+  & .byline-visual-chapter[data-kind="text"] h2 { font-size: clamp(2.1rem, 1.3rem + 3.6cqi, 3.9rem); }
+  & .byline-visual-chapter[data-kind="text"][data-align="center"] .byline-visual-chapter-text { text-align: center; }
+  /* Light words: a dark band across the story. */
+  & .byline-visual-chapter[data-kind="text"][data-tone="light"] { background: var(--ink, #121212); border-block-start: 0; color: var(--page, #fff); padding-block: clamp(3rem, 10cqi, 6.5rem); }
+  & .byline-visual-chapter[data-kind="text"][data-tone="light"] :is(.byline-visual-chapter-eyebrow, .byline-visual-chapter-dek) { color: color-mix(in srgb, var(--page, #fff) 82%, transparent); }
+  & .byline-visual-chapter[data-kind="text"][data-tone="light"] .byline-visual-chapter-text { padding-inline: var(--byline-bleed-inset-start) var(--byline-bleed-inset-end); }
+
+  /* Split chapter, narrow: photograph, credit, then the words. */
+  & .byline-visual-chapter[data-kind="split"] { align-content: start; grid-template-areas: "media" "credit" "text"; min-height: 0; row-gap: 0; }
+  & .byline-visual-chapter[data-kind="split"] .byline-visual-chapter-media { aspect-ratio: 4 / 3; grid-area: media; inset: auto; overflow: hidden; position: relative; z-index: auto; }
+  & .byline-visual-chapter[data-kind="split"] .byline-visual-chapter-media img { inset: 0; position: absolute; }
+  & .byline-visual-chapter[data-kind="split"] .byline-visual-chapter-credit { color: var(--story-soft, var(--soft-muted)); grid-area: credit; margin: .5rem 0 0; position: static; text-align: left; }
+  & .byline-visual-chapter[data-kind="split"] .byline-visual-chapter-text { align-self: center; grid-area: text; max-width: 40rem; padding: clamp(1.25rem, 4cqi, 2.5rem) 0 0; }
+  & .byline-visual-chapter[data-kind="split"][data-align="center"] .byline-visual-chapter-text { justify-self: center; text-align: center; }
+  & .byline-visual-chapter[data-kind="split"][data-tone="light"] { background: var(--ink, #121212); color: var(--page, #fff); }
+  & .byline-visual-chapter[data-kind="split"][data-tone="light"] :is(.byline-visual-chapter-eyebrow, .byline-visual-chapter-dek, .byline-visual-chapter-credit) { color: color-mix(in srgb, var(--page, #fff) 82%, transparent); }
+  & .byline-visual-chapter[data-kind="split"][data-tone="light"] .byline-visual-chapter-text { padding-block-end: clamp(1.25rem, 4cqi, 2.5rem); padding-inline: clamp(1.25rem, 4cqi, 2.5rem); }
+  & .byline-visual-chapter[data-kind="split"] picture { display: contents; }
+}
+/* Split chapter, wide: photograph and words side by side, the photograph's half as tall as the chosen height. */
+@container byline-content (min-width: 860px) {
+  .byline-article-view .article-body .byline-visual-chapter[data-kind="split"] {
+    align-items: stretch;
+    column-gap: clamp(2rem, 5cqi, 4.5rem);
+    grid-template-areas: "media text" "credit text";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 1fr auto;
+    min-height: clamp(22rem, 62svh, 44rem);
+    & .byline-visual-chapter-media { align-self: stretch; aspect-ratio: auto; min-height: 16rem; }
+    & .byline-visual-chapter-text { align-self: center; padding: 0 clamp(1.25rem, 4cqi, 3rem) 0 0; }
+    &[data-height="short"] { min-height: clamp(15rem, 36svh, 24rem); }
+    &[data-height="half"] { min-height: max(20rem, 50svh); }
+    &[data-height="full"] { min-height: max(24rem, 100svh); }
+  }
+}
+/* A photo chapter on a phone: portrait-friendly, the heading low and clear of the edges and of the photo credit. */
+@container byline-content (max-width: 700px) {
+  .byline-article-view .article-body .byline-visual-chapter:not([data-kind]):has(> .byline-visual-chapter-credit) .byline-visual-chapter-text { padding-block-end: calc(clamp(1.25rem, 4cqi, 3rem) + 1.5rem); }
+}
+@container byline-content (max-width: 520px) {
+  .byline-article-view .article-body .byline-visual-chapter:not([data-kind])[data-height="half"] { min-height: max(22rem, 62svh); }
+  .byline-article-view .article-body .byline-visual-chapter:not([data-kind])[data-height="full"] { min-height: max(26rem, 100svh); }
+}
+.byline-article-view .article-body .byline-visual-chapter-media picture { display: contents; }
+
+/* ----------------------------------------------------------------- Gallery */
+.byline-article-view .article-body {
+  /* Featured: the lead photograph is the moment; the rest follow after a breath. */
+  & .byline-gallery.is-featured > .byline-gallery-item:first-child { margin-block-end: calc(var(--story-space) * .5) !important; }
+}
+/* A phone: whole photographs one per row; an even grid keeps two square-ish tiles, never thumbnails. */
+@container byline-content (max-width: 500px) {
+  .byline-article-view .article-body .byline-gallery.is-cropped.byline-gallery:not(.is-essay) { --byline-gallery-columns: 2; --byline-gallery-gap: 8px; }
+  .byline-article-view .article-body .byline-gallery.is-cropped:not(.is-essay) > .byline-gallery-item img { aspect-ratio: 1; }
+  .byline-article-view .article-body .byline-gallery.is-featured.is-cropped > .byline-gallery-item:first-child img { aspect-ratio: auto; }
+  .byline-article-view .article-body .byline-gallery.is-essay { row-gap: calc(var(--story-moment-space) * .8); }
+}
+
+/* ---------------------------------------------------------- Forced colours */
+@media (forced-colors: active) {
+  .byline-article-view .article-body {
+    & .byline-portrait-text[data-presentation="spotlight"] .byline-portrait-text-body { background: Canvas; color: CanvasText; text-shadow: none; }
+    & .byline-visual-chapter[data-kind] { background: Canvas; color: CanvasText; }
+  }
+}

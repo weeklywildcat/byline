@@ -45,10 +45,11 @@ describe("the canonical ArticleBody renderer", () => {
 
   it("places a wide photo in a breakout frame and prints the credit from Media", () => {
     const html = render(only(FIXTURE_BLOCKS.photo));
-    expect(html).toContain(`<div class="${articleBlockFrameClassName("photo", "wide")}" data-block-type="photo"><figure class="byline-photo"><img src="newsroom-panorama.jpg" alt="Students wait`);
+    // Wide and full photos reach a phone's edges by default (Auto); the caption stays inset.
+    expect(html).toContain(`<div class="${articleBlockFrameClassName("photo", "wide", { phoneBleed: true })}" data-block-type="photo"><figure class="byline-photo"><img src="newsroom-panorama.jpg" alt="Students wait`);
     expect(html).toContain('<figcaption><p class="byline-caption">By 11:42');
     expect(html).toContain('<p class="photo-credit">Photo: Maya Torres</p>');
-    expect(render(only({ ...FIXTURE_BLOCKS.photo, placement: "full" }))).toContain('class="byline-block byline-block-photo alignfull"');
+    expect(render(only({ ...FIXTURE_BLOCKS.photo, placement: "full" }))).toContain('class="byline-block byline-block-photo alignfull byline-frame-bleed"');
     expect(render(only({ ...FIXTURE_BLOCKS.photo, placement: "column" }))).toContain('class="byline-block byline-block-photo"');
   });
 

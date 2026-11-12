@@ -3,7 +3,7 @@ import type { ArchiveCategory, ArchivePost } from "@/lib/public-content";
 /** Coverage, feed, and video sitemap cases shared by the static browser tests. */
 export function browserContent(posts: ArchivePost[], categories: ArchiveCategory[]) {
   const section: ArchiveCategory = {
-    id: 91, count: 3, name: "Off Deadline", slug: "behind-the-scenes",
+    id: 91, count: 4, name: "Off Deadline", slug: "behind-the-scenes",
     taxonomy: "category", parent: 0, description: "Stories behind the stories", link: "https://weeklywildcat.com/category/behind-the-scenes/"
   };
   const { live: _live, ...base } = posts.find((post) => post.id === 9)!;
@@ -27,5 +27,17 @@ export function browserContent(posts: ArchivePost[], categories: ArchiveCategory
       ...(video ? { byline: { format: "video", video: { provider: "youtube", videoId: "dQw4w9WgXcQ", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "Fixture video", thumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", uploadDate: "2026-08-14T09:00:00-04:00", duration: "PT1M32S" } } } : {})
     };
   });
-  return { posts: [...posts, ...additions], categories: [...categories, section] };
+  // The presentation-preset feature (fixture story presentation 93): an older, unpinned Off Deadline story,
+  // so it stays out of the homepage's general news lists and no listing it joins moves.
+  const feature: ArchivePost = {
+    ...base, id: 93, slug: "weekly-wildcat-feature-rhythm-fixture", sticky: false,
+    categories: [...base.categories, section.id],
+    _embedded: { ...base._embedded, "wp:term": [[...(base._embedded?.["wp:term"]?.[0] ?? []), section], base._embedded?.["wp:term"]?.[1] ?? []] },
+    date: "2026-07-01T09:00:00", date_gmt: "2026-07-01T13:00:00", modified: "2026-07-01T09:00:00", modified_gmt: "2026-07-01T13:00:00",
+    link: "https://weeklywildcat.com/2026/07/01/news/weekly-wildcat-feature-rhythm-fixture/",
+    title: { rendered: "The lunch line, rebuilt" },
+    content: { rendered: "<p>The feature fixture's text edition.</p>" },
+    excerpt: { rendered: "<p>How a third serving window changed third lunch.</p>" }
+  };
+  return { posts: [...posts, ...additions, feature], categories: [...categories, section] };
 }

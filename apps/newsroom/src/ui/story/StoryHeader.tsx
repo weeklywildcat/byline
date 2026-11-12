@@ -21,7 +21,7 @@ import { PlanningProperties } from "@byline/newsroom-screens/workspace/DetailsSe
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronLeft, Ellipsis, Eye, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, Ellipsis, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { IMMERSIVE_ALIGNMENT_OPTIONS, STORY_PRESENTATION_OPTIONS } from "../../domain/vocabulary";
@@ -39,7 +39,7 @@ import { PhaseBadge } from "./PhaseBadge";
 import { usePublicationActions } from "./PublicationActions";
 import { blockingLines } from "./publication-readiness-model";
 import { StoryMediaReadinessNotice, useStoryMediaReadiness } from "./publication-readiness";
-import { PresentationStatus, useStoryPresentationResolution, useStoryPreview } from "./StoryPreviewControl";
+import { PresentationStatus, StoryPreviewButton, useStoryPresentationResolution, useStoryPreview } from "./StoryPreviewControl";
 import type { StoryScreenContext } from "./StoryScreen";
 import { StoryURL, useStoryURL } from "./StoryURL";
 
@@ -361,13 +361,14 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
             {saving ? <Spinner className="size-3" /> : saveLabel === "Saved" ? <Check className="size-3" aria-hidden="true" /> : null}
             {saveLabel}
           </span>
+          {/* Preview is a frequent writing action: a direct button, never an overflow item (StoryPreviewControl). */}
+          <StoryPreviewButton preview={preview} />
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button ref={menuTrigger} type="button" variant="outline" size="icon-sm" aria-label="More story actions" />}>
               <Ellipsis aria-hidden="true" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuGroup>
-                {preview.available ? <DropdownMenuItem onClick={preview.toggle} data-story-preview=""><Eye aria-hidden="true" />{preview.previewing ? "Close preview" : "Preview"}</DropdownMenuItem> : null}
                 <DropdownMenuItem onClick={() => setDetailsOpen(true)}><SlidersHorizontal aria-hidden="true" />Story details{publicationProblems && canEditPublication ? <Badge variant="destructive" className="ml-auto">{publicationProblems}</Badge> : null}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onOpen("history")}><History aria-hidden="true" />View history</DropdownMenuItem>
                 {liveCoverage && id != null ? <DropdownMenuItem render={<ShellLink href={liveCoverage.fieldHref} />}><Smartphone aria-hidden="true" />Open in Field Mode</DropdownMenuItem> : null}

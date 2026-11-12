@@ -56,6 +56,18 @@ export type ProseNode = ParagraphNode | HeadingNode | ListNode;
 export type Placement = "column" | "wide" | "full";
 export const PLACEMENTS: readonly Placement[] = ["column", "wide", "full"];
 
+/**
+ * How a photograph meets the screen edge on a phone. `auto` lets the
+ * placement decide (column photos stay inset, wide and full ones reach the
+ * edges); `bleed` is "Edge to edge". Captions always stay inset. Absent is
+ * `auto`. See presentation.ts.
+ */
+export type PhonePresentation = "auto" | "inset" | "bleed";
+
+/** Text set over a photograph: one of two publication-safe tones, on one of three scrims. Never a colour. */
+export type OverlayTone = "light" | "dark";
+export type ScrimStrength = "subtle" | "standard" | "strong";
+
 /** One photograph. Credit is never here: it belongs to the Media asset. */
 export type PhotoBlock = {
   type: "photo";
@@ -66,6 +78,8 @@ export type PhotoBlock = {
   /** Replaces the asset's own alt text for this use only. */
   altOverride?: string;
   placement: Placement;
+  /** On a phone: absent or `auto` follows the placement. */
+  phone?: PhonePresentation;
 };
 
 export type GalleryItem = { id: string; media: MediaId | null; caption: string; altOverride?: string };
@@ -84,8 +98,13 @@ export type GalleryBlock = { type: "gallery"; id: string; items: GalleryItem[]; 
 
 /** A source's words, reported in the story, with an optional public link to where they were said or published. */
 export type ReportedQuoteBlock = { type: "reportedQuote"; id: string; text: string; attribution: string; sourceUrl?: string; sourceLabel?: string };
-/** A line lifted from the story and set large. */
-export type PullQuoteBlock = { type: "pullQuote"; id: string; text: string; attribution?: string };
+/**
+ * A line lifted from the story and set large. Standard sits in the reading
+ * column; Breakout is larger and reaches past it on wide screens; Full is a
+ * major pause as wide as the article. Absent means standard.
+ */
+export type PullQuotePresentation = "standard" | "breakout" | "full";
+export type PullQuoteBlock = { type: "pullQuote"; id: string; text: string; attribution?: string; presentation?: PullQuotePresentation };
 
 export type KeyFact = { id: string; text: string };
 /** Standard: one ruled row per fact. Compact: two columns when the article canvas is wide enough. Absent means standard. */
@@ -126,8 +145,23 @@ export type TimelineEventDocument = { media: MediaId; page?: number };
 export type TimelineEvent = { id: string; label: string; title: string; body: string; current: boolean; image?: TimelineEventImage; link?: TimelineEventLink; document?: TimelineEventDocument };
 export type TimelineBlock = { type: "timeline"; id: string; items: TimelineEvent[] };
 
-/** A compact profile or explainer moment: a portrait and the short passage that belongs with it. */
+/**
+ * Feature Media (stored as `portraitText`, its first name): a photograph and
+ * the short passage that belongs with it, in one of four presentations.
+ *
+ * - `split` (absent): photo beside the passage, the original Portrait + Text.
+ * - `breakout`: a large photo carries the moment; the passage beside or below.
+ * - `spotlight`: a big photo with a few words over it on wide screens, on a
+ *   scrim (`tone`, `scrim`); photo then words on a phone.
+ * - `sticky`: the photo stays in view while the passage beside it is read; an
+ *   ordinary photo-then-passage sequence on a phone.
+ *
+ * `side` is the photo's side on wide screens. `phoneOrder` (Split only) and
+ * `phone` decide the phone sequence. Source order is always the reading order.
+ */
 export type PortraitSide = "left" | "right";
+export type FeatureMediaPresentation = "split" | "breakout" | "spotlight" | "sticky";
+export type FeatureMediaPhoneOrder = "media" | "text";
 export type PortraitTextBlock = {
   type: "portraitText";
   id: string;
@@ -137,9 +171,32 @@ export type PortraitTextBlock = {
   body: ParagraphNode[];
   caption?: string;
   side: PortraitSide;
+  presentation?: FeatureMediaPresentation;
+  /** Split only: which comes first on a phone. Absent is the photo. */
+  phoneOrder?: FeatureMediaPhoneOrder;
+  /** On a phone: absent or `auto` follows the presentation. */
+  phone?: PhonePresentation;
+  /** Spotlight only: the words over the photo. */
+  tone?: OverlayTone;
+  scrim?: ScrimStrength;
 };
 
-/** A deliberate section break in a long visual story. Its heading is an H2 of the story. */
+/**
+ * A Chapter (stored as `visualChapter`): a deliberate transition in a long
+ * story. Its heading is an H2 of the story.
+ *
+ * - `media` (absent): the heading over a photograph, `height` tall.
+ * - `text`: a typographic break; no photograph (`media` is null).
+ * - `split`: photograph and heading side by side, photograph first when narrow.
+ *
+ * `height` (photo and split chapters) is absent for one saved before heights
+ * existed, which keeps its original proportion. `tone` is the colour of the
+ * words: absent means light over a photograph and dark on a text or split
+ * chapter (a light-text text chapter sits on a dark band). `scrim` (photo
+ * chapters) is how much the photo is darkened or lightened behind them.
+ */
+export type ChapterKind = "media" | "text" | "split";
+export type ChapterHeight = "short" | "half" | "full";
 export type ChapterPlacement = "wide" | "full";
 export const CHAPTER_PLACEMENTS: readonly ChapterPlacement[] = ["wide", "full"];
 export type ChapterAlign = "bottom-left" | "center";
@@ -154,6 +211,10 @@ export type VisualChapterBlock = {
   dek?: string;
   placement: ChapterPlacement;
   align: ChapterAlign;
+  kind?: ChapterKind;
+  height?: ChapterHeight;
+  tone?: OverlayTone;
+  scrim?: ScrimStrength;
 };
 
 /**

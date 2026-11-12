@@ -18,7 +18,7 @@ describe("every block in the final registry renders from the one ArticleBody", (
 
   it("puts wide and full moments in their frames and leaves reading material in the column", () => {
     expect(render(FIXTURE_BLOCKS.portraitText)).toContain('class="byline-block byline-block-portraitText alignwide"');
-    expect(render(FIXTURE_BLOCKS.visualChapter)).toContain('class="byline-block byline-block-visualChapter alignfull"');
+    expect(render(FIXTURE_BLOCKS.visualChapter)).toContain('class="byline-block byline-block-visualChapter alignfull byline-frame-bleed"');
     expect(render({ ...FIXTURE_BLOCKS.visualChapter, placement: "wide" })).toContain("alignwide");
     expect(render(FIXTURE_BLOCKS.dataTable)).toContain('class="byline-block byline-block-dataTable"');
     expect(render(FIXTURE_BLOCKS.keyNumbers)).toContain('class="byline-block byline-block-keyNumbers"');

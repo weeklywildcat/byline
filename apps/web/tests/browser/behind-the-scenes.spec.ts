@@ -8,7 +8,8 @@ for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/off-deadline/");
     await expect(page.getByRole("heading", { level: 1, name: "Off Deadline" })).toBeVisible();
-    await expect(page.locator("main .story-teaser")).toHaveCount(3);
+    // Three Off Deadline stories and the oldest, the presentation-preset feature fixture.
+    await expect(page.locator("main .story-teaser")).toHaveCount(4);
     await expect(page.locator("main .story-teaser").first()).toContainText(TITLE);
     expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("index,follow");
     expect(await page.locator('link[rel="canonical"]').getAttribute("href")).toBe("https://weeklywildcat.com/off-deadline/");

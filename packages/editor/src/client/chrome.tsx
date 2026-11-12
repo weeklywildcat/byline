@@ -217,7 +217,8 @@ export function SettingsSurface({ open, onOpenChange, trigger, title, descriptio
       <>
         {cloneElement(trigger as ReactElement<{ onClick?: () => void }>, { onClick: () => onOpenChange(true) })}
         <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent side="bottom" className="gap-3 p-4" data-byline-chrome="">
+          {/* The Sheet's own safe-area padding outranks a plain `p-4`, which left the content touching the screen edges: keep a 1rem gutter that also clears the safe areas. */}
+          <SheetContent side="bottom" className="max-h-[85dvh] gap-3 overflow-y-auto pt-4 data-[side=bottom]:pr-[max(1rem,var(--byline-safe-right,0px))] data-[side=bottom]:pb-[max(1rem,var(--byline-safe-bottom,0px))] data-[side=bottom]:pl-[max(1rem,var(--byline-safe-left,0px))]" data-byline-chrome="">
             <SheetHeader className="p-0">
               <SheetTitle>{title}</SheetTitle>
               {description ? <SheetDescription>{description}</SheetDescription> : null}

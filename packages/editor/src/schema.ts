@@ -1,4 +1,4 @@
-import { ARTICLE_BLOCK_LIMITS as LIMITS, ARTICLE_BLOCKS, boundedParagraphs, DEFAULT_HEADINGS, hasInlineText, isStubEvent, parseSocialPostUrl, safeWebUrl, visualizationHeights, visualizationUrl, type ArticleBlockType } from "@byline/article-body";
+import { ARTICLE_BLOCK_LIMITS as LIMITS, ARTICLE_BLOCKS, CHAPTER_HEIGHT_OPTIONS, CHAPTER_KIND_OPTIONS, FEATURE_MEDIA_OPTIONS, FEATURE_MEDIA_PHONE_ORDER_OPTIONS, OVERLAY_TONE_OPTIONS, PHONE_PRESENTATION_OPTIONS, PULL_QUOTE_OPTIONS, SCRIM_OPTIONS, type PresetOption, boundedParagraphs, DEFAULT_HEADINGS, hasInlineText, isStubEvent, parseSocialPostUrl, safeWebUrl, visualizationHeights, visualizationUrl, type ArticleBlockType } from "@byline/article-body";
 import { parseYouTubeVideoId } from "@byline/core";
 import type { Block, Field, Validate } from "payload";
 import { blockIconDataUri } from "./icons";
@@ -38,6 +38,15 @@ const chapterFields = (): Field => ({
     { name: "label", type: "text", maxLength: LIMITS.chapterLabel }
   ]
 });
+
+/**
+ * A presentation preset (docs/story-presentation.md). Deliberately neither
+ * required nor defaulted: Payload fills a `defaultValue` into every block whose
+ * form it builds, which would quietly restyle stories saved before the field
+ * existed. Absent means the block's original look (presentation.ts); a new
+ * block gets its recommended preset when it is inserted (`NEW_BLOCK_FIELDS`, fields.ts).
+ */
+const preset = <T extends string>(name: string, options: ReadonlyArray<PresetOption<T>>): Field => ({ name, type: "select", options: options.map((option) => ({ value: option.value, label: option.label })) });
 
 const PLACEMENT_OPTIONS = [{ value: "column", label: "Column" }, { value: "wide", label: "Wide" }, { value: "full", label: "Full" }];
 const MEDIA_PLACEMENT_OPTIONS = [{ value: "wide", label: "Wide" }, { value: "full", label: "Full" }];
@@ -102,7 +111,8 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "media", type: "upload", relationTo: "media", required: true, filterOptions: imageOnly },
     { name: "caption", type: "textarea", maxLength: LIMITS.caption },
     { name: "altOverride", type: "text", maxLength: LIMITS.altText },
-    { name: "placement", type: "select", required: true, defaultValue: "column", options: [{ value: "column", label: "Column" }, { value: "wide", label: "Wide" }, { value: "full", label: "Full" }] }
+    { name: "placement", type: "select", required: true, defaultValue: "column", options: [{ value: "column", label: "Column" }, { value: "wide", label: "Wide" }, { value: "full", label: "Full" }] },
+    preset("phone", PHONE_PRESENTATION_OPTIONS)
   ]),
   gallery: storyBlock("gallery", [
     {
@@ -130,7 +140,8 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
   ]),
   pullQuote: storyBlock("pullQuote", [
     { name: "text", type: "textarea", required: true, maxLength: LIMITS.quote },
-    { name: "attribution", type: "text", maxLength: LIMITS.attribution }
+    { name: "attribution", type: "text", maxLength: LIMITS.attribution },
+    preset("presentation", PULL_QUOTE_OPTIONS)
   ]),
   keyFacts: storyBlock("keyFacts", [
     { name: "heading", type: "text", defaultValue: DEFAULT_HEADINGS.keyFacts, maxLength: LIMITS.heading },
@@ -186,16 +197,32 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "heading", type: "text", maxLength: LIMITS.portraitHeading },
     { name: "body", type: "textarea", required: true, maxLength: LIMITS.portraitBody },
     { name: "caption", type: "textarea", maxLength: LIMITS.caption },
-    { name: "side", type: "select", required: true, defaultValue: "left", options: [{ value: "left", label: "Photo on the left" }, { value: "right", label: "Photo on the right" }] }
+    { name: "side", type: "select", required: true, defaultValue: "left", options: [{ value: "left", label: "Photo on the left" }, { value: "right", label: "Photo on the right" }] },
+    preset("presentation", FEATURE_MEDIA_OPTIONS),
+    preset("phoneOrder", FEATURE_MEDIA_PHONE_ORDER_OPTIONS),
+    preset("phone", PHONE_PRESENTATION_OPTIONS),
+    preset("tone", OVERLAY_TONE_OPTIONS),
+    preset("scrim", SCRIM_OPTIONS)
   ]),
   visualChapter: storyBlock("visualChapter", [
-    { name: "media", type: "upload", relationTo: "media", required: true, filterOptions: imageOnly },
+    // A text chapter needs no photograph; photo and split chapters do.
+    {
+      name: "media",
+      type: "upload",
+      relationTo: "media",
+      filterOptions: imageOnly,
+      validate: (value: unknown, { siblingData }: { siblingData?: { kind?: unknown } }) => (siblingData?.kind === "text" || (value !== null && value !== undefined && value !== "") ? true : "Choose the chapter's photograph, or make it a text chapter.")
+    },
     { name: "altOverride", type: "text", maxLength: LIMITS.altText },
     { name: "eyebrow", type: "text", maxLength: LIMITS.chapterEyebrow },
     { name: "heading", type: "text", required: true, maxLength: LIMITS.chapterHeading },
     { name: "dek", type: "textarea", maxLength: LIMITS.chapterDek },
     { name: "placement", type: "select", required: true, defaultValue: "full", options: MEDIA_PLACEMENT_OPTIONS },
-    { name: "align", type: "select", required: true, defaultValue: "bottom-left", options: [{ value: "bottom-left", label: "Bottom left" }, { value: "center", label: "Centered" }] }
+    { name: "align", type: "select", required: true, defaultValue: "bottom-left", options: [{ value: "bottom-left", label: "Bottom left" }, { value: "center", label: "Centered" }] },
+    preset("kind", CHAPTER_KIND_OPTIONS),
+    preset("height", CHAPTER_HEIGHT_OPTIONS),
+    preset("tone", OVERLAY_TONE_OPTIONS),
+    preset("scrim", SCRIM_OPTIONS)
   ]),
   video: storyBlock("video", [
     {

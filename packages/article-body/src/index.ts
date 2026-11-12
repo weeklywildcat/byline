@@ -13,3 +13,4 @@ export * from "./social";
 export * from "./evidence";
 export * from "./native-chart";
 export * from "./final-score";
+export * from "./presentation";

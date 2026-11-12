@@ -1,5 +1,13 @@
 import {
   altFor,
+  chapterHeight,
+  chapterKind,
+  chapterTone,
+  featureMediaPhoneOrder,
+  featureMediaPresentation,
+  overlayTone,
+  pullQuotePresentation,
+  scrimStrength,
   collectFootnotes,
   collectSources,
 
@@ -35,6 +43,7 @@ import {
   AnnotatedImageFigure,
   annotationAnchor,
   ArticleBlockFrame,
+  articleBlockPhoneBleed,
   articleBlockPlacement,
   ArticleImage,
   AudioFigure,
@@ -82,8 +91,21 @@ export type MediaTable = ArticleBody["media"];
  * interactive draws its static fallback (the public site and the newsroom
  * supply their own registry; the renderer never imports one).
  */
+/**
+ * An explicit crop a story block may ask for (the Media art-direction shapes
+ * the presets use): Wide (16:9) for a photograph set across a wide screen,
+ * Portrait for one filling a phone. The editor draws these in Media → Crops.
+ */
+export type ArticleImageShape = "wide" | "portrait";
+
 export type ArticleRenderHost = {
-  imageSources?: (asset: ArticleMediaAsset, sizes?: string) => { src: string; srcSet?: string } | undefined;
+  /**
+   * The files for an image. Without `shape`: the natural renditions. With a
+   * `shape`: only the editor's explicit crop for that shape, or `undefined`
+   * when there is none (the photograph then fills its frame from the natural
+   * files at its focal point, as everywhere else on the site).
+   */
+  imageSources?: (asset: ArticleMediaAsset, sizes?: string, shape?: ArticleImageShape) => { src: string; srcSet?: string } | undefined;
   formatDate?: (iso: string) => string;
   /** The publication's timezone and locale, for event times (UTC and en-US when absent). */
   timeZone?: string;
@@ -109,10 +131,37 @@ const defaultFormatDate = (iso: string): string => new Intl.DateTimeFormat("en-U
 
 const lookup = (media: MediaTable, id: unknown): ArticleMediaAsset | null => (id === null || id === undefined ? null : media[mediaKey(id as string | number)] ?? null);
 
-function BodyImage({ asset, host, alt, sizes }: { asset: ArticleMediaAsset; host: ArticleRenderHost; alt: string; sizes?: string }) {
+/** One art-directed alternative: an explicit Media crop used where `media` matches. */
+type ArtDirection = { shape: ArticleImageShape; media: string; sizes: string };
+
+/** A phone filled by a photograph uses its Portrait crop; a wide screen its Wide crop. */
+const PHONE_MEDIA = "(max-width: 640px)";
+const WIDE_MEDIA = "(min-width: 641px)";
+
+function BodyImage({ asset, host, alt, sizes, art }: { asset: ArticleMediaAsset; host: ArticleRenderHost; alt: string; sizes?: string; art?: readonly ArtDirection[] }) {
   const sources = host.imageSources?.(asset, sizes);
-  return <ArticleImage asset={sources ? { ...asset, src: sources.src } : asset} srcSet={sources?.srcSet} alt={alt} sizes={sizes} />;
+  const image = <ArticleImage asset={sources ? { ...asset, src: sources.src } : asset} srcSet={sources?.srcSet} alt={alt} sizes={sizes} />;
+  // Only the crops the editor actually drew become <source>s; without any, this is the plain image.
+  const crops = (art ?? []).flatMap((entry) => {
+    const crop = host.imageSources?.(asset, entry.sizes, entry.shape);
+    return crop ? [{ ...entry, srcSet: crop.srcSet ?? crop.src }] : [];
+  });
+  if (!crops.length) return image;
+  return (
+    <picture>
+      {crops.map((crop) => <source key={crop.shape} media={crop.media} srcSet={crop.srcSet} sizes={crop.sizes} data-shape={crop.shape} />)}
+      {image}
+    </picture>
+  );
 }
+
+/** Responsive `sizes` for each Feature Media presentation, matching story-presentation.css. */
+const FEATURE_MEDIA_SIZES = {
+  split: "(min-width: 1080px) 416px, (min-width: 640px) 40vw, 100vw",
+  breakout: "(min-width: 1080px) 700px, (min-width: 900px) 66vw, 100vw",
+  spotlight: "100vw",
+  sticky: "(min-width: 1080px) 470px, (min-width: 740px) 45vw, 100vw"
+} as const;
 
 /** Inline text: bold, italic, links, line breaks, footnote and source references. Nothing else exists. */
 export function InlineContent({ children, footnotes = {}, sources = {} }: { children: readonly Inline[]; footnotes?: Record<string, number>; sources?: Record<string, number> }): ReactNode {
@@ -233,7 +282,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
     const asset = lookup(media, block.media);
     if (!asset) return null;
     return (
-      <ArticleBlockFrame type="photo" placement={articleBlockPlacement(block)}>
+      <ArticleBlockFrame type="photo" placement={articleBlockPlacement(block)} phoneBleed={articleBlockPhoneBleed(block)}>
         <StoryFigure className="byline-photo" media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes={block.placement === "column" ? "(min-width: 800px) 760px, 100vw" : block.placement === "wide" ? "(min-width: 1080px) 1040px, 100vw" : "100vw"} />} caption={<CaptionText text={block.caption} />} credit={asset.credit} />
       </ArticleBlockFrame>
     );
@@ -244,7 +293,7 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
     const layout = block.layout ?? "grid";
     const sizes = (index: number) => (layout === "essay" || (layout === "featured" && index === 0) ? "(min-width: 1080px) 1040px, 100vw" : "(min-width: 1080px) 520px, 100vw");
     return (
-      <ArticleBlockFrame type="gallery" placement={articleBlockPlacement(block)}>
+      <ArticleBlockFrame type="gallery" placement={articleBlockPlacement(block)} phoneBleed={articleBlockPhoneBleed({ type: "gallery", layout })}>
         <GalleryLayout count={items.length} fit={block.fit} layout={layout}>
           {items.map(({ item, asset }, index) => (
             <StoryFigure key={item.id} className="byline-gallery-item" media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, item.altOverride)} sizes={sizes(index)} />} caption={<CaptionText text={item.caption} />} credit={asset.credit} />
@@ -256,11 +305,17 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
   portraitText: ({ block, media, context }) => {
     const asset = lookup(media, block.media);
     if (!asset) return null;
+    const presentation = featureMediaPresentation(block);
+    const sizes = FEATURE_MEDIA_SIZES[presentation];
     return (
-      <ArticleBlockFrame type="portraitText" placement="wide">
+      <ArticleBlockFrame type="portraitText" placement={articleBlockPlacement(block)} phoneBleed={articleBlockPhoneBleed(block)}>
         <PortraitTextFigure
           side={block.side}
-          media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="(min-width: 1080px) 416px, (min-width: 640px) 40vw, 100vw" />}
+          presentation={presentation}
+          phoneOrder={featureMediaPhoneOrder(block)}
+          tone={presentation === "spotlight" ? overlayTone(block.tone) : undefined}
+          scrim={presentation === "spotlight" ? scrimStrength(block.scrim) : undefined}
+          media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes={sizes} art={presentation === "spotlight" ? [{ shape: "wide", media: WIDE_MEDIA, sizes }] : undefined} />}
           caption={block.caption ? <CaptionText text={block.caption} /> : undefined}
           credit={asset.credit}
           heading={block.heading ? <h3>{block.heading}</h3> : undefined}
@@ -312,8 +367,8 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
     </ArticleBlockFrame>
   ),
   pullQuote: ({ block }) => (
-    <ArticleBlockFrame type="pullQuote">
-      <PullQuoteView text={<TextParagraphs text={block.text} />} attribution={block.attribution} />
+    <ArticleBlockFrame type="pullQuote" placement={articleBlockPlacement(block)}>
+      <PullQuoteView text={<TextParagraphs text={block.text} />} attribution={block.attribution} presentation={pullQuotePresentation(block)} />
     </ArticleBlockFrame>
   ),
   keyFacts: ({ block }) => (
@@ -526,19 +581,28 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
     );
   },
   visualChapter: ({ block, media, context }) => {
-    const asset = lookup(media, block.media);
-    if (!asset) return null;
+    const kind = chapterKind(block);
+    const asset = kind === "text" ? null : lookup(media, block.media);
+    if (kind !== "text" && !asset) return null;
+    const placement = articleBlockPlacement(block);
+    const sizes = kind === "split" ? "(min-width: 900px) 50vw, 100vw" : placement === "wide" ? "(min-width: 1080px) 1040px, 100vw" : "100vw";
+    // A photo chapter fills its frame: a phone uses the photograph's Portrait crop and a wide screen its Wide crop, when the editor drew them.
+    const art: ArtDirection[] | undefined = kind === "media" ? [{ shape: "portrait", media: PHONE_MEDIA, sizes: "100vw" }, { shape: "wide", media: WIDE_MEDIA, sizes }] : undefined;
     return (
-      <ArticleBlockFrame type="visualChapter" placement={articleBlockPlacement(block)}>
+      <ArticleBlockFrame type="visualChapter" placement={placement} phoneBleed={articleBlockPhoneBleed(block)}>
         <VisualChapterView
           id={`chapter-${block.id}`}
           align={block.align}
           headingId={`${block.id}-heading`}
-          media={<BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes="100vw" />}
+          kind={kind}
+          height={chapterHeight(block)}
+          tone={chapterTone(block)}
+          scrim={kind === "media" ? scrimStrength(block.scrim) : undefined}
+          media={asset ? <BodyImage host={context.host} asset={asset} alt={altFor(asset, block.altOverride)} sizes={sizes} art={art} /> : undefined}
           eyebrow={block.eyebrow ? <p className="byline-kicker byline-visual-chapter-eyebrow">{block.eyebrow}</p> : undefined}
           heading={block.heading}
           dek={block.dek ? <p className="byline-visual-chapter-dek">{block.dek}</p> : undefined}
-          credit={asset.credit}
+          credit={asset?.credit}
         />
       </ArticleBlockFrame>
     );

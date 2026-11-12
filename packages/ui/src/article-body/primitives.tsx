@@ -1,4 +1,23 @@
-import type { ArticleBlockType, ArticleMediaAsset, Placement } from "@byline/article-body";
+import {
+  chapterKind,
+  chapterTone,
+  featureMediaPhone,
+  featureMediaPlacement,
+  photoPhone,
+  pullQuotePresentation,
+  type ArticleBlockType,
+  type ArticleMediaAsset,
+  type ChapterHeight,
+  type ChapterKind,
+  type FeatureMediaPhoneOrder,
+  type FeatureMediaPresentation,
+  type GalleryLayoutKind,
+  type OverlayTone,
+  type PhonePresentation,
+  type Placement,
+  type PullQuotePresentation,
+  type ScrimStrength
+} from "@byline/article-body";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 /**
@@ -14,22 +33,50 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 const join = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(" ");
 
-/** The frame classes every block's outermost element carries (see article-body.css). */
-export function articleBlockFrameClassName(type: ArticleBlockType, placement: Placement = "column"): string {
-  return join("byline-block", `byline-block-${type}`, placement === "wide" && "alignwide", placement === "full" && "alignfull");
+/**
+ * The frame classes every block's outermost element carries (see article-body.css).
+ * `phoneBleed`: on a phone-width canvas the block reaches the screen edges,
+ * past the article's side padding (story-presentation.css); captions stay inset.
+ */
+export function articleBlockFrameClassName(type: ArticleBlockType, placement: Placement = "column", options: { phoneBleed?: boolean } = {}): string {
+  return join("byline-block", `byline-block-${type}`, placement === "wide" && "alignwide", placement === "full" && "alignfull", options.phoneBleed && "byline-frame-bleed");
 }
 
+/**
+ * What decides a block's frame: its type and, for the blocks with
+ * presentation presets, those choices. Loosely typed on purpose: the editor
+ * reads it straight from stored fields, the renderer from the semantic block,
+ * and both get the same answer (unknown values fall back to the default).
+ */
+export type ArticleBlockFrameInput = {
+  type: ArticleBlockType;
+  placement?: Placement | string | null;
+  presentation?: string | null;
+  phone?: string | null;
+  kind?: string | null;
+  tone?: string | null;
+  layout?: string | null;
+};
+
+const placementOf = (value: unknown, fallback: Placement): Placement => (value === "column" || value === "wide" || value === "full" ? value : fallback);
+
 /** Where a block sits: a Photo's own choice; a Gallery is a visual moment; everything else reads in the column. */
-export function articleBlockPlacement(block: { type: ArticleBlockType; placement?: Placement }): Placement {
+export function articleBlockPlacement(block: ArticleBlockFrameInput): Placement {
   switch (block.type) {
     case "photo":
+      return placementOf(block.placement, "column");
+    // Stored blocks always carry a placement; the fallbacks match the editor's field readers.
     case "visualChapter":
     case "annotatedImage":
+      return placementOf(block.placement, "full");
     case "beforeAfter":
-      return block.placement ?? "column";
+      return placementOf(block.placement, "wide");
+    case "portraitText":
+      return featureMediaPlacement({ presentation: block.presentation as FeatureMediaPresentation | undefined });
+    case "pullQuote":
+      return pullQuotePresentation({ presentation: block.presentation as PullQuotePresentation | undefined }) === "standard" ? "column" : "wide";
     // Major visual moments break out of the reading column; everything else reads in it.
     case "gallery":
-    case "portraitText":
     case "video":
     case "chartMap":
     case "repositoryInteractive":
@@ -41,10 +88,37 @@ export function articleBlockPlacement(block: { type: ArticleBlockType; placement
   }
 }
 
+/**
+ * Whether a block reaches the screen edges on a phone: a Photo or Feature
+ * Media by its own choice (Auto follows the placement or preset), every photo
+ * or split Chapter and a text Chapter on a dark band, and the Photo Essay and Featured galleries
+ * (their photographs bleed; captions stay inset).
+ */
+export function articleBlockPhoneBleed(block: ArticleBlockFrameInput): boolean {
+  switch (block.type) {
+    case "photo":
+      return photoPhone({ placement: placementOf(block.placement, "column"), phone: block.phone as PhonePresentation | undefined }) === "bleed";
+    case "portraitText":
+      return featureMediaPhone({ presentation: block.presentation as FeatureMediaPresentation | undefined, phone: block.phone as PhonePresentation | undefined }) === "bleed";
+    case "visualChapter":
+      // A photo or split chapter is a full moment; a text chapter only when it is a dark band (light words).
+      return chapterKind({ kind: block.kind as ChapterKind | undefined }) !== "text" || chapterTone({ kind: "text", tone: block.tone as OverlayTone | undefined }) === "light";
+    case "gallery":
+      return block.layout === "essay" || block.layout === "featured";
+    default:
+      return false;
+  }
+}
+
+/** The frame classes for one block (or one block's stored fields). */
+export function articleBlockFrameClassNameOf(block: ArticleBlockFrameInput): string {
+  return articleBlockFrameClassName(block.type, articleBlockPlacement(block), { phoneBleed: articleBlockPhoneBleed(block) });
+}
+
 /** The public frame. The editor uses its own block element with the same classes. */
-export function ArticleBlockFrame({ type, placement, children }: { type: ArticleBlockType; placement?: Placement; children: ReactNode }): ReactNode {
+export function ArticleBlockFrame({ type, placement, phoneBleed, children }: { type: ArticleBlockType; placement?: Placement; phoneBleed?: boolean; children: ReactNode }): ReactNode {
   return (
-    <div className={articleBlockFrameClassName(type, placement)} data-block-type={type}>
+    <div className={articleBlockFrameClassName(type, placement, { phoneBleed })} data-block-type={type}>
       {children}
     </div>
   );
@@ -88,7 +162,7 @@ export function StoryFigure({ className, media, caption, credit, children }: { c
  * width. Photo Essay: one whole photograph after another, each with its
  * caption. Featured: the first photograph large, the rest a grid below it.
  */
-export function GalleryLayout({ count, fit, layout = "grid", children, ...rest }: { count: number; fit: "natural" | "crop"; layout?: "grid" | "essay" | "featured"; children: ReactNode } & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">): ReactNode {
+export function GalleryLayout({ count, fit, layout = "grid", children, ...rest }: { count: number; fit: "natural" | "crop"; layout?: GalleryLayoutKind; children: ReactNode } & Omit<ComponentPropsWithoutRef<"div">, "className" | "children">): ReactNode {
   return (
     <div className={join("byline-gallery", layout === "essay" ? "is-essay" : fit === "crop" && "is-cropped", layout === "featured" && "is-featured", layout === "grid" && count === 2 && "is-pair")} data-layout={layout} {...rest}>
       {children}
@@ -107,10 +181,15 @@ export function ReportedQuoteView({ text, attribution, source, cite }: { text: R
   );
 }
 
-/** A line pulled from the story, between rules, in the headline face. */
-export function PullQuoteView({ text, attribution }: { text: ReactNode; attribution?: ReactNode }): ReactNode {
+/**
+ * A line pulled from the story, between rules, in the headline face.
+ * Standard sits in the column; Breakout is larger and reaches past it on wide
+ * screens; Full is a major typographic pause across the article. Never a card,
+ * never a decorative quotation mark.
+ */
+export function PullQuoteView({ text, attribution, presentation = "standard" }: { text: ReactNode; attribution?: ReactNode; presentation?: PullQuotePresentation }): ReactNode {
   return (
-    <figure className="byline-pull-quote">
+    <figure className="byline-pull-quote" data-presentation={presentation === "standard" ? undefined : presentation}>
       <blockquote>
         {text}
         {attribution ? <cite>{attribution}</cite> : null}
@@ -186,30 +265,92 @@ export function TimelineItem({ current, newPeriod, label, title, body, evidence,
 // classes the shared CSS styles and takes content as slots, exactly as above.
 // ---------------------------------------------------------------------------
 
-/** A portrait and the passage that goes with it. The CSS owns the 40/60 split and the stacking. */
-export function PortraitTextFigure({ side, media, caption, credit, heading, children }: { side: "left" | "right"; media: ReactNode; caption?: ReactNode; credit?: string; heading?: ReactNode; children: ReactNode }): ReactNode {
+/**
+ * Feature Media: a photograph and the passage that belongs with it, in one
+ * of four presentations (story-presentation.css owns every geometry).
+ *
+ * Source order is the phone's reading order: photo then passage, or the
+ * passage first when a Split asks for Text first. Wider layouts place the
+ * photo on its `side` with the grid, never by reordering the markup. The
+ * Split preset's markup is exactly the original Portrait + Text.
+ */
+export function PortraitTextFigure({ side, media, caption, credit, heading, children, presentation = "split", phoneOrder = "media", tone, scrim }: {
+  side: "left" | "right";
+  media: ReactNode;
+  caption?: ReactNode;
+  credit?: string;
+  heading?: ReactNode;
+  children: ReactNode;
+  presentation?: FeatureMediaPresentation;
+  phoneOrder?: FeatureMediaPhoneOrder;
+  /** Spotlight only: the words over the photo on wide screens. */
+  tone?: OverlayTone;
+  scrim?: ScrimStrength;
+}): ReactNode {
+  const figure = <StoryFigure key="figure" className="byline-portrait-text-figure" media={media} caption={caption} credit={credit} />;
+  const body = (
+    <div key="body" className="byline-portrait-text-body">
+      {heading}
+      {children}
+    </div>
+  );
+  const spotlight = presentation === "spotlight";
   return (
-    <div className="byline-portrait-text" data-side={side}>
-      <StoryFigure className="byline-portrait-text-figure" media={media} caption={caption} credit={credit} />
-      <div className="byline-portrait-text-body">
-        {heading}
-        {children}
-      </div>
+    <div
+      className="byline-portrait-text"
+      data-side={side}
+      data-presentation={presentation === "split" ? undefined : presentation}
+      data-phone-order={phoneOrder === "text" ? "text" : undefined}
+      data-tone={spotlight ? (tone ?? "light") : undefined}
+      data-scrim={spotlight ? (scrim ?? "standard") : undefined}
+    >
+      {phoneOrder === "text" ? [body, figure] : [figure, body]}
     </div>
   );
 }
 
-/** A chapter opener: a photograph with its heading over a scrim. The heading is an H2 of the story. */
-export function VisualChapterView({ id, align, headingId, media, eyebrow, heading, dek, credit }: { id?: string; align: "bottom-left" | "center"; headingId: string; media: ReactNode; eyebrow?: ReactNode; heading: ReactNode; dek?: ReactNode; credit?: string }): ReactNode {
+/**
+ * A Chapter: a deliberate transition. A photo chapter sets its heading over
+ * the photograph on a scrim; a split chapter sets them side by side
+ * (photograph first when narrow); a text chapter is a typographic break with
+ * no photograph. The heading is an H2 of the story.
+ *
+ * `height` is absent for a chapter saved before heights existed, which keeps
+ * its original proportion; `tone` is the words' colour (chapterTone).
+ */
+export function VisualChapterView({ id, align, headingId, media, eyebrow, heading, dek, credit, kind = "media", height, tone, scrim }: {
+  id?: string;
+  align: "bottom-left" | "center";
+  headingId: string;
+  media?: ReactNode;
+  eyebrow?: ReactNode;
+  heading: ReactNode;
+  dek?: ReactNode;
+  credit?: string;
+  kind?: ChapterKind;
+  height?: ChapterHeight;
+  tone?: OverlayTone;
+  scrim?: ScrimStrength;
+}): ReactNode {
+  const hasMedia = kind !== "text" && Boolean(media);
   return (
-    <section className="byline-visual-chapter" id={id} data-align={align} aria-labelledby={headingId}>
-      <div className="byline-visual-chapter-media">{media}</div>
+    <section
+      className="byline-visual-chapter"
+      id={id}
+      data-align={align}
+      data-kind={kind === "media" ? undefined : kind}
+      data-height={kind === "text" ? undefined : height}
+      data-tone={tone && tone !== (kind === "media" ? "light" : "dark") ? tone : undefined}
+      data-scrim={kind === "media" && scrim && scrim !== "standard" ? scrim : undefined}
+      aria-labelledby={headingId}
+    >
+      {hasMedia ? <div className="byline-visual-chapter-media">{media}</div> : null}
       <div className="byline-visual-chapter-text">
         {eyebrow}
         <h2 id={headingId}>{heading}</h2>
         {dek}
       </div>
-      {credit ? <p className="photo-credit byline-visual-chapter-credit">Photo: {credit}</p> : null}
+      {hasMedia && credit ? <p className="photo-credit byline-visual-chapter-credit">Photo: {credit}</p> : null}
     </section>
   );
 }

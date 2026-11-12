@@ -1,7 +1,7 @@
 "use client";
 
-import { articleBlockFrameClassName, articleBlockPlacement } from "@byline/ui/article-body";
-import { isArticleBlockType, type Placement } from "@byline/article-body";
+import { articleBlockFrameClassNameOf, type ArticleBlockFrameInput } from "@byline/ui/article-body";
+import { isArticleBlockType } from "@byline/article-body";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { BlockNode, createClientFeature, INSERT_BLOCK_COMMAND, InlineBlockNode } from "@payloadcms/richtext-lexical/client";
 import {
@@ -21,6 +21,7 @@ import { useLexicalEditable } from "@payloadcms/richtext-lexical/lexical/react/u
 import { mergeRegister } from "@payloadcms/richtext-lexical/lexical/utils";
 import { Plus } from "lucide-react";
 import { useEffect, useLayoutEffect, useState } from "react";
+import { withNewBlockFields } from "../fields";
 import { markCreated } from "./focus";
 import { AddBlockBar, AddBlockMenu } from "./inserter";
 import { useOptionalEditorHost } from "./host";
@@ -28,7 +29,7 @@ import { insertStoryBlock } from "./lexical";
 
 /** The body element is the article's: the shared CSS styles it as `.article-body`. */
 const ROOT_CLASSES = ["article-body", "byline-article-canvas-body"];
-const FRAME_CLASS = /^(?:byline-block(?:-.+)?|alignwide|alignfull)$/;
+const FRAME_CLASS = /^(?:byline-block(?:-.+)?|byline-frame-.+|alignwide|alignfull)$/;
 
 const isHistoryKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && !event.altKey && ["z", "y"].includes(event.key.toLowerCase());
 
@@ -38,7 +39,8 @@ const isHistoryKey = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) 
  * - the contenteditable root becomes the article's `.article-body`, so prose
  *   uses the literal public CSS;
  * - each block node's element gets the block frame classes the public
- *   renderer puts on its frame (`.byline-block byline-block-photo alignwide`),
+ *   renderer puts on its frame (`.byline-block byline-block-photo alignwide
+ *   byline-frame-bleed`), from the same stored presentation choices,
  *   so breakouts and spacing are the same rules;
  * - keystrokes in a block's own fields stay with those fields (Lexical keeps
  *   Undo/Redo), so Enter, Backspace or arrows never edit the story around it;
@@ -87,8 +89,11 @@ function BylineCanvasPlugin() {
     editor.registerMutationListener(InlineBlockNode, (mutations) => {
       for (const [key, mutation] of mutations) if (mutation === "created") markCreated(key);
     }, { skipInitialization: true }),
-    // Runs before Payload's own handler (higher priority) and lets it insert (returns false).
-    editor.registerCommand(INSERT_BLOCK_COMMAND, () => {
+    // Runs before Payload's own handler (higher priority) and lets it insert (returns false). Every
+    // insertion path (Add menu, gutter, slash menu) passes through here, so a new block gets its
+    // starting presets (NEW_BLOCK_FIELDS) on the very fields Payload creates the node with.
+    editor.registerCommand(INSERT_BLOCK_COMMAND, (payload) => {
+      if (payload && typeof payload === "object") withNewBlockFields(payload as Record<string, unknown>);
       window.setTimeout(() => {
         editor.update(() => $setSelection(null));
         editor.getRootElement()?.blur();
@@ -104,10 +109,11 @@ function applyFrame(editor: LexicalEditor, key: string) {
   const element = editor.getElementByKey(key);
   if (!element) return;
   const frame = editor.getEditorState().read(() => {
-    const fields = ($getNodeByKey(key) as BlockNode | null)?.getFields() as { blockType?: unknown; placement?: unknown } | undefined;
+    const fields = ($getNodeByKey(key) as BlockNode | null)?.getFields() as (Omit<ArticleBlockFrameInput, "type"> & { blockType?: unknown }) | undefined;
     const type = fields?.blockType;
     if (!isArticleBlockType(type)) return null;
-    return articleBlockFrameClassName(type, articleBlockPlacement({ type, placement: fields?.placement as Placement | undefined }));
+    // The stored presentation choices give the same frame the public renderer draws (placement, edge to edge on a phone).
+    return articleBlockFrameClassNameOf({ ...fields, type });
   });
   for (const name of [...element.classList]) if (FRAME_CLASS.test(name)) element.classList.remove(name);
   if (frame) element.classList.add(...frame.split(" "));

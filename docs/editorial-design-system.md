@@ -16,7 +16,7 @@ see [article-editor.md](article-editor.md).
 | --- | --- | --- |
 | **Prose** | Paragraphs, headings, lists | 760px measure, Newsreader body, Erode headings |
 | **Supporting context** | Key facts, margin notes, Context boxes, tables, timelines, footnotes, related coverage | A hairline rule on top and a small-caps label. No box, no background, no shadow. Body text one step smaller (1rem). Sits in the prose measure, or beside it at wide widths. |
-| **Major visual moment** | Wide and full-bleed photographs, galleries, annotated images, comparisons, charts and maps, interactives, Visual Chapters | Breaks out to 1040px (`alignwide`) or the full canvas (`alignfull`), with `--story-moment-space` (2.25-3.5rem) above and below. No frame or border around photographs. |
+| **Major visual moment** | Wide and full-bleed photographs, galleries, Feature Media, annotated images, comparisons, charts and maps, interactives, Chapters | Breaks out to 1040px (`alignwide`) or the full canvas (`alignfull`), with `--story-moment-space` (2.25-3.5rem) above and below. No frame or border around photographs. |
 
 Widths stay 760 / 1040 / 1440. The measure lives in
 `packages/ui/article-body.css`, shared by the public page and the Payload
@@ -50,10 +50,14 @@ reading material: Key Numbers, Comparison, Related Coverage, Expandable, Data
 Table, Audio, Editor's Note (rule + accent label, never a coloured alert box),
 Margin Note (a hairline, floated into the margin at wide container widths, in
 order when narrow) and footnotes (superscript links, one ordered list at the
-end). Major visual moments: Portrait + Text, Video, Chart / Map, Annotated
-Image, Before / After and Visual Chapter (full-bleed, headline on the shared
-scrim, never arbitrary positioning). Their CSS is `newsroom/story-blocks.css`
-beside the existing partials; Chart / Map, Annotated Image and Before / After
+end). Major visual moments: Feature Media (Split, Breakout, Spotlight,
+Sticky), Video, Chart / Map, Annotated Image, Before / After and Chapter
+(photo, text or split; full-bleed, headline on the shared scrim, never
+arbitrary positioning). How strongly each one interrupts the column is a
+small set of presets, never CSS knobs: see
+[story-presentation.md](story-presentation.md). Their CSS is
+`newsroom/story-blocks.css` and `newsroom/story-presentation.css` beside the
+existing partials; Chart / Map, Annotated Image and Before / After
 reuse `visualization.css`, `annotated-image.css` and `before-after.css`.
 
 ## Tokens (defined in `figure.css`, available to every partial)

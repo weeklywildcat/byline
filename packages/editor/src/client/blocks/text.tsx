@@ -1,6 +1,6 @@
 "use client";
 
-import { ARTICLE_BLOCK_LIMITS as LIMITS, CONTEXT_HEADING_SUGGESTIONS, DEFAULT_HEADINGS, safeWebUrl, webUrlHost } from "@byline/article-body";
+import { ARTICLE_BLOCK_LIMITS as LIMITS, CONTEXT_HEADING_SUGGESTIONS, DEFAULT_HEADINGS, PULL_QUOTE_OPTIONS, safeWebUrl, webUrlHost } from "@byline/article-body";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
@@ -18,6 +18,7 @@ import { useFocusWhenCreated } from "../focus";
 import { useAnnounce } from "../host";
 import { ChoiceToggle } from "./parts";
 import { RichFormatButtons, RichParagraphs, type RichFieldHandle } from "./rich-text";
+import { PresentationNote, PresentationSurface, PresetField, PULL_QUOTE_PREVIEWS } from "./presentation";
 import { focusIn, useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
 export function ReportedQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
@@ -73,8 +74,19 @@ export function PullQuoteEditor({ node, id, nodeKey }: BlockEditorProps) {
   useFocusWhenCreated(nodeKey, text);
   const readOnly = !node.editable;
   return (
-    <BlockShell type="pullQuote" node={node} issues={issues}>
+    <BlockShell
+      type="pullQuote"
+      node={node}
+      issues={issues}
+      actions={
+        <PresentationSurface blockLabel="Pull Quote">
+          <PresetField name="presentation" label="How strongly it breaks the story" value={fields.presentation} options={PULL_QUOTE_OPTIONS} preview={(value) => PULL_QUOTE_PREVIEWS[value]} onChange={(presentation) => set({ presentation })} />
+          <PresentationNote>On a phone every quote stays in the reading column, with room around it; the type never grows past what fits.</PresentationNote>
+        </PresentationSurface>
+      }
+    >
       <PullQuoteView
+        presentation={fields.presentation}
         text={<InlineText inputRef={text} className="byline-quote-text" label="Pull quote" placeholder="A line from the story worth repeating." value={fields.text} maxLength={LIMITS.quote} readOnly={readOnly} multiline onEnter={() => attribution.current?.focus()} onChange={(value) => set({ text: value })} />}
         attribution={<InlineText inputRef={attribution} className="byline-quote-attribution" label="Attribution (optional)" placeholder="Who said it (optional)" value={fields.attribution} maxLength={LIMITS.attribution} readOnly={readOnly} onChange={(value) => set({ attribution: value })} />}
       />

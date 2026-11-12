@@ -2,6 +2,7 @@ import type { StoryPresentationIdentity } from "./resolve";
 import type { StoryPresentationRegistry } from "./types";
 import OverrideFixtureStory from "./stories/override-fixture";
 import VisualFixtureStory from "./stories/visual-fixture";
+import FeatureRhythmFixtureStory from "./stories/feature-rhythm-fixture";
 
 /**
  * Stories with a custom presentation, keyed by the stable Story ID used by the
@@ -33,7 +34,9 @@ export const storyPresentations: StoryPresentationRegistry = {
  */
 export const fixtureStoryPresentations: StoryPresentationRegistry = {
   6: OverrideFixtureStory,
-  10: VisualFixtureStory
+  10: VisualFixtureStory,
+  // Every story presentation preset in one feature (docs/story-presentation.md).
+  93: FeatureRhythmFixtureStory
 };
 
 /** The registry a host renders with: the public entries, plus the fixtures when it opts in. */

@@ -373,3 +373,96 @@ export const FIXTURE_FIRST_PHASE_BODY: ArticleBody = {
     // Inline Source references (and the timeline's attached evidence) came later than the first phase.
     .map((node) => (node.type === "paragraph" ? { ...node, children: node.children.filter((child) => child.type !== "source") } : node.type === "timeline" ? { ...node, items: node.items.map(({ image: _image, link: _link, document: _document, ...event }) => event) } : node))
 };
+
+/**
+ * A feature story built for rhythm, not inventory (docs/story-presentation.md):
+ * it alternates comfortable reading with visual expansion, opens a new part
+ * with a Chapter, and returns to reading after every moment. It uses each
+ * presentation preset once, so the visual fixture story, the renderer tests
+ * and the browser checks at phone, tablet and desktop widths all read it.
+ */
+const prose = (...texts: string[]) => texts.map(paragraph);
+export const FIXTURE_FEATURE_STORY_BODY: ArticleBody = {
+  format: ARTICLE_BODY_FORMAT,
+  version: ARTICLE_BODY_VERSION,
+  media: FIXTURE_MEDIA,
+  nodes: [
+    ...prose(
+      "At 11:52 a.m., the bell for third lunch rings and the line outside the Greenwood High cafeteria is already past the trophy case.",
+      "By the time the last students reach the register, many have nine minutes left to eat. Some have stopped trying."
+    ),
+    { type: "photo", id: "feature-photo-column", media: 102, caption: "Student council members sort through 412 survey responses about the lunch line in October.", placement: "column" },
+    ...prose(
+      "The student council heard it so often that in October it asked everyone. Of the 412 students who answered its survey, more than half said they had skipped lunch at least once that month because the line was too long.",
+      "The cafeteria staff had noticed too. Two serving windows were built for a school of 900; Greenwood now has 1,340 students."
+    ),
+    { type: "photo", id: "feature-photo-full", media: 101, caption: "Third lunch, 11:54 a.m.: the line wraps past the trophy case two minutes after the bell.", placement: "full" },
+    ...prose(
+      "From above, the problem is a geometry problem. Every student passes through one of two windows, and each tray takes about eleven seconds.",
+      "\"It isn't the food,\" said Ana Ruiz, a junior who eats third lunch. \"It's the door. Everybody hits the same door at the same time.\""
+    ),
+    { type: "portraitText", id: "feature-split", media: 103, heading: "Ana Ruiz, junior", body: prose("Ruiz started timing the line for a statistics project. Her median wait over three weeks: 14 minutes.", "She shared the spreadsheet with the student council, which used it to design the survey."), caption: "Ruiz on the courtyard steps, where she usually finishes lunch.", side: "left" },
+    ...prose(
+      "Her numbers matched what the cafeteria's own register logs showed: the longest waits came in the first six minutes of each period, then the line nearly vanished."
+    ),
+    { type: "pullQuote", id: "feature-quote-breakout", text: "It isn't the food. It's the door. Everybody hits the same door at the same time.", attribution: "Ana Ruiz, junior", presentation: "breakout" },
+    ...prose(
+      "That pattern pointed to a fix that would not need a bigger building: a third, faster window for students who already know what they want."
+    ),
+    { type: "visualChapter", id: "feature-chapter-media", media: 106, eyebrow: "Part two", heading: "The third window", dek: "Over winter break, the kitchen staff rebuilt one wall of the serving line.", placement: "full", align: "bottom-left", height: "full" },
+    ...prose(
+      "Nutrition Services manager Dale Whitfield sketched the express window on the back of a menu. It would serve three prepacked meals and nothing else.",
+      "The district approved $18,400 for the counter, a second register and a tablet for orders placed during second period."
+    ),
+    { type: "portraitText", id: "feature-breakout", media: 107, heading: "Opening day", body: prose("The window opened Jan. 6. By the end of the first week it was serving one in four third-lunch students."), caption: "The express window, foreground, on its first day.", side: "left", presentation: "breakout" },
+    ...prose(
+      "Whitfield's team watched the register logs every afternoon that first month. The six-minute surge was still there, but it ended sooner."
+    ),
+    { type: "portraitText", id: "feature-sticky", media: 104, heading: "Behind the counter", body: prose(
+      "Marisol Peña runs the express window. She starts at 9:40, when second-period orders begin to arrive on the tablet.",
+      "By 11:30 she has packed every pre-ordered meal into labeled bags, sorted by the first letter of each student's last name.",
+      "When the bell rings she does not take orders. She hands out bags, scans student IDs and keeps one eye on the clock.",
+      "\"The first five minutes are everything,\" she said. \"If I'm fast then, the whole room is calm by 12:05.\"",
+      "Some days the tablet freezes. Peña keeps a paper list as a backup and has used it twice since January.",
+      "Students who forget to order still come to her window. She sends them to the main line with a reminder for tomorrow, and most of them, she said, do order the next day.",
+      "By 12:10 her shelf is empty. She wipes the counter, prints the next day's labels and starts again at 9:40."
+    ), caption: "Peña checks the morning's orders on the express station tablet.", side: "right", presentation: "sticky" },
+    ...prose(
+      "Peña's station handles about 120 meals in the first ten minutes of third lunch. The two original windows handle the rest."
+    ),
+    { type: "visualChapter", id: "feature-chapter-text", media: null, eyebrow: "Part three", heading: "What changed, and what didn't", placement: "wide", align: "bottom-left", kind: "text" },
+    ...prose(
+      "By February, the median wait for third lunch had fallen from 14 minutes to six, according to the cafeteria's register logs.",
+      "Not everyone is in the express line. Students who want a hot meal still wait, and on pizza Fridays the line reaches the trophy case again."
+    ),
+    { type: "portraitText", id: "feature-spotlight", media: 102, heading: "The council's next survey", body: prose("In March the student council will ask the same questions again, and compare."), caption: "The student council's survey committee at its February meeting.", side: "left", presentation: "spotlight", scrim: "strong" },
+    ...prose(
+      "Council president Imani Brooks said the committee would publish the results, good or bad. \"We asked for this,\" she said. \"Now we have to measure it.\""
+    ),
+    { type: "pullQuote", id: "feature-quote-full", text: "We asked for this. Now we have to measure it.", attribution: "Imani Brooks, student council president", presentation: "full" },
+    ...prose(
+      "For now, the most visible change is the courtyard. Students who used to eat standing in line now eat on the steps."
+    ),
+    { type: "gallery", id: "feature-gallery-essay", fit: "natural", layout: "essay", items: [
+      { id: "essay-1", media: 103, caption: "12:01 p.m.: lunch on the courtyard steps." },
+      { id: "essay-2", media: 105, caption: "Prepacked chicken wraps wait for third lunch." },
+      { id: "essay-3", media: 104, caption: "The express station tablet, between periods." }
+    ] },
+    ...prose(
+      "The district will decide in May whether to add an express window at Greenwood Middle School, which faces the same problem with fewer students."
+    ),
+    { type: "visualChapter", id: "feature-chapter-split", media: 107, eyebrow: "Next", heading: "The middle school is watching", dek: "Its principal visited twice in January.", placement: "full", align: "bottom-left", kind: "split", height: "short" },
+    ...prose(
+      "Greenwood Middle's lunch periods are shorter, and its cafeteria has one window. Its principal, Teresa Vance, said she had seen enough to ask for a budget estimate."
+    ),
+    { type: "gallery", id: "feature-gallery-grid", fit: "crop", layout: "grid", items: [
+      { id: "grid-1", media: 106, caption: "Before: two windows." },
+      { id: "grid-2", media: 107, caption: "After: three." },
+      { id: "grid-3", media: 105, caption: "The prepacked menu." },
+      { id: "grid-4", media: 102, caption: "The survey committee." }
+    ] },
+    ...prose(
+      "Back at Greenwood High, the bell for third lunch rings at 11:52. At 11:58, the line ends at the cafeteria door."
+    )
+  ]
+};

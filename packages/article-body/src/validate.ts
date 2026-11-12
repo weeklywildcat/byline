@@ -8,6 +8,7 @@ import { chartDataProblem } from "./native-chart";
 import { isCanonicalSocialPost } from "./social";
 import { ARTICLE_BODY_FORMAT, ARTICLE_BODY_VERSION, isArticleBlock, type ArticleBlockType, type ArticleBody } from "./types";
 import { visualizationHeights, visualizationUrl } from "./visualization";
+import { CHAPTER_HEIGHTS, CHAPTER_KINDS, chapterKind, FEATURE_MEDIA_PHONE_ORDERS, FEATURE_MEDIA_PRESENTATIONS, featureMediaPresentation, OVERLAY_TONES, PHONE_PRESENTATIONS, PULL_QUOTE_PRESENTATIONS, SCRIM_STRENGTHS } from "./presentation";
 
 /**
  * The authoritative runtime validator for a complete `byline-v1` body.
@@ -45,6 +46,7 @@ const pick = (values: readonly string[], optional = false): Field => ({ optional
 const bool: Field = { check: (value, path, errors) => (typeof value === "boolean" ? undefined : fail(errors, path, "must be true or false")) };
 const mediaRef: Field = { check: (value, path, errors) => (typeof value === "number" && Number.isSafeInteger(value) ? undefined : typeof value === "string" && value !== "" ? undefined : fail(errors, path, "must be a Media id")) };
 const optMediaRef: Field = { optional: true, check: mediaRef.check };
+const nullableMediaRef: Field = { check: (value, path, errors) => (value === null ? undefined : mediaRef.check(value, path, errors)) };
 const percent: Field = { check: (value, path, errors) => (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100 ? undefined : fail(errors, path, "must be between 0 and 100")) };
 const webUrl = (optional = true): Field => ({ optional, check: (value, path, errors) => (typeof value === "string" && safeWebUrl(value) === value ? undefined : fail(errors, path, "must be a web address (http or https)")) });
 const optPositiveInt: Field = { optional: true, check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 1 ? undefined : fail(errors, path, "must be a whole number of 1 or more")) };
@@ -127,13 +129,13 @@ const tableData = (rowsMin: number, rowsMax: number, columnsMin: number, columns
 const side = object({ label: str(L.comparisonLabel), title: req(L.comparisonTitle, true), body: paragraphs(L.comparisonBody) });
 
 const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> } = {
-  photo: { type: pick(["photo"]), id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true), placement: pick(["column", "wide", "full"]) },
+  photo: { type: pick(["photo"]), id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true), placement: pick(["column", "wide", "full"]), phone: pick(PHONE_PRESENTATIONS, true) },
   gallery: { type: pick(["gallery"]), id: idField, fit: pick(["natural", "crop"]), layout: pick(["grid", "essay", "featured"], true), items: list(object({ id: idField, media: mediaRef, caption: str(L.caption), altOverride: opt(L.altText, true) }), L.galleryMin, L.galleryMax) },
-  portraitText: { type: pick(["portraitText"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), heading: opt(L.portraitHeading, true), body: paragraphs(L.portraitBody), caption: opt(L.caption), side: pick(["left", "right"]) },
+  portraitText: { type: pick(["portraitText"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), heading: opt(L.portraitHeading, true), body: paragraphs(L.portraitBody), caption: opt(L.caption), side: pick(["left", "right"]), presentation: pick(FEATURE_MEDIA_PRESENTATIONS, true), phoneOrder: pick(FEATURE_MEDIA_PHONE_ORDERS, true), phone: pick(PHONE_PRESENTATIONS, true), tone: pick(OVERLAY_TONES, true), scrim: pick(SCRIM_STRENGTHS, true) },
   video: { type: pick(["video"]), id: idField, videoId: { check: (value, path, errors) => (typeof value === "string" && /^[A-Za-z0-9_-]{11}$/.test(value) ? undefined : fail(errors, path, "must be a YouTube video id")) }, title: req(L.videoTitle, true), caption: opt(L.caption), chapters: chapterList, transcript: opt(L.videoTranscript) },
   audio: { type: pick(["audio"]), id: idField, media: mediaRef, title: req(L.audioTitle, true), caption: opt(L.caption), transcript: req(L.audioTranscript), chapters: chapterList },
   reportedQuote: { type: pick(["reportedQuote"]), id: idField, text: req(L.quote), attribution: req(L.attribution, true), sourceUrl: webUrl(), sourceLabel: opt(L.quoteSourceLabel, true) },
-  pullQuote: { type: pick(["pullQuote"]), id: idField, text: req(L.quote), attribution: opt(L.attribution, true) },
+  pullQuote: { type: pick(["pullQuote"]), id: idField, text: req(L.quote), attribution: opt(L.attribution, true), presentation: pick(PULL_QUOTE_PRESENTATIONS, true) },
   keyFacts: { type: pick(["keyFacts"]), id: idField, heading: req(L.heading, true), facts: list(object({ id: idField, text: req(L.fact) }), 1, L.factsMax), presentation: pick(["standard", "compact"], true) },
   context: { type: pick(["context"]), id: idField, heading: req(L.heading, true), body: paragraphs(L.contextBody) },
   editorsNote: { type: pick(["editorsNote"]), id: idField, body: paragraphs(L.noteBody) },
@@ -175,7 +177,7 @@ const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> }
   keyNumbers: { type: pick(["keyNumbers"]), id: idField, heading: opt(L.heading, true), source: opt(L.keyNumbersSource, true), items: list(object({ id: idField, value: req(L.keyNumberValue, true), label: req(L.keyNumberLabel, true), context: opt(L.keyNumberContext, true) }), L.keyNumbersMin, L.keyNumbersMax) },
   annotatedImage: { type: pick(["annotatedImage"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), caption: str(L.caption), placement: pick(["wide", "full"]), markers: list(object({ id: idField, x: percent, y: percent, title: str(L.annotationTitle, { line: true }), body: str(L.annotationBody) }), 1, L.annotationsMax) },
   beforeAfter: { type: pick(["beforeAfter"]), id: idField, before: mediaRef, after: mediaRef, beforeLabel: req(L.comparisonPhotoLabel, true), afterLabel: req(L.comparisonPhotoLabel, true), fit: pick(["cover", "contain"]), caption: str(L.caption), placement: pick(["wide", "full"]) },
-  visualChapter: { type: pick(["visualChapter"]), id: idField, media: mediaRef, altOverride: opt(L.altText, true), eyebrow: opt(L.chapterEyebrow, true), heading: req(L.chapterHeading, true), dek: opt(L.chapterDek), placement: pick(["wide", "full"]), align: pick(["bottom-left", "center"]) },
+  visualChapter: { type: pick(["visualChapter"]), id: idField, media: nullableMediaRef, altOverride: opt(L.altText, true), eyebrow: opt(L.chapterEyebrow, true), heading: req(L.chapterHeading, true), dek: opt(L.chapterDek), placement: pick(["wide", "full"]), align: pick(["bottom-left", "center"]), kind: pick(CHAPTER_KINDS, true), height: pick(CHAPTER_HEIGHTS, true), tone: pick(OVERLAY_TONES, true), scrim: pick(SCRIM_STRENGTHS, true) },
   timeline: {
     type: pick(["timeline"]),
     id: idField,
@@ -315,6 +317,19 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
       if (problem) errors.push(`chartMap ${block.id}: ${problem}`);
     }
     if (block.type === "chartMap" && block.mode !== "native" && (block.data || block.chartType)) errors.push(`chartMap ${block.id}: only a native chart has data`);
+    // Presentation choices exist only where they apply (presentation.ts): a stray one is a malformed body, not a silent no-op.
+    if (block.type === "portraitText") {
+      const presentation = featureMediaPresentation(block);
+      if (block.phoneOrder !== undefined && presentation !== "split") errors.push(`portraitText ${block.id}: only Split chooses the order on a phone`);
+      if ((block.tone !== undefined || block.scrim !== undefined) && presentation !== "spotlight") errors.push(`portraitText ${block.id}: only Spotlight sets words over the photo`);
+    }
+    if (block.type === "visualChapter") {
+      const kind = chapterKind(block);
+      if (kind === "text" && block.media !== null) errors.push(`visualChapter ${block.id}: a text chapter has no photograph`);
+      if (kind !== "text" && block.media === null) errors.push(`visualChapter ${block.id}: a photo or split chapter needs its photograph`);
+      if (kind === "text" && (block.height !== undefined || block.altOverride !== undefined)) errors.push(`visualChapter ${block.id}: a text chapter has no height or alt text`);
+      if (block.scrim !== undefined && kind !== "media") errors.push(`visualChapter ${block.id}: only a photo chapter has a scrim`);
+    }
   }
   const missing = missingReferences(body);
   for (const id of missing.stories) errors.push(`related coverage: Story ${String(id)} is not in the reference table`);

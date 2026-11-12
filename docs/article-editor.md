@@ -91,15 +91,19 @@ Semantic data (the contract; `packages/article-body/src/types.ts`):
 
 | Block | Data |
 | --- | --- |
-| `photo` | `{ media, caption, altOverride?, placement: "column" \| "wide" \| "full" }` |
+| `photo` | `{ media, caption, altOverride?, placement: "column" \| "wide" \| "full", phone? }` |
 | `gallery` | `{ items: [{ id, media, caption, altOverride? }], fit: "natural" \| "crop" }` (2–24) |
 | `reportedQuote` | `{ text, attribution }` |
-| `pullQuote` | `{ text, attribution? }` |
+| `pullQuote` | `{ text, attribution?, presentation? }` |
 | `keyFacts` | `{ heading, facts: [{ id, text }] }` (≤12) |
 | `context` | `{ heading, body: paragraph[] }` |
 | `document` | `{ media, title?, context?, source?, pages: [{ id, page, label }] }` (≤12) |
 | `timeline` | `{ items: [{ id, label, title, body, current }] }` (2–25) |
 | `dataProject` | `{ project, title, description }` (title ≤200, description ≤600): a published [Byline Data](byline-data.md#story-embeds) Project by ID and this story's own heading and description. Nothing else |
+
+Presentation presets (`phone`, `presentation`, `kind`, `height`, `tone`,
+`scrim`, …) are optional, and absent means the block's original look: see
+[story-presentation.md](story-presentation.md).
 
 `label` is editorial text ("Fall 2026"), not a date. Gallery columns are not
 stored: two photographs pair, larger galleries use the responsive grid by
@@ -166,7 +170,9 @@ showing the block's name and its actions, and a More menu:
 - `ButtonGroup`: related actions (Replace, Add event, Page reference).
 - `ToggleGroup`: exclusive choices (Column/Wide/Full, Whole/Even grid).
 - `DropdownMenu`: Move up, Move down, Remove, and the Context heading choices.
-- `Popover` on a pointer, `Sheet` on touch: secondary settings (alt text).
+- `Popover` on a pointer, `Sheet` on touch: secondary settings (alt text) and
+  **Presentation**, the one surface for a visual block's presets
+  ([story-presentation.md](story-presentation.md)).
 - `Tooltip`: icon labels. `Empty`: unfinished media. `Attachment`: the chosen PDF.
 - `Badge`: "Not published yet" / "Left out" beside a calm one-line reason.
 

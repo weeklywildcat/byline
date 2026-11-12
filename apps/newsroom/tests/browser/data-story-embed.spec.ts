@@ -65,7 +65,7 @@ async function openStory(page: Page) {
 }
 
 async function togglePreview(page: Page) {
-  await page.getByRole("button", { name: "More story actions" }).click();
+  // Preview is a direct header button (never in the overflow menu).
   await page.locator("[data-story-preview]").click();
 }
 

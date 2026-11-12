@@ -37,10 +37,10 @@ describe("the final registry", () => {
     expect(ARTICLE_BLOCK_TYPES).toHaveLength(29);
     const groups = ARTICLE_BLOCK_FAMILIES.map((family) => [family.label, ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id).map((type) => ARTICLE_BLOCKS[type].label)]);
     expect(groups).toEqual([
-      ["Media", ["Photo", "Photo Gallery", "Portrait + Text", "Video", "Audio", "Social Post"]],
+      ["Media", ["Photo", "Photo Gallery", "Feature Media", "Video", "Audio", "Social Post"]],
       ["Explain", ["Reported Quote", "Pull Quote", "Key Facts", "Context", "Editor's Note", "Margin Note", "Expandable", "Document (PDF)"]],
       ["Data & visual", ["Chart / Map", "Data Table", "Data Project", "Comparison", "Key Numbers", "Final Score", "Annotated Image", "Before / After"]],
-      ["Structure & interact", ["Visual Chapter", "Timeline", "Related Coverage", "Event", "Poll", "Repository Interactive", "Repository Tracker"]]
+      ["Structure & interact", ["Chapter", "Timeline", "Related Coverage", "Event", "Poll", "Repository Interactive", "Repository Tracker"]]
     ]);
   });
 
