@@ -391,8 +391,8 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
           ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Add transcript</Button>
           : transcript.state !== "ready"
             ? <Button type="button" size="xs" variant="outline" onClick={onImport}>Upload replacement</Button>
-            : transcript.quoteCount
-              ? <ConfirmReplaceTranscriptButton quoteCount={transcript.quoteCount} onReplace={onImport} />
+            : transcript.selectionCount
+              ? <ConfirmReplaceTranscriptButton selectionCount={transcript.selectionCount} onReplace={onImport} />
               : <Button type="button" size="xs" variant="outline" onClick={onImport}>Replace transcript</Button>
         : null}
       {editable ? <Button type="button" size="xs" variant="ghost" disabled={toggle.isPending} aria-pressed={item.confidential} onClick={() => toggle.mutate()}><Lock data-icon="inline-start" />{item.confidential ? "Confidential" : "Make confidential"}</Button> : null}
@@ -455,7 +455,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
   );
 }
 
-function ConfirmReplaceTranscriptButton({ quoteCount, onReplace }: { quoteCount: number; onReplace: () => void }) {
+function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selectionCount: number; onReplace: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -464,7 +464,7 @@ function ConfirmReplaceTranscriptButton({ quoteCount, onReplace }: { quoteCount:
         <AlertDialogHeader>
           <AlertDialogTitle>Replace this transcript?</AlertDialogTitle>
           <AlertDialogDescription>
-            The transcript text will be replaced. {quoteCount === 1 ? "The saved quote stays exactly as saved, including its verification status." : `All ${quoteCount} saved quotes stay exactly as saved, including their verification status.`}
+            The transcript text will be replaced. {selectionCount === 1 ? "The saved quote or highlight stays exactly as saved, including any verification." : `All ${selectionCount} saved quotes and highlights stay exactly as saved, including verification.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -482,11 +482,7 @@ function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: Reporting
   const interview = file.fileKind === "audio";
   const title = interview ? "Remove this interview?" : "Remove this file?";
   const transcriptPart = transcript ? " and its transcript" : "";
-  const quotePart = transcript?.quoteCount
-    ? transcript.quoteCount === 1
-      ? " The saved quote will also be deleted."
-      : ` All ${transcript.quoteCount} saved quotes will also be deleted.`
-    : "";
+  const savedMaterialPart = transcript?.selectionCount ? " Saved quotes or highlights from that transcript will also be deleted." : "";
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <Button type="button" size="xs" variant="ghost" disabled={removing} onClick={() => setOpen(true)}>Remove</Button>
@@ -494,7 +490,7 @@ function ConfirmRemoveFileButton({ file, removing, onRemove }: { file: Reporting
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{quotePart} This cannot be undone.
+            This permanently deletes {interview ? "the recording" : "this file"}{transcriptPart}.{savedMaterialPart} This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
