@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/newsroom-ui/ui/resizable";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
@@ -104,6 +105,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const [matchIndex, setMatchIndex] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const contextTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const refresh = useCallback(() => Promise.all([cache.invalidateQueries({ queryKey: transcriptKey(transcriptId) }), cache.invalidateQueries({ queryKey: reportingKey(storyId) }), cache.invalidateQueries({ queryKey: ["byline", "story-quotes", storyId] })]), [cache, transcriptId, storyId]);
   const canEdit = detail?.canEdit === true && !context.readOnly;
@@ -279,7 +281,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
             {detail.editedAt ? <span>Edited</span> : null}
           </p>
         </div>
-        {!wide ? <Button type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Source & quotes{detail.selections.length ? <Badge variant="secondary" className="ml-1">{detail.selections.length}</Badge> : null}</Button> : null}
+        {!wide ? <Button ref={contextTriggerRef} type="button" size="sm" variant="outline" onClick={() => setContextOpen(true)}><PanelRight data-icon="inline-start" />Details{detail.selections.length ? <Badge variant="secondary" className="ml-1">{detail.selections.length}</Badge> : null}</Button> : null}
       </div>
       <GroundRulesBanner detail={detail} />
       {wide ? (
@@ -302,8 +304,11 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
         </div>
       )}
       <Sheet open={contextOpen && !wide} onOpenChange={setContextOpen}>
-        <SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
-          <SheetHeader><SheetTitle>Source & quotes</SheetTitle><SheetDescription>Who is speaking, the ground rules, and the quotes saved from this recording.</SheetDescription></SheetHeader>
+        <SheetContent side="right" finalFocus={contextTriggerRef} className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{detail.file.kind === "audio" ? "Interview details" : "Transcript details"}</SheetTitle>
+            <SheetDescription>Source, speakers, ground rules, and saved material for this transcript.</SheetDescription>
+          </SheetHeader>
           <div className="px-4 pb-6">{contextPanel}</div>
         </SheetContent>
       </Sheet>
@@ -328,10 +333,13 @@ function BackButton({ onBack }: { onBack: () => void }) {
 
 /** Audio stays pinned above the transcript while reviewing. */
 function Player({ detail, audioRef, onTime }: { detail: TranscriptDetail; audioRef: React.RefObject<HTMLAudioElement | null>; onTime: (ms: number) => void }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [detail.file.url]);
   if (!detail.file.url) return <div className="py-2"><Alert><AlertCircle /><AlertTitle>No recording attached</AlertTitle><AlertDescription>Playback is unavailable, but timestamped passages still keep their original positions.</AlertDescription></Alert></div>;
   return (
-    <div className="sticky top-0 z-10 -mx-1 bg-background px-1 py-2">
-      <audio ref={audioRef} controls preload="metadata" src={detail.file.url} aria-label={`Recording: ${detail.file.filename}`} className="h-10 w-full" onTimeUpdate={(event) => onTime(event.currentTarget.currentTime * 1000)} />
+    <div className="sticky top-0 z-10 -mx-1 grid gap-2 bg-background px-1 py-2">
+      <audio ref={audioRef} controls preload="metadata" src={detail.file.url} aria-label={`Recording: ${detail.file.filename}`} className="h-10 w-full" onCanPlay={() => setFailed(false)} onError={() => setFailed(true)} onTimeUpdate={(event) => onTime(event.currentTarget.currentTime * 1000)} />
+      {failed ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Recording could not be loaded</AlertTitle><AlertDescription>The transcript is still available. Return to Reporting if the recording needs to be replaced.</AlertDescription></Alert> : null}
     </div>
   );
 }
@@ -418,7 +426,7 @@ function Segment({ segment, heading, diarized, profiles, sourceName, isActive, r
         {editing ? (
           <div className="grid gap-2">
             <Textarea value={text} rows={3} aria-label="Passage text" onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") onDone(); if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); save.mutate(); } }} autoFocus />
-            <div className="flex gap-2"><Button type="button" size="sm" disabled={save.isPending || !text.trim()} onClick={() => save.mutate()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={onDone}>Cancel</Button></div>
+            <div className="flex gap-2"><Button type="button" size="sm" disabled={save.isPending || !text.trim()} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save</Button><Button type="button" size="sm" variant="ghost" disabled={save.isPending} onClick={onDone}>Cancel</Button></div>
           </div>
         ) : (
           <p data-segment-text={segment.id} className="text-[0.95rem] leading-relaxed [overflow-wrap:anywhere]">{marked(segment.text, ranges, currentRange)}</p>
@@ -458,7 +466,7 @@ function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, trans
       <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
       {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={apply.isPending || !name.trim()}>This passage</Button>
+        <Button type="submit" size="sm" disabled={apply.isPending || !name.trim()}>{apply.isPending ? <Spinner data-icon="inline-start" /> : null}This passage</Button>
         {segment.speaker ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || !name.trim()} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
       </div>
     </form>
@@ -526,7 +534,7 @@ function NameSpeaker({ api, detail, profile, profiles, onDone, onCancel }: { api
       <Input value={name} maxLength={120} aria-label={`Name for ${profile.label}`} placeholder="Name this speaker" autoFocus onChange={(event) => setName(event.target.value)} />
       {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 5).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
       <div className="flex gap-2">
-        <Button type="button" size="xs" disabled={rename.isPending || (!name.trim() && !profile.named)} onClick={() => rename.mutate()}>{name.trim() || !profile.named ? "Save name" : "Clear name"}</Button>
+        <Button type="button" size="xs" disabled={rename.isPending || (!name.trim() && !profile.named)} onClick={() => rename.mutate()}>{rename.isPending ? <Spinner data-icon="inline-start" /> : null}{name.trim() || !profile.named ? "Save name" : "Clear name"}</Button>
         <Button type="button" size="xs" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </InlineForm>
@@ -540,7 +548,7 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
     <div className="grid gap-5 p-4 text-sm" data-transcript-context="">
       <section aria-label="Source" className="grid gap-1.5">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Source</h3>
-        {detail.source ? <p className="font-medium">{detail.source.label}{detail.source.role ? <span className="font-normal text-muted-foreground">, {detail.source.role}</span> : null}</p> : <p className="text-muted-foreground">No source on this recording.</p>}
+        {detail.source ? <p className="font-medium">{detail.source.label}{detail.source.role ? <span className="font-normal text-muted-foreground">, {detail.source.role}</span> : null}</p> : <p className="text-muted-foreground">No source attached.</p>}
         {detail.appointment ? <p className="text-muted-foreground">{detail.appointment.title}</p> : null}
         <p className="flex flex-wrap items-center gap-2"><Badge variant={rules.rule === "off-record" ? "destructive" : "outline"}>{groundRuleLabel(rules.rule)}</Badge>{rules.recordingPermission ? <span className="text-xs text-muted-foreground">Recording permission confirmed</span> : null}</p>
         {rules.note ? <p className="text-xs text-muted-foreground">{rules.note}</p> : null}
@@ -548,8 +556,8 @@ function TranscriptContext({ context, detail, profiles, canEdit, seek, playSampl
         <p className="text-xs text-muted-foreground">{detail.origin === "manual" ? "Uploaded transcript" : `Legacy machine transcript${detail.model ? ` · ${detail.model}` : ""}. Not verified.`}</p>
       </section>
       {profiles.length ? <SpeakersPanel api={context.api} detail={detail} profiles={profiles} canEdit={canEdit} playSample={playSample} refresh={refresh} /> : null}
-      {detail.state === "ready" ? <section aria-label="Saved quotes" className="grid gap-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this recording</h3>
+      {detail.state === "ready" ? <section aria-label="Saved transcript material" className="grid gap-2">
+        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saved from this transcript</h3>
         {detail.selections.length === 0 ? <p className="text-muted-foreground">Select words in the transcript to save a highlight or a quote.</p> : (
           <ul className="grid gap-3">{detail.selections.map((selection) => <li key={selection.id}><SelectionCard context={context} selection={selection} detail={detail} seek={seek} refresh={refresh} /></li>)}</ul>
         )}
