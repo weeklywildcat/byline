@@ -197,6 +197,18 @@ describe("recordings, ground rules and transcripts", () => {
     expect((await payload.count({ collection: "reporting-files", where: { clientKey: { equals: "standalone-transcript-0001" } } })).totalDocs).toBe(1);
     expect((await payload.count({ collection: "reporting-transcripts", where: { file: { equals: standalone.body.fileId } } })).totalDocs).toBe(1);
 
+    const standaloneQuote = await call("post", "/byline/reporting/transcripts/:id/selections", "alice", {
+      params: { id: standalone.body.transcriptId },
+      data: { segmentIds: ["s0"], kind: "quote" }
+    });
+    expect(standaloneQuote.status).toBe(200);
+    const cannotVerifyWithoutAudio = await call("post", "/byline/reporting/selections/:id/verify", "alice", {
+      params: { id: standaloneQuote.body.id },
+      data: { verified: true }
+    });
+    expect(cannotVerifyWithoutAudio.status).toBe(409);
+    expect(cannotVerifyWithoutAudio.body.message).toMatch(/recording is required/i);
+
     const wrongParent = await call("post", "/byline/stories/:id/reporting/transcripts", "alice", {
       params: { id: ids.story },
       data: { fileId: standalone.body.fileId, replace: true },
