@@ -12,6 +12,7 @@ const block = (page: Page, id: string) => page.locator(`[data-block-type]:has(#$
 const byType = (page: Page, type: string, index = 0) => page.locator(`[data-block-type="${type}"]`).nth(index);
 const box = async (locator: Locator) => (await locator.boundingBox())!;
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+const clientWidth = (page: Page) => page.evaluate(() => document.documentElement.clientWidth);
 const css = (locator: Locator, property: string) => locator.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property);
 
 async function open(page: Page, width: number, height = 900) {
@@ -47,16 +48,17 @@ test.describe('on a phone (390px)', () => {
   test.beforeEach(async ({ page }) => open(page, 390, 844));
 
   test('a full-width photo reaches both screen edges while its caption stays inset', async ({ page }) => {
+    const width = await clientWidth(page);
     const image = await box(photoFull(page).locator('img'));
     expect(image.x).toBe(0);
-    expect(image.width).toBe(390);
+    expect(image.width).toBe(width);
     const caption = await box(photoFull(page).locator('figcaption .byline-caption'));
     expect(caption.x).toBeGreaterThanOrEqual(16);
-    expect(caption.x + caption.width).toBeLessThanOrEqual(390 - 16);
+    expect(caption.x + caption.width).toBeLessThanOrEqual(width - 16);
     // A column photo keeps the story's margins.
     const inset = await box(photoColumn(page).locator('img'));
     expect(inset.x).toBeGreaterThanOrEqual(16);
-    expect(inset.x + inset.width).toBeLessThanOrEqual(390 - 16);
+    expect(inset.x + inset.width).toBeLessThanOrEqual(width - 16);
   });
 
   test('Split becomes one column, photo then passage', async ({ page }) => {
@@ -67,10 +69,11 @@ test.describe('on a phone (390px)', () => {
   });
 
   test('Breakout and Spotlight bleed the photo and keep their words inset below it, on the page', async ({ page }) => {
+    const width = await clientWidth(page);
     for (const moment of [breakout(page), spotlight(page)]) {
       const image = await box(moment.locator('img'));
       expect(image.x).toBe(0);
-      expect(image.width).toBe(390);
+      expect(image.width).toBe(width);
       const passage = await box(moment.locator('.byline-portrait-text-body'));
       expect(passage.y).toBeGreaterThanOrEqual(image.y + image.height);
       // The words themselves (not their padded container) keep the gutter.
@@ -92,7 +95,7 @@ test.describe('on a phone (390px)', () => {
 
   test('a full-screen chapter fills the small viewport and keeps its words clear of the photo credit', async ({ page }) => {
     const rect = await box(chapter(page));
-    expect(rect.width).toBe(390);
+    expect(rect.width).toBe(await clientWidth(page));
     expect(rect.height).toBeGreaterThanOrEqual(844 - 1);
     const dek = await box(chapter(page).locator('.byline-visual-chapter-dek'));
     const credit = await box(chapter(page).locator('.byline-visual-chapter-credit'));
@@ -108,6 +111,7 @@ test.describe('on a phone (390px)', () => {
   });
 
   test('pull quotes gain room without absurd type, and stay in the column', async ({ page }) => {
+    const width = await clientWidth(page);
     for (const presentation of ['breakout', 'full']) {
       const element = quote(page, presentation);
       const size = parseFloat(await css(element.locator('blockquote'), 'font-size'));
@@ -115,16 +119,17 @@ test.describe('on a phone (390px)', () => {
       expect(size).toBeLessThan(36);
       const rect = await box(element);
       expect(rect.x).toBeGreaterThanOrEqual(16);
-      expect(rect.x + rect.width).toBeLessThanOrEqual(390 - 16);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(width - 16);
     }
   });
 
   test('a Photo Essay bleeds each photograph with inset captions; an even grid keeps two tiles per row', async ({ page }) => {
+    const width = await clientWidth(page);
     const essay = page.locator('.byline-gallery.is-essay');
     for (const item of await essay.locator('.byline-gallery-item').all()) {
       const image = await box(item.locator('img'));
       expect(image.x).toBe(0);
-      expect(image.width).toBe(390);
+      expect(image.width).toBe(width);
       expect((await box(item.locator('figcaption .byline-caption'))).x).toBeGreaterThanOrEqual(16);
     }
     const tiles = page.locator('.byline-gallery.is-cropped > .byline-gallery-item');
