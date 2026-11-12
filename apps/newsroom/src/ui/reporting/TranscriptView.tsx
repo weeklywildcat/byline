@@ -4,7 +4,8 @@ import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
-import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
@@ -12,9 +13,10 @@ import { Input } from "@byline/newsroom-ui/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@byline/newsroom-ui/ui/resizable";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Play, Search } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, PanelRight, Pencil, Play, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { groundRuleLabel, quoteUse } from "../../domain/reporting";
@@ -175,7 +177,7 @@ function TranscriptBody({ context, transcriptId, onBack, width, hideBack = false
   const detailError = detailQuery.error;
   const accessLost = detailError instanceof ApiError && detailError.status >= 400 && detailError.status < 500;
   if (detailQuery.isError && (!detail || accessLost)) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<InlineAlert title="This transcript isn't available" onAction={() => void detailQuery.refetch()}>{(detailQuery.error as Error).message}</InlineAlert></div>;
-  if (!detail) return <div className="grid gap-3">{hideBack ? null : <BackButton onBack={onBack} />}<p role="status" className="text-sm text-muted-foreground">Loading transcript…</p></div>;
+  if (!detail) return <TranscriptSkeleton hideBack={hideBack} onBack={onBack} />;
 
   const contextPanel = <TranscriptContext context={context} detail={detail} profiles={profiles} canEdit={canEdit} seek={seek} playSample={playSample} refresh={refresh} />;
   const searchBar = (
