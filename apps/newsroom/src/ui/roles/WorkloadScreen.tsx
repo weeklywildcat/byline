@@ -4,6 +4,7 @@ import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -46,8 +47,8 @@ function LoadBadge({ level }: { level: LoadLevel }) {
 /** A count tinted by what it means: overdue work red, work due this week amber, busier counts heavier. */
 function Count({ value, tone }: { value: number; tone: Tone }) {
   if (!value) return <span className="text-muted-foreground/50">0</span>;
-  if (tone === "overdue") return <span className="inline-flex min-w-6 justify-center rounded-md bg-red-100 px-1.5 py-0.5 font-semibold text-red-800 dark:bg-red-950 dark:text-red-300">{value}</span>;
-  if (tone === "due") return <span className="inline-flex min-w-6 justify-center rounded-md bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-300">{value}</span>;
+  if (tone === "overdue") return <Badge variant="outline" className="min-w-6 justify-center border-red-200 bg-red-50 px-1.5 font-semibold text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{value}</Badge>;
+  if (tone === "due") return <Badge variant="outline" className="min-w-6 justify-center border-amber-200 bg-amber-50 px-1.5 font-medium text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">{value}</Badge>;
   return <span className={value >= 4 ? "font-semibold" : "font-medium"}>{value}</span>;
 }
 
@@ -82,7 +83,7 @@ export function WorkloadScreen() {
         </div>
 
         {workload.isError ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>Workload couldn’t be loaded</AlertTitle><AlertDescription>{problemsOf(workload.error)[0]}</AlertDescription><AlertAction><Button type="button" size="xs" variant="outline" onClick={() => void workload.refetch()}>Try again</Button></AlertAction></Alert> : null}
-        {workload.isPending ? <div className="divide-y overflow-hidden rounded-xl border" aria-busy="true">{[0, 1, 2, 3].map((n) => <div key={n} className="flex items-center gap-6 px-4 py-3"><Skeleton className="h-4 w-36" /><Skeleton className="ml-auto h-4 w-64" /></div>)}</div> : null}
+        {workload.isPending ? <Card className="gap-0 divide-y py-0" aria-busy="true">{[0, 1, 2, 3].map((n) => <div key={n} className="flex items-center gap-6 px-4 py-3"><Skeleton className="h-4 w-36" /><Skeleton className="ml-auto h-4 w-64" /></div>)}</Card> : null}
         {workload.data && !rows.length ? (
           <Empty className="rounded-xl border border-dashed">
             <EmptyHeader>
@@ -96,7 +97,7 @@ export function WorkloadScreen() {
 
         {rows.length ? (
           <>
-            <div className="hidden overflow-x-auto rounded-xl border md:block">
+            <Card className="hidden gap-0 overflow-x-auto py-0 md:block">
               <Table>
                 <caption className="sr-only">Work assigned to each person, in alphabetical order</caption>
                 <TableHeader>
@@ -116,8 +117,8 @@ export function WorkloadScreen() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-            <ItemGroup className="gap-0 divide-y overflow-hidden rounded-xl border md:hidden" aria-label="Work assigned to each person">
+            </Card>
+            <Card className="gap-0 py-0 md:hidden"><ItemGroup className="gap-0 divide-y" aria-label="Work assigned to each person">
               {rows.map((row) => (
                 <div role="listitem" key={row.userId}>
                   <Item size="sm" className="rounded-none border-0">
@@ -128,7 +129,7 @@ export function WorkloadScreen() {
                   </Item>
                 </div>
               ))}
-            </ItemGroup>
+            </ItemGroup></Card>
             <div className="grid gap-2 text-sm text-muted-foreground">
               <dl className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Load levels">
                 {LOAD_LEVELS.map((level) => <div key={level} className="flex items-center gap-1.5"><dt><LoadBadge level={level} /></dt><dd className="tabular-nums">{range(level)}</dd></div>)}
