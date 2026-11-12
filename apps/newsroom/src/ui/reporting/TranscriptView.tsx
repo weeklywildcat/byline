@@ -455,6 +455,11 @@ function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, trans
     onSuccess: async () => { setOpen(false); await refresh(); },
     onError: (error: Error) => toast.error(error.message)
   });
+  const clear = useMutation({
+    mutationFn: () => editTranscript(api, transcriptId, { segmentId: segment.id, speaker: "", expectedUpdatedAt: updatedAt }),
+    onSuccess: async () => { setName(""); setOpen(false); await refresh(); },
+    onError: (error: Error) => toast.error(error.message)
+  });
   // A diarized transcript never presents an unattributed passage as someone's words.
   const label = shown ?? (diarized ? "Unknown speaker" : "Add speaker");
   const plain = shown ? "" : "text-muted-foreground";
@@ -466,9 +471,9 @@ function SpeakerEditor({ segment, diarized, profiles, sourceName, canEdit, trans
       <Input id={`speaker-${segment.id}`} value={name} maxLength={120} onChange={(event) => setName(event.target.value)} onFocus={(event) => event.currentTarget.select()} autoFocus />
       {suggestions.length ? <div className="flex flex-wrap gap-1.5">{suggestions.slice(0, 6).map((entry) => <Button key={entry} type="button" size="xs" variant="outline" onClick={() => setName(entry)}>{entry}</Button>)}</div> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={apply.isPending || !name.trim()}>{apply.isPending ? <Spinner data-icon="inline-start" /> : null}This passage</Button>
-        {segment.speaker && name.trim() ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
-        {segment.speaker ? <Button type="button" size="sm" variant="ghost" disabled={apply.isPending} onClick={() => { setName(""); void editTranscript(api, transcriptId, { segmentId: segment.id, speaker: "", expectedUpdatedAt: updatedAt }).then(async () => { setOpen(false); await refresh(); }).catch((error: Error) => toast.error(error.message)); }}>Clear speaker</Button> : null}
+        <Button type="submit" size="sm" disabled={apply.isPending || clear.isPending || !name.trim()}>{apply.isPending ? <Spinner data-icon="inline-start" /> : null}This passage</Button>
+        {segment.speaker && name.trim() ? <Button type="button" size="sm" variant="outline" disabled={apply.isPending || clear.isPending} onClick={() => apply.mutate(true)}>Everywhere</Button> : null}
+        {segment.speaker ? <Button type="button" size="sm" variant="ghost" disabled={apply.isPending || clear.isPending} onClick={() => clear.mutate()}>{clear.isPending ? <Spinner data-icon="inline-start" /> : null}Clear speaker</Button> : null}
       </div>
     </form>
   );
