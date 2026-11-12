@@ -4,9 +4,11 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "sites/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/select-site.mjs",
     "dev": "npm run dev --workspace @byline/web",
     "typecheck": "npm run typecheck:packages && npm run typecheck:frontend && npm run typecheck:newsroom",
     "typecheck:packages": "tsc --noEmit -p tsconfig.packages.json",
@@ -31,7 +33,8 @@
     "test:newsroom:integration": "npm run test:integration --workspace @byline/newsroom",
     "tracker": "node scripts/repository-tracker.mjs",
     "deploy:newsroom": "bash scripts/deploy-newsroom.sh",
-    "test:data": "npm run test --workspace @byline/data && npm run test --workspace @byline/data-presentations"
+    "test:data": "npm run test --workspace @byline/data && npm run test --workspace @byline/data-presentations",
+    "site": "node scripts/select-site.mjs"
   },
   "devDependencies": {
     "@types/react": "19.2.18",

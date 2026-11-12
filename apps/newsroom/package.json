@@ -69,7 +69,8 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "sharp": "0.35.5",
-    "sonner": "2.0.8"
+    "sonner": "2.0.8",
+    "@byline/site-contract": "0.1.0"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

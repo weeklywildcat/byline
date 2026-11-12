@@ -10,6 +10,8 @@ import { Redirects } from "./collections/Redirects";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeRepositoryInteractives, describeRepositoryTrackers, describeStoryPresentations, repositoryInteractiveRegistry, repositoryTrackerRegistry, storyPresentationRegistry } from "@byline/story-presentations";
+import siteConfig from "@byline/site/config";
+import { assertSiteCompatible } from "@byline/site-contract";
 import { postgresAdapter } from "@payloadcms/db-postgres";
 import { nodemailerAdapter } from "@payloadcms/email-nodemailer";
 import nodemailer from "nodemailer";
@@ -82,6 +84,10 @@ function withImportIdGuard(collection: CollectionConfig): CollectionConfig {
  * (docs/publication-media.md). Object storage may be added later for
  * backup/replication; it is not a runtime or public-delivery dependency.
  */
+
+// Phase 0 spike: the server loads only the site's plain-data entry.
+assertSiteCompatible(siteConfig);
+if (process.env.BYLINE_SITE_SPIKE_LOG === "1") console.log(`[byline] newsroom site: ${siteConfig.id}`);
 
 const collections: CollectionConfig[] = [
   Stories,

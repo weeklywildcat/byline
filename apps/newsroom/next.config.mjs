@@ -3,7 +3,7 @@ import { withPayload } from "@payloadcms/next/withPayload";
 /** The private newsroom. The public newspaper is apps/web (Astro); nothing here is public reading. */
 const nextConfig = {
   // The design system and the shared article packages ship TypeScript source.
-  transpilePackages: ["@byline/newsroom-ui", "@byline/newsroom-screens", "@byline/admin-runtime", "@byline/core", "@byline/article-body", "@byline/content", "@byline/editor", "@byline/story-presentations", "@byline/ui", "@byline/theme-weekly-wildcat", "@byline/theme-contract"],
+  transpilePackages: ["@byline/newsroom-ui", "@byline/newsroom-screens", "@byline/admin-runtime", "@byline/core", "@byline/article-body", "@byline/content", "@byline/editor", "@byline/story-presentations", "@byline/ui", "@byline/theme-weekly-wildcat", "@byline/theme-contract", "@byline/site", "@byline/site-contract"],
   poweredByHeader: false,
   async redirects() {
     return [{ source: "/", destination: "/admin", permanent: false }];

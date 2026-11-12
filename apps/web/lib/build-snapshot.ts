@@ -1,3 +1,4 @@
+import siteConfig from "@byline/site/config";
 import { getNativeSnapshot } from "./native-snapshot";
 import { publicDataProjects } from "./public-data";
 import { publicPageHref } from "./native-archive-views";
@@ -87,7 +88,10 @@ function routeEntries(input: {
     { path: "/sports/schedule/", kind: "redirect", redirectTo: archiveHref, delivery: "edge" },
     ...Object.entries(REDIRECTED_PAGE_SLUGS).map(([slug, target]): RouteManifestEntry => ({ path: `/${slug}/`, kind: "redirect", redirectTo: target })),
     { path: "/404.html", kind: "not-found" },
-    { path: "/404/", kind: "not-found" }
+    { path: "/404/", kind: "not-found" },
+    // Phase 0 spike: pages the selected site owns join the route manifest.
+    // A page that replaces an engine route keeps that route's own manifest entry.
+    ...siteConfig.pages.filter((page) => !FIXED_PUBLIC_CONTENT_ROUTES.some((route) => route.path === page.pattern)).map((page): RouteManifestEntry => ({ path: page.pattern, kind: "page" }))
   ];
   const articles = input.posts.filter(isVisibleContentPost).flatMap((post) => {
     const route = getPostRouteParts(post);

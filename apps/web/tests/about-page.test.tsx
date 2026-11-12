@@ -129,7 +129,8 @@ describe("about page", () => {
 
   it("is rendered by code, so the CMS page of the same slug is not also generated", () => {
     const route = readFileSync(new URL("../src/pages/[...segment].astro", import.meta.url), "utf8");
-    const about = readFileSync(new URL("../src/pages/about.astro", import.meta.url), "utf8");
+    // About is an engine route a site may switch off, so the site integration injects it.
+    const about = readFileSync(new URL("../src/engine-routes/about.astro", import.meta.url), "utf8");
 
     expect(CODE_ROUTED_PAGE_SLUGS).toEqual(expect.arrayContaining(["about", "join"]));
     expect(route).toContain("CODE_ROUTED_PAGE_SLUGS");

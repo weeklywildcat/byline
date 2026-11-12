@@ -1,3 +1,4 @@
+import siteConfig from "@byline/site/config";
 import { nativeStory } from "./native-snapshot";
 import { publicPageHref } from "./native-archive-views";
 import { CODE_ROUTED_PAGE_SLUGS } from "@/lib/code-routes";
@@ -51,7 +52,9 @@ const APPLICATION_PAGES: Array<{ path: string; changeFrequency: SitemapEntry["ch
   { path: "/corrections/", changeFrequency: "weekly", priority: 0.5 },
   { path: "/media-kit/", changeFrequency: "monthly", priority: 0.5 },
   { path: "/open-source/", changeFrequency: "monthly", priority: 0.4 },
-  ...CODE_ROUTED_PAGE_SLUGS.filter((slug) => slug !== BEHIND_THE_SCENES.pageSlug).map((slug) => ({ path: `/${slug}/`, changeFrequency: "monthly" as const, priority: 0.5 }))
+  ...CODE_ROUTED_PAGE_SLUGS.filter((slug) => slug !== BEHIND_THE_SCENES.pageSlug).map((slug) => ({ path: `/${slug}/`, changeFrequency: "monthly" as const, priority: 0.5 })),
+  // Phase 0 spike: pages the selected site owns (those replacing an engine route are already listed).
+  ...siteConfig.pages.filter((page) => !CODE_ROUTED_PAGE_SLUGS.some((slug) => page.pattern === `/${slug}/`)).map((page) => ({ path: page.pattern, changeFrequency: "monthly" as const, priority: 0.5 }))
 ];
 
 function modifiedAt(item: { modified?: string; modified_gmt?: string }, timeZone: string) {

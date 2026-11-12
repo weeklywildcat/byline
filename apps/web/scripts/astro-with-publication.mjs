@@ -31,7 +31,9 @@ async function loadFixturePublication() {
  */
 async function sourceFingerprint() {
   const hash = createHash("sha256");
-  const roots = ["../../packages", "src", "components", "lib", "views", "public/fonts"];
+  // The selected site is source too, wherever it lives (in this repository or beside a pinned engine).
+  const siteDirectory = path.dirname(require.resolve("@byline/site/package.json"));
+  const roots = ["../../packages", "src", "components", "lib", "views", "public/fonts", siteDirectory];
   async function visit(directory) {
     let entries;
     try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
@@ -42,7 +44,7 @@ async function sourceFingerprint() {
       else if (/\.(css|astro|tsx?|mjs|json)$/.test(entry.name)) hash.update(file).update(await readFile(file));
     }
   }
-  for (const root of roots) await visit(path.join(projectRoot, root));
+  for (const root of roots) await visit(path.resolve(projectRoot, root));
   return hash.digest("hex");
 }
 
