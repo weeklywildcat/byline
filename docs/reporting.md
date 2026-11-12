@@ -112,7 +112,7 @@ transcript.
 
 The schema still accepts the historical state/origin/provider fields so existing
 machine transcripts remain readable. New imports are saved immediately as **ready**,
-with **manual** origin and **manual** provider. Segment ids are stable: editing words
+with **manual** origin and no transcription provider. Segment ids are stable: editing words
 or renaming a speaker keeps timing and ids; stale edits are a 409.
 
 Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
@@ -152,12 +152,21 @@ A reporter adds a transcript deliberately:
   uploaded transcript file as the private reporting document that owns the
   transcript.
 - **Replace:** an existing transcript can be replaced by uploading a new file
-  from the recording. This also provides a clean escape hatch for any incomplete
-  transcript left by the retired automatic system.
+  from the recording. Saved quotes remain snapshots of what the reporter saved,
+  including verification status; only the transcript text is replaced. This also
+  provides a clean escape hatch for any incomplete transcript left by the retired
+  automatic system.
 
 The old machine-transcription columns and migrations are intentionally retained
 for backward compatibility. They are not an active execution path and can be
 removed only in a future data migration after old records no longer need them.
+
+Reporting provenance is protected from destructive cleanup. A recording cannot be
+deleted while one of its saved quotes is used in an article, and an individual
+saved quote cannot be deleted while it is referenced by an article. Remove the
+Reported Quote from the article first; once `usedIn` is empty, ordinary cleanup
+is allowed. Unused recordings with transcripts or saved quotes require an
+explicit destructive confirmation in the UI.
 
 ## Screens
 
