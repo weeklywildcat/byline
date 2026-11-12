@@ -383,15 +383,27 @@ export async function verifySelection(ctx: ScreenContext, id: number, verified: 
     const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
     if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
   }
-  const updated = await payload.update({
-    collection: "transcript-selections",
-    id,
-    data: verified ? { state: "verified", verifiedBy: ctx.user.id as number, verifiedAt: new Date().toISOString(), kind: "quote" } : { state: "saved", verifiedBy: null, verifiedAt: null },
-    overrideAccess: true,
-    depth: 0,
-    req: ctx.req,
-    context: { ...ctx.req.context, bylineSystem: true, bylineVerification: true }
-  });
+  // Field access receives the existing request object. When a Local API call
+  // also supplies `req`, a separate `context` option does not replace
+  // `req.context`, so set this request-local flag for the protected write
+  // and restore it immediately afterwards.
+  const requestContext = ctx.req.context as Record<string, unknown>;
+  const previousVerification = requestContext.bylineVerification;
+  requestContext.bylineVerification = true;
+  let updated;
+  try {
+    updated = await payload.update({
+      collection: "transcript-selections",
+      id,
+      data: verified ? { state: "verified", verifiedBy: ctx.user.id as number, verifiedAt: new Date().toISOString(), kind: "quote" } : { state: "saved", verifiedBy: null, verifiedAt: null },
+      overrideAccess: true,
+      depth: 0,
+      req: ctx.req
+    });
+  } finally {
+    if (previousVerification === undefined) delete requestContext.bylineVerification;
+    else requestContext.bylineVerification = previousVerification;
+  }
   if (verified) await recordStoryActivity(ctx.req, row.story, "quote-verified", id);
   return { id, state: updated.state, verifiedAt: updated.verifiedAt ?? null };
 }
