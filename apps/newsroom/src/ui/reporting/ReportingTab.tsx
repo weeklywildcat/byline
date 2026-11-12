@@ -4,7 +4,7 @@ import { PHOTO_FILE_ACCEPT } from "@byline/core";
 import { InlineForm } from "@byline/newsroom-ui/components/inline-form";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, AttachmentDescription, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@byline/newsroom-ui/ui/attachment";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
 import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
@@ -16,21 +16,22 @@ import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hook
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Input } from "@byline/newsroom-ui/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, PanelRight, Plus, Radio, Search, StickyNote, Upload, X } from "lucide-react";
+import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, Mic, MoreHorizontal, PanelRight, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
@@ -101,6 +102,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const pendingBound = useRef<Bound | null>(null);
   const data = query.data;
   const wide = width >= RAIL_AT;
+  const compactFilters = width > 0 && width < 620;
   const refresh = useCallback(() => cache.invalidateQueries({ queryKey: reportingKey(storyId) }), [cache, storyId]);
   const canCapture = !context.readOnly && data?.capabilities.capture === true;
 
@@ -173,7 +175,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
     return <TranscriptView context={context} transcriptId={openTranscript} onBack={() => { setOpenTranscript(null); void refresh(); }} />;
   }
   if (query.isError) return <InlineAlert title="Reporting isn't available" onAction={() => void query.refetch()}>{(query.error as Error).message}</InlineAlert>;
-  if (!data) return <p role="status" className="text-sm text-muted-foreground">Loading reporting…</p>;
+  if (!data) return <ReportingSkeleton />;
 
   const visible = sortMaterial(data.materials).filter((item) => materialMatchesFilter(item, filter) && materialMatchesSearch(item, needle));
   const groups = materialDayGroups(visible, data.timeZone);
