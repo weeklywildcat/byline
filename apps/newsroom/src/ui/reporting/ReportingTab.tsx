@@ -183,7 +183,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
     <div className="flex min-w-0 flex-col gap-4" data-reporting="">
       <input ref={fileInput} type="file" multiple hidden onChange={(event) => { onFiles("file", event.target.files); event.target.value = ""; }} aria-label="Upload a file" />
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} multiple hidden onChange={(event) => { onFiles("photo", event.target.files); event.target.value = ""; }} aria-label="Upload a photo" />
-      <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) enqueue("transcript", file, file.name); pendingBound.current = null; event.target.value = ""; }} aria-label="Import a transcript" />
+      <input ref={transcriptInput} type="file" accept=".txt,.srt,.vtt,text/plain,text/vtt" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) { enqueue("transcript", file, file.name); setPanel(null); setBound(null); } pendingBound.current = null; event.target.value = ""; }} aria-label="Upload a transcript" />
       <div className="grid gap-4" style={wide ? { gridTemplateColumns: "minmax(0, 1fr) 17.5rem" } : undefined}>
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
