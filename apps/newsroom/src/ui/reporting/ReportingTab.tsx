@@ -104,7 +104,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   const pendingBound = useRef<Bound | null>(null);
   const data = query.data;
   const wide = width >= RAIL_AT;
-  const compactFilters = width > 0 && width < 620;
+  const compactFilters = width < 620;
   const refresh = useCallback(() => cache.invalidateQueries({ queryKey: reportingKey(storyId) }), [cache, storyId]);
   const canCapture = !context.readOnly && data?.capabilities.capture === true;
 
@@ -246,9 +246,11 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
                   <EmptyTitle>{data.materials.length ? "Nothing matches" : "Nothing captured yet"}</EmptyTitle>
                   <EmptyDescription>{data.materials.length ? "No reporting material matches the current search and filter." : canCapture ? "Interviews, notes, transcripts, photos, files and links all land here on the story." : "Material captured for this story will appear here."}</EmptyDescription>
                 </EmptyHeader>
-                <EmptyContent>
-                  {data.materials.length ? <Button type="button" variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear search & filters</Button> : canCapture ? <CaptureMenu capture={capture()} /> : null}
-                </EmptyContent>
+                {data.materials.length || canCapture ? (
+                  <EmptyContent>
+                    {data.materials.length ? <Button type="button" variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear search & filters</Button> : <CaptureMenu capture={capture()} />}
+                  </EmptyContent>
+                ) : null}
               </Empty>
             ) : groups.map((group) => (
               <div key={group.label} className="grid gap-1">
