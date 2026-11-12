@@ -7,10 +7,11 @@ import { Attachment, AttachmentActions, AttachmentAction, AttachmentContent, Att
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { AppointmentDialog } from "@byline/newsroom-screens/workspace/AppointmentDialog";
+import { ResourceDialog } from "@byline/newsroom-screens/workspace/ResourcesSection";
 import { SourceDialog } from "@byline/newsroom-screens/workspace/SourceDialog";
 import { useDialogTarget } from "@byline/newsroom-screens/workspace/dialog-target";
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
-import type { StoryAppointment, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
+import type { StoryAppointment, StoryResource, StorySource } from "@byline/newsroom-screens/workspace/workspace-types";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useDebouncedValue, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
@@ -33,10 +34,10 @@ import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, LockOpen, Mic, MoreHorizontal, PanelRight, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, LockOpen, Mic, MoreHorizontal, PanelRight, Pencil, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type StoryMaterialItem } from "../../domain/reporting";
+import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type ResourceMaterial, type StoryMaterialItem } from "../../domain/reporting";
 import type { ReportingAppointment, ReportingSource } from "../../reporting/material";
 import { postJson } from "../story/api";
 import { formatDay } from "../story/parts";
@@ -435,6 +436,7 @@ function MaterialRow({ context, item, onOpenTranscript, refresh, onImport }: { c
               : <Button type="button" size="xs" variant="outline" onClick={onImport}>Replace transcript</Button>
         : null}
       {transcript?.usedSelectionCount ? <Badge variant="secondary">{transcript.usedSelectionCount === 1 ? "Used in article" : `${transcript.usedSelectionCount} saved items in articles`}</Badge> : null}
+      {item.kind === "resource" ? <ResourceMaterialActions context={context} resource={item} refresh={refresh} /> : null}
       {editable && !(item.kind === "note" && editing) ? (
         <MaterialActionsMenu
           triggerRef={actionsTriggerRef}
@@ -521,6 +523,49 @@ function ConfirmReplaceTranscriptButton({ selectionCount, onReplace }: { selecti
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function ResourceMaterialActions({ context, resource, refresh }: { context: StoryScreenContext; resource: ResourceMaterial; refresh: () => Promise<unknown> }) {
+  const workspace = useOptionalWorkspace();
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const dialog = useDialogTarget<StoryResource>("[data-reporting-resource-action]");
+  const record = workspace?.data.resources.find((entry) => entry.id === resource.resourceId) ?? null;
+  const canManage = Boolean(record && resource.canEdit && !context.readOnly && workspace?.caps.manageResources);
+  const remove = useMutation({
+    mutationFn: async () => {
+      if (!workspace || !record) throw new Error("This link is no longer available.");
+      return workspace.client.removeResource(Number(context.storyId), record.id);
+    },
+    onSuccess: async (_result) => {
+      if (!workspace || !record) return;
+      toast.success("Link removed.", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void workspace.client.addResource(Number(context.storyId), { label: record.label, url: record.url, purpose: record.purpose })
+              .then(async () => { await Promise.all([workspace.reload(), refresh()]); toast.success("Link restored."); })
+              .catch((error: Error) => toast.error(error.message));
+          }
+        }
+      });
+      await Promise.all([workspace.reload(), refresh()]);
+    },
+    onError: (error: Error) => toast.error(error.message)
+  });
+  if (!canManage || !workspace || !record) return null;
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button ref={trigger} type="button" size="icon-xs" variant="ghost" aria-label={`Actions for ${resource.label}`} data-reporting-resource-action="" />}><MoreHorizontal /></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-44">
+          <DropdownMenuItem onClick={() => dialog.openWith(record, trigger.current)}><Pencil />Edit link</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate()}><Trash2 />Remove link</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ResourceDialog key={`reporting-resource-${dialog.session}`} open={dialog.open} resource={dialog.target} onClose={() => { dialog.close(); void refresh(); }} finalFocus={dialog.finalFocus} />
+    </>
   );
 }
 
