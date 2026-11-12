@@ -5,7 +5,6 @@ import { lockRow } from "../db/locks";
 import { normalizeGroundRules, REPORTING_FILE_MIME_TYPES, REPORTING_LIMITS, reportingFileKind } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import { privateReportingDir } from "../reporting/paths";
-import { queueTranscriptionAfterUpload } from "../reporting/transcription/queue";
 import { transcriptSearchText } from "../domain/transcript";
 
 /**
@@ -19,7 +18,7 @@ import { transcriptSearchText } from "../domain/transcript";
  * - `reporting-files`: private uploads (interview recordings, PDFs,
  *   documents), stored apart from Media and served only through Payload's
  *   access-checked file route.
- * - `reporting-transcripts`: one transcript per recording, provider-neutral.
+ * - `reporting-transcripts`: one uploaded transcript per recording (legacy machine transcripts remain readable).
  * - `transcript-selections`: highlights and quotes, stored as snapshots.
  *
  * Access is `access/reporting-context.ts`: normal material follows the
@@ -164,7 +163,7 @@ export const ReportingFiles: CollectionConfig = {
   access: { read: readReporting(), create: createReporting, update: changeReporting(), delete: changeReporting() },
   hooks: {
     beforeChange: [stampCreator, sameStoryContext, describeUpload],
-    afterChange: [logConfidentiality("reporting-files"), queueTranscriptionAfterUpload],
+    afterChange: [logConfidentiality("reporting-files")],
     beforeDelete: [removeDerived]
   },
   fields: [
