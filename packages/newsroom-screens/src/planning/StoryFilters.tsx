@@ -5,9 +5,10 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { InputGroupButton } from "@byline/newsroom-ui/ui/input-group";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
-import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
-import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
+import { useAnyCoarsePointer, useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { EMPTY_PLANNING_FILTERS, normalizePlanningFilters, type PlanningFilters, type PlanningPerson, type PlanningWorkflowStatus } from "../planning/planning-model";
@@ -75,7 +76,9 @@ export type StoryFiltersProps = {
  */
 export function StoryFilters({ filters, onChange, statuses, writers, editors, showPublished, today }: StoryFiltersProps) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [frameRef, width] = useElementWidth<HTMLDivElement>();
   const touch = useAnyCoarsePointer();
+  const compact = width > 0 && width < 720;
   const update = (patch: Partial<PlanningFilters>) => onChange(normalizePlanningFilters({ ...filters, ...patch }));
   const chips = [...moreFilterChips(filters), ...(showPublished?.value ? [{ key: "published", label: "Showing published", clear: {} as Partial<PlanningFilters> }] : [])];
   const workflowOptions: Option[] = [{ value: ALL, label: "All workflows" }, ...statuses.filter((status) => status.group !== "derived").map((status) => ({ value: status.id, label: status.label }))];
@@ -83,32 +86,53 @@ export function StoryFilters({ filters, onChange, statuses, writers, editors, sh
   const moreTrigger = <Button type="button" variant="outline" className="shrink-0" />;
   const moreLabel = <><SlidersHorizontal data-icon="inline-start" aria-hidden="true" />More filters{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}<ChevronDown data-icon="inline-end" aria-hidden="true" /></>;
 
-  return <div className="flex flex-col gap-2" role="search" aria-label={"Filter stories"}>
-    <div className="flex flex-wrap items-center gap-1.5 @4xl/planning:flex-nowrap">
-      <InputGroup className="min-w-48 flex-[1_1_12rem]">
+  const primaryFields = <>
+    <Field><FieldLabel htmlFor="story-filter-workflow">Workflow</FieldLabel><OptionSelect id="story-filter-workflow" label="Workflow" value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="w-full" /></Field>
+    <Field><FieldLabel htmlFor="story-filter-writer">Writer</FieldLabel><OptionSelect id="story-filter-writer" label="Writer" value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, "Any writer")} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="w-full" /></Field>
+    <Field><FieldLabel htmlFor="story-filter-editor">Editor</FieldLabel><OptionSelect id="story-filter-editor" label="Editor" value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, "Any editor")} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="w-full" /></Field>
+  </>;
+
+  return <div ref={frameRef} className="flex flex-col gap-2" role="search" aria-label={"Filter stories"}>
+    <div className="flex items-center gap-1.5">
+      <InputGroup className="min-w-0 flex-1">
         <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
         <InputGroupInput type="search" aria-label={"Search stories"} placeholder={"Search stories…"} value={filters.query} onChange={(event) => update({ query: event.target.value })} />
+        {filters.query ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear story search" onClick={() => update({ query: "" })}><X /></InputGroupButton></InputGroupAddon> : null}
       </InputGroup>
-      <OptionSelect label={"Workflow"} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="h-8 w-32 shrink-0" />
-      <OptionSelect label={"Writer"} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, "Any writer")} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
-      <OptionSelect label={"Editor"} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, "Any editor")} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
-      {touch ? <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
-        <DrawerTrigger render={moreTrigger}>{moreLabel}</DrawerTrigger>
+      {compact ? <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
+        <DrawerTrigger render={<Button type="button" variant="outline" className="shrink-0" />}>
+          <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />Filters{chips.length ? <Badge variant="secondary" className="ml-1">{chips.length}</Badge> : null}
+        </DrawerTrigger>
         <DrawerContent>
-          <DrawerHeader><DrawerTitle>Filters</DrawerTitle></DrawerHeader>
-          <div className="px-4"><MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} /></div>
-          <DrawerFooter><DrawerClose render={<Button type="button" variant="outline" />}>Done</DrawerClose></DrawerFooter>
+          <DrawerHeader><DrawerTitle>Filter stories</DrawerTitle><DrawerDescription>Workflow, people, publication and deadline filters.</DrawerDescription></DrawerHeader>
+          <div className="grid gap-4 px-4"><FieldGroup className="gap-3">{primaryFields}</FieldGroup><MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} /></div>
+          <DrawerFooter className="flex-row">
+            {hasActiveFilters(filters) || showPublished?.value ? <Button type="button" variant="ghost" className="flex-1" onClick={() => { onChange({ ...EMPTY_PLANNING_FILTERS }); showPublished?.onChange(false); }}>Clear all</Button> : null}
+            <DrawerClose render={<Button type="button" className="flex-1" />}>Done</DrawerClose>
+          </DrawerFooter>
         </DrawerContent>
-      </Drawer> : <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-        <PopoverTrigger render={moreTrigger}>{moreLabel}</PopoverTrigger>
-        <PopoverContent align="start" className="w-80 gap-4">
-          <MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} />
-        </PopoverContent>
-      </Popover>}
-      {hasActiveFilters(filters) || showPublished?.value ? <Button type="button" variant="ghost" className="shrink-0" onClick={() => { onChange({ ...EMPTY_PLANNING_FILTERS }); showPublished?.onChange(false); }}>Clear</Button> : null}
+      </Drawer> : <>
+        <OptionSelect label={"Workflow"} value={filters.workflow} options={workflowOptions} onChange={(workflow) => update({ workflow })} className="h-8 w-32 shrink-0" />
+        <OptionSelect label={"Writer"} value={filters.writerId === null ? "" : String(filters.writerId)} options={personOptions(writers, "Any writer")} onChange={(value) => update({ writerId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
+        <OptionSelect label={"Editor"} value={filters.editorId === null ? "" : String(filters.editorId)} options={personOptions(editors, "Any editor")} onChange={(value) => update({ editorId: value ? Number(value) : null })} className="h-8 w-32 shrink-0" />
+        {touch ? <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
+          <DrawerTrigger render={moreTrigger}>{moreLabel}</DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader><DrawerTitle>More filters</DrawerTitle><DrawerDescription>Publication, deadlines and newsroom attention filters.</DrawerDescription></DrawerHeader>
+            <div className="px-4"><MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} /></div>
+            <DrawerFooter><DrawerClose render={<Button type="button" variant="outline" />}>Done</DrawerClose></DrawerFooter>
+          </DrawerContent>
+        </Drawer> : <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+          <PopoverTrigger render={moreTrigger}>{moreLabel}</PopoverTrigger>
+          <PopoverContent align="start" className="w-80 gap-4">
+            <MoreFilterFields filters={filters} update={update} showPublished={showPublished} today={today} />
+          </PopoverContent>
+        </Popover>}
+        {hasActiveFilters(filters) || showPublished?.value ? <Button type="button" variant="ghost" className="shrink-0" onClick={() => { onChange({ ...EMPTY_PLANNING_FILTERS }); showPublished?.onChange(false); }}>Clear</Button> : null}
+      </>}
     </div>
     {chips.length ? <ul className="flex flex-wrap items-center gap-1.5" aria-label={"Active filters"}>
-      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" className="gap-1 pr-0.5">{chip.label}<button type="button" className="rounded-full p-0.5 hover:bg-foreground/10 any-pointer-coarse:relative any-pointer-coarse:after:absolute any-pointer-coarse:after:top-1/2 any-pointer-coarse:after:right-0 any-pointer-coarse:after:size-11 any-pointer-coarse:after:-translate-y-1/2" aria-label={`Remove filter: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))}><X className="size-3" aria-hidden="true" /></button></Badge></li>)}
+      {chips.map((chip) => <li key={chip.key}><Badge variant="secondary" render={<button type="button" aria-label={`Remove filter: ${chip.label}`} onClick={() => (chip.key === "published" ? showPublished?.onChange(false) : update(chip.clear))} />} className="gap-1 pr-1 hover:bg-secondary/80">{chip.label}<X className="size-3" aria-hidden="true" /></Badge></li>)}
     </ul> : null}
   </div>;
 }
