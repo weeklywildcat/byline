@@ -146,12 +146,12 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
   };
 
   const capture = (from?: Bound) => ({
-    note: () => { setBound(from ?? null); setPanel("note"); },
-    record: () => { setBound(from ?? null); setPanel("record"); },
+    note: () => { pendingBound.current = null; setBound(from ?? null); setPanel("note"); },
+    record: () => { pendingBound.current = null; setBound(from ?? null); setPanel("record"); },
     file: () => pick(fileInput, from),
     photo: () => pick(photoInput, from),
     transcript: () => pick(transcriptInput, from),
-    link: () => { setBound(from ?? null); setPanel("link"); }
+    link: () => { pendingBound.current = null; setBound(from ?? null); setPanel("link"); }
   });
 
   // Story Context's capture shortcuts and appointment links land here once, after the notebook loads.
@@ -256,7 +256,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
               <div key={group.label} className="grid gap-1">
                 <h4 className="pt-2 text-sm font-medium">{group.label}</h4>
                 <ul className="divide-y border-y">
-                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => item.kind === "file" ? capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id, fileId: item.id, replaceTranscript: true }).transcript() : capture().transcript()} /></li>)}
+                  {group.items.map((item) => <li key={item.key}><MaterialRow context={context} item={item} onOpenTranscript={setOpenTranscript} refresh={refresh} onImport={() => item.kind === "file" ? capture({ sourceId: item.source?.id, appointmentId: item.appointment?.id, fileId: item.id, replaceTranscript: Boolean(item.transcript) }).transcript() : capture().transcript()} /></li>)}
                 </ul>
               </div>
             ))}
