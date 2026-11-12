@@ -649,10 +649,11 @@ function AppointmentRow({ appointment, data, timeZone, capture, canCapture, stac
   const source = data.sources.find((entry) => entry.id === appointment.sourceId);
   const from: Bound = { appointmentId: appointment.id, ...(source ? { sourceId: source.id } : {}), label: appointment.title };
   const time = appointment.startAt ? new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(appointment.startAt)) : formatDay(appointment.windowStart, timeZone) || "No time yet";
-  const actions = canCapture && appointment.kind !== "photo" ? <div className="flex gap-1.5"><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></div> : null;
+  const captureActions = canCapture && appointment.kind !== "photo" ? <><Button type="button" size="xs" variant="outline" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button></> : null;
+  const editAction = onEdit ? <Button type="button" size="icon-xs" variant="ghost" aria-label={`Edit appointment: ${appointment.title}`} onClick={(event) => onEdit(event.currentTarget)}><Pencil /></Button> : null;
+  const actions = captureActions || editAction ? <div className="flex flex-wrap items-center gap-1.5">{captureActions}{editAction}</div> : null;
   // In the narrow rail the title gets its own line; buttons never squeeze it.
-  const name = onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{appointment.title}</button> : appointment.title;
-  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{name}</p><p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><span>{time}</span>{appointment.status === "cancelled" ? <Badge variant="secondary">Cancelled</Badge> : null}</p>{actions}</div>;
+  if (stacked) return <div className="grid gap-1 py-2" data-appointment-id={appointment.id}><p className="text-sm font-medium">{appointment.title}</p><p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><span>{time}</span>{appointment.status === "cancelled" ? <Badge variant="secondary">Cancelled</Badge> : null}</p>{actions}</div>;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <CalendarClock aria-hidden="true" className="size-4 text-muted-foreground" />
@@ -721,12 +722,13 @@ function SourceRow({ context, source, canEdit, canCapture, capture, refresh, onE
   return (
     <Item size="xs" className="flex-col items-stretch gap-1 rounded-none px-0 py-2">
       <ItemContent>
-        <ItemTitle>{onEdit ? <button type="button" className="touch-hit text-left hover:underline" onClick={(event) => onEdit(event.currentTarget)}>{source.label}</button> : source.label}</ItemTitle>
+        <ItemTitle>{source.label}</ItemTitle>
         {source.role ? <ItemDescription>{source.role}</ItemDescription> : null}
       </ItemContent>
       <ItemActions className="flex-wrap">
         <GroundRulesEditor context={context} source={source} canEdit={canEdit} refresh={refresh} />
         {canCapture ? <><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).note()}>Note</Button><Button type="button" size="xs" variant="ghost" onClick={() => capture(from).record()}><Mic data-icon="inline-start" />Interview</Button></> : null}
+        {onEdit ? <Button type="button" size="icon-xs" variant="ghost" aria-label={`Edit source: ${source.label}`} onClick={(event) => onEdit(event.currentTarget)}><Pencil /></Button> : null}
       </ItemActions>
     </Item>
   );
