@@ -144,6 +144,16 @@ async function selectionsForTranscripts(req: PayloadRequest, transcriptIds: numb
   })).docs;
 }
 
+async function lockSelectionRows(req: PayloadRequest, ids: number[]) {
+  for (const id of [...new Set(ids)].sort((a, b) => a - b)) await lockRow(req, "transcript_selections", id);
+}
+
+async function lockedSelectionsForTranscripts(req: PayloadRequest, transcriptIds: number[]) {
+  const initial = await selectionsForTranscripts(req, transcriptIds);
+  await lockSelectionRows(req, initial.map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0));
+  return selectionsForTranscripts(req, transcriptIds);
+}
+
 function assertNoUsedSelections(rows: Array<{ usedIn?: unknown }>, noun: "recording" | "transcript") {
   const used = rows.filter(isUsedSelection);
   if (!used.length) return;
@@ -161,9 +171,14 @@ function assertNoUsedSelections(rows: Array<{ usedIn?: unknown }>, noun: "record
  */
 const removeDerived: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const transcripts = await req.payload.find({ collection: "reporting-transcripts", where: { file: { equals: id } }, depth: 0, pagination: false, overrideAccess: true, select: {}, req });
-  const ids = transcripts.docs.map((row) => row.id);
+  const ids = transcripts.docs.map((row) => Number(row.id)).filter((value) => Number.isSafeInteger(value) && value > 0).sort((a, b) => a - b);
   if (!ids.length) return;
-  const selections = await selectionsForTranscripts(req, ids);
+
+  // Selection creation locks its transcript first. Take the same parent locks so
+  // no new quote can appear after we enumerate the children, then lock every
+  // child before re-reading usedIn and deleting.
+  for (const transcriptId of ids) await lockRow(req, "reporting_transcripts", transcriptId);
+  const selections = await lockedSelectionsForTranscripts(req, ids);
   assertNoUsedSelections(selections, "recording");
   await req.payload.delete({ collection: "transcript-selections", where: { transcript: { in: ids } }, overrideAccess: true, req });
   await req.payload.delete({ collection: "reporting-transcripts", where: { id: { in: ids } }, overrideAccess: true, req });
@@ -173,7 +188,8 @@ const removeDerived: CollectionBeforeDeleteHook = async ({ id, req }) => {
 const removeTranscriptSelections: CollectionBeforeDeleteHook = async ({ id, req }) => {
   const transcriptId = Number(id);
   if (!Number.isInteger(transcriptId) || transcriptId <= 0) return;
-  const selections = await selectionsForTranscripts(req, [transcriptId]);
+  await lockRow(req, "reporting_transcripts", transcriptId);
+  const selections = await lockedSelectionsForTranscripts(req, [transcriptId]);
   assertNoUsedSelections(selections, "transcript");
   if (selections.length) {
     await req.payload.delete({ collection: "transcript-selections", where: { transcript: { equals: transcriptId } }, overrideAccess: true, req });
@@ -182,7 +198,10 @@ const removeTranscriptSelections: CollectionBeforeDeleteHook = async ({ id, req 
 
 /** A selection referenced by an article is immutable provenance until that reference is removed. */
 const protectUsedSelectionDelete: CollectionBeforeDeleteHook = async ({ id, req }) => {
-  const found = await req.payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, depth: 0, overrideAccess: true, select: { usedIn: true }, req });
+  const selectionId = Number(id);
+  if (!Number.isSafeInteger(selectionId) || selectionId <= 0) return;
+  await lockRow(req, "transcript_selections", selectionId);
+  const found = await req.payload.find({ collection: "transcript-selections", where: { id: { equals: selectionId } }, limit: 1, depth: 0, overrideAccess: true, select: { usedIn: true }, req });
   if (found.docs[0] && isUsedSelection(found.docs[0])) {
     throw new APIError("This saved quote is used in an article. Remove it from the article before deleting it.", 409);
   }
