@@ -120,8 +120,10 @@ Manual import accepts `.txt` (untimed paragraphs, optional `[mm:ss]` stamps,
 
 Selections (`transcript-selections`) are **snapshots** of the words, timing,
 speaker, attribution and ground rules, never character offsets. They start
-**saved**; a reporter marks a quote **verified** after listening to the audio.
-Changing the words un-verifies it. Uploading a transcript never verifies a quote.
+**saved**; a reporter marks a quote **verified** only after listening to its
+attached recording. Transcript-only material has no audio to verify against, so
+its quotes remain unverified. Changing the words un-verifies a quote. Uploading
+a transcript never verifies one.
 
 The chain stays inspectable (`GET /api/byline/reporting/selections/:id/provenance`):
 
