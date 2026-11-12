@@ -172,7 +172,7 @@ test("a transcript opens from Plan as a focused view, with Back to Plan and brow
 });
 
 test("an interview recording accepts a transcript upload and attaches it to that recording", async ({ page, request, baseURL }) => {
-  const wav = Buffer.alloc(44 + 8000 * 2);
+  const wav = Buffer.alloc(44 + 8000 * 2 * 5);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
   wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
   wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
@@ -197,9 +197,9 @@ test("an interview recording accepts a transcript upload and attaches it to that
   await row.getByRole("button", { name: "Add transcript" }).click();
   const chooser = await chooserPromise;
   await chooser.setFiles({
-    name: `interview-${stamp}.vtt`,
-    mimeType: "text/vtt",
-    buffer: Buffer.from("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v Principal Smith>Students deserve a hot lunch.\n")
+    name: `interview-${stamp}.txt`,
+    mimeType: "text/plain",
+    buffer: Buffer.from("[00:00] Principal Smith: Students deserve a hot lunch.\n\n[00:03] Principal Smith: The district is reviewing the schedule.")
   });
 
   await expect(row.getByRole("button", { name: "Open transcript" })).toBeVisible();
@@ -208,6 +208,22 @@ test("an interview recording accepts a transcript upload and attaches it to that
   const docs = (await transcript.json()).docs;
   expect(docs).toHaveLength(1);
   expect(docs[0]).toMatchObject({ file: recordingId, state: "ready", origin: "manual", provider: null });
+  expect(docs[0].segments.map(({ startMs, endMs }: { startMs: number | null; endMs: number | null }) => ({ startMs, endMs }))).toEqual([
+    { startMs: 0, endMs: 3000 },
+    { startMs: 3000, endMs: null }
+  ]);
+
+  await row.getByRole("button", { name: "Open transcript" }).click();
+  const transcriptView = page.locator("[data-transcript-view]");
+  const finalPassage = transcriptView.locator('[data-segment="s1"]');
+  await expect(finalPassage).toBeVisible();
+  await transcriptView.locator("audio").evaluate((audio: HTMLAudioElement) => {
+    audio.currentTime = 3.5;
+    audio.dispatchEvent(new Event("timeupdate", { bubbles: true }));
+  });
+  await expect(finalPassage).toHaveAttribute("data-active", "");
+  await transcriptView.getByRole("button", { name: "Reporting" }).click();
+  await expect(page.locator(`[data-key="file:${recordingId}"]`)).toBeVisible();
 
   const quote = await request.post(`/api/byline/reporting/transcripts/${docs[0].id}/selections`, {
     headers: headers(baseURL!),
