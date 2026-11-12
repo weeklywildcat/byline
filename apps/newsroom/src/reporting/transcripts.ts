@@ -335,6 +335,16 @@ export async function createSelection(ctx: ScreenContext, transcriptId: number, 
 }
 
 export async function updateSelection(ctx: ScreenContext, id: number, input: SelectionInput) {
+  const changesSnapshot = input.text !== undefined || input.attribution !== undefined || input.kind === "quote" || input.kind === "highlight";
+  if (changesSnapshot) {
+    const found = await ctx.req.payload.find({ collection: "transcript-selections", where: { id: { equals: id } }, limit: 1, select: { usedIn: true }, ...as(ctx) });
+    const selection = found.docs[0];
+    if (!selection) throw new APIError("That saved quote is not available.", 404);
+    if (Array.isArray(selection.usedIn) && selection.usedIn.length > 0) {
+      throw new APIError("This saved quote is used in an article. Remove it from the article before changing its words or attribution.", 409);
+    }
+  }
+
   const data: Record<string, unknown> = {};
   if (input.text !== undefined) {
     const text = clean(input.text, 4000);
@@ -361,8 +371,8 @@ export async function deleteSelection(ctx: ScreenContext, id: number) {
 
 /**
  * Verification is deliberate: the reporter listened to the source audio and
- * says these are the words. Never automatic, never inferred from a machine
- * transcript; changing the words afterwards un-verifies them.
+ * says these are the words. Uploading or editing a transcript never verifies
+ * a quote; changing the saved words afterwards un-verifies them.
  */
 export async function verifySelection(ctx: ScreenContext, id: number, verified: boolean) {
   const { payload } = ctx.req;
