@@ -49,7 +49,7 @@ changing the opening never changes it.
   (centre) and search (right) over the opening, on a transparent bar. The logo is one dark asset
   shown in its own colours (an `<img>` and a filter, because a mask image must be CORS-readable and
   Live Preview shows the public site's artwork). Over a photograph it and the menu and search icons
-  get a white edge, no disc, and there is no top veil over the photograph. Hit targets are 44px. On a wide screen a **Split**
+  get a crisp white outline (no disc, no glow), and there is no top veil over the photograph. Hit targets are 44px. On a wide screen a **Split**
   opening puts the logo at the left, beside the menu, because its seam is mid-viewport.
 - The menu is a native modal `<dialog>` laid out as a left sheet: focus trap, Escape, inert page,
   focus restored to the menu button, safe-area padding. Its sections are `getNavigation("header")`

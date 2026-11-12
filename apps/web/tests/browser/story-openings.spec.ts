@@ -263,7 +263,7 @@ test.describe('control legibility over photographs', () => {
     });
   }
 
-  test('on the publication surface the halo goes away', async ({ page }) => {
+  test('on the publication surface the outline goes away', async ({ page }) => {
     await open(page, stories.immersive);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect(page.locator('[data-story-nav]')).toHaveAttribute('data-solid', 'true');
