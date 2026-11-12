@@ -66,39 +66,23 @@ try {
     file: { data: wav(60), mimetype: "audio/wav", name: "coach-smith.wav", size: 44 + 8000 * 2 * 60 }
   });
   const segments = [
-    { id: "s0", startMs: 0, endMs: 9000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We knew going into the second half we had to tackle better, and the kids responded." },
-    { id: "s1", startMs: 9000, endMs: 15000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "What changed defensively after the break?" },
-    { id: "s2", startMs: 15000, endMs: 28000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "We switched to man coverage and trusted our corners to win their matchups." },
-    { id: "s3", startMs: 28000, endMs: 41000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "Was the weather a factor in your play calling?" },
-    { id: "s4", startMs: 41000, endMs: 58000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "Not really. We practiced in worse. It came down to execution and the kids' effort." }
+    { id: "s0", startMs: 0, endMs: 9000, speaker: "Coach Smith", text: "We knew going into the second half we had to tackle better, and the kids responded." },
+    { id: "s1", startMs: 9000, endMs: 15000, speaker: "Reporter", text: "What changed defensively after the break?" },
+    { id: "s2", startMs: 15000, endMs: 28000, speaker: "Coach Smith", text: "We switched to man coverage and trusted our corners to win their matchups." },
+    { id: "s3", startMs: 28000, endMs: 41000, speaker: "Reporter", text: "Was the weather a factor in your play calling?" },
+    { id: "s4", startMs: 41000, endMs: 58000, speaker: "Coach Smith", text: "Not really. We practiced in worse. It came down to execution and the kids' effort." }
   ];
   const transcript = await payload.create({
     collection: "reporting-transcripts", ...system,
-    data: { story, file: file.id, source: coach, appointment: interview, createdBy: alice.id, state: "ready", origin: "machine", provider: "faster-whisper", model: "small.en", language: "en", durationMs: 60_000, segments, searchText: segments.map((s) => `${s.speaker}: ${s.text}`).join("\n"), groundRules: file.groundRules, completedAt: new Date().toISOString(), capturedAt: new Date().toISOString() } as never
+    data: { story, file: file.id, source: coach, appointment: interview, createdBy: alice.id, state: "ready", origin: "manual", provider: "manual", model: null, language: "en", durationMs: 60_000, segments, searchText: segments.map((s) => `${s.speaker}: ${s.text}`).join("\n"), groundRules: file.groundRules, completedAt: new Date().toISOString(), capturedAt: new Date().toISOString() } as never
   });
   await payload.create({
     collection: "transcript-selections", ...system,
-    data: { story, transcript: transcript.id, file: file.id, source: coach, kind: "quote", text: "We switched to man coverage and trusted our corners.", attribution: "Coach Smith, Head coach", speaker: "SPEAKER_00", startMs: 15000, endMs: 28000, segmentIds: ["s2"], groundRules: file.groundRules, state: "verified", verifiedBy: alice.id, verifiedAt: new Date().toISOString(), createdBy: alice.id } as never
+    data: { story, transcript: transcript.id, file: file.id, source: coach, kind: "quote", text: "We switched to man coverage and trusted our corners.", attribution: "Coach Smith, Head coach", speaker: "Coach Smith", startMs: 15000, endMs: 28000, segmentIds: ["s2"], groundRules: file.groundRules, state: "verified", verifiedBy: alice.id, verifiedAt: new Date().toISOString(), createdBy: alice.id } as never
   });
   await payload.create({
     collection: "transcript-selections", ...system,
-    data: { story, transcript: transcript.id, file: file.id, source: coach, kind: "quote", text: "It came down to execution and the kids' effort.", attribution: "Coach Smith, Head coach", speaker: "SPEAKER_00", startMs: 41000, endMs: 58000, segmentIds: ["s4"], groundRules: file.groundRules, state: "saved", createdBy: alice.id } as never
-  });
-  // A recording whose speaker-labelled draft is still arriving (Identifying speakers is done; Whisper is at 18%).
-  const live = await payload.create({
-    collection: "reporting-files", ...system,
-    data: { story, source: coach, appointment: interview, createdBy: alice.id, capturedAt: new Date(Date.now() - 1800_000).toISOString(), durationMs: 60_000, groundRules: file.groundRules } as never,
-    file: { data: wav(60), mimetype: "audio/wav", name: "follow-up-call.wav", size: 44 + 8000 * 2 * 60 }
-  });
-  const draft = [
-    { id: "s0", startMs: 192_000, endMs: 195_000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "What did you think when you got the call?" },
-    { id: "s1", startMs: 196_000, endMs: 201_000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "At first I honestly thought somebody was joking." },
-    { id: "s2", startMs: 201_500, endMs: 203_000, speaker: "SPEAKER_01", speakerKey: "SPEAKER_01", text: "Really, I did." },
-    { id: "s3", startMs: 202_000, endMs: 206_000, speaker: "SPEAKER_00", speakerKey: "SPEAKER_00", text: "When did it start feeling real?" }
-  ];
-  await payload.create({
-    collection: "reporting-transcripts", ...system,
-    data: { story, file: live.id, source: coach, appointment: interview, createdBy: alice.id, state: "processing", origin: "machine", provider: "faster-whisper", model: "small.en", language: "en", durationMs: 60_000, segments: draft, searchText: "", progressPercent: 18, progressMessage: "Transcribing audio", transcriptionRunToken: "11111111-1111-4111-8111-111111111111", groundRules: live.groundRules, capturedAt: new Date().toISOString() } as never
+    data: { story, transcript: transcript.id, file: file.id, source: coach, kind: "quote", text: "It came down to execution and the kids' effort.", attribution: "Coach Smith, Head coach", speaker: "Coach Smith", startMs: 41000, endMs: 58000, segmentIds: ["s4"], groundRules: file.groundRules, state: "saved", createdBy: alice.id } as never
   });
   void tipster;
   // Published stories for the Front Page Desk.
@@ -112,7 +96,7 @@ try {
   for (const [index, [headline, sectionId]] of headlines.entries()) {
     await payload.create({ collection: "stories", overrideAccess: true, context: { bylineSystem: true }, data: { headline, slug: `fp-${index}`, deck: `${headline}. A short deck for the homepage preview.`, section: sectionId, contributors: [alice.linkedPerson], _status: "published", publishedAt: new Date(Date.now() - (index + 1) * 3_600_000).toISOString() } as never });
   }
-  console.log(JSON.stringify({ story, transcript: transcript.id, processing: transcript.id + 1, accounts: ["editor@example.test", "alice@example.test", "admin@example.test", "bob@example.test"] }));
+  console.log(JSON.stringify({ story, transcript: transcript.id, accounts: ["editor@example.test", "alice@example.test", "admin@example.test", "bob@example.test"] }));
 } finally {
   await payload.db.destroy?.();
 }
