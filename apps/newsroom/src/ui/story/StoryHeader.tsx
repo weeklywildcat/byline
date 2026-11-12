@@ -158,6 +158,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
   const stale = Boolean(run && run.steps.some((step) => step.state === "stale"));
   const waitingFor = run?.status === "active" ? run.steps.find((step) => step.state === "active")?.waitingFor ?? null : null;
   const due = planned?.deadline && !hasPublishedDoc ? `Due ${relativeDay(planned.deadline, { now: new Date(), timeZone: context.timeZone })}` : null;
+  // A missed deadline says so in the header, as it does in the brief: "Overdue · due Nov 8".
+  const overdue = Boolean(due && planned?.deadline && planned.deadline.slice(0, 10) < newsroomToday(context.timeZone));
   const sidelined = phase === "on-hold" || phase === "dropped";
   const preview = useStoryPreview();
   // Schedule, Unpublish and Move to trash are not lifecycle steps. Trash is Payload's recoverable delete, distinct from editorial Drop, and stays reachable in every phase.
@@ -351,7 +353,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
               {planned?.editor ? <span className="truncate text-muted-foreground max-xl:hidden">· Edited by {planned.editor.name}</span> : null}
             </div>
           ) : null}
-          {due ? <span className="text-sm text-muted-foreground">{due}</span> : null}
+          {due ? <span className={overdue ? "text-sm font-medium text-warning" : "text-sm text-muted-foreground"} data-story-due={overdue ? "overdue" : ""}>{overdue ? `Overdue · ${due.charAt(0).toLowerCase()}${due.slice(1)}` : due}</span> : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 max-sm:w-full">
@@ -515,6 +517,11 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
       </Dialog>
     </header>
   );
+}
+
+/** Today in the newsroom's timezone, as a date-only key ("2026-11-12"). */
+function newsroomToday(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 /** The editor's stage override: the server checks who may, closes any open review and records it in History. */

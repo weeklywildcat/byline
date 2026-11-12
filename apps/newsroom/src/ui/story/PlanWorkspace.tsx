@@ -5,7 +5,8 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { StoryBrief, StoryRecentActivity, StoryToDo, useOpenWorkCount } from "@byline/newsroom-screens/story-context/StoryPlan";
 import { useOptionalWorkspace, WorkspaceGate, WorkspaceStaleNotice } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { Smartphone } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { cn } from "@byline/newsroom-ui/lib/utils";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLiveCoverage } from "../live/LiveCoverageProvider";
 import { SavedQuotes } from "../reporting/ReportingReference";
 import { ReportingTab } from "../reporting/ReportingTab";
@@ -35,6 +36,7 @@ export const planSectionId = (section: PlanSection) => `plan-${section}`;
 export function PlanWorkspace({ context, location, go, leadImage }: { context: StoryScreenContext; location: StoryLocation; go: (place: StoryPlace) => void; leadImage: { url: string | null; alt: string | null } | null }) {
   const live = useLiveCoverage();
   const frame = useRef<HTMLDivElement | null>(null);
+  const active = useSectionInView();
   const jump = (section: PlanSection) => {
     const target = document.getElementById(planSectionId(section));
     if (!target) return;
@@ -56,14 +58,22 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
 
   return (
     <div ref={frame} className="@container/plan mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:gap-6 md:px-8" data-plan-workspace="">
-      <nav aria-label="Plan sections" className="-mx-4 -mt-2 overflow-x-auto overscroll-x-contain px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0" data-plan-jump="">
+      {/*
+        Sticky under the app header, so a reporter can move between sections
+        from anywhere in a long Plan (on a phone especially). The section in
+        view is marked as the current one.
+      */}
+      <nav aria-label="Plan sections" className="sticky top-12 z-10 -mx-4 -mt-2 overflow-x-auto overscroll-x-contain border-b border-border/70 bg-background/95 px-4 py-1.5 backdrop-blur-sm [scrollbar-width:none] supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8 [&::-webkit-scrollbar]:hidden" data-plan-jump="">
         <div className="flex w-max min-w-full items-center gap-1 text-sm">
           <span className="mr-1 shrink-0 text-xs text-muted-foreground max-sm:sr-only">Jump to</span>
-          {PLAN_SECTIONS.map((section) => (
-            <Button key={section} type="button" variant="ghost" size="sm" className="h-9 shrink-0 px-2.5 text-muted-foreground" onClick={() => jump(section)}>
-              {SECTION_TITLES[section]}{section === "todo" ? <WorkspaceCount /> : null}
-            </Button>
-          ))}
+          {PLAN_SECTIONS.map((section) => {
+            const current = section === active;
+            return (
+              <Button key={section} type="button" variant={current ? "secondary" : "ghost"} size="sm" className={cn("h-9 shrink-0 px-2.5", current ? "text-foreground" : "text-muted-foreground")} aria-current={current ? "true" : undefined} onClick={() => jump(section)} data-plan-jump-target={section}>
+                {SECTION_TITLES[section]}{section === "todo" ? <WorkspaceCount /> : null}
+              </Button>
+            );
+          })}
         </div>
       </nav>
 
@@ -113,13 +123,13 @@ export function PlanWorkspace({ context, location, go, leadImage }: { context: S
 function PlanSectionFrame({ section, description, actions, children }: { section: PlanSection; description?: string; actions?: ReactNode; children: ReactNode }) {
   const id = planSectionId(section);
   return (
-    <Card id={id} role="region" aria-labelledby={`${id}-title`} className="scroll-mt-24 gap-4 overflow-visible [--card-spacing:--spacing(3)] sm:gap-5 sm:[--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]" data-plan-section={section}>
+    <Card id={id} role="region" aria-labelledby={`${id}-title`} className="scroll-mt-28 gap-4 overflow-visible [--card-spacing:--spacing(3)] sm:gap-5 sm:[--card-spacing:--spacing(4)] md:[--card-spacing:--spacing(6)]" data-plan-section={section}>
       <CardHeader>
         <CardTitle>
           <h2 id={`${id}-title`} tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none" data-plan-heading="">{SECTION_TITLES[section]}</h2>
         </CardTitle>
-        {description ? <CardDescription className="max-w-prose">{description}</CardDescription> : null}
-        {actions ? <CardAction className="flex flex-wrap items-center gap-2">{actions}</CardAction> : null}
+        {description ? <CardDescription className="max-w-prose @max-lg/plan:col-span-2">{description}</CardDescription> : null}
+        {actions ? <CardAction className="flex flex-wrap items-center gap-2 @max-lg/plan:[grid-row:1]">{actions}</CardAction> : null}
       </CardHeader>
       <CardContent className="@container/plan-card flex min-w-0 flex-col gap-4">{children}</CardContent>
     </Card>
@@ -134,4 +144,33 @@ function WorkspaceCount() {
 function OpenCount() {
   const count = useOpenWorkCount();
   return count ? <span className="ml-1 rounded-full bg-muted px-1.5 text-xs tabular-nums text-foreground">{count}<span className="sr-only"> open</span></span> : null;
+}
+
+/**
+ * Which Plan section the reader is in: the last one whose top has passed
+ * just under the sticky jump links (the app header plus the links), or the
+ * last section once the page cannot scroll any further.
+ */
+function useSectionInView(): PlanSection {
+  const [active, setActive] = useState<PlanSection>("brief");
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      const line = 120;
+      let current: PlanSection = PLAN_SECTIONS[0];
+      for (const section of PLAN_SECTIONS) {
+        const element = document.getElementById(planSectionId(section));
+        if (element && element.getBoundingClientRect().top <= line) current = section;
+      }
+      const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atEnd && window.scrollY > 0) current = PLAN_SECTIONS[PLAN_SECTIONS.length - 1];
+      setActive(current);
+    };
+    const onScroll = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
+  }, []);
+  return active;
 }

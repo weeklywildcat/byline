@@ -136,8 +136,11 @@ export function PlanningProperties({ compact = false }: { compact?: boolean } = 
         {caps.assign ? <AssigneePicker appearance="value" label="Editor" placeholder="No editor" people={people} value={editor} onChange={(person) => save({ editorId: person ? Number(person.id) : null })} disabled={busy} hints={hints} /> : story.editor?.name || "None"}
       </Property>
       <Property compact={compact} label="Story deadline">
-        {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
-        {overdue ? <span className="ml-2 text-xs text-warning">Overdue</span> : null}
+        {/* The date and its Overdue flag share a line when they fit, and line up when they wrap. */}
+        <span className="flex flex-wrap items-center gap-x-1">
+          {caps.assign ? <DatePicker appearance="value" label="Story deadline" dateOnly value={story.deadline} timezone={timezone} disabled={busy} onChange={(deadline) => save({ deadline })} /> : <>{exactDate(story.deadline, timezone)}</>}
+          {overdue ? <span className="text-xs font-medium text-warning">Overdue</span> : null}
+        </span>
       </Property>
       <Property compact={compact} label="Publication target">
         {caps.assign ? <DatePicker appearance="value" label="Publication target" value={story.plannedPublication} timezone={timezone} disabled={busy} onChange={(plannedPublishAt) => save({ plannedPublishAt })} /> : <>{exactDate(story.plannedPublication, timezone)}</>}

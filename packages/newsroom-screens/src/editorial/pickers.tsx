@@ -82,7 +82,8 @@ export function DatePicker({ id, label, value, timezone, onChange, disabled, dat
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={<Button id={id} {...triggerProps(appearance, appearance === "field" ? "justify-start" : undefined)} disabled={disabled} aria-label={`Change ${label.toLowerCase()}`} />}>
       <CalendarDays aria-hidden="true" className={appearance === "value" ? "hidden" : "text-muted-foreground"} />
-      <span className={cn("truncate", !text && "text-muted-foreground")}>{text || placeholder}</span>
+      {/* A value-style trigger wraps (its row is narrow on a phone) rather than cutting the time off. */}
+      <span className={cn(appearance === "value" ? "min-w-0" : "truncate", !text && "text-muted-foreground")}>{text || placeholder}</span>
     </PopoverTrigger>
     <PopoverContent className="w-auto gap-0 p-0" align="start">
       <Calendar mode="single" selected={selected} defaultMonth={selected} onSelect={(date) => {
