@@ -1,5 +1,5 @@
 import { APIError, type Where } from "payload";
-import { canChangeMaterial, canSeeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
+import { canChangeMaterial, reportingAudience, type ReportingAudience } from "../access/reporting-context";
 import { atLeast, relationId } from "../access/user";
 import { inTransaction, lockRow } from "../db/locks";
 import { groundRuleLabel, normalizeGroundRules, quoteUse, REPORTING_LIMITS, type GroundRulesSnapshot, type QuoteUse } from "../domain/reporting";
