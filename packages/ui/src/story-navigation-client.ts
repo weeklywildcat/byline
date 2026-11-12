@@ -5,8 +5,8 @@
  * Preview from an effect; it returns a cleanup.
  *
  * No scroll listener: one IntersectionObserver watches the opening
- * (`[data-story-nav-zone]`) against a zero-height line at the top of the
- * viewport. The bar is transparent while the opening touches that line.
+ * (`[data-story-nav-zone]`) against a one-pixel band at the top of the
+ * viewport. The bar is transparent while the opening touches that band.
  */
 export function startStoryNavigation(scope: ParentNode = document): () => void {
   const root = scope.querySelector<HTMLElement>("[data-story-nav]");
@@ -60,17 +60,31 @@ export function startStoryNavigation(scope: ParentNode = document): () => void {
     // Nothing to be transparent over, or no observer: the readable state.
     setSolid(true);
   } else {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[entries.length - 1];
-        if (!entry) return;
-        // Collapsed to a line at the top edge, "intersecting" means the watched element spans that line.
-        setSolid(surface ? entry.isIntersecting : !entry.isIntersecting);
-      },
-      { rootMargin: "0px 0px -100% 0px", threshold: 0 }
-    );
-    observer.observe(watched);
-    stops.push(() => observer.disconnect());
+    const view = root.ownerDocument.defaultView ?? window;
+    let observer: IntersectionObserver | null = null;
+    const observe = () => {
+      observer?.disconnect();
+      // IntersectionObserver percentage margins are resolved from the root width,
+      // even on the vertical axis. Use pixels so this is always a 1px top band.
+      const height = Math.max(1, view.innerHeight);
+      const nextObserver = new IntersectionObserver(
+        (entries) => {
+          if (observer !== nextObserver) return;
+          const entry = entries[entries.length - 1];
+          if (!entry) return;
+          setSolid(surface ? entry.isIntersecting : !entry.isIntersecting);
+        },
+        { rootMargin: `0px 0px -${height - 1}px 0px`, threshold: 0 }
+      );
+      observer = nextObserver;
+      observer.observe(watched);
+    };
+    observe();
+    view.addEventListener("resize", observe);
+    stops.push(() => {
+      view.removeEventListener("resize", observe);
+      observer?.disconnect();
+    });
   }
 
   return () => stops.forEach((stop) => stop());

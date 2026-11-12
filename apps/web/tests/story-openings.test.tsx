@@ -106,6 +106,19 @@ describe("Feature", () => {
     expect(doc.querySelector("picture img")?.getAttribute("alt")).toBe("A student stands in the garden");
   });
 
+  it("keeps the original focal position and marks only actual crop sources for centering", () => {
+    const image = base().image!;
+    const article = render(base({ storyPresentation: "feature", image: { ...image, objectPosition: "24% 72%" } }));
+    const picture = article.querySelector(".story-opening-media picture")!;
+    expect(picture.hasAttribute("data-phone-crop")).toBe(true);
+    expect(picture.hasAttribute("data-tablet-crop")).toBe(false);
+    expect(picture.querySelector("img")?.style.getPropertyValue("--byline-image-natural-position")).toBe("24% 72%");
+
+    const natural = render(base({ storyPresentation: "feature", image: { ...image, sources: undefined, objectPosition: "24% 72%" } }));
+    expect(natural.querySelector(".story-opening-media picture")).toBeNull();
+    expect(natural.querySelector(".story-opening-media img")?.style.getPropertyValue("--byline-image-natural-position")).toBe("24% 72%");
+  });
+
   it("falls back to the normal article without a lead image", () => {
     const doc = render(base({ storyPresentation: "feature", image: null }));
     expect(doc.querySelector(".story-opening")).toBeNull();
@@ -137,6 +150,18 @@ describe("Immersive", () => {
     expect(left.querySelector("main")!.className).toContain("immersive-article-bottom-left");
     expect(left.querySelector("[data-story-nav-zone]")?.className).toContain("hero-reveal");
     expect(render(base({ storyPresentation: "immersive", immersiveAlignment: "center" })).querySelector("main")!.className).toContain("immersive-article-center");
+  });
+
+  it("marks a prepared portrait source while preserving the natural focal fallback", () => {
+    const image = base().image!;
+    const article = render(base({ storyPresentation: "immersive", image: {
+      ...image,
+      objectPosition: "19% 42%",
+      sources: [{ media: "(max-width: 1023px) and (orientation: portrait)", srcSet: "/media/cropped.jpg 800w" }]
+    } }));
+    const picture = article.querySelector(".hero-reveal picture")!;
+    expect(picture.hasAttribute("data-portrait-crop")).toBe(true);
+    expect(picture.querySelector("img")?.style.getPropertyValue("--hero-reveal-natural-position")).toBe("19% 42%");
   });
 
   it("art-directs the photograph for phones", () => {

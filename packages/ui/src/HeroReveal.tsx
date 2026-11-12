@@ -58,7 +58,7 @@ export function HeroReveal({ image, imagePosition, scrim, align = "center", targ
       <script id="hero-reveal-fit" dangerouslySetInnerHTML={{ __html: HERO_REVEAL_FIT_SCRIPT }} />
       <header className={["hero-reveal", className].filter(Boolean).join(" ")} style={style} data-story-nav-zone={navZone ? "" : undefined}>
         {image?.src ? (
-          <picture>
+          <picture data-portrait-crop={image.sources?.some((source) => source.media === "(max-width: 1023px) and (orientation: portrait)") ? "" : undefined}>
             {image.sources?.map((source) => (
               <source key={source.media} media={source.media} srcSet={source.srcSet} sizes={source.sizes ?? "100vw"} width={source.width ?? undefined} height={source.height ?? undefined} />
             ))}
@@ -71,7 +71,7 @@ export function HeroReveal({ image, imagePosition, scrim, align = "center", targ
               height={image.height ?? undefined}
               alt={image.alt}
               fetchPriority="high"
-              style={imagePosition ? { objectPosition: imagePosition } : undefined}
+              style={imagePosition ? ({ "--hero-reveal-natural-position": imagePosition } as CSSProperties) : undefined}
             />
           </picture>
         ) : null}
