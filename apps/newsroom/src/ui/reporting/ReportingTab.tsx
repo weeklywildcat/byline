@@ -17,7 +17,7 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
@@ -240,9 +240,13 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
             {groups.length === 0 && !uploads.length ? (
               <Empty className="border border-dashed py-10">
                 <EmptyHeader>
+                  <EmptyMedia variant="icon">{data.materials.length ? <Search /> : <StickyNote />}</EmptyMedia>
                   <EmptyTitle>{data.materials.length ? "Nothing matches" : "Nothing captured yet"}</EmptyTitle>
-                  <EmptyDescription>{data.materials.length ? "Try another filter or search." : canCapture ? "Add an interview, note, transcript, photo, document or link. It all lands here, on this story." : "Material captured for this story will appear here."}</EmptyDescription>
+                  <EmptyDescription>{data.materials.length ? "No reporting material matches the current search and filter." : canCapture ? "Interviews, notes, transcripts, photos, files and links all land here on the story." : "Material captured for this story will appear here."}</EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  {data.materials.length ? <Button type="button" variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear search & filters</Button> : canCapture ? <CaptureMenu capture={capture()} /> : null}
+                </EmptyContent>
               </Empty>
             ) : groups.map((group) => (
               <div key={group.label} className="grid gap-1">
