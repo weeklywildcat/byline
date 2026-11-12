@@ -239,9 +239,6 @@ export type TranscriptSummary = {
   durationMs: number | null;
   quoteCount: number;
   verifiedCount: number;
-  failure: string | null;
-  progressPercent: number | null;
-  progressMessage: string | null;
 };
 
 export type ReportingFileMaterial = MaterialBase & {
