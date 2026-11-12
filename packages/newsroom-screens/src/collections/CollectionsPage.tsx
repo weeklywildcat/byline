@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ListFilter, Plus, Search } from "lucide-react";
+import { ListFilter, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { ItemGroup } from "@byline/newsroom-ui/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
@@ -100,6 +101,7 @@ export function CollectionsPage({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear collection search" onClick={() => setSearch("")}><X /></InputGroupButton></InputGroupAddon> : null}
           </InputGroup>
           <Popover>
             <PopoverTrigger render={<Button variant="outline" className="pointer-coarse:min-h-11" aria-label={filters ? `Filters, ${filters} on` : "Filters"} />}>
@@ -140,11 +142,13 @@ export function CollectionsPage({
           <InlineAlert onAction={() => void list.refetch()}>{describeEditorialError(list.error, "Collections could not be loaded.")}</InlineAlert>
         ) : data && data.collections.length ? (
           <>
-            <ItemGroup className="gap-0 rounded-xl border" aria-label={`${collectionViews[query.view]} collections`} aria-busy={list.isFetching || undefined}>
-              {data.collections.map((c) => (
-                <CollectionRow key={c.id} collection={c} timezone={data.timezone} onAction={onAction} />
-              ))}
-            </ItemGroup>
+            <Card className="gap-0 py-0">
+              <ItemGroup className="gap-0" aria-label={`${collectionViews[query.view]} collections`} aria-busy={list.isFetching || undefined}>
+                {data.collections.map((c) => (
+                  <CollectionRow key={c.id} collection={c} timezone={data.timezone} onAction={onAction} />
+                ))}
+              </ItemGroup>
+            </Card>
             {data.pages > 1 ? (
               <nav aria-label="Collection pages" className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
                 <span>

@@ -5,6 +5,7 @@ import { DatePicker } from "../editorial/pickers";
 import { useElementWidth, useIncrementalItems } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@byline/newsroom-ui/ui/select";
@@ -156,7 +157,7 @@ export function StoryList(props: StoryListProps) {
   if (!stories.length) return <Empty className="border"><EmptyHeader><EmptyTitle>{hiddenPublished ? "No active stories in this view" : "No stories match"}</EmptyTitle><EmptyDescription>{hiddenPublished ? "Finished published stories are hidden. Use Show published above to see them." : "Try clearing a filter, or choose a different saved view."}</EmptyDescription></EmptyHeader></Empty>;
 
   const table = width === 0 || width >= TABLE_MIN_WIDTH;
-  return <div className="flex flex-col gap-2"><div ref={ref} className="overflow-hidden rounded-xl border bg-card shadow-xs">
+  return <div className="flex flex-col gap-2"><div ref={ref}><Card className="gap-0 py-0 shadow-xs">
     {table
       ? <Table className="table-fixed border-collapse" aria-label={"Stories"}>
         <TableHeader className="bg-muted/40">
@@ -201,5 +202,5 @@ export function StoryList(props: StoryListProps) {
         </Item>))}
         {hasMore ? <div ref={sentinel} aria-hidden="true" className="h-12" /> : null}
       </ItemGroup>}
-  </div></div>;
+  </Card></div></div>;
 }

@@ -126,7 +126,7 @@ export function ResourcesSection({ plain = false, title = "Files & Links", headi
         <Heading id="ws-files-title" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</Heading>
         {canManage ? <Button type="button" variant="ghost" size="xs" data-ws-add="link" onClick={(event) => dialog.openWith(null, event.currentTarget)}>Add link</Button> : null}
       </div>
-      {failed ? <SectionFailed what="links" onRetry={() => void reload()} /> : data.resources.length ? <div className="-mx-2.5">{rows}</div> : <p className="text-sm text-muted-foreground">No links yet.{canManage ? " Link the working draft, notes and research." : ""}</p>}
+      {failed ? <SectionFailed what="links" onRetry={() => void reload()} /> : data.resources.length ? <div className="-mx-2.5">{rows}</div> : <Empty className="min-h-0 items-start px-0 py-3 text-left"><EmptyHeader><EmptyTitle>No links yet</EmptyTitle>{canManage ? <EmptyDescription>Link the working draft, notes and research.</EmptyDescription> : null}</EmptyHeader></Empty>}
       {editor}
     </section>;
   }

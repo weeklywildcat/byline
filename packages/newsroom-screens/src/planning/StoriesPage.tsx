@@ -3,6 +3,7 @@ import { ChevronDown, Plus } from "lucide-react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { useDebouncedValue, useNow } from "@byline/newsroom-ui/lib/hooks";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
@@ -218,12 +219,14 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
             {viewsControl}
             {showViewsPicker ? <StoryViewsPicker views={storyViews} /> : null}
           </div> : null}
-          <div className={showViewsPicker || viewsControl ? "flex items-center gap-2" : "flex flex-1 flex-row-reverse items-center justify-between gap-2"}>
-            <TabsList variant="line" aria-label={"Stories presentation"}>
-              {presentations.map((id) => id === "board"
-                ? <BoardTab key={id} active={view === "board"} value={boardLayout} onChange={changeBoardLayout} />
-                : <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
-            </TabsList>
+          <div className={showViewsPicker || viewsControl ? "min-w-0" : "flex min-w-0 flex-1 flex-row-reverse items-center justify-between gap-2"}>
+            <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <TabsList variant="line" aria-label={"Stories presentation"} className="w-max min-w-full justify-start">
+                {presentations.map((id) => id === "board"
+                  ? <BoardTab key={id} active={view === "board"} value={boardLayout} onChange={changeBoardLayout} />
+                  : <TabsTrigger key={id} value={id}>{VIEW_LABELS[id]}</TabsTrigger>)}
+              </TabsList>
+            </div>
           </div>
         </div>
         <StoryFilters today={siteDay(now, timezone)} filters={filters} onChange={changeFilters} showPublished={view === "board" || view === "list" ? { value: showPublished, onChange: setShowPublished } : undefined} statuses={statuses} writers={people.writers} editors={people.editors} />
@@ -234,7 +237,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
         {planning.isError && !data ? <InlineAlert onAction={() => void planning.refetch()}>{describePlanningError(planning.error, "Stories are unavailable right now.")}</InlineAlert> : null}
         {planning.isError && data ? <InlineAlert onAction={() => void planning.refetch()}>These stories may be out of date. Refreshing failed.</InlineAlert> : null}
         {loading
-          ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <div key={i} className="flex flex-col gap-2 rounded-xl border p-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>)}</div>
+          ? <div role="status" aria-label={"Loading stories"} className="grid gap-3 @3xl/stories:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <Card key={i} size="sm"><CardContent className="grid gap-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></CardContent></Card>)}</div>
           : <>
             <TabsContent value="board"><StoryBoard layout={boardLayout} stories={workingStories} statuses={statuses} canMoveStories={canMove} movingStoryId={movingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onMoveStory={move} onOpenStory={open} /></TabsContent>
             <TabsContent value="list"><StoryList stories={workingStories} hiddenPublished={hiddenPublished} statuses={statuses} sort={sort} canMoveStories={canMove} canAssignStories={canAssign} canUpdateStories={canUpdateStories} movingStoryId={movingStoryId} updatingStoryId={updatingStoryId} timezone={timezone} now={now} workspaceUrl={workspaceUrl} onSortChange={changeSort} onMoveStory={move} onUpdateStory={update} onOpenStory={open} /></TabsContent>

@@ -8,6 +8,7 @@ import { ScheduleXCalendar, useCalendarApp } from "@schedule-x/react";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
@@ -216,10 +217,12 @@ function CalendarSurface({ collectionId, stories, timezone, getSchedule, current
       {legend.map((category) => <li key={category} className="flex items-center gap-1.5"><span aria-hidden="true" className={`size-2 rounded-full ${CATEGORY_DOT_CLASSES[category]}`} />{CATEGORY_LABELS[category]}</li>)}
     </ul> : null}
 
-    <div ref={frameRef} className="min-w-0 overflow-hidden rounded-xl border" data-calendar-frame="">
-      <CalendarDragPolicyContext value={dragPolicy}>
-        <ScheduleXCalendar calendarApp={calendar} customComponents={CALENDAR_COMPONENTS} />
-      </CalendarDragPolicyContext>
+    <div ref={frameRef} className="min-w-0">
+      <Card className="gap-0 overflow-hidden py-0" data-calendar-frame="">
+        <CalendarDragPolicyContext value={dragPolicy}>
+          <ScheduleXCalendar calendarApp={calendar} customComponents={CALENDAR_COMPONENTS} />
+        </CalendarDragPolicyContext>
+      </Card>
     </div>
 
     <AlertDialog open={Boolean(confirming)} onOpenChange={(open) => { if (!open) setConfirming(null); }}>

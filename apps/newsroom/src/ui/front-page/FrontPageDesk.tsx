@@ -9,6 +9,7 @@ import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
 import { FieldGroup } from "@byline/newsroom-ui/ui/field";
@@ -182,7 +183,7 @@ function DeskBody({ api, admin }: { api: string; admin: string }) {
             {wide ? <aside aria-label="Slots" className="min-w-0">{inspector}</aside> : null}
           </div>
         </div>
-        <DragOverlay>{dragging ? <div className="rounded-md border bg-background px-3 py-2 text-sm shadow-lg">{dragging.headline}</div> : null}</DragOverlay>
+        <DragOverlay>{dragging ? <Card size="sm" className="w-fit gap-0 px-3 py-2 text-sm shadow-lg">{dragging.headline}</Card> : null}</DragOverlay>
         <Sheet open={poolOpen && !wide} onOpenChange={setPoolOpen}>
           <SheetContent side="left" className="overflow-y-auto data-[side=left]:w-full data-[side=left]:sm:max-w-sm">
             <SheetHeader><SheetTitle>Stories</SheetTitle><SheetDescription>{selected ? `Choose a story for ${slotLabel(selected)}.` : "Choose a slot, then a story."}</SheetDescription></SheetHeader>
@@ -259,7 +260,7 @@ function PoolItem({ story, placed, onChoose }: { story: PoolStory; placed: boole
   return (
     <CommandItem value={String(story.id)} onSelect={onChoose} className="items-start gap-2" data-pool-story={story.id}>
       {/* A dedicated handle: dragging never steals a normal click on the story. */}
-      <button type="button" ref={drag.setNodeRef} {...drag.attributes} {...drag.listeners} aria-label={`Drag ${story.headline} to a slot`} className="mt-0.5 shrink-0 cursor-grab rounded text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50" onClick={(event) => event.stopPropagation()}><GripVertical className="size-4" /></button>
+      <Button type="button" ref={drag.setNodeRef} {...drag.attributes} {...drag.listeners} variant="ghost" size="icon-xs" aria-label={`Drag ${story.headline} to a slot`} className="mt-0.5 shrink-0 cursor-grab text-muted-foreground" onClick={(event) => event.stopPropagation()}><GripVertical className="size-4" /></Button>
       <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{story.headline}</span><span className="block text-xs text-muted-foreground">{story.section}{placed ? " · On the homepage" : ""}</span></span>
     </CommandItem>
   );
@@ -273,14 +274,16 @@ function SlotInspector({ desk, selected, onSelect, onAutomatic, onChoose, busy }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 text-sm" data-slot-inspector="">
       {slot ? (
-        <section aria-label="Selected slot" className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border p-3">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{slot.label} · {pinned ? "Pinned" : "Automatic"}</p>
-          <p className="font-medium">{pinned ? desk.stories[pinned]?.headline ?? "A story" : "Byline chooses this story automatically."}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={onChoose}>{pinned ? "Replace" : "Choose story"}</Button>
-            {pinned ? <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onAutomatic(slot.id)}>Return to automatic</Button> : null}
-          </div>
-        </section>
+        <Card size="sm" role="region" aria-label="Selected slot">
+          <CardContent className="grid gap-2">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{slot.label} · {pinned ? "Pinned" : "Automatic"}</p>
+            <p className="font-medium">{pinned ? desk.stories[pinned]?.headline ?? "A story" : "Byline chooses this story automatically."}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={onChoose}>{pinned ? "Replace" : "Choose story"}</Button>
+              {pinned ? <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onAutomatic(slot.id)}>Return to automatic</Button> : null}
+            </div>
+          </CardContent>
+        </Card>
       ) : <p className="text-muted-foreground">Select a slot on the homepage or below.</p>}
       <section aria-label="All slots" className="grid grid-cols-[minmax(0,1fr)] gap-1">
         <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Slots</h2>
@@ -293,11 +296,11 @@ function SlotInspector({ desk, selected, onSelect, onAutomatic, onChoose, busy }
 function SlotRow({ slot, story, selected, changed, onSelect }: { slot: { id: string; label: string }; story: string | null; selected: boolean; changed: boolean; onSelect: () => void }) {
   const drop = useDroppable({ id: slot.id });
   return (
-    <button ref={drop.setNodeRef} type="button" onClick={onSelect} aria-pressed={selected} data-slot-row={slot.id} className={`flex w-full items-center gap-2 px-1 py-2 text-left focus-visible:ring-3 focus-visible:ring-ring/50 ${selected ? "bg-accent" : ""} ${drop.isOver ? "outline-2 outline-primary" : ""}`}>
+    <Button ref={drop.setNodeRef} type="button" variant="ghost" onClick={onSelect} aria-pressed={selected} data-slot-row={slot.id} className={`h-auto w-full justify-start rounded-none px-2 py-2 text-left font-normal whitespace-normal ${selected ? "bg-accent" : ""} ${drop.isOver ? "outline-2 outline-primary" : ""}`}>
       <span className="min-w-0 flex-1"><span className="block text-xs text-muted-foreground">{slot.label}</span><span className="block truncate">{story ?? "Automatic"}</span></span>
       {story ? <Badge variant="outline">Pinned</Badge> : null}
       {changed ? <span className="text-xs text-muted-foreground">Unpublished</span> : null}
-    </button>
+    </Button>
   );
 }
 
