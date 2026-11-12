@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { articleCanvas } from './story-fixtures';
 
 /**
  * The Feature, Immersive and Split story openings, and the Minimal site
@@ -47,6 +46,7 @@ async function open(page: Page, url: string) {
 
 const box = async (page: Page, selector: string) => (await page.locator(selector).first().boundingBox())!;
 const noHorizontalOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+const layoutBounds = (page: Page) => page.evaluate(() => { const rect = document.body.getBoundingClientRect(); return { left: rect.left, right: rect.right, width: rect.width, center: (rect.left + rect.right) / 2 }; });
 const near = (actual: number, expected: number, tolerance = 2) => expect(Math.abs(actual - expected), `${actual} vs ${expected}`).toBeLessThanOrEqual(tolerance);
 
 test.describe('Site navigation', () => {
@@ -186,7 +186,7 @@ test.describe('Site navigation', () => {
       for (const url of [stories.featureFull, stories.splitLeft, stories.immersive]) {
         await open(page, url);
         expect(await noHorizontalOverflow(page), url).toBe(true);
-        const canvas = await articleCanvas(page);
+        const layout = await layoutBounds(page);
         const menu = await box(page, '[data-story-nav-open]');
         const logo = await box(page, '.story-nav__logo-mark');
         const search = await box(page, '.story-nav__layer--end a');
@@ -195,13 +195,13 @@ test.describe('Site navigation', () => {
         expect(menu.height).toBeGreaterThanOrEqual(44);
         expect(search.width).toBeGreaterThanOrEqual(44);
         expect(menu.x).toBeGreaterThanOrEqual(0);
-        expect(search.x + search.width).toBeLessThanOrEqual(canvas.right);
+        expect(search.x + search.width).toBeLessThanOrEqual(layout.right);
         if (url === stories.splitLeft && size.width >= 1024) {
           // A Split opening's seam is mid-viewport: on a wide screen the logo sits at the left, beside the menu.
           expect(logo.x).toBeGreaterThanOrEqual(menu.x + menu.width);
           expect(logo.x).toBeLessThan(menu.x + menu.width + 24);
         } else {
-          near(logo.x + logo.width / 2, canvas.center);
+          near(logo.x + logo.width / 2, layout.center);
         }
         expect(logo.x).toBeGreaterThanOrEqual(menu.x + menu.width);
         expect(logo.x + logo.width).toBeLessThan(search.x);
@@ -217,7 +217,7 @@ test.describe('Site navigation', () => {
     const menu = await box(page, '[data-story-nav-open]');
     const search = await box(page, '.story-nav__layer--end a');
     expect(menu.x).toBeGreaterThanOrEqual(0);
-    expect(search.x + search.width).toBeLessThanOrEqual((await articleCanvas(page)).right);
+    expect(search.x + search.width).toBeLessThanOrEqual((await layoutBounds(page)).right);
     await page.getByRole('button', { name: 'Open site navigation' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     expect(await noHorizontalOverflow(page)).toBe(true);
@@ -306,7 +306,7 @@ test.describe('Feature', () => {
     await open(page, stories.featureFull);
     const media = await box(page, '.story-opening-media');
     near(media.x, 0);
-    near(media.width, (await articleCanvas(page)).width);
+    near(media.width, (await layoutBounds(page)).width);
   });
 
   test('phone: the photograph is edge to edge while the headline stays inset', async ({ page }) => {
@@ -314,7 +314,7 @@ test.describe('Feature', () => {
     await open(page, stories.featureWide);
     const media = await box(page, '.story-opening-media');
     near(media.x, 0);
-    near(media.width, (await articleCanvas(page)).width);
+    near(media.width, (await layoutBounds(page)).width);
     expect((await box(page, '.story-opening-headline')).x).toBeGreaterThanOrEqual(16);
     expect((await box(page, '.story-opening-caption .featured-image-caption-row')).x).toBeGreaterThanOrEqual(16);
     expect(await noHorizontalOverflow(page)).toBe(true);
@@ -358,14 +358,14 @@ test.describe('Split', () => {
     test(`${size.width}px: stacked, headline package first, then an edge-to-edge photograph`, async ({ page }) => {
       await page.setViewportSize(size);
       await open(page, stories.splitLeft);
-      const canvas = await articleCanvas(page);
+      const layout = await layoutBounds(page);
       const text = await box(page, '.story-opening-split-text');
       const figure = await box(page, '.story-opening-split-figure');
       expect(figure.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
       near(figure.x, 0);
-      near(figure.width, canvas.width);
+      near(figure.width, layout.width);
       // No narrow columns: the text uses a readable measure.
-      expect(text.width).toBeGreaterThan(canvas.width * 0.9);
+      expect(text.width).toBeGreaterThan(layout.width * 0.9);
       expect(await noHorizontalOverflow(page)).toBe(true);
     });
   }
