@@ -5,7 +5,7 @@ import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
 import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle, AlertDialogTrigger } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
@@ -558,25 +558,27 @@ function SelectionCard({ context, selection, detail, seek, refresh }: { context:
       {selection.canEdit && !context.readOnly ? (
         <div className="flex flex-wrap gap-1.5">
           {selection.kind === "highlight" ? <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("promote")}>Make it a quote</Button> : selection.state === "saved" ? <Button type="button" size="xs" disabled={run.isPending} onClick={() => run.mutate("verify")}>I listened — verify</Button> : <Button type="button" size="xs" variant="outline" disabled={run.isPending} onClick={() => run.mutate("unverify")}>Unverify</Button>}
-          {selection.usedIn.length ? null : <Button type="button" size="xs" variant="ghost" disabled={run.isPending} onClick={() => setRemoveOpen(true)}>Remove</Button>}
+          {selection.usedIn.length ? null : (
+            <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+              <AlertDialogTrigger render={<Button type="button" size="xs" variant="ghost" disabled={run.isPending} />}>Remove</AlertDialogTrigger>
+              <AlertDialogContent size="sm">
+                <AlertDialogHeader>
+                  <AlertDialogMedia><Trash2 /></AlertDialogMedia>
+                  <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           {blocked && detail.canOverrideOffRecord && selection.kind === "quote" && !overriding ? <Button type="button" size="xs" variant="outline" onClick={() => setOverriding(true)}>Editor override…</Button> : null}
         </div>
       ) : null}
-      <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogMedia><Trash2 /></AlertDialogMedia>
-            <AlertDialogTitle>Remove this saved {selection.kind === "highlight" ? "highlight" : "quote"}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the saved {selection.kind === "highlight" ? "highlight" : selection.state === "verified" ? "verified quote" : "quote"} from Reporting. The transcript itself is unchanged. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={run.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={run.isPending} onClick={() => run.mutate("remove")}>{run.isPending ? "Removing…" : "Remove"}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       {overriding ? (
         <InlineForm label="Editor override" className="grid gap-1.5" onSubmit={() => { if (!run.isPending && reason.trim().length >= 8) run.mutate("override"); }} onCancel={() => setOverriding(false)}>
           <p className="text-xs text-destructive">This was said off the record. Approving public use is recorded with your name and reason.</p>
