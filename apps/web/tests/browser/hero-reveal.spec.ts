@@ -183,14 +183,11 @@ for (const story of stories) for (const viewport of viewports) {
   });
 }
 
-test('respects reduced motion on the scroll cue', async ({ page }) => {
+test('reduced motion keeps the cue-free immersive reveal usable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openReveal(page, stories[0].url);
-  const animation = () => page.locator('.hero-reveal-scroll svg').evaluate((svg) => getComputedStyle(svg).animationName);
-  expect(await animation()).toBe('hero-reveal-bob');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  expect(await animation()).toBe('none');
+  await openReveal(page, stories[0].url);
+  await expect(page.locator('.hero-reveal-scroll')).toHaveCount(0);
   // The reveal itself is ordinary sticky scrolling, so it needs no motion fallback.
   await expectRevealGeometry(page);
 });
