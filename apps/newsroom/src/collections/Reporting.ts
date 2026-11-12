@@ -345,12 +345,29 @@ export const TranscriptSelections: CollectionConfig = {
           if (transcript.state !== "ready") throw new APIError("This transcript is not ready for quotes or highlights. Upload a replacement transcript first.", 409);
         }
         if (operation === "update" && originalDoc && data.transcript !== undefined && relationChanged(data.transcript, originalDoc.transcript)) throw new APIError("A selection cannot move to another transcript.", 400);
-        if (operation === "update" && originalDoc && isUsedSelection(originalDoc)) {
+        if (operation === "update" && originalDoc) {
           const changesSnapshot =
             (data.text !== undefined && data.text !== originalDoc.text) ||
             (data.attribution !== undefined && data.attribution !== originalDoc.attribution) ||
             (data.kind !== undefined && data.kind !== originalDoc.kind);
-          if (changesSnapshot) throw new APIError("This saved quote is used in an article. Remove it from the article before changing its words or attribution.", 409);
+          if (changesSnapshot) {
+            const selectionId = Number(originalDoc.id);
+            if (Number.isSafeInteger(selectionId) && selectionId > 0) {
+              await lockRow(req, "transcript_selections", selectionId);
+              const fresh = await req.payload.findByID({
+                collection: "transcript-selections",
+                id: selectionId,
+                overrideAccess: true,
+                disableErrors: true,
+                depth: 0,
+                select: { usedIn: true },
+                req
+              });
+              if (fresh && isUsedSelection(fresh)) {
+                throw new APIError("This saved quote is used in an article. Remove it from the article before changing its words or attribution.", 409);
+              }
+            }
+          }
         }
         // Changing the words un-verifies them: verification is of exact words against the audio.
         if (operation === "update" && originalDoc?.state === "verified" && data.text !== undefined && data.text !== originalDoc.text) {
