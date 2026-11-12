@@ -7,6 +7,7 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { DialogRoot as Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/adaptive-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
@@ -152,7 +153,7 @@ export function useStoryViews({ fetchers, filters, sort, selectedId, onApply, in
             <ItemContent><ItemTitle>{view.name}</ItemTitle></ItemContent>
             <ItemActions><SavedViewActions view={view} canSave={canSave} canDelete={canDelete} onRename={() => setDialog({ kind: "rename", view })} onDelete={() => remove.mutate(view)} /></ItemActions>
           </Item>)}</ItemGroup>
-          : <p className="text-sm text-muted-foreground">You have no saved views.</p>}
+          : <Empty className="min-h-0 py-6"><EmptyHeader><EmptyTitle>No saved views</EmptyTitle><EmptyDescription>Save a filtered Stories view to reuse it here.</EmptyDescription></EmptyHeader></Empty>}
       </DialogContent>
     </Dialog>
   </>;
