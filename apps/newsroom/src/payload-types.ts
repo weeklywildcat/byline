@@ -286,8 +286,11 @@ export interface Story {
       | boolean
       | null;
   };
-  presentation: 'standard' | 'immersive';
+  presentation: 'standard' | 'feature' | 'immersive' | 'split';
   immersiveAlignment?: ('bottom-left' | 'center') | null;
+  featureWidth?: ('wide' | 'full') | null;
+  splitImageSide?: ('left' | 'right') | null;
+  siteNavigation?: ('standard' | 'minimal') | null;
   reportingNote?: string | null;
   /**
    * Part of the public URL. Changing a published Story, Page or Section path preserves the old address with a redirect.
@@ -1957,6 +1960,9 @@ export interface StoriesSelect<T extends boolean = true> {
       };
   presentation?: T;
   immersiveAlignment?: T;
+  featureWidth?: T;
+  splitImageSide?: T;
+  siteNavigation?: T;
   reportingNote?: T;
   slug?: T;
   publishedAt?: T;

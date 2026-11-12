@@ -19,6 +19,8 @@ export * from "./article-view";
 export * from "./article-live";
 export * from "./HeroReveal";
 export * from "./immersive-article-view";
+export * from "./story-opening-views";
+export * from "./story-navigation";
 
 import type { BylineThemeTokens, CoreBylineBlockId } from "@byline/theme-contract";
 

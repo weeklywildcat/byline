@@ -11,7 +11,8 @@ ArticlePresentation                   (apps/web/lib/article-presentation.ts)
       │   a presentation arranges the newsroom body;
       │   a flagship visual story replaces it with its own narrative
       ↓ no
-2. author chose Immersive in the newsroom?       → ImmersiveArticleView  (authors)
+2. author chose Feature, Immersive or Split?    → its built-in opening   (authors)
+   (needs a lead image; never a video story)
       ↓ no
 3.                                            → ArticleView           (default)
 ```
@@ -27,16 +28,20 @@ Where each kind of work belongs:
 | Ordinary reporting, photos, quotes, embeds | the newsroom |
 | A Datawrapper or Flourish chart, Google or OpenStreetMap map | Chart / Map block |
 | A small self-contained interactive (calculator, quiz, custom chart) | Repository Interactive ([article editor](article-editor.md)) |
-| The standard fullscreen photo opening | the newsroom **Story presentation → Immersive** |
+| The standard fullscreen photo opening | the newsroom **Story opening → Immersive** |
 | A bespoke layout around the newsroom text | A presentation (below) |
 | Scrollytelling, an immersive narrative, a major visual feature | A [flagship visual story](#flagship-visual-stories) |
 
 There is no the newsroom scrollytelling tool: scroll-driven storytelling is always a
 flagship visual story's own code.
 
-## The author option: Immersive
+## The author options: Story opening and Site navigation
 
-In the Byline Story editor's **Story presentation** panel (Document sidebar):
+See [story-openings.md](story-openings.md) for the four openings (Standard, Feature,
+Immersive, Split) and the Minimal site navigation. A repository override beats all of
+them, including the navigation (it keeps the Standard header). Immersive, in short:
+
+In the Byline Story editor's **Story opening** control (Story details → Appearance):
 
 - **Standard** (default) is the normal article.
 - **Immersive** opens the story on its featured image, full screen under the site

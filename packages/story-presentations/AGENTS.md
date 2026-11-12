@@ -20,13 +20,13 @@ Start by identifying the story and reading enough of it to understand what the p
 
 Then decide which of these paths fits the request:
 
-1. **Built-in Immersive is enough.** If the request is only the standard fullscreen featured-image reveal with a bottom-left or centered headline, do not create a repository override. That treatment already exists as the Byline newsroom **Story presentation → Immersive** option.
+1. **Built-in Immersive is enough.** If the request is only the standard fullscreen featured-image reveal with a bottom-left or centered headline, do not create a repository override. That treatment already exists as the Byline newsroom **Story opening → Immersive** option.
 2. **Bespoke presentation is warranted.** If the writer wants custom art direction, unusual typography, a different composition, story-specific graphics, custom transitions, or placement beyond the built-in Immersive treatment, create a repository override.
 3. **A flagship visual story is warranted.** Only when the reporting, data, photography, graphics and scrolling must work together as one experience (scrollytelling, a sticky chart that changes with the text, a visual narrative) and mapping the Byline newsroom paragraphs to it would make the work worse. Create it with `--visual` (see below). Ask before choosing this for an ordinary story: it moves the narrative out of the Byline newsroom.
 
 Use the Chart / Map block for supported hosted charts and maps. Use a Repository Interactive for a small custom interaction, and a flagship visual story for scrollytelling.
 
-A repository override always wins over the Byline newsroom Standard/Immersive setting.
+A repository override always wins over the Byline newsroom Story opening (Standard, Feature, Immersive or Split) and Site navigation settings.
 
 ## Before designing
 
@@ -329,4 +329,4 @@ Tell them:
 - the custom design is tied to that story's post ID
 - removing the repository override returns it to the normal editor-selected presentation
 
-If the writer only wanted the standard fullscreen treatment, point them to **Story presentation → Immersive** in the Byline newsroom instead of creating an override.
+If the writer only wanted the standard fullscreen treatment, point them to **Story opening → Immersive** in the Byline newsroom instead of creating an override.

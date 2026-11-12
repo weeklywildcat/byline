@@ -79,7 +79,7 @@ export function nativeArchiveViews({ datasets, publication }: PublicBuildSnapsho
       status: "publish", type: "post", author: Number(primary ?? 0), featured_media: story.image ?? 0,
       categories: section.map(({ id }) => id), tags: topics.map(({ id }) => id), sticky: false, contributors, corrections: story.corrections,
       live: archiveLiveState(story.live),
-      byline: { presentation: story.presentation, immersiveAlignment: story.immersiveAlignment, format: story.format, video: story.videoMetadata },
+      byline: { presentation: story.presentation, immersiveAlignment: story.immersiveAlignment, featureWidth: story.featureWidth, splitImageSide: story.splitImageSide, siteNavigation: story.siteNavigation, format: story.format, video: story.videoMetadata },
       _embedded: { author: primary ? [authorsById.get(Number(primary))!] : [], "wp:featuredmedia": feature ? [feature] : [], "wp:term": [section, topics] }
     };
   });

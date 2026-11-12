@@ -20,7 +20,7 @@ import { absoluteUrl, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
 import { getPostGameScoreGameIds, getPostHref, getPostRouteParts } from "@/lib/public-content";
 import { stripHtml, decodeHtml } from "@/lib/format";
-import { StoryArticle, getStoryPresentation } from "@/lib/story-presentation-host";
+import { StoryArticle, getStoryChrome, getStoryLogoAlign, getStoryPresentation } from "@/lib/story-presentation-host";
 import { isVisualStory } from "@byline/story-presentations";
 import { ArticleGameCard } from "@/components/ArticleGameCard";
 import { ArticleShareActions } from "@/components/ArticleShareActions";
@@ -75,6 +75,8 @@ const section = story ? { name: decodeHtml(story.section.name), href: story.sect
   : category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/`, slug: category.slug } : null;
 const publication = getPublicationConfig();
 const visualStory = isVisualStory(getStoryPresentation(id));
+// The Site navigation choice reaches the layout before it renders, so no article component ever edits the header.
+const chrome = getStoryChrome(presentation) === "minimal" ? "story-overlay" : "standard";
 const slots = {
   shareActions: React.createElement("div", { id: "article-share-island-slot" }),
   primaryGame: showPrimaryGame && primaryGame ? React.createElement(ArticleGameCard, { game: primaryGame, className: "article-primary-game-card" }) : null,
@@ -82,7 +84,7 @@ const slots = {
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
-<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo hideMastheadDate>
+<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo={chrome === "standard"} hideMastheadDate chrome={chrome} chromeLogo={getStoryLogoAlign(presentation)}>
   <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(story ? nativeArticleJsonLd(story, !visualStory) : getArticleJsonLd(post!, { articleBody: !visualStory }))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },

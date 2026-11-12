@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import {
   StoryArticle as SharedStoryArticle,
   findStoryPresentation,
+  resolveStoryChrome,
+  resolveStoryLogoAlign,
   storyPresentationRegistry,
   type StoryArticleProps,
   type StoryPresentationHost
@@ -42,4 +44,14 @@ export function getStoryPresentation(storyId: number | string) {
 /** The shared `StoryArticle` with the public registry and this host. */
 export function StoryArticle(props: Omit<StoryArticleProps, "registry" | "host">): ReactNode {
   return <SharedStoryArticle {...props} registry={publicStoryRegistry()} host={publicStoryHost} />;
+}
+
+/** The site chrome a story asks for ("standard" or "minimal"), resolved before the layout renders its header. */
+export function getStoryChrome(presentation: { id: number | string; siteNavigation?: "standard" | "minimal" | null }) {
+  return resolveStoryChrome(presentation, publicStoryRegistry());
+}
+
+/** Where the minimal bar's logo sits on a wide screen for this story ("start" for Split). */
+export function getStoryLogoAlign(presentation: Parameters<typeof resolveStoryLogoAlign>[0]) {
+  return resolveStoryLogoAlign(presentation, publicStoryRegistry());
 }

@@ -282,7 +282,7 @@ canonical PublicStory + ArticleBody
           ↓
 @byline/story-presentations
           ↓
-custom override → Immersive → Standard
+custom override → Feature / Immersive / Split → Standard
           ↓
 exact private preview iframe
 ```

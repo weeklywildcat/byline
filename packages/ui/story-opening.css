@@ -1,0 +1,274 @@
+/* Feature and Split story openings (FeatureArticleView, SplitArticleView).
+   Hosts provide --paper, --ink, --muted, --rule, --accent and the font variables.
+   Mobile first: the phone layout is its own design, not the desktop one compressed. */
+
+.story-opening {
+  /* Room the Minimal site navigation bar needs where the page background (not a photograph) is behind it. */
+  --opening-top: 0px;
+  --opening-gutter: max(20px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  overflow-x: clip;
+}
+
+.story-opening[data-site-navigation="minimal"] {
+  --opening-top: calc(56px + env(safe-area-inset-top, 0px));
+}
+
+/* ------------------------------------------------------------ shared type */
+
+.story-opening .story-opening-kicker {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.story-opening .story-opening-kicker:empty {
+  display: none;
+}
+
+.story-opening .story-opening-series {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.story-opening .story-opening-headline {
+  color: var(--ink);
+  font-family: var(--font-headline);
+  font-size: clamp(2.05rem, 7.2vw, 3.1rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.07;
+  margin: 12px 0 14px;
+  text-wrap: balance;
+}
+
+.story-opening .story-opening-excerpt {
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: clamp(1.08rem, 3.8vw, 1.3rem);
+  line-height: 1.4;
+  max-width: 36em;
+}
+
+.story-opening .story-opening-excerpt p {
+  margin: 0;
+}
+
+.story-opening .story-opening-caption {
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.story-opening .story-opening-caption p {
+  margin: 0;
+}
+
+.story-opening .story-opening-media {
+  background: #1f2328;
+  overflow: hidden;
+  position: relative;
+}
+
+.story-opening .story-opening-media picture {
+  display: contents;
+}
+
+.story-opening .story-opening-media img {
+  display: block;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------- Feature */
+
+.story-opening-feature .story-opening-head-shell.article-shell {
+  padding-bottom: 28px;
+  padding-top: calc(var(--opening-top) + 36px);
+}
+
+.story-opening-feature .story-opening-head {
+  margin: 0 auto;
+  max-width: 62rem;
+}
+
+.story-opening-feature .article-meta-block {
+  margin-top: 22px;
+}
+
+.story-opening-feature .story-opening-figure {
+  margin: 0;
+}
+
+/* Phone: the photograph goes edge to edge; the headline stays inset above it. */
+.story-opening-feature .story-opening-media {
+  aspect-ratio: 4 / 5;
+  max-height: 86svh;
+}
+
+.story-opening-feature .story-opening-caption {
+  margin: 12px auto 0;
+  max-width: 62rem;
+  padding-inline: var(--opening-gutter);
+}
+
+.story-opening-feature .story-opening-body-shell.article-shell {
+  padding-top: 36px;
+}
+
+@media (min-width: 641px) {
+  .story-opening-feature .story-opening-media {
+    aspect-ratio: 3 / 2;
+  }
+
+  .story-opening-feature .story-opening-headline {
+    font-size: clamp(2.6rem, 5.2vw, 4.3rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Wide: a deliberate margin on both sides and a wider frame than the text column. */
+  .story-opening-feature-wide .story-opening-figure {
+    margin-inline: auto;
+    max-width: min(1320px, calc(100% - 64px));
+  }
+
+  .story-opening-feature-wide .story-opening-media {
+    aspect-ratio: 3 / 2;
+    max-height: 84svh;
+  }
+
+  /* Full: the photograph spans the viewport. */
+  .story-opening-feature-full .story-opening-media {
+    aspect-ratio: 16 / 9;
+    max-height: 90svh;
+  }
+
+  .story-opening-feature .story-opening-head-shell.article-shell {
+    padding-bottom: 40px;
+    padding-top: calc(var(--opening-top) + 56px);
+  }
+}
+
+/* ------------------------------------------------------------------ Split */
+
+/* Below 1024px the two are stacked, in source order: headline package, then photograph. */
+.story-opening-split .story-opening-split-text {
+  padding: calc(var(--opening-top) + 32px) var(--opening-gutter) 28px;
+}
+
+.story-opening-split .story-opening-split-copy {
+  margin: 0 auto;
+  max-width: 40rem;
+}
+
+.story-opening-split .story-opening-split-figure {
+  margin: 0;
+}
+
+.story-opening-split .story-opening-split-figure .story-opening-media {
+  aspect-ratio: 4 / 5;
+  max-height: 86svh;
+}
+
+.story-opening-split .story-opening-split-figure .story-opening-caption {
+  margin: 12px auto 0;
+  max-width: 40rem;
+  padding-inline: var(--opening-gutter);
+}
+
+.story-opening-split .article-meta-block {
+  margin-top: 22px;
+}
+
+.story-opening-split .story-opening-body-shell.article-shell {
+  padding-top: 36px;
+}
+
+@media (min-width: 641px) and (max-width: 1023.98px) {
+  .story-opening-split .story-opening-split-figure .story-opening-media {
+    aspect-ratio: 4 / 3;
+  }
+
+  .story-opening-split .story-opening-headline {
+    font-size: clamp(2.6rem, 6.4vw, 3.6rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .story-opening-split .story-opening-split-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
+    min-height: clamp(580px, 100vh, 980px);
+    min-height: clamp(580px, 100svh, 980px);
+  }
+
+  .story-opening-split-left .story-opening-split-grid {
+    grid-template-columns: minmax(0, 56fr) minmax(0, 44fr);
+  }
+
+  .story-opening-split-left .story-opening-split-figure {
+    order: -1;
+  }
+
+  /* Headline package sits low in its column, like a printed feature opening. */
+  .story-opening-split .story-opening-split-text {
+    align-items: end;
+    display: flex;
+    padding: calc(var(--opening-top) + 48px) clamp(32px, 4.4vw, 80px) clamp(40px, 7svh, 72px);
+  }
+
+  .story-opening-split .story-opening-split-copy {
+    margin: 0;
+    max-width: 34rem;
+  }
+
+  .story-opening-split .story-opening-headline {
+    font-size: clamp(2.4rem, 3.6vw, 3.7rem);
+  }
+
+  /* The photograph fills its half to the bottom edge; the caption sits on paper beneath it. */
+  .story-opening-split .story-opening-split-figure {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .story-opening-split .story-opening-split-figure .story-opening-media {
+    aspect-ratio: auto;
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 420px;
+  }
+
+  .story-opening-split .story-opening-split-figure .story-opening-caption {
+    margin: 0;
+    max-width: none;
+    padding: 12px clamp(20px, 2.4vw, 40px);
+  }
+
+  /* Under Minimal site navigation the photograph reaches the top edge: a soft veil keeps the logo and
+     menu legible on a bright or mid-gray sky, where the logo's `difference` blend alone fails. */
+  .story-opening-split[data-site-navigation="minimal"] .story-opening-media::after {
+    background: linear-gradient(to bottom, rgba(14, 17, 22, 0.6), rgba(14, 17, 22, 0) calc(170px + env(safe-area-inset-top, 0px)));
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-opening * {
+    scroll-behavior: auto;
+  }
+}

@@ -5,6 +5,8 @@ import "@byline/ui/newsroom-blocks.css";
 import "@byline/ui/article.css";
 import "@byline/ui/hero-reveal.css";
 import "@byline/ui/immersive-article.css";
+import "@byline/ui/story-opening.css";
+import "@byline/ui/story-navigation.css";
 import "../../views/fonts.css";
 import "../../views/globals.css";
 import "@byline/ui/contributor-profile.css";
@@ -24,8 +26,13 @@ interface Props {
   // Article pages omit the masthead's build date; the homepage masthead is its h1.
   hideMastheadDate?: boolean;
   homepage?: boolean;
+  // A story's Site navigation choice, resolved by the page before it renders the layout.
+  // "story-overlay" is the Minimal navigation: menu, logo and search over the story opening.
+  chrome?: "standard" | "story-overlay";
+  chromeLogo?: "center" | "start";
 }
-const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false, hideMastheadDate = false, homepage = false } = Astro.props;
+const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false, hideMastheadDate = false, homepage = false, chrome = "standard", chromeLogo = "center" } = Astro.props;
+const overlay = chrome === "story-overlay";
 const publication = getPublicationConfig();
 const activeTheme = getActiveTheme();
 const metadataTitle = metadata.title;
@@ -79,7 +86,8 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
 <html lang={publication.locale} data-byline-theme={activeTheme.id} data-byline-density={activeTheme.tokens.density} style={style}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* Only the Minimal story navigation draws behind the status bar, so only it opts into the full screen and clears the insets itself. */}
+    <meta name="viewport" content={overlay ? "width=device-width, initial-scale=1, viewport-fit=cover" : "width=device-width, initial-scale=1"} />
     {themeColor && <meta name="theme-color" content={themeColor} />}
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -97,8 +105,12 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
-    {stickyLogo && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
-    <SiteHeader sticky={stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} />
+    {(stickyLogo || overlay) && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
+    <SiteHeader mode={overlay ? "story-overlay" : "standard"} logoAlign={chromeLogo} sticky={overlay ? undefined : stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} />
+    {overlay && <script>
+      import { startStoryNavigation } from "@byline/ui/story-navigation-client";
+      startStoryNavigation(document);
+    </script>}
     <span id="main-content" tabindex="-1"></span>
     {stickyNav && <script is:inline>
       (function () {

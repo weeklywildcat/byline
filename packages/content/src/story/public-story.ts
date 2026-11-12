@@ -4,8 +4,11 @@ import type {
   ArticleImageView,
   ArticleLiveView,
   ArticleVideoView,
+  FeatureImageWidth,
   ImmersiveAlignment,
+  SplitImageSide,
   StoryPresentationChoice,
+  StorySiteNavigation,
   StoryVideoBadgeView
 } from "./presentation";
 
@@ -88,6 +91,10 @@ export type PublicStory<Image> = PublicStorySummary<Image> & {
   athleteMeta: string[];
   presentation: StoryPresentationChoice;
   immersiveAlignment: ImmersiveAlignment;
+  /** Optional on the wire: stories published before the Feature and Split openings omit these. */
+  featureWidth?: FeatureImageWidth;
+  splitImageSide?: SplitImageSide;
+  siteNavigation?: StorySiteNavigation;
   primaryVideo: ArticleVideoView | null;
   contributors: PublicStoryContributor<Image>[];
   modifiedAt: string;
@@ -115,6 +122,13 @@ export type StoryImageUsage = {
   /** Whether the image is the page's canonical image for search, or presentation only. */
   searchVisibility: "canonical" | "presentation";
   shape?: ImageCropShape;
+  /**
+   * Return an image only when the editor made an explicit crop of `shape`;
+   * otherwise `null`. Used for art-directed phone and tablet alternatives,
+   * where the natural image must not masquerade as a crop. A host that has no
+   * crops returns `null`.
+   */
+  cropOnly?: boolean;
 };
 
 export type ArticlePresentationContext<Image> = {

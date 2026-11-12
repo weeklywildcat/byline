@@ -14,6 +14,8 @@ import { publicEditorialPosts } from "@/tests/fixtures/public-editorial-content"
 const OVERRIDE_ID = 6;
 const VISUAL_ID = 10;
 const IMMERSIVE_ID = 8;
+// What a story with no explicit opening settings reads as.
+const DEFAULT_OPENING = { featureWidth: "wide", splitImageSide: "right", siteNavigation: "standard" } as const;
 const OverrideFixtureStory = fixtureStoryPresentations[OVERRIDE_ID];
 const VisualFixtureStory = fixtureStoryPresentations[VISUAL_ID];
 
@@ -119,12 +121,12 @@ describe("WordPress story presentation settings", () => {
   const post = (byline?: Record<string, unknown>, legacy?: Record<string, unknown>) => ({ ...publicEditorialPosts[0], ...(byline ? { byline } : {}), ...(legacy ? { weeklyWildcat: legacy } : {}) }) as unknown as ArchivePost;
 
   it("reads the choice from the Byline settings, then the legacy alias", () => {
-    expect(getPostStoryPresentation(post({ presentation: "immersive", immersiveAlignment: "center" }))).toEqual({ presentation: "immersive", immersiveAlignment: "center" });
-    expect(getPostStoryPresentation(post(undefined, { presentation: "immersive" }))).toEqual({ presentation: "immersive", immersiveAlignment: "bottom-left" });
+    expect(getPostStoryPresentation(post({ presentation: "immersive", immersiveAlignment: "center" }))).toEqual({ ...DEFAULT_OPENING, presentation: "immersive", immersiveAlignment: "center" });
+    expect(getPostStoryPresentation(post(undefined, { presentation: "immersive" }))).toEqual({ ...DEFAULT_OPENING, presentation: "immersive", immersiveAlignment: "bottom-left" });
   });
 
   it("defaults to Standard and Bottom left for older stories and anything unrecognized", () => {
-    const standard = { presentation: "standard", immersiveAlignment: "bottom-left" };
+    const standard = { ...DEFAULT_OPENING, presentation: "standard", immersiveAlignment: "bottom-left" };
     expect(getPostStoryPresentation(post())).toEqual(standard);
     expect(getPostStoryPresentation(post({ primaryGameId: 4 }))).toEqual(standard);
     expect(getPostStoryPresentation(post({ presentation: "fullbleed", immersiveAlignment: "right" }))).toEqual(standard);

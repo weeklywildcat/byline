@@ -4,6 +4,7 @@ import {
   escapeHtml,
   formatEditorialDate,
   reportingNoteParagraphs,
+  requestedPresentation,
   type ArticleImageView,
   type ArticlePresentationContext,
   type PublicCorrection,
@@ -73,7 +74,8 @@ export function previewMediaAsset(doc: Doc): ArticleMediaAsset | null {
  */
 export function projectPayloadImage(image: PayloadImage, usage: StoryImageUsage): ArticleImageView | null {
   const { media } = image;
-  if (!isImage(media)) return null;
+  // Live Preview has no prepared crops: art-directed phone and tablet alternatives appear on the public page only.
+  if (usage.cropOnly || !isImage(media)) return null;
   const asset = previewMediaAsset(media);
   if (!asset) return null;
   const library = isDoc(media.sizes) && isDoc(media.sizes.library) ? media.sizes.library : null;
@@ -258,8 +260,11 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
     topics,
     sections: primarySection ? [primarySection] : [],
     athleteMeta: [],
-    presentation: doc.presentation === "immersive" ? "immersive" : "standard",
+    presentation: requestedPresentation(doc.presentation),
     immersiveAlignment: doc.immersiveAlignment === "center" ? "center" : "bottom-left",
+    featureWidth: doc.featureWidth === "full" ? "full" : "wide",
+    splitImageSide: doc.splitImageSide === "left" ? "left" : "right",
+    siteNavigation: doc.siteNavigation === "minimal" ? "minimal" : "standard",
     primaryVideo: primaryVideo(doc, title),
     contributors: people.map(contributor),
     modifiedAt,

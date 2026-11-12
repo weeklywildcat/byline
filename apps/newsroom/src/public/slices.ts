@@ -23,7 +23,7 @@ const relationId = (value: unknown): number | string | null => (value && typeof 
 /** Every Story field the native snapshot (and its listings, archives, feeds and SEO) can read. */
 export const STORY_PUBLIC_FIELDS = [
   "headline", "deck", "kicker", "section", "topics", "contributors", "featuredMedia", "featuredCaption",
-  "contentFormat", "body", "legacyHtml", "format", "video", "presentation", "immersiveAlignment",
+  "contentFormat", "body", "legacyHtml", "format", "video", "presentation", "immersiveAlignment", "featureWidth", "splitImageSide", "siteNavigation",
   "reportingNote", "slug", "publishedAt", "updatedAt"
 ] as const;
 

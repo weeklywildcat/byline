@@ -309,8 +309,11 @@
               "listed": {"type":"boolean"},
               "athleteMeta": {"type":"array","items":{"type":"string"}},
               "format": {"type":"string","enum":["standard","audio","video"]},
-              "presentation": {"type":"string","enum":["standard","immersive"]},
+              "presentation": {"type":"string","enum":["standard","feature","immersive","split"]},
               "immersiveAlignment": {"type":"string","enum":["center","bottom-left"]},
+              "featureWidth": {"type":"string","enum":["wide","full"]},
+              "splitImageSide": {"type":"string","enum":["left","right"]},
+              "siteNavigation": {"type":"string","enum":["standard","minimal"]},
               "video": {
                 "anyOf": [
                   {

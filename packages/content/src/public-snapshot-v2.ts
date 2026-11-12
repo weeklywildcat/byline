@@ -62,7 +62,9 @@ const story = obj({
   publishedAt: instant, modifiedAt: instant, section: term, sections: z.array(term).min(1), topics: z.array(term),
   sectionKeys: z.array(name), topicKeys: z.array(name), contributorKeys: z.array(name), contributors: z.array(contributor),
   image: id.nullable(), leadCaption: text, listed: z.boolean(), athleteMeta: z.array(text),
-  format: z.enum(["standard", "audio", "video"]), presentation: z.enum(["standard", "immersive"]), immersiveAlignment: z.enum(["center", "bottom-left"]),
+  format: z.enum(["standard", "audio", "video"]), presentation: z.enum(["standard", "feature", "immersive", "split"]), immersiveAlignment: z.enum(["center", "bottom-left"]),
+  // Optional: a story published before Feature, Split and Site navigation simply omits them.
+  featureWidth: z.enum(["wide", "full"]).optional(), splitImageSide: z.enum(["left", "right"]).optional(), siteNavigation: z.enum(["standard", "minimal"]).optional(),
   video: obj({ duration: text.nullable() }).nullable(),
   primaryVideo: obj({ videoId: text.regex(/^[\w-]{11}$/), title: name, embedUrl: url, duration: text.nullable().optional() }).nullable(),
   videoMetadata: video.nullable(), corrections: z.array(correction), reportingNote: z.array(text),

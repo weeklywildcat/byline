@@ -16,6 +16,8 @@ import "@byline/ui/newsroom-blocks.css";
 import "@byline/ui/article.css";
 import "@byline/ui/hero-reveal.css";
 import "@byline/ui/immersive-article.css";
+import "@byline/ui/story-opening.css";
+import "@byline/ui/story-navigation.css";
 import "../../../../web/views/fonts.css";
 import "../../../../web/views/globals.css";
 import "@byline/ui/contributor-profile.css";
@@ -27,7 +29,8 @@ export const metadata: Metadata = {
   title: "Story preview",
   robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } }
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+// `cover` so the Minimal site navigation can draw to the screen edge and clear the insets itself.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function PreviewLayout({ children }: { children: ReactNode }) {
   const style = themeTokensToCssVariables(weeklyWildcatTheme.tokens) as CSSProperties;

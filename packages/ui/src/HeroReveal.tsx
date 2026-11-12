@@ -18,6 +18,8 @@ export type HeroRevealImage = {
   alt: string;
   width?: number | null;
   height?: number | null;
+  /** Art-directed phone and tablet crops, tried in order. */
+  sources?: Array<{ media: string; srcSet: string; sizes?: string; width?: number | null; height?: number | null }>;
 };
 
 export type HeroRevealProps = {
@@ -32,6 +34,8 @@ export type HeroRevealProps = {
   target: string;
   scrollLabel?: string;
   className?: string;
+  /** Marks the hero as the region Minimal site navigation sits over (`data-story-nav-zone`). */
+  navZone?: boolean;
   /** The words over the image. Include the page or article `<h1>` here. */
   children?: ReactNode;
 };
@@ -46,25 +50,30 @@ export type HeroRevealProps = {
 export const HERO_REVEAL_FIT_SCRIPT =
   "(function(){var a=document.querySelector('[data-hero-reveal-anchor]');if(!a)return;var r=document.documentElement;function f(){r.style.setProperty('--hero-reveal-header-h',Math.max(0,a.getBoundingClientRect().top+window.scrollY)+'px')}f();addEventListener('resize',f);addEventListener('load',f);if(window.ResizeObserver)new ResizeObserver(f).observe(document.body)})()";
 
-export function HeroReveal({ image, imagePosition, scrim, align = "center", target, scrollLabel = "Scroll", className, children }: HeroRevealProps): ReactNode {
+export function HeroReveal({ image, imagePosition, scrim, align = "center", target, scrollLabel = "Scroll", className, navZone = false, children }: HeroRevealProps): ReactNode {
   const style = scrim === undefined ? undefined : ({ "--hero-reveal-scrim": String(scrim) } as CSSProperties);
   return (
     <>
       <div className="hero-reveal-anchor" data-hero-reveal-anchor aria-hidden="true" />
       <script id="hero-reveal-fit" dangerouslySetInnerHTML={{ __html: HERO_REVEAL_FIT_SCRIPT }} />
-      <header className={["hero-reveal", className].filter(Boolean).join(" ")} style={style}>
+      <header className={["hero-reveal", className].filter(Boolean).join(" ")} style={style} data-story-nav-zone={navZone ? "" : undefined}>
         {image?.src ? (
-          <img
-            className="hero-reveal-image"
-            src={image.src}
-            srcSet={image.srcSet}
-            sizes={image.sizes ?? "100vw"}
-            width={image.width ?? undefined}
-            height={image.height ?? undefined}
-            alt={image.alt}
-            fetchPriority="high"
-            style={imagePosition ? { objectPosition: imagePosition } : undefined}
-          />
+          <picture>
+            {image.sources?.map((source) => (
+              <source key={source.media} media={source.media} srcSet={source.srcSet} sizes={source.sizes ?? "100vw"} width={source.width ?? undefined} height={source.height ?? undefined} />
+            ))}
+            <img
+              className="hero-reveal-image"
+              src={image.src}
+              srcSet={image.srcSet}
+              sizes={image.sizes ?? "100vw"}
+              width={image.width ?? undefined}
+              height={image.height ?? undefined}
+              alt={image.alt}
+              fetchPriority="high"
+              style={imagePosition ? { objectPosition: imagePosition } : undefined}
+            />
+          </picture>
         ) : null}
         <div className={align === "end" ? "hero-reveal-copy hero-reveal-copy-end" : "hero-reveal-copy"}>{children}</div>
         <a className="hero-reveal-scroll" href={`#${target}`}>
@@ -78,7 +87,7 @@ export function HeroReveal({ image, imagePosition, scrim, align = "center", targ
   );
 }
 
-/** The opaque surface that follows the hero and rides up over it. */
-export function HeroRevealContent({ id, className, children }: { id: string; className?: string; children?: ReactNode }): ReactNode {
-  return <div className={["hero-reveal-content", className].filter(Boolean).join(" ")} id={id}>{children}</div>;
+/** The opaque surface that follows the hero and rides up over it. `navSurface` marks it as what Minimal site navigation turns solid over. */
+export function HeroRevealContent({ id, className, navSurface = false, children }: { id: string; className?: string; navSurface?: boolean; children?: ReactNode }): ReactNode {
+  return <div className={["hero-reveal-content", className].filter(Boolean).join(" ")} id={id} data-story-nav-surface={navSurface ? "" : undefined}>{children}</div>;
 }

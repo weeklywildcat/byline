@@ -14,7 +14,10 @@ import { guardPrivilegedBlocks, repairEmptyStoryBody, requireCompleteBody } from
 import type { StoryPlan } from "../payload-types";
 import {
   CONTENT_FORMATS,
+  FEATURE_IMAGE_WIDTH_OPTIONS,
   IMMERSIVE_ALIGNMENT_OPTIONS,
+  SPLIT_IMAGE_SIDE_OPTIONS,
+  STORY_SITE_NAVIGATION_OPTIONS,
   STORY_FORMAT_OPTIONS,
   STORY_PRESENTATION_OPTIONS
 } from "../domain/vocabulary";
@@ -292,7 +295,25 @@ export const Stories: CollectionConfig = {
               defaultValue: "bottom-left",
               options: [...IMMERSIVE_ALIGNMENT_OPTIONS],
               admin: { condition: (data) => data?.presentation === "immersive" }
-            }
+            },
+            {
+              name: "featureWidth",
+              label: "Image width",
+              type: "select",
+              defaultValue: "wide",
+              options: [...FEATURE_IMAGE_WIDTH_OPTIONS],
+              admin: { condition: (data) => data?.presentation === "feature" }
+            },
+            {
+              name: "splitImageSide",
+              label: "Image side",
+              type: "select",
+              defaultValue: "right",
+              options: [...SPLIT_IMAGE_SIDE_OPTIONS],
+              admin: { condition: (data) => data?.presentation === "split" }
+            },
+            // Chosen separately from the opening: the site chrome around the story.
+            { name: "siteNavigation", label: "Site navigation", type: "select", defaultValue: "standard", options: [...STORY_SITE_NAVIGATION_OPTIONS] }
           ]
         },
         { name: "reportingNote", label: "How we reported this", type: "textarea", maxLength: 4000 },

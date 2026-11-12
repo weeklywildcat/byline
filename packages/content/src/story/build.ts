@@ -1,5 +1,8 @@
+import type { ImageCropShape } from "@byline/core";
 import type {
   ArticleContributorView,
+  ArticleImageSourceView,
+  ArticleImageView,
   ArticleLinkView,
   ArticlePresentation,
   ArticleSeriesPartView,
@@ -16,6 +19,7 @@ import type {
   PublicTerm,
   StoryImageUsage
 } from "./public-story";
+import { requestedPresentation } from "./resolution";
 import { articleBodyPlainText, plainTextFromHtml, wordCount } from "./text";
 
 /**
@@ -36,11 +40,37 @@ const COVERAGE_GUIDE_LIMIT = 4;
 /** The geometry of every image the article uses. Both hosts project through these. */
 export const ARTICLE_IMAGE_USAGE = {
   lead: { role: "lead", sizes: "(max-width: 900px) 100vw, 900px", priority: true, searchVisibility: "canonical" },
+  // The Feature, Immersive and Split openings paint the lead photograph across the viewport.
+  leadFull: { role: "lead", sizes: "100vw", priority: true, searchVisibility: "canonical" },
+  leadSplit: { role: "lead", sizes: "(max-width: 1023px) 100vw, 56vw", priority: true, searchVisibility: "canonical" },
   contributor: { role: "contributor", sizes: "132px", priority: false, searchVisibility: "presentation" },
   // Compact teasers are square (globals.css .story-teaser-compact).
   card: { role: "card", sizes: "(max-width: 900px) 100vw, 360px", priority: false, searchVisibility: "presentation", shape: "square" },
   seriesPart: { role: "series-part", sizes: "(max-width: 700px) 30vw, 180px", priority: false, searchVisibility: "presentation", shape: "standard" }
 } as const satisfies Record<string, StoryImageUsage>;
+
+/**
+ * The lead photograph for the story's opening. Standard keeps the original
+ * geometry exactly. Feature, Immersive and Split ask for full-viewport sizes
+ * and the editor's explicit phone and tablet crops, when they made any.
+ */
+function leadImage<Image>(story: PublicStory<Image>, context: ArticlePresentationContext<Image>): ArticleImageView | null {
+  if (!story.image) return null;
+  const opening = requestedPresentation(story.presentation);
+  if (opening === "standard" || story.primaryVideo) return context.image(story.image, ARTICLE_IMAGE_USAGE.lead);
+  const usage = opening === "split" ? ARTICLE_IMAGE_USAGE.leadSplit : ARTICLE_IMAGE_USAGE.leadFull;
+  const image = context.image(story.image, usage);
+  if (!image) return null;
+  const directions: Array<{ media: string; shape: ImageCropShape }> = opening === "immersive"
+    ? [{ media: "(max-width: 1023px) and (orientation: portrait)", shape: "portrait" }]
+    : [{ media: "(max-width: 640px)", shape: "portrait" }, { media: "(max-width: 1023px)", shape: "standard" }];
+  const sources: ArticleImageSourceView[] = [];
+  for (const { media, shape } of directions) {
+    const crop = context.image(story.image, { ...usage, shape, cropOnly: true });
+    if (crop?.srcSet) sources.push({ media, srcSet: crop.srcSet, sizes: usage.sizes === ARTICLE_IMAGE_USAGE.leadSplit.sizes ? "100vw" : usage.sizes, width: crop.width, height: crop.height });
+  }
+  return sources.length > 0 ? { ...image, sources } : image;
+}
 
 export function readingTimeLabel(words: number): string {
   return `${Math.max(1, Math.ceil(words / WORDS_PER_MINUTE))} min read`;
@@ -218,6 +248,9 @@ export function buildArticlePresentation<Image>(story: PublicStory<Image>, conte
     athleteMeta: story.athleteMeta,
     storyPresentation: story.presentation,
     immersiveAlignment: story.immersiveAlignment,
+    ...(story.featureWidth ? { featureWidth: story.featureWidth } : {}),
+    ...(story.splitImageSide ? { splitImageSide: story.splitImageSide } : {}),
+    ...(story.siteNavigation ? { siteNavigation: story.siteNavigation } : {}),
     ...(story.primaryVideo ? { video: story.primaryVideo } : {}),
     contributors: story.contributors.map((contributor) => contributorView(contributor, context.contributorStories, context)),
     fallbackByline: `${context.publication.shortName} Staff`,
@@ -226,7 +259,7 @@ export function buildArticlePresentation<Image>(story: PublicStory<Image>, conte
     modifiedAt: liveUpdated ? liveUpdated.updatedAt : updated ? story.modifiedAt : null,
     modifiedLabel: liveUpdated ? liveUpdated.updatedLabel : updated ? context.formatDate(story.modifiedAt) : null,
     readingTime: storyReadingTime(story),
-    image: story.image ? context.image(story.image, ARTICLE_IMAGE_USAGE.lead) : null,
+    image: leadImage(story, context),
     corrections: story.corrections.filter((correction) => !correction.legacy).map((correction) => ({
       id: correction.id,
       label: correctionTypeLabel(correction.type),

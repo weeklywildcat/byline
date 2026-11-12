@@ -39,5 +39,26 @@ export function browserContent(posts: ArchivePost[], categories: ArchiveCategory
     content: { rendered: "<p>The feature fixture's text edition.</p>" },
     excerpt: { rendered: "<p>How a third serving window changed third lunch.</p>" }
   };
-  return { posts: [...posts, ...additions, feature], categories: [...categories, section] };
+  // The story openings (Feature, Split, Immersive) and Site navigation, one story each. Like the presentation-preset
+  // feature above they are unpinned Off Deadline stories, so no homepage list moves; they borrow an immersive fixture's lead photograph.
+  const photo = posts.find((post) => post.id === 8)!;
+  const openings = [
+    { id: 94, day: "10", slug: "weekly-wildcat-opening-feature", title: "The gardener who stayed", byline: { presentation: "feature", featureWidth: "wide" } },
+    { id: 95, day: "11", slug: "weekly-wildcat-opening-feature-full-minimal", title: "Forty years on the same field", byline: { presentation: "feature", featureWidth: "full", siteNavigation: "minimal" } },
+    { id: 96, day: "12", slug: "weekly-wildcat-opening-split-left-minimal", title: "A school year in nine portraits", byline: { presentation: "split", splitImageSide: "left", siteNavigation: "minimal" } },
+    { id: 97, day: "13", slug: "weekly-wildcat-opening-split", title: "The long walk to the bus", byline: { presentation: "split", splitImageSide: "right" } },
+    { id: 98, day: "14", slug: "weekly-wildcat-opening-immersive-minimal", title: "Night practice under the lights", byline: { presentation: "immersive", immersiveAlignment: "bottom-left", siteNavigation: "minimal" } },
+    { id: 99, day: "15", slug: "weekly-wildcat-opening-standard-minimal", title: "A quiet morning in the library", byline: { siteNavigation: "minimal" } }
+  ].map(({ id, day, slug, title, byline }): ArchivePost => ({
+    ...photo, id, slug, sticky: false,
+    categories: [...photo.categories, section.id],
+    _embedded: { ...photo._embedded, "wp:term": [[...(photo._embedded?.["wp:term"]?.[0] ?? []), section], photo._embedded?.["wp:term"]?.[1] ?? []] },
+    date: `2026-01-${day}T09:00:00`, date_gmt: `2026-01-${day}T14:00:00`, modified: `2026-01-${day}T09:00:00`, modified_gmt: `2026-01-${day}T14:00:00`,
+    link: `https://weeklywildcat.com/2026/01/${day}/news/${slug}/`,
+    title: { rendered: title },
+    content: { rendered: "<p>The opening fixture's text edition.</p><p>A second paragraph, so the body has some length under the opening.</p>" },
+    excerpt: { rendered: "<p>A deck that runs a line or two under the headline.</p>" },
+    byline
+  }));
+  return { posts: [...posts, ...additions, feature, ...openings], categories: [...categories, section] };
 }

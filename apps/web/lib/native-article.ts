@@ -20,6 +20,8 @@ export function nativeImage(id: number, usage: StoryImageUsage) {
   if (asset?.manifest.kind !== "image") return null;
   const { manifest } = asset;
   const crop = usage.shape && usage.shape !== "social" ? manifest.crops[usage.shape] : undefined;
+  // An art-directed alternative exists only where the editor made the crop.
+  if (usage.cropOnly && !crop) return null;
   const ladder = usage.shape === "social" ? [manifest.social] : crop?.renditions ?? manifest.natural;
   const fallback = ladder[ladder.length - 1];
   const { x, y } = manifest.focalPoint;
