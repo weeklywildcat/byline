@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@byline/newsro
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { exactDate, relativeTime, shortDateTime, siteDay } from "../home/newsroom-model";
 import { ProductionSummary, StoryDueLabel, plannedLabel, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
+import { StoryHoverCard, StoryIntentArea } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { isPlannedDayOnly, movableWorkflowStatuses, type PlanningSort, type PlanningSortKey, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 
@@ -172,7 +172,7 @@ export function StoryList(props: StoryListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visible.map((story) => context(story, <TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
+          {visible.map((story) => context(story, <StoryIntentArea storyId={story.id}><TableRow key={story.id} data-story-id={story.id} aria-busy={busy(story) || undefined} className="h-12 cursor-pointer border-b border-border/70 hover:bg-muted/40" onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
             <TableCell className="py-2 pl-3 whitespace-normal"><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 text-[15px] font-semibold leading-5" /></StoryHoverCard></TableCell>
             <TableCell className="py-2 [&_[data-slot=select-trigger]]:max-w-full [&_[data-slot=badge]]:max-w-full"><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} /></TableCell>
             <TableCell className="py-2 whitespace-normal"><People story={story} /></TableCell>
@@ -181,12 +181,12 @@ export function StoryList(props: StoryListProps) {
             <TableCell className="py-2"><ProductionSummary story={story} maxSignals={2} className="flex-row gap-x-1.5 gap-y-1 [&_[data-slot=badge]]:max-w-full" /></TableCell>
             <TableCell className="py-2 text-xs text-muted-foreground">{story.modifiedAt ? <time dateTime={story.modifiedAt} title={exactDate(story.modifiedAt, timezone)}>{relativeTime(story.modifiedAt, timezone, now)}</time> : "—"}</TableCell>
             <TableCell className="py-2 text-right">{menu(story)}</TableCell>
-          </TableRow>))}
+          </TableRow></StoryIntentArea>))}
           {hasMore ? <TableRow ref={sentinel} aria-hidden="true" className="hover:bg-transparent"><TableCell colSpan={8} className="h-12" /></TableRow> : null}
         </TableBody>
       </Table>
       : <ItemGroup className="gap-0" aria-label={"Stories"}>
-        {visible.map((story) => context(story, <Item key={story.id} size="sm" data-story-id={story.id} className="cursor-pointer rounded-none border-0 border-b border-border/70 hover:bg-muted/40 active:bg-muted/60 last:border-b-0" aria-busy={busy(story) || undefined} onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
+        {visible.map((story) => context(story, <StoryIntentArea storyId={story.id}><Item key={story.id} size="sm" data-story-id={story.id} className="cursor-pointer rounded-none border-0 border-b border-border/70 hover:bg-muted/40 active:bg-muted/60 last:border-b-0" aria-busy={busy(story) || undefined} onClick={(event) => { if (opensPeek(event)) onOpenStory(story.id); }}>
           <ItemContent>
             <ItemTitle><StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className="line-clamp-2 font-semibold" /></StoryHoverCard></ItemTitle>
             <div className="text-sm"><People story={story} /></div>
@@ -198,7 +198,7 @@ export function StoryList(props: StoryListProps) {
             </div>
           </ItemContent>
           <ItemActions><InlineWorkflow story={story} statuses={statuses} canMove={canMoveStories && story.canEditPlanning !== false} disabled={busy(story)} onMove={onMoveStory} />{menu(story)}</ItemActions>
-        </Item>))}
+        </Item></StoryIntentArea>))}
         {hasMore ? <div ref={sentinel} aria-hidden="true" className="h-12" /> : null}
       </ItemGroup>}
   </div></div>;
