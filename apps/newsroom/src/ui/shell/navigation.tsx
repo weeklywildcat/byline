@@ -2,12 +2,12 @@
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { useRouteTransition } from "@payloadcms/ui";
-import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ShellLayer } from "./layer";
+import { prefetchFullRoute } from "./prefetch";
 
 /**
  * What a screen with a document open reports about it: edited since the last
@@ -88,8 +88,7 @@ export function ShellNavigationProvider({ children, warmHrefs = [] }: { children
       if (!active) return;
       for (const href of warmHrefs) {
         if (warmedRoutes.current.has(href) || href.split("?")[0] === pathname) continue;
-        warmedRoutes.current.add(href);
-        router.prefetch(href, { kind: "full" } as unknown as PrefetchOptions);
+        if (prefetchFullRoute(router, href)) warmedRoutes.current.add(href);
       }
     };
     const idleWindow = window as Window & {
@@ -188,7 +187,7 @@ export function usePrefetchOnIntent(href: string) {
   const timer = useRef<number | null>(null);
   const prefetch = useCallback(() => {
     // "full": the dynamic screen itself, not only its loading shell (Next's PrefetchKind.FULL).
-    router.prefetch(href, { kind: "full" } as unknown as PrefetchOptions);
+    prefetchFullRoute(router, href);
   }, [router, href]);
   const cancel = useCallback(() => { if (timer.current !== null) window.clearTimeout(timer.current); timer.current = null; }, []);
   useEffect(() => cancel, [cancel]);
