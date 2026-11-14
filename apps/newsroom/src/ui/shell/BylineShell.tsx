@@ -6,6 +6,7 @@ import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-que
 import { QueryClientProvider } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
+import { primaryNavigationFor } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { BylineCreateProvider } from "./create";
 import { routeSidebarWidthRule, shellRouteFor, ShellLayoutProvider, shellSidebarStyle, SidebarWidthSyncProvider, useAdaptiveNavigation, useCurrentShellLayout, useSidebarWidthLayout } from "./layout";
@@ -48,13 +49,14 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
   const pathname = usePathname() ?? "";
   const search = useSearchParams()?.toString() ?? "";
   const widthRule = routeSidebarWidthRule(shellRouteFor(pathname, routes.admin, search));
+  const warmHrefs = useMemo(() => account ? primaryNavigationFor(account.role).map((item) => `${routes.admin}${item.path}` || "/") : [], [account?.role, routes.admin]);
   return (
     <QueryClientProvider client={client}>
       {widthRule ? <style>{widthRule}</style> : null}
       <SidebarProvider defaultOpen={defaultOpen} keyboardShortcut={adaptive ? false : SIDEBAR_SHORTCUT} persistCookie={SIDEBAR_COOKIE} style={style}>
         <ShellLayoutProvider value={layout}>
           <SidebarWidthSyncProvider value={width.sync}>
-            <ShellNavigationProvider>
+            <ShellNavigationProvider warmHrefs={warmHrefs}>
               {/* Collections sits above Create and Search: ⌘K and every shared screen reach a Collection through it. */}
               <CollectionsWorkspaceShell>
                 <BylineCreateProvider>

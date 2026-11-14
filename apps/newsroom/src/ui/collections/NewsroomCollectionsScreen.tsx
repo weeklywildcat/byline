@@ -4,7 +4,6 @@ import { CollectionsScreen } from "@byline/newsroom-screens/collections/Collecti
 import { CollectionHostProvider, type CollectionHost } from "@byline/newsroom-screens/collections/collection-host";
 import type { CollectionGuard } from "@byline/newsroom-screens/collections/collection-guard";
 import { DEFAULT_COLLECTION_QUERY } from "@byline/newsroom-screens/collections/collection-model";
-import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -18,6 +17,7 @@ import { useBylineCreate } from "../shell/create";
 import { useShellLayout } from "../shell/layout";
 import { useLeaveGuard, useShellNavigation } from "../shell/navigation";
 import { useBylineSearch } from "../shell/search";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
 import { useCollectionsWorkspace } from "./CollectionsWorkspaceShell";
 import { collectionsHistory, useCollectionRoute } from "./collection-route";
@@ -37,15 +37,14 @@ export function NewsroomCollectionsScreen({ currentUserId }: { currentUserId: nu
   const routes = useNewsroomRoutes();
   const { getPreference, setPreference } = usePreferences();
   const fetchers = useMemo<Fetchers>(() => ({ ...createPayloadHomeFetchers(routes.api), ...createPayloadPlanningFetchers(routes.api, { getPreference, setPreference }) }), [routes.api, getPreference, setPreference]);
+  const preloadStory = useStoryPreload(fetchers, routes.story);
   return (
     <AdminRoot className="byline-collections" toaster={false}>
-      <StoryHoverProvider fetchers={fetchers}>
-        <StoryPeekHost fetchers={fetchers} workspaceUrl={routes.story}>
-          <main className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4 px-4 py-6 lg:px-6" data-byline-collections-screen="">
-            <CollectionsBody fetchers={fetchers} currentUserId={currentUserId} />
-          </main>
-        </StoryPeekHost>
-      </StoryHoverProvider>
+      <StoryPeekHost fetchers={fetchers} workspaceUrl={routes.story} preloadStory={preloadStory}>
+        <main className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-4 px-4 py-6 lg:px-6" data-byline-collections-screen="">
+          <CollectionsBody fetchers={fetchers} currentUserId={currentUserId} />
+        </main>
+      </StoryPeekHost>
     </AdminRoot>
   );
 }

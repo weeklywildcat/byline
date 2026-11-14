@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
@@ -11,17 +11,22 @@ import { exactDate, shortDateTime } from "../home/newsroom-model";
 import { reportingSummaryLine, type PlanningStory } from "../planning/planning-model";
 import { ProductionSummary, WorkflowBadge, plannedLabel } from "./story-parts";
 import type { StoryFetchers } from "./story-fetchers";
-import { workspaceKey } from "./story-query";
+import { prefetchStoryWorkspace, workspaceQueryOptions } from "../workspace/workspace-query";
 import { openTasks } from "../workspace/workspace-model";
 
 type StoryHoverSummary = Pick<PlanningStory, "id" | "title"> & Partial<Omit<PlanningStory, "id" | "title">>;
 
-type StoryHoverContextValue = { fetchers: StoryFetchers };
+type StoryHoverContextValue = { fetchers: StoryFetchers; preloadStory: (storyId: number) => void };
 
 const StoryHoverContext = createContext<StoryHoverContextValue | null>(null);
 
-export function StoryHoverProvider({ fetchers, children }: StoryHoverContextValue & { children: ReactNode }) {
-  const value = useMemo(() => ({ fetchers }), [fetchers]);
+export function StoryHoverProvider({ fetchers, preloadStory, children }: { fetchers: StoryFetchers; preloadStory?: (storyId: number) => void; children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const warmStory = useCallback((storyId: number) => {
+    if (preloadStory) preloadStory(storyId);
+    else if (fetchers.getWorkspace) void prefetchStoryWorkspace(queryClient, storyId, fetchers.getWorkspace);
+  }, [fetchers.getWorkspace, preloadStory, queryClient]);
+  const value = useMemo(() => ({ fetchers, preloadStory: warmStory }), [fetchers, warmStory]);
   return <StoryHoverContext value={value}>{children}</StoryHoverContext>;
 }
 
@@ -77,30 +82,62 @@ export function StoryHoverCard(props: {
 }) {
   const context = useContext(StoryHoverContext);
   const canHover = useFineHoverPointer();
-  if (!canHover || !context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
-  return <StoryHoverCardQuery {...props} context={context} />;
+  if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
+  return <StoryHoverCardQuery {...props} context={context} canHover={canHover} />;
 }
 
-function StoryHoverCardQuery({ storyId, title, story, note, children, context }: {
+export const STORY_PREFETCH_INTENT_MS = 60;
+
+type IntentProps = Pick<ComponentProps<"div">, "onPointerEnter" | "onPointerLeave" | "onFocus" | "onTouchStart">;
+
+/** Shared intent handlers for a Story row, card or headline. */
+export function useStoryIntent(storyId: number): IntentProps & { preload: () => void } {
+  const context = useContext(StoryHoverContext);
+  const intentTimer = useRef<number | null>(null);
+  const cancelIntent = useCallback(() => {
+    if (intentTimer.current !== null) window.clearTimeout(intentTimer.current);
+    intentTimer.current = null;
+  }, []);
+  const preload = useCallback(() => {
+    cancelIntent();
+    if (!context || storyId <= 0) return;
+    context.preloadStory(storyId);
+  }, [cancelIntent, context, storyId]);
+  const scheduleIntent = useCallback(() => {
+    cancelIntent();
+    if (!context || storyId <= 0) return;
+    intentTimer.current = window.setTimeout(preload, STORY_PREFETCH_INTENT_MS);
+  }, [cancelIntent, context, preload, storyId]);
+  useEffect(() => cancelIntent, [cancelIntent]);
+  return { onPointerEnter: scheduleIntent, onPointerLeave: cancelIntent, onFocus: preload, onTouchStart: preload, preload };
+}
+
+function StoryHoverCardQuery({ storyId, title, story, note, children, context, canHover }: {
   storyId: number;
   title: string;
   story?: StoryHoverSummary;
   note?: string;
   children: ReactElement;
   context: StoryHoverContextValue;
+  canHover: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const intent = useStoryIntent(storyId);
   const blockOpenUntil = useRef(0);
   const suppressForSecondaryPress = () => {
     blockOpenUntil.current = performance.now() + 750;
     setOpen(false);
   };
-  const preview = useQuery({
-    queryKey: workspaceKey(storyId),
-    queryFn: () => context.fetchers.getWorkspace!(storyId),
-    enabled: open,
-    staleTime: 30_000
-  });
+  const preview = useQuery({ ...workspaceQueryOptions(storyId, context.fetchers.getWorkspace!), enabled: open });
+
+  if (!canHover) {
+    type IntentProps = Pick<ComponentProps<"button">, "onFocus" | "onTouchStart">;
+    const child = children as ReactElement<IntentProps>;
+    return cloneElement(child, {
+      onFocus: (event) => { child.props.onFocus?.(event); intent.preload(); },
+      onTouchStart: (event) => { child.props.onTouchStart?.(event); intent.preload(); }
+    });
+  }
 
   const workspace = preview.data;
   const resolved: StoryHoverSummary = workspace?.story || story || { id: storyId, title };
@@ -116,6 +153,10 @@ function StoryHoverCardQuery({ storyId, title, story, note, children, context }:
       delay={260}
       closeDelay={140}
       render={children}
+      onPointerEnter={intent.onPointerEnter}
+      onPointerLeave={intent.onPointerLeave}
+      onFocus={intent.onFocus}
+      onTouchStart={intent.onTouchStart}
       onPointerDownCapture={(event) => {
         if (event.button === 2 || (event.button === 0 && event.ctrlKey)) suppressForSecondaryPress();
       }}
