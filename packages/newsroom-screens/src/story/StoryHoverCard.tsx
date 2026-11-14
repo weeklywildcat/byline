@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
@@ -77,19 +77,20 @@ export function StoryHoverCard(props: {
 }) {
   const context = useContext(StoryHoverContext);
   const canHover = useFineHoverPointer();
-  if (!canHover || !context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
-  return <StoryHoverCardQuery {...props} context={context} />;
+  if (!context?.fetchers.getWorkspace || props.storyId <= 0) return props.children;
+  return <StoryHoverCardQuery {...props} context={context} canHover={canHover} />;
 }
 
 export const STORY_PREFETCH_INTENT_MS = 60;
 
-function StoryHoverCardQuery({ storyId, title, story, note, children, context }: {
+function StoryHoverCardQuery({ storyId, title, story, note, children, context, canHover }: {
   storyId: number;
   title: string;
   story?: StoryHoverSummary;
   note?: string;
   children: ReactElement;
   context: StoryHoverContextValue;
+  canHover: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -114,6 +115,15 @@ function StoryHoverCardQuery({ storyId, title, story, note, children, context }:
     setOpen(false);
   };
   const preview = useQuery({ ...workspaceQueryOptions(storyId, context.fetchers.getWorkspace!), enabled: open });
+
+  if (!canHover) {
+    type IntentProps = Pick<ComponentProps<"button">, "onFocus" | "onTouchStart">;
+    const child = children as ReactElement<IntentProps>;
+    return cloneElement(child, {
+      onFocus: (event) => { child.props.onFocus?.(event); preload(); },
+      onTouchStart: (event) => { child.props.onTouchStart?.(event); preload(); }
+    });
+  }
 
   const workspace = preview.data;
   const resolved: StoryHoverSummary = workspace?.story || story || { id: storyId, title };
