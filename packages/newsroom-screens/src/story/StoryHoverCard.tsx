@@ -21,6 +21,7 @@ type StoryHoverContextValue = { fetchers: StoryFetchers; preloadStory: (storyId:
 const StoryHoverContext = createContext<StoryHoverContextValue | null>(null);
 
 export function StoryHoverProvider({ fetchers, preloadStory, children }: { fetchers: StoryFetchers; preloadStory?: (storyId: number) => void; children: ReactNode }) {
+  const queryClient = useQueryClient();
   const warmStory = useCallback((storyId: number) => {
     if (preloadStory) preloadStory(storyId);
     else if (fetchers.getWorkspace) void prefetchStoryWorkspace(queryClient, storyId, fetchers.getWorkspace);
@@ -92,7 +93,6 @@ type IntentProps = Pick<ComponentProps<"div">, "onPointerEnter" | "onPointerLeav
 /** Shared intent handlers for a Story row, card or headline. */
 export function useStoryIntent(storyId: number): IntentProps & { preload: () => void } {
   const context = useContext(StoryHoverContext);
-  const queryClient = useQueryClient();
   const intentTimer = useRef<number | null>(null);
   const cancelIntent = useCallback(() => {
     if (intentTimer.current !== null) window.clearTimeout(intentTimer.current);
