@@ -16,7 +16,7 @@ import { WorkspaceHeader } from "./WorkspaceHeader";
 import { WorkspaceLoadError, WorkspaceSkeleton } from "./WorkspaceStates";
 import { WorkspaceContext, type WorkspaceContextValue, type WorkspaceEnv } from "./workspace-context";
 import { workspaceError } from "./workspace-errors";
-import { workspaceKey, workspaceQueryClient } from "./workspace-query";
+import { workspaceQueryClient, workspaceQueryOptions } from "./workspace-query";
 import type { StoryWorkspace as StoryWorkspaceData, WorkspaceSection } from "./workspace-types";
 
 export type StoryWorkspaceAppProps = WorkspaceEnv;
@@ -48,14 +48,13 @@ export function useOptionalWorkspace(): WorkspaceContextValue | null {
  * below, or the Payload Story screen's Plan tab.
  */
 export function StoryWorkspaceProvider({ children, ...env }: WorkspaceEnv & { children: ReactNode }) {
-  return <QueryClientProvider client={workspaceQueryClient}><WorkspaceLoader env={env}>{children}</WorkspaceLoader></QueryClientProvider>;
+  return <WorkspaceLoader env={env}>{children}</WorkspaceLoader>;
 }
 
 function WorkspaceLoader({ env, children }: { env: WorkspaceEnv; children: ReactNode }) {
   const { storyId, client } = env;
   const query = useQuery({
-    queryKey: workspaceKey(storyId),
-    queryFn: () => client.getWorkspace(storyId),
+    ...workspaceQueryOptions(storyId, (id) => client.getWorkspace(id)),
     // A 403/404 will not change on a retry; a dropped connection might.
     retry: (count, error) => { const failure = workspaceError(error); return !failure.forbidden && !failure.notFound && count < 1; }
   });
@@ -106,9 +105,11 @@ export function WorkspaceAnnouncer() {
 
 /** The Story Workspace page (WordPress): header, then the sections in two columns. */
 export function StoryWorkspaceApp(props: StoryWorkspaceAppProps) {
-  return <StoryWorkspaceProvider {...props}>
-    <AdminRoot><WorkspaceGate><WorkspacePage /></WorkspaceGate></AdminRoot>
-  </StoryWorkspaceProvider>;
+  return <QueryClientProvider client={workspaceQueryClient}>
+    <StoryWorkspaceProvider {...props}>
+      <AdminRoot><WorkspaceGate><WorkspacePage /></WorkspaceGate></AdminRoot>
+    </StoryWorkspaceProvider>
+  </QueryClientProvider>;
 }
 
 function WorkspacePage() {
