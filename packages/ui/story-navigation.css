@@ -245,6 +245,14 @@
   text-underline-offset: 4px;
 }
 
+/* The section this story belongs to. */
+.story-nav__sections a[aria-current],
+.story-nav__secondary a[aria-current] {
+  box-shadow: inset 3px 0 0 var(--accent, #0969da);
+  color: var(--accent, #0969da);
+  padding-left: 14px;
+}
+
 /* A modal sheet holds the page still behind it. */
 body:has(.story-nav__sheet[open]) {
   overflow: hidden;

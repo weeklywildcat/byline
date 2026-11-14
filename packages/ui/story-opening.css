@@ -129,6 +129,8 @@
 /* Phone: the photograph goes edge to edge; the headline stays inset above it. */
 .story-opening-feature .story-opening-media {
   aspect-ratio: 4 / 5;
+  /* When max-height caps the frame, aspect-ratio narrows it; keep it centered in its figure. */
+  margin-inline: auto;
   max-height: 86svh;
 }
 

@@ -1,5 +1,6 @@
 import { StoryNavigation } from "@byline/ui";
 import { getNavigation, getPublicationConfig } from "@/lib/publication";
+import { currentLink } from "@/lib/current-section";
 import { THE_PROWLER } from "@/lib/the-prowler";
 
 const publication = getPublicationConfig();
@@ -50,9 +51,11 @@ type SiteHeaderProps = {
   // "prowler" swaps in The Prowler wordmark on the satire section and its
   // stories; the utility strip then links back to the publication's homepage.
   masthead?: "publication" | "prowler";
+  // The address being rendered, so the section it belongs to can be marked as current.
+  currentPath?: string;
 };
 
-export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, showDate = true, homepage = false, masthead = "publication" }: SiteHeaderProps) {
+export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, showDate = true, homepage = false, masthead = "publication", currentPath }: SiteHeaderProps) {
   const prowler = masthead === "prowler";
   const brand = prowler
     ? { name: THE_PROWLER.name, href: THE_PROWLER.path, logoUrl: THE_PROWLER.logo.src, alt: THE_PROWLER.name }
@@ -64,8 +67,8 @@ export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, sh
         publicationName={brand.name}
         homeHref={brand.href}
         logoUrl={brand.logoUrl}
-        sections={headerNavigation.map(({ label, url }) => ({ label, url }))}
-        secondary={menuSecondaryNavigation.map(({ label, url }) => ({ label, url }))}
+        sections={headerNavigation.map(({ label, url }) => ({ label, url, current: currentLink(url, currentPath) }))}
+        secondary={menuSecondaryNavigation.map(({ label, url }) => ({ label, url, current: currentLink(url, currentPath) }))}
       />
     );
   }
@@ -109,7 +112,7 @@ export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, sh
 
       <nav aria-label="Sections" className="section-nav">
         {headerNavigation.map((section) => (
-          <a key={`${section.label}-${section.url}`} href={section.url}>
+          <a key={`${section.label}-${section.url}`} href={section.url} aria-current={currentLink(section.url, currentPath)}>
             {section.label}
           </a>
         ))}
