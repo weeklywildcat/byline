@@ -18,5 +18,6 @@ export function createPayloadPeopleApi(api: string): PeopleApi {
     create: (input) => request("/people", "POST", input),
     update: (id, input) => request(`/people/${id}`, "PATCH", input),
     saveAccess: (id, input) => request(`/people/${id}/access`, "PUT", input),
+    restartOnboarding: (id) => request(`/people/${id}/onboarding/restart`, "POST"),
   };
 }

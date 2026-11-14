@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
+import { markWelcomeSeen } from "./helpers";
 const fixtures = () =>
   JSON.parse(
     readFileSync("/private/tmp/byline-people-browser.json", "utf8"),
@@ -9,6 +10,7 @@ async function login(page: Page, role = "editor") {
     data: { email: `${role}@example.test`, password: "people-browser-123456" },
   });
   expect(res.ok()).toBe(true);
+  await markWelcomeSeen(page.request, { Authorization: `JWT ${(await res.json()).token}` });
 }
 const row = (page: Page, name: string) =>
   page.locator("[data-person-row]").filter({ hasText: name });

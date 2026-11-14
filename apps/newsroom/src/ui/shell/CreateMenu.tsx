@@ -11,6 +11,7 @@ import { ChevronDown, FileText, Layers, ListTodo, Plus, Upload, type LucideIcon 
 import type { CreateAction, CreateKind } from "../../domain/navigation";
 import { useBylineCreate } from "./create";
 import { BOTTOM_NAVIGATION_QUERY } from "./shell-config";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 const ICONS: Record<CreateKind, LucideIcon> = { story: FileText, task: ListTodo, collection: Layers, media: Upload };
 
@@ -49,7 +50,7 @@ export function CreateMenu({ compact = false }: { compact?: boolean }) {
   );
 
   return (
-    <SidebarMenu>
+    <SidebarMenu {...tourAnchor("create")}>
       <SidebarMenuItem>
         {collapsed && (more.length || compact) ? (
           <DropdownMenu>
@@ -95,7 +96,7 @@ export function HeaderCreate() {
   };
 
   return (
-    <div className="byline-header-create">
+    <div className="byline-header-create" {...tourAnchor("create")}>
       {phone || drawerOpen || choice ? (
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} onOpenChangeComplete={(open) => {
           if (!open && choice) {

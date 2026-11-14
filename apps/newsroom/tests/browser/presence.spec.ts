@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import pg from "pg";
 import { PRESENCE_TIMING } from "../../src/domain/presence";
+import { markWelcomeSeen } from "./helpers";
 
 const API = "/api/byline/presence";
 const STORY = "Greenwood expands its library";
@@ -12,6 +13,7 @@ const row = (parent: ReturnType<typeof panel>, name: string) => parent.getByRole
 async function login(page: Page, name: string, origin: string) {
   const response = await page.request.post("/api/users/login", { headers: { Origin: origin }, data: { email: `${name}@example.test`, password: "presence-fixture-password" } });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await markWelcomeSeen(page.request, { Authorization: `JWT ${(await response.json()).token}`, Origin: origin });
 }
 
 // Headless Chromium doesn't consistently hide background pages across contexts.

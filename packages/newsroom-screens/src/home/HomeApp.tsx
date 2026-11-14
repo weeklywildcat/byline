@@ -262,7 +262,8 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   // In a host shell, Home's muted canvas fills the content area; in wp-admin it lines up with the admin gutter.
   return <StoryHoverProvider fetchers={fetchers}><main className={cn("@container/home", shell && "min-h-full w-full bg-muted")}>
     <div className={cn("mx-auto flex max-w-[1320px] flex-col gap-5", shell ? "px-4 py-6 sm:px-7" : "mt-6 mb-8 pr-5 pl-1")}>
-    <header className="flex items-start justify-between gap-3">
+    {/* data-byline-tour: the newsroom's welcome tour points here (apps/newsroom/src/ui/onboarding). */}
+    <header className="flex items-start justify-between gap-3" data-byline-tour="home-screen">
       <div className="min-w-0">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Today</h1>
         <p className="text-sm text-muted-foreground">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: timezone }).format(now)}{data ? <span className="whitespace-nowrap"> · Week {isoWeek(today)}</span> : null}</p>

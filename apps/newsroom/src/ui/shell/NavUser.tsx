@@ -5,10 +5,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avat
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
 import { cn } from "@byline/newsroom-ui/lib/utils";
-import { ChevronsUpDown, Keyboard, LogOut, NotebookPen, UserRound, Wrench } from "lucide-react";
+import { ChevronsUpDown, Compass, Keyboard, LogOut, NotebookPen, UserRound, Wrench } from "lucide-react";
 import { ShellLink } from "./navigation";
 import { useSignOut } from "./sign-out";
 import { useBylineShortcuts } from "./shortcuts";
+import { useOnboarding } from "../onboarding/OnboardingProvider";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 export type ShellUser = { name: string; subtitle: string; avatarUrl: string | null; profileHref?: string | null };
 
@@ -53,9 +55,10 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
   const { isMobile, state } = useSidebar();
   const { signingOut, signOut } = useSignOut(logoutUrl, loginHref);
   const { openHelp } = useBylineShortcuts();
+  const { replayWelcome } = useOnboarding();
 
   return (
-    <SidebarMenu>
+    <SidebarMenu {...tourAnchor("account")}>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger render={<SidebarMenuButton type="button" size="lg" tooltip={compact ? { children: user.name, hidden: false } : state === "collapsed" ? user.name : undefined} aria-label={`Account: ${user.name}`} className={cn("data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground", compact && "md:h-8 md:p-0 any-pointer-coarse:justify-center")} />}>
@@ -73,6 +76,7 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             {/* Field Mode: the reporter's phone-first capture screen (its own shell, docs/field-mode.md). */}
             <DropdownMenuItem render={<ShellLink href={`${admin}/field`} />}><NotebookPen aria-hidden="true" />Field Mode</DropdownMenuItem>
             <DropdownMenuItem onClick={openHelp}><Keyboard aria-hidden="true" />Keyboard shortcuts<DropdownMenuShortcut>?</DropdownMenuShortcut></DropdownMenuItem>
+            <DropdownMenuItem onClick={replayWelcome}><Compass aria-hidden="true" />Take the Byline tour</DropdownMenuItem>
             <DropdownMenuSeparator />
             {systemHref ? (
               <>

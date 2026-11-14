@@ -23,6 +23,7 @@ import { useBylineSearch } from "./search";
 import { useModifierLabel } from "./shortcuts";
 import { useStoryCrumb } from "./story-crumb";
 import { WeeklyWildcatLogo } from "./WeeklyWildcatLogo";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 /**
  * The Byline app header (`admin.components.header`): sticky above every admin
@@ -108,7 +109,7 @@ function HeaderBar({ role, hasProfile, loginHref }: { role: Role; hasProfile: bo
       </div>
       {primary && <PrimaryNavigation admin={routes.admin} role={role} active={primary.key} hasProfile={hasProfile} loginHref={loginHref} logoutUrl={`${routes.api}/users/logout`} />}
       <div className="byline-header-actions ml-auto flex shrink-0 items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={openSearch} aria-keyshortcuts="Control+K Meta+K" className="byline-header-search justify-start text-muted-foreground sm:w-56" data-shell-search="">
+        <Button type="button" variant="outline" size="sm" onClick={openSearch} aria-keyshortcuts="Control+K Meta+K" className="byline-header-search justify-start text-muted-foreground sm:w-56" data-shell-search="" {...tourAnchor("search")}>
           <Search data-icon="inline-start" aria-hidden="true" />
           <span className="byline-search-label max-sm:sr-only">Search</span>
           <KbdGroup className="ml-auto max-sm:hidden" aria-hidden="true"><Kbd>{modifier}</Kbd><Kbd>K</Kbd></KbdGroup>

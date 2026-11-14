@@ -14,11 +14,28 @@ function env(): Record<string, string> {
 
 export type Account = "EDITOR" | "STAFF" | "ADMIN";
 
-export async function login(request: APIRequestContext, baseURL: string, who: Account): Promise<string> {
+export async function login(request: APIRequestContext, baseURL: string, who: Account, options: { welcome?: "seen" | "fresh" } = {}): Promise<string> {
   const values = env();
   const response = await request.post("/api/users/login", { headers: { Origin: baseURL }, data: { email: values[`BYLINE_DEV_${who}_EMAIL`], password: values[`BYLINE_DEV_${who}_PASSWORD`] } });
   expect(response.ok(), `sign in as ${who}`).toBeTruthy();
-  return (await response.json()).token as string;
+  const token = (await response.json()).token as string;
+  if (options.welcome !== "fresh") await markWelcomeSeen(request, { Authorization: `JWT ${token}`, Origin: baseURL });
+  return token;
+}
+
+export const WELCOME_PREFERENCE = "byline:onboarding:welcome:v1";
+
+/**
+ * Suites about other screens sign in as accounts that have already seen the
+ * first-run welcome (src/ui/onboarding), acknowledging any administrator
+ * request, so it never covers the screen under test. Uses the account's own
+ * Payload Preference, exactly as finishing the tour does.
+ */
+export async function markWelcomeSeen(request: APIRequestContext, headers: Record<string, string>): Promise<void> {
+  const me = await request.get("/api/users/me", { headers });
+  const requestedAt = ((await me.json()).user?.welcomeOnboardingRequestedAt as string | null | undefined) ?? null;
+  const saved = await request.post(`/api/payload-preferences/${WELCOME_PREFERENCE}`, { headers, data: { value: { schema: 1, status: "completed", finishedAt: new Date().toISOString(), acknowledgedRequestAt: requestedAt } } });
+  expect(saved.ok(), `mark the welcome seen: ${await saved.text()}`).toBeTruthy();
 }
 
 export async function signIn(context: BrowserContext, baseURL: string, token: string): Promise<void> {

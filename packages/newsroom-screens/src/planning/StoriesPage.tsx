@@ -211,7 +211,7 @@ export function StoriesPage({ fetchers, currentUserId, initialView, initialFilte
   // navigation column; a permanent views rail beside Stories did not earn a second one.
   return <div className="@container/stories">
     <div className="flex min-w-0 flex-col gap-4">
-      <PageHeader title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button type="button" onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
+      <PageHeader tour="stories-screen" title={"Stories"} description={"Track everything the newsroom is working on."} actions={onNewStory ? <Button type="button" onClick={onNewStory}><Plus data-icon="inline-start" aria-hidden="true" />New story</Button> : undefined} />
       <Tabs value={view} onValueChange={(next) => changeView(next as StoriesView)} className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           {showViewsPicker || viewsControl ? <div className="flex items-center gap-2">

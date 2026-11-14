@@ -13,13 +13,17 @@ try {
     const email = `${name}@weeklywildcat.com`;
     const existing = await payload.find({ collection: "users", where: { email: { equals: email } }, limit: 1 });
     const data = { name, email, role, enabled, password: "byline-browser-password", googleSubject: null };
+    let user;
     if (existing.docs[0]) {
       const id = existing.docs[0].id;
-      await payload.update({ collection: "users", id, data });
+      user = await payload.update({ collection: "users", id, data });
       await payload.db.updateOne({ collection: "users", id, data: { loginAttempts: 0, lockUntil: null } });
     } else {
-      await payload.create({ collection: "users", data });
+      user = await payload.create({ collection: "users", data });
     }
+    // These accounts test sign-in, not the first-run welcome (src/ui/onboarding): they have seen it.
+    await payload.delete({ collection: "payload-preferences", where: { and: [{ key: { equals: "byline:onboarding:welcome:v1" } }, { "user.value": { equals: user.id } }] } });
+    await payload.create({ collection: "payload-preferences", user: { ...user, collection: "users" }, data: { key: "byline:onboarding:welcome:v1", user: { relationTo: "users", value: user.id }, value: { schema: 1, status: "completed", finishedAt: new Date().toISOString(), acknowledgedRequestAt: null } } });
   }
 } finally {
   await payload.destroy();

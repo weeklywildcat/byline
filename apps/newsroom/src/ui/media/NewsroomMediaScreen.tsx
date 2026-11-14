@@ -43,6 +43,7 @@ import { useMediaNavigate, useMediaRoute } from "./media-route";
 import { useMediaUnsaved } from "./media-unsaved";
 import { useBylineMediaPicker, useMediaPreferences, useMediaWorkspace } from "./MediaWorkspaceShell";
 import { createPayloadMediaWorkFetchers } from "./payload-media-fetchers";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 /**
  * Byline Media (`/admin/media`): one destination for the newsroom's files
@@ -274,7 +275,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
 
   return (
     <main className={cn("mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-4 py-4 sm:py-6 lg:px-6")} data-byline-media-screen="" data-media-view={route.view}>
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2" {...tourAnchor("media-screen")}>
         {!paneShowing ? (
           <Button variant="outline" size="sm" className="order-2 mt-0.5 sm:order-none" onClick={() => workspace.setSheetOpen(true)} aria-label="Media navigation" data-media-browse="">
             <PanelLeft data-icon="inline-start" aria-hidden="true" />Browse

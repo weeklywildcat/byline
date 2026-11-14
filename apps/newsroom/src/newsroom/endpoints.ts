@@ -79,7 +79,7 @@ import type { AssignmentInput } from "../domain/role-admin";
 import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
-import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
+import { createPerson, ownProfile, peopleList, personDetail, restartPersonOnboarding, savePersonAccess, updatePerson } from "./people";
 import { presenceHeartbeat, presenceSnapshot } from "./presence";
 import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
@@ -613,6 +613,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
   { path: "/byline/people/:id", method: "patch", handler: handle(async (ctx, req) => updatePerson(ctx, idParam(req), await body<PersonPatch>(req))) },
   { path: "/byline/people/:id/access", method: "put", handler: handle(async (ctx, req) => savePersonAccess(ctx, idParam(req), await body<PersonAccessInput>(req))) },
+  { path: "/byline/people/:id/onboarding/restart", method: "post", handler: handle((ctx, req) => restartPersonOnboarding(ctx, idParam(req))) },
   { path: "/byline/profile", method: "get", handler: handle((ctx) => ownProfile(ctx)) },
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },
