@@ -132,7 +132,7 @@ export function StoryToDo({ leadImage, onOpenReporting }: { leadImage: { url: st
   return (
     <div className="grid gap-6 @min-[600px]/plan-card:grid-cols-2 @min-[600px]/plan-card:gap-8" data-story-todo="">
       <div className="flex min-w-0 flex-col gap-6">
-        <Checklist id="plan-tasks" title="Tasks" level={3} />
+        <Checklist id="plan-tasks" title="Tasks" addLabel="Add task" level={3} />
         <ContextSection id="plan-interviews" title="Interviews and appointments" level={3}>
           {interviews.length ? (
             <ItemGroup className="gap-0" aria-label="Interviews and appointments to do" data-plan-todo="interviews">

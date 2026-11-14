@@ -235,7 +235,7 @@ function ReportingBody({ context, width, capture: captureIntent, appointmentId, 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Material</h3>
               {compactFilters ? (
-                <Select value={filter} onValueChange={(value) => { if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
+                <Select items={MATERIAL_FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))} value={filter} onValueChange={(value) => { if (MATERIAL_FILTERS.some((entry) => entry.value === value)) setFilter(value as MaterialFilter); }}>
                   <SelectTrigger size="sm" aria-label="Filter material"><SelectValue /></SelectTrigger>
                   <SelectContent align="end">{MATERIAL_FILTERS.map((entry) => <SelectItem key={entry.value} value={entry.value}>{entry.label}</SelectItem>)}</SelectContent>
                 </Select>
