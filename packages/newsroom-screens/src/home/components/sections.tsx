@@ -18,7 +18,7 @@ import { ItemContent, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { DEFAULT_WORKFLOW_STATUSES, type PlanningStory } from "../../planning/planning-model";
 import { StoryContextMenu } from "../../planning/StoryActionsMenu";
-import { StoryHoverCard } from "../../story/StoryHoverCard";
+import { StoryHoverCard, StoryIntentArea } from "../../story/StoryHoverCard";
 import { productionSignal, StoryTitleButton, WorkflowBadge, workflowBadgeSpec } from "../../story/story-parts";
 import { publishDate, type DeskStage } from "../desk-model";
 import { dayDistance, exactDate, shortDateTime, type AgendaCategory, type AgendaEvent, type WeekAgenda } from "../newsroom-model";
@@ -230,7 +230,7 @@ export function BudgetTable({ stories, label, timezone, now, onOpen, workspaceUr
     <TableBody>
       {stories.map((story) => {
         const art = productionSignal(story);
-        return context(story, <TableRow key={story.id} data-story-id={story.id} className="h-14 cursor-pointer border-border/50 hover:bg-muted/40" onClick={(event) => {
+        return context(story, <StoryIntentArea storyId={story.id}><TableRow key={story.id} data-story-id={story.id} className="h-14 cursor-pointer border-border/50 hover:bg-muted/40" onClick={(event) => {
           // Only bare row/cell space opens Peek; the title button is the keyboard route.
           if (!event.defaultPrevented && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey &&
             (event.target === event.currentTarget || (event.target instanceof HTMLTableCellElement && event.target.parentElement === event.currentTarget))) onOpen(story.id);
@@ -241,7 +241,7 @@ export function BudgetTable({ stories, label, timezone, now, onOpen, workspaceUr
           <TableCell className="py-2 [&_[data-slot=badge]]:max-w-full"><WorkflowBadge workflow={story.workflow} /></TableCell>
           <TableCell className="hidden py-2 @3xl/home:table-cell [&_[data-slot=badge]]:max-w-full">{art ? <WorkStatusBadge kind={art.kind} intensity={art.intensity}>{art.label}</WorkStatusBadge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
           <TableCell className="py-2 pr-4.5 text-right text-sm tabular-nums"><PublishCell story={story} timezone={timezone} now={now} /></TableCell>
-        </TableRow>);
+        </TableRow></StoryIntentArea>);
       })}
     </TableBody>
   </Table>
@@ -249,7 +249,7 @@ export function BudgetTable({ stories, label, timezone, now, onOpen, workspaceUr
   <ItemGroup aria-label={label} className="gap-0 @2xl/home:hidden">
     {stories.map((story) => {
       const art = productionSignal(story);
-      return context(story, <ItemButton key={story.id} size="sm" data-story-id={story.id} className="min-h-14 flex-nowrap rounded-none border-0 border-t border-border/50 px-4.5 py-2.5 first:border-t-0 hover:bg-muted/40" onClick={() => onOpen(story.id)}>
+      return context(story, <StoryIntentArea storyId={story.id}><ItemButton key={story.id} size="sm" data-story-id={story.id} className="min-h-14 flex-nowrap rounded-none border-0 border-t border-border/50 px-4.5 py-2.5 first:border-t-0 hover:bg-muted/40" onClick={() => onOpen(story.id)}>
         <ItemContent className="min-w-0 gap-1">
           <ItemTitle className="block w-full line-clamp-2 text-sm leading-5 font-medium">{decodeEntities(story.title) || "Untitled story"}</ItemTitle>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs [&_[data-slot=badge]]:max-w-40">
@@ -258,7 +258,7 @@ export function BudgetTable({ stories, label, timezone, now, onOpen, workspaceUr
             <PublishCell story={story} timezone={timezone} now={now} inline />
           </span>
         </ItemContent>
-      </ItemButton>);
+      </ItemButton></StoryIntentArea>);
     })}
   </ItemGroup>
   </>;
