@@ -193,7 +193,6 @@ function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant
 
   // The open story stays in view even when the queue leaves it out, from the
   // workspace the Story screen already loaded (the same cache, so no new request).
-  const homeFetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
   const workspace = useQuery({
     queryKey: workspaceKey(storyId ?? 0),
     queryFn: () => homeFetchers.workspace!.getWorkspace(storyId!),
