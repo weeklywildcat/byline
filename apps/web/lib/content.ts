@@ -1,6 +1,7 @@
 import { nativeStory } from "./native-snapshot";
 import { stripHtml } from "@/lib/format";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
+import { THE_PROWLER } from "@/lib/the-prowler";
 import { FOCUS_SECTION_SLUGS, PUBLIC_SECTION_SLUGS } from "@/lib/sections";
 import {
   getLegacyCorrectionNotices,
@@ -44,7 +45,9 @@ export function getPrimaryPublicCategory(post: ArchivePost) {
 
 export function getPrimaryVisibleCategory(post: ArchivePost) {
   const categories = getPostCategories(post);
-  return categories.find((category) => category.slug === BEHIND_THE_SCENES.slug)
+  // Satire always shows as satire, even when a story also sits in a news section.
+  return categories.find((category) => category.slug === THE_PROWLER.slug)
+    ?? categories.find((category) => category.slug === BEHIND_THE_SCENES.slug)
     ?? categories.find((category) => !isHiddenCategory(category)) ?? null;
 }
 
@@ -128,10 +131,15 @@ export function isBehindTheScenesPost(post: ArchivePost) {
   return getPostCategories(post).some((category) => category.slug === BEHIND_THE_SCENES.slug);
 }
 
-// Public BTS articles remain searchable, indexable and listed on author pages.
-// Category membership only changes automatic placement in general news lists.
+export function isProwlerPost(post: ArchivePost) {
+  return getPostCategories(post).some((category) => category.slug === THE_PROWLER.slug);
+}
+
+// Public BTS and Prowler articles remain searchable, indexable and listed on
+// author pages. Category membership only changes automatic placement in
+// general news lists.
 export function isGeneralEditorialPost(post: ArchivePost) {
-  return isVisibleContentPost(post) && !isBehindTheScenesPost(post);
+  return isVisibleContentPost(post) && !isBehindTheScenesPost(post) && !isProwlerPost(post);
 }
 
 export function filterGeneralEditorialPosts(posts: ArchivePost[]) {
@@ -140,6 +148,11 @@ export function filterGeneralEditorialPosts(posts: ArchivePost[]) {
 
 export function getBehindTheScenesPosts(posts: ArchivePost[]) {
   return posts.filter((post) => isVisibleContentPost(post) && isBehindTheScenesPost(post))
+    .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
+}
+
+export function getProwlerPosts(posts: ArchivePost[]) {
+  return posts.filter((post) => isVisibleContentPost(post) && isProwlerPost(post))
     .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id);
 }
 

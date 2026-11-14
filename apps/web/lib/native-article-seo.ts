@@ -4,6 +4,7 @@ import { youTubeDefaultThumbnailUrl } from "@byline/core";
 import { absoluteUrl, buildPageMetadata, getPublisherSchema, getSeoDescription } from "./seo";
 import { decodeHtml } from "./format";
 import { nativeMedia } from "./native-snapshot";
+import { isProwlerHref } from "./the-prowler";
 
 function description(story: PublicStorySnapshot) {
   return getSeoDescription(story.excerptHtml || articleBodyPlainText(story.body));
@@ -44,7 +45,7 @@ export function nativeArticleJsonLd(story: PublicStorySnapshot, includeBody: boo
   }));
   const publisher = getPublisherSchema();
   const article = {
-    "@type": story.live ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle", "@id": `${url}#article`, mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    "@type": isProwlerHref(story.section.href) ? "SatiricalArticle" : story.live ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle", "@id": `${url}#article`, mainEntityOfPage: { "@type": "WebPage", "@id": url },
     headline: decodeHtml(title), description: description(story), url, datePublished: publishedAt, dateModified: modifiedAt, publisher,
     author: authors.length === 1 ? authors[0] : authors.length ? authors : { "@type": "Organization", name: publisher.name },
     articleSection: decodeHtml(story.section.name), keywords: story.topics.length ? story.topics.map((topic) => decodeHtml(topic.name)).join(", ") : undefined,

@@ -4,6 +4,7 @@ import React from "react";
 import { getHomepagePageData, metadata } from "@/views/page";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
+import { ProwlerSection } from "@/components/ProwlerSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { HomepagePackages, ThisWeekCard, packageHeadingId } from "@byline/ui";
 import { toCalendarEntries } from "@/lib/homepage-packages";
@@ -24,6 +25,7 @@ const relocateScript = `document.querySelectorAll('.astro-island-relocation[data
         calendar: ({ package: resolvedPackage, packageId }) => "latest" in resolvedPackage ? React.createElement(ThisWeekCard, { entries: toCalendarEntries(data.sportsSchedule.schoolEvents, data.sportsSchedule.upcomingGames, resolvedPackage.utility.calendarLimit ?? 3), heading: resolvedPackage.utility.calendarHeading ?? "At NSHS", scheduleHref: "/sports/schedule/", headingId: packageHeadingId(`${packageId}-calendar`, "this-week-heading") }) : null,
         newsletter: ({ packageId }) => React.createElement("div", { id: `home-newsletter-${packageId}-slot` })
       }} />
+      <ProwlerSection posts={data.prowlerPosts} />
       <BehindTheScenesSection posts={data.behindTheScenesPosts} />
   </main>
   {leadPackages.length > 0 && <HomepageHeroRailLimiter client:load />}
