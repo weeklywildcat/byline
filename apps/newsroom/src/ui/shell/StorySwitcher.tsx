@@ -70,6 +70,7 @@ export function StorySwitcherProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const scrollTops = useRef<Partial<Record<"sidebar" | "sheet", number>>>({});
   const fetchers = useMemo(() => createPayloadPlanningFetchers(routes.api, { getPreference, setPreference }), [routes.api, getPreference, setPreference]);
+  const homeFetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
   const storyUrl = useCallback((id: number) => `${routes.admin}/collections/stories/${id}`, [routes.admin]);
   const preloadStory = useStoryPreload(homeFetchers, storyUrl);
 
