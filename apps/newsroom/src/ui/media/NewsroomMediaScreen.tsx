@@ -11,7 +11,6 @@ import { mediaAssetKey } from "@byline/newsroom-screens/media/media-library-api"
 import { invalidateMediaLibrary, useMediaNavigator } from "@byline/newsroom-screens/media/media-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { MediaWork } from "@byline/newsroom-screens/media/MediaWork";
-import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
@@ -37,6 +36,7 @@ import { useLeaveGuard, useShellNavigation } from "../shell/navigation";
 import { useBylineSearch } from "../shell/search";
 import { MEDIA_INSPECTOR_QUERY } from "../shell/shell-config";
 import { useNewsroomTimeZone } from "../shell/timezone";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
 import { MediaNavigator } from "./MediaNavigator";
 import { useMediaNavigate, useMediaRoute } from "./media-route";
@@ -66,13 +66,12 @@ export function NewsroomMediaScreen({ currentUserId }: { currentUserId: number }
   const admin = config.routes.admin;
   const fetchers = useMemo(() => ({ ...createPayloadHomeFetchers(api), ...createPayloadPlanningFetchers(api, { getPreference, setPreference }), ...createPayloadMediaWorkFetchers(api) }), [api, getPreference, setPreference]);
   const storyUrl = useMemo(() => (storyId: number) => `${admin}/collections/stories/${storyId}`, [admin]);
+  const preloadStory = useStoryPreload(fetchers, storyUrl);
   return (
     <AdminRoot className="byline-media" toaster={false}>
-      <StoryHoverProvider fetchers={fetchers}>
-        <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl}>
-          <MediaBody fetchers={fetchers} currentUserId={currentUserId} storyUrl={storyUrl} />
-        </StoryPeekHost>
-      </StoryHoverProvider>
+      <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl} preloadStory={preloadStory}>
+        <MediaBody fetchers={fetchers} currentUserId={currentUserId} storyUrl={storyUrl} />
+      </StoryPeekHost>
     </AdminRoot>
   );
 }
