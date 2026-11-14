@@ -43,6 +43,8 @@ export type HomeShell = {
   openCreate: (kind: "story" | "task", options?: { storyId?: number | null }) => void;
   /** While Home is mounted, stories picked in the shell's search open in Home's Story Peek. */
   setStoryOpener?: (open: ((storyId: number) => void) | null) => void;
+  /** Warm the Story route and workspace data when Home shows intent to open it. */
+  preloadStory?: (storyId: number) => void;
 };
 
 const SCOPE_ITEM_CLASS = "aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground";
@@ -128,6 +130,7 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   }, [createKind, shell]);
 
   function openStory(id: number) {
+    shell?.preloadStory?.(id);
     if (!peekId) setOrigin(document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setPeekId(id);
     setRecentIds((ids) => [id, ...ids.filter((item) => item !== id)].slice(0, 8));
@@ -260,7 +263,7 @@ function HomeWorkspace({ fetchers, actionUrls, shell, preferences }: HomeAppProp
   const budgetShown = budget ? (budgetExpanded ? budget[budgetTab] : budget[budgetTab].slice(0, BUDGET_LIMIT)) : [];
 
   // In a host shell, Home's muted canvas fills the content area; in wp-admin it lines up with the admin gutter.
-  return <StoryHoverProvider fetchers={fetchers}><main className={cn("@container/home", shell && "min-h-full w-full bg-muted")}>
+  return <StoryHoverProvider fetchers={fetchers} preloadStory={shell?.preloadStory}><main className={cn("@container/home", shell && "min-h-full w-full bg-muted")}>
     <div className={cn("mx-auto flex max-w-[1320px] flex-col gap-5", shell ? "px-4 py-6 sm:px-7" : "mt-6 mb-8 pr-5 pl-1")}>
     <header className="flex items-start justify-between gap-3">
       <div className="min-w-0">
