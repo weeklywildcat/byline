@@ -547,3 +547,48 @@ export async function savePersonAccess(
   );
   return personDetail(ctx, id);
 }
+
+/**
+ * Asks for the Person's welcome introduction to show again the next time they
+ * open Byline. It records only when it was asked
+ * (`users.welcomeOnboardingRequestedAt`); the account's own onboarding
+ * preference acknowledges it once they finish or skip, and nothing else on
+ * the account or the Person changes. Returns the Person so the panel's access
+ * revision (the account's `updatedAt`) stays current.
+ */
+export async function restartPersonOnboarding(ctx: ScreenContext, id: number): Promise<PersonDetail> {
+  if (!atLeast(ctx.user, "administrator"))
+    throw new APIError("Only administrators can restart the welcome tour.", 403);
+  await ctx.req.payload.findByID({ collection: "people", id, select: {}, depth: 0, ...asUser(ctx) });
+  const { req } = ctx;
+  const started = await initTransaction(req);
+  try {
+    const linked = await req.payload.find({
+      collection: "users",
+      where: { linkedPerson: { equals: id } },
+      select: { enabled: true },
+      depth: 0,
+      limit: 2,
+      ...asUser(ctx),
+    });
+    if (linked.totalDocs > 1)
+      throw new APIError("This Person has more than one sign-in account. Resolve it in System administration.", 409);
+    const account = linked.docs[0];
+    if (!account) throw new APIError("This Person doesn't have newsroom access.", 409);
+    if (account.enabled !== true) throw new APIError("This Person's newsroom access is disabled.", 409);
+    await req.payload.update({
+      collection: "users",
+      id: account.id,
+      data: { welcomeOnboardingRequestedAt: new Date().toISOString() },
+      select: {},
+      depth: 0,
+      overrideLock: false,
+      ...asUser(ctx),
+    });
+    if (started) await commitTransaction(req);
+  } catch (error) {
+    if (started) await killTransaction(req);
+    throw error;
+  }
+  return personDetail(ctx, id);
+}

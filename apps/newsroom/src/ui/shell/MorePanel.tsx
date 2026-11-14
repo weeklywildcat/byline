@@ -6,7 +6,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Kbd } from "@byline/newsroom-ui/ui/kbd";
 import { Separator } from "@byline/newsroom-ui/ui/separator";
-import { BookmarkCheck, ChevronRight, Keyboard, LogOut, NotebookPen, Settings, UserRound, Wrench, type LucideIcon } from "lucide-react";
+import { BookmarkCheck, ChevronRight, Compass, Keyboard, LogOut, NotebookPen, Settings, UserRound, Wrench, type LucideIcon } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { canAdministerSystem, navigationFor, STORIES_PATH, SYSTEM_ADMINISTRATION_PATH, type NavItem } from "../../domain/navigation";
 import type { MoreAccount } from "./MoreNavigation";
@@ -14,6 +14,7 @@ import { NAV_ICONS } from "./nav-items";
 import { opensElsewhere, ShellLink, useShellNavigation } from "./navigation";
 import { useBylineShortcuts } from "./shortcuts";
 import { useSignOut } from "./sign-out";
+import { useOnboarding } from "../onboarding/OnboardingProvider";
 
 function MoreGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -38,6 +39,7 @@ function MoreLink({ href, label, icon: Icon, follow }: { href: string; label: st
 export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, afterClose }: MoreAccount & { afterClose: (action: () => void) => void }) {
   const { navigate } = useShellNavigation();
   const { openHelp } = useBylineShortcuts();
+  const { replayWelcome } = useOnboarding();
   const { signOut, signingOut } = useSignOut(logoutUrl, loginHref);
   const items = navigationFor(role);
   const team = items.find((item) => item.key === "people");
@@ -73,6 +75,9 @@ export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, after
         {hasProfile && <MoreLink href={`${admin}/profile`} label="My profile" icon={UserRound} follow={follow} />}
         <Button type="button" variant="ghost" className="h-11 w-full justify-start gap-2.5 px-3" aria-keyshortcuts="?" onClick={() => afterClose(openHelp)}>
           <Keyboard aria-hidden="true" />Keyboard shortcuts <Kbd className="ml-auto" aria-hidden="true">?</Kbd>
+        </Button>
+        <Button type="button" variant="ghost" className="h-11 w-full justify-start gap-2.5 px-3" onClick={() => afterClose(replayWelcome)}>
+          <Compass aria-hidden="true" />Take the Byline tour
         </Button>
         {canAdminister && <MoreLink href={`${admin}${SYSTEM_ADMINISTRATION_PATH}`} label="System administration" icon={Wrench} follow={follow} />}
         <Button type="button" variant="ghost" className="h-11 w-full justify-start gap-2.5 px-3" disabled={signingOut} onClick={() => afterClose(signOut)}>

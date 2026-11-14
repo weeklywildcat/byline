@@ -14,4 +14,6 @@ export type PeopleApi = {
   create: (input: NewPerson) => Promise<PersonDetail>;
   update: (id: number, input: PersonPatch) => Promise<PersonDetail>;
   saveAccess: (id: number, input: PersonAccessInput) => Promise<PersonDetail>;
+  /** Administrators: show the Person's welcome introduction again the next time they open Byline. Changes nothing else. */
+  restartOnboarding: (id: number) => Promise<PersonDetail>;
 };

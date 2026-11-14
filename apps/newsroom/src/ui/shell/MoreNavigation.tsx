@@ -8,6 +8,7 @@ import { Ellipsis, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Role } from "../../domain/vocabulary";
 import { MorePanel } from "./MorePanel";
+import { tourAnchor } from "../onboarding/tour-targets";
 import { ADAPTIVE_NAVIGATION_QUERY, BOTTOM_NAVIGATION_QUERY } from "./shell-config";
 
 export type MoreAccount = { admin: string; role: Role; hasProfile: boolean; loginHref: string; logoutUrl: string };
@@ -52,7 +53,7 @@ export function MoreNavigation(account: MoreAccount) {
     setOpen(false);
   }
 
-  const trigger = <button type="button" aria-haspopup="dialog" className="byline-primary-link byline-more-trigger appearance-none bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring" />;
+  const trigger = <button type="button" aria-haspopup="dialog" {...tourAnchor("more")} className="byline-primary-link byline-more-trigger appearance-none bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring" />;
   const label = <><Ellipsis className="size-5 shrink-0" aria-hidden="true" />More</>;
   const panel = <MorePanel {...account} afterClose={afterClose} />;
 

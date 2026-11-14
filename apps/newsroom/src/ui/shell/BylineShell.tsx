@@ -20,13 +20,14 @@ import { MediaWorkspaceShell } from "../media/MediaWorkspaceShell";
 import { CollectionsWorkspaceShell } from "../collections/CollectionsWorkspaceShell";
 import { SIDEBAR_COOKIE, SIDEBAR_SHORTCUT } from "./shell-config";
 import { PresenceProvider } from "./PresenceProvider";
+import { OnboardingProvider } from "../onboarding/OnboardingProvider";
 
 /**
  * The Byline application shell's state, above every admin view: one query
  * cache for all Byline screens, the one shadcn Sidebar state (shared by the
  * Nav, the app header and any screen that needs it), guarded navigation, the
  * Create controller, the command palette, the Story switcher, the Stories,
- * Calendar, Media and Collections workspaces and the newsroom's one toaster (screens inside the shell render none of their own,
+ * Calendar, Media and Collections workspaces, first-run onboarding and the newsroom's one toaster (screens inside the shell render none of their own,
  * so a toast never appears twice).
  *
  * It adds no layout of its own: Payload's template still places the Nav and
@@ -65,7 +66,7 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
                       <StorySwitcherProvider>
                         <StoriesWorkspaceShell>
                           <CalendarWorkspaceShell>
-                            <MediaWorkspaceShell><PresenceProvider>{children}</PresenceProvider></MediaWorkspaceShell>
+                            <MediaWorkspaceShell><PresenceProvider><OnboardingProvider>{children}</OnboardingProvider></PresenceProvider></MediaWorkspaceShell>
                           </CalendarWorkspaceShell>
                         </StoriesWorkspaceShell>
                       </StorySwitcherProvider>

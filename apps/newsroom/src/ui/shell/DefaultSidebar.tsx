@@ -23,6 +23,7 @@ import { useNavigationCounts } from "./navigation-counts";
 import { ShellLink } from "./navigation";
 import { NavUser } from "./NavUser";
 import { WeeklyWildcatLogo } from "./WeeklyWildcatLogo";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 /**
  * The ordinary global sidebar's contents (inside BylineSidebar's one
@@ -126,7 +127,7 @@ function NavLink({ item, active, count }: { item: ShellNavLink; active: boolean;
       <SidebarMenuButton
         isActive={active}
         tooltip={item.label}
-        render={<ShellLink href={item.href} aria-current={active ? "page" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }} />}
+        render={<ShellLink href={item.href} aria-current={active ? "page" : undefined} {...tourAnchor(`nav-${item.key}`)} onClick={() => { if (isMobile) setOpenMobile(false); }} />}
       >
         {Icon ? <Icon aria-hidden="true" /> : null}
         <span>{item.label}</span>

@@ -25,6 +25,8 @@ import * as migration_20261109_213214_cms_url_default from './20261109_213214_cm
 import * as migration_20261110_193200_transcription_jobs from './20261110_193200_transcription_jobs';
 import * as migration_20261110_195045_byline_data from './20261110_195045_byline_data';
 import * as migration_20261112_141645_hero_site_navigation from './20261112_141645_hero_site_navigation';
+import * as migration_20261112_212319_reporting_jobs_schema_drift from './20261112_212319_reporting_jobs_schema_drift';
+import * as migration_20261114_010953_welcome_onboarding_request from './20261114_010953_welcome_onboarding_request';
 
 export const migrations = [
   {
@@ -160,6 +162,16 @@ export const migrations = [
   {
     up: migration_20261112_141645_hero_site_navigation.up,
     down: migration_20261112_141645_hero_site_navigation.down,
-    name: '20261112_141645_hero_site_navigation'
+    name: '20261112_141645_hero_site_navigation',
+  },
+  {
+    up: migration_20261112_212319_reporting_jobs_schema_drift.up,
+    down: migration_20261112_212319_reporting_jobs_schema_drift.down,
+    name: '20261112_212319_reporting_jobs_schema_drift',
+  },
+  {
+    up: migration_20261114_010953_welcome_onboarding_request.up,
+    down: migration_20261114_010953_welcome_onboarding_request.down,
+    name: '20261114_010953_welcome_onboarding_request'
   },
 ];

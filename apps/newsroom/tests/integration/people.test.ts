@@ -681,6 +681,78 @@ describe("Creation and public identity management", () => {
   });
 });
 
+describe("Restarting the welcome tour", () => {
+  const restart = (key: string | null, id: number) =>
+    call("post", "/byline/people/:id/onboarding/restart", key, undefined, id);
+  const account = (key: string) =>
+    payload.findByID({ collection: "users", id: accounts[key].id, depth: 0 });
+
+  it("lets only administrators restart it, and changes nothing but the request time", async () => {
+    const before = await account("other");
+    const personBefore = await payload.findByID({ collection: "people", id: persons.other, depth: 0 });
+    expect(before.welcomeOnboardingRequestedAt ?? null).toBeNull();
+
+    expect((await restart(null, persons.other)).status).toBe(401);
+    expect((await restart("writer", persons.other)).status).toBe(403);
+    expect((await restart("other", persons.other)).status).toBe(403);
+    expect((await restart("editor", persons.other)).status).toBe(403);
+    expect((await account("other")).welcomeOnboardingRequestedAt ?? null).toBeNull();
+
+    const started = Date.now();
+    const done = await restart("admin", persons.other);
+    expect(done.status).toBe(200);
+    // The Person comes back with its fresh access revision, so the panel can keep editing access.
+    expect(done.body.access.revision).toBe((await account("other")).updatedAt);
+    const after = await account("other");
+    expect(Date.parse(after.welcomeOnboardingRequestedAt!)).toBeGreaterThanOrEqual(started - 1000);
+    const strip = ({ updatedAt: _u, welcomeOnboardingRequestedAt: _w, sessions: _s, ...rest }: Record<string, unknown>) => rest;
+    expect(strip(after as never)).toEqual(strip(before as never));
+    expect(await payload.findByID({ collection: "people", id: persons.other, depth: 0 })).toEqual(personBefore);
+
+    // A second request is a newer request.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect((await restart("admin", persons.other)).status).toBe(200);
+    expect(Date.parse((await account("other")).welcomeOnboardingRequestedAt!)).toBeGreaterThan(Date.parse(after.welcomeOnboardingRequestedAt!));
+  });
+
+  it("refuses a Person without newsroom access, or with disabled access", async () => {
+    const created = await call("post", "/byline/people", "editor", { name: "No Access Fixture", type: "active", newsroomRole: "Reporter" });
+    const response = await restart("admin", created.body.person.id);
+    expect(response.status).toBe(409);
+    expect(response.body.message ?? response.body.errors?.[0]?.message).toMatch(/newsroom access/);
+    expect((await restart("admin", persons.disabled)).status).toBe(409);
+    expect((await restart("admin", 999_999)).status).toBe(404);
+  });
+
+  it("keeps the request private to the account and administrators, and unwritable by its owner", async () => {
+    await restart("admin", persons.other);
+    const asUser = async (key: string, id: number) =>
+      payload.findByID({ collection: "users", id, depth: 0, overrideAccess: false, user: accounts[key] });
+    expect((await asUser("writer", accounts.other.id)).welcomeOnboardingRequestedAt).toBeUndefined();
+    expect((await asUser("editor", accounts.other.id)).welcomeOnboardingRequestedAt).toBeUndefined();
+    expect((await asUser("other", accounts.other.id)).welcomeOnboardingRequestedAt).toEqual(expect.any(String));
+    expect((await asUser("admin", accounts.other.id)).welcomeOnboardingRequestedAt).toEqual(expect.any(String));
+
+    const current = (await account("other")).welcomeOnboardingRequestedAt;
+    await payload.update({ collection: "users", id: accounts.other.id, data: { welcomeOnboardingRequestedAt: null }, overrideAccess: false, user: accounts.other });
+    expect((await account("other")).welcomeOnboardingRequestedAt).toBe(current);
+
+    // The account's own onboarding preference is Payload's per-user preference: nobody else reads it.
+    await payload.create({
+      collection: "payload-preferences",
+      data: { key: "byline:onboarding:welcome:v1", user: { relationTo: "users", value: accounts.other.id }, value: { schema: 1, status: "skipped", finishedAt: new Date().toISOString(), acknowledgedRequestAt: current } },
+      user: accounts.other,
+    });
+    const visible = async (key: string) =>
+      (await payload.find({ collection: "payload-preferences", where: { key: { equals: "byline:onboarding:welcome:v1" } }, overrideAccess: false, user: accounts[key], depth: 0 })).totalDocs;
+    expect(await visible("other")).toBe(1);
+    expect(await visible("writer")).toBe(0);
+    expect(await visible("editor")).toBe(0);
+
+    expect(JSON.stringify(await publicPeople(payload))).not.toMatch(/welcomeOnboarding|onboarding/i);
+  });
+});
+
 describe("Privacy, accessible usage and historical integrity", () => {
   it("usage reads only accessible stories, with no account secrets in detail", async () => {
     // Put the person on a story, then change the plan's contributors so that the writer no longer has draft access.

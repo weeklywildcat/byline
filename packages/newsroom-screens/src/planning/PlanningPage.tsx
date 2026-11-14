@@ -5,8 +5,9 @@ import { RowSkeletons } from "../story/rows";
 import type { OptionalQuery } from "./planning-query";
 
 /** The compact header every Planning destination shares with Home and the Story Workspace. */
-export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
-  return <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+/** `tour`: a stable anchor a newsroom tour may point at (`data-byline-tour`). */
+export function PageHeader({ title, description, actions, tour }: { title: string; description?: string; actions?: ReactNode; tour?: string }) {
+  return <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2" data-byline-tour={tour}>
     <div>
       <h1 className="font-heading text-2xl font-semibold tracking-tight">{title}</h1>
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
