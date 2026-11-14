@@ -12,7 +12,7 @@ import type { PlanningFetchers } from "@byline/newsroom-screens/planning/plannin
 import { describePlanningError, type PlanningStory } from "@byline/newsroom-screens/planning/planning-model";
 import { usePlanningStories } from "@byline/newsroom-screens/planning/planning-query";
 import type { BuiltInStoryView } from "@byline/newsroom-screens/planning/story-views";
-import { workspaceKey, workspaceQueryClient } from "@byline/newsroom-screens/workspace/workspace-query";
+import { workspaceKey } from "@byline/newsroom-screens/workspace/workspace-query";
 import { usePreferences } from "@payloadcms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown } from "lucide-react";
@@ -23,6 +23,7 @@ import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { ShellLayer } from "./layer";
 import { useShellLayout } from "./layout";
 import { ShellLink } from "./navigation";
+import { useStoryPreload } from "../story/preload";
 import { STORY_SWITCHER_QUEUE_PREFERENCE } from "./shell-config";
 import { pinnedCurrentStory, STORY_SWITCHER_DEFAULT_QUEUE, storySwitcherFilters, storySwitcherMeta, storySwitcherQueue, storySwitcherQueues, storySwitcherRows, type StorySwitcherQueueId } from "./story-switcher-model";
 
@@ -34,6 +35,8 @@ type StorySwitcher = {
   search: string;
   setSearch: (search: string) => void;
   fetchers: Pick<PlanningFetchers, "getPlanning">;
+  homeFetchers: ReturnType<typeof createPayloadHomeFetchers>;
+  preloadStory: (storyId: number) => void;
   /** Each presentation's list scroll position, kept while Payload remounts the sidebar on every navigation. */
   scrollTops: RefObject<Partial<Record<"sidebar" | "sheet", number>>>;
   /** The temporary presentation for screens too narrow for the Story workspace. */
@@ -67,6 +70,8 @@ export function StorySwitcherProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const scrollTops = useRef<Partial<Record<"sidebar" | "sheet", number>>>({});
   const fetchers = useMemo(() => createPayloadPlanningFetchers(routes.api, { getPreference, setPreference }), [routes.api, getPreference, setPreference]);
+  const storyUrl = useCallback((id: number) => `${routes.admin}/collections/stories/${id}`, [routes.admin]);
+  const preloadStory = useStoryPreload(homeFetchers, storyUrl);
 
   // Read the remembered queue the first time a story is open; My stories if there is none.
   const needed = Boolean(account) && storyId !== null && queue === null;
@@ -94,11 +99,13 @@ export function StorySwitcherProvider({ children }: { children: ReactNode }) {
     search,
     setSearch,
     fetchers,
+    homeFetchers,
+    preloadStory,
     scrollTops,
     sheetOpen,
     openSheet: () => setSheetOpen(true),
     closeSheet: () => setSheetOpen(false)
-  }), [queue, queues, chooseQueue, search, fetchers, sheetOpen]);
+  }), [queue, queues, chooseQueue, search, fetchers, homeFetchers, preloadStory, sheetOpen]);
 
   return (
     <SwitcherContext value={value}>
@@ -169,7 +176,7 @@ export function StorySwitcherContent({ variant = "sidebar", title, description, 
 }
 
 function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant }: { queue: StorySwitcherQueueId; queueLabel: string; onNavigate?: () => void; scroller: RefObject<HTMLDivElement | null>; variant: "sidebar" | "sheet" }) {
-  const { search, fetchers, scrollTops } = useStorySwitcher();
+  const { search, fetchers, homeFetchers, preloadStory, scrollTops } = useStorySwitcher();
   const account = useNewsroomAccount();
   const routes = useNewsroomRoutes();
   const { storyId } = useShellLayout();
@@ -191,7 +198,7 @@ function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant
     queryFn: () => homeFetchers.workspace!.getWorkspace(storyId!),
     enabled: storyId !== null && Boolean(data) && !listed,
     retry: false
-  }, workspaceQueryClient);
+  });
   const current = storyId !== null && workspace.data?.story.id === storyId ? { ...workspace.data.story, title: decodeEntities(workspace.data.story.title) } : null;
   const pinned = data ? pinnedCurrentStory(rows, current) : null;
 
@@ -214,7 +221,7 @@ function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant
         <SidebarGroup className="px-0 py-0">
           <SidebarGroupLabel className="h-auto px-4 pt-3 pb-1">Current story</SidebarGroupLabel>
           <SidebarGroupContent>
-            <StorySwitcherRow story={pinned} current timezone={timezone} href={routes.story(pinned.id)} onNavigate={onNavigate} />
+            <StorySwitcherRow story={pinned} current timezone={timezone} href={routes.story(pinned.id)} onNavigate={onNavigate} onPrefetch={() => preloadStory(pinned.id)} />
           </SidebarGroupContent>
         </SidebarGroup>
       ) : null}
@@ -223,7 +230,7 @@ function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant
         <SidebarGroupContent>
           {rows.length ? (
             <ul className="flex flex-col" aria-label={queueLabel}>
-              {rows.map((story) => <li key={story.id}><StorySwitcherRow story={story} current={story.id === storyId} timezone={timezone} href={routes.story(story.id)} onNavigate={onNavigate} /></li>)}
+              {rows.map((story) => <li key={story.id}><StorySwitcherRow story={story} current={story.id === storyId} timezone={timezone} href={routes.story(story.id)} onNavigate={onNavigate} onPrefetch={() => preloadStory(story.id)} /></li>)}
             </ul>
           ) : <p className="p-4 text-sm text-muted-foreground">{empty}</p>}
         </SidebarGroupContent>
@@ -234,13 +241,14 @@ function StorySwitcherResults({ queue, queueLabel, onNavigate, scroller, variant
 }
 
 /** One story: its headline and one line of context. Choosing it opens its Story screen. */
-export function StorySwitcherRow({ story, current, timezone, href, onNavigate }: { story: PlanningStory; current: boolean; timezone: string; href: string; onNavigate?: () => void }) {
+export function StorySwitcherRow({ story, current, timezone, href, onNavigate, onPrefetch }: { story: PlanningStory; current: boolean; timezone: string; href: string; onNavigate?: () => void; onPrefetch?: () => void }) {
   const meta = storySwitcherMeta(story, timezone);
   return (
     <ShellLink
       href={href}
       aria-current={current ? "page" : undefined}
       onClick={onNavigate}
+      onPrefetchIntent={onPrefetch}
       data-story-id={story.id}
       className="flex flex-col items-start gap-1 border-b border-sidebar-border px-4 py-3 text-sm leading-tight text-sidebar-foreground outline-hidden ring-sidebar-ring ring-inset hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:shadow-[inset_2px_0_0_var(--sidebar-primary)]"
     >
