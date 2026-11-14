@@ -4,7 +4,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useRouteTransition } from "@payloadcms/ui";
 import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ShellLayer } from "./layer";
@@ -69,10 +69,40 @@ export const useShellNavigation = () => use(NavigationContext);
  * otherwise it waits for Payload's own autosave, and asks before leaving
  * anything that still is not saved. It is not a second save system.
  */
-export function ShellNavigationProvider({ children }: { children: ReactNode }) {
+export function ShellNavigationProvider({ children, warmHrefs = [] }: { children: ReactNode; warmHrefs?: readonly string[] }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
+  const warmedRoutes = useRef(new Set<string>());
   const { startRouteTransition } = useRouteTransition();
   const guard = useRef<LeaveGuard | null>(null);
+
+  // The primary shell has only four destinations, so warm them after the
+  // current screen settles. Large story/media lists stay intent-only.
+  useEffect(() => {
+    if (!warmHrefs.length) return;
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return;
+
+    let active = true;
+    const warm = () => {
+      if (!active) return;
+      for (const href of warmHrefs) {
+        if (warmedRoutes.current.has(href) || href.split("?")[0] === pathname) continue;
+        warmedRoutes.current.add(href);
+        router.prefetch(href, { kind: "full" } as unknown as PrefetchOptions);
+      }
+    };
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const id = idleWindow.requestIdleCallback(warm, { timeout: 1200 });
+      return () => { active = false; idleWindow.cancelIdleCallback?.(id); };
+    }
+    const id = window.setTimeout(warm, 400);
+    return () => { active = false; window.clearTimeout(id); };
+  }, [pathname, router, warmHrefs]);
   const waiting = useRef(false);
   const [unsavedAction, setUnsavedAction] = useState<(() => void) | null>(null);
   const [unsavedText, setUnsavedText] = useState("");
