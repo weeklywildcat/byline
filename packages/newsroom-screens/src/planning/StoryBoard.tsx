@@ -11,7 +11,7 @@ import { Card, CardContent } from "@byline/newsroom-ui/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { ProductionSummary, StoryAttentionSignals, StoryDueLabel, StoryTitleButton, WorkflowBadge } from "../story/story-parts";
-import { StoryHoverCard } from "../story/StoryHoverCard";
+import { StoryHoverCard, StoryIntentArea } from "../story/StoryHoverCard";
 import { StoryActionsMenu, StoryContextMenu } from "./StoryActionsMenu";
 import { boardWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
 import { browserStorage, isStageCollapsed, readBoardCollapsed, writeBoardCollapsed, type BoardCollapsedChoices, type BoardLayout } from "./stories-board-layout";
@@ -137,7 +137,7 @@ function BoardCard(props: StoryItemProps) {
   const movable = isMovable(story, canMoveStories);
   const { dragging, touch, setHandle } = useStoryDrag(element, story, movable);
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
-    <Card ref={setElement} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
+    <StoryIntentArea storyId={story.id}><Card ref={setElement} size="sm" role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
       className={cn("relative shrink-0 gap-1 rounded-[10px] py-2 shadow-xs transition-colors duration-700 [content-visibility:auto] [contain-intrinsic-size:auto_64px]", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <CardContent className="flex flex-col gap-1 px-2.5">
         <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("pr-5 text-[13px] leading-[1.35] line-clamp-2 any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
@@ -146,7 +146,7 @@ function BoardCard(props: StoryItemProps) {
       </CardContent>
       {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
-    </Card>
+    </Card></StoryIntentArea>
   </StoryContextMenu>;
 }
 
@@ -158,7 +158,7 @@ function DenseRow(props: StoryItemProps) {
   const { dragging, touch, setHandle } = useStoryDrag(element, story, movable);
   const names = writersOf(story).map((person) => person.name).join(", ");
   return <StoryContextMenu story={story} statuses={statuses} canMove={canMoveStories} disabled={moving} onMove={onMoveStory} workspaceUrl={workspaceUrl} onOpenStory={onOpenStory}>
-    <div ref={setElement} role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
+    <StoryIntentArea storyId={story.id}><div ref={setElement} role="listitem" data-story-id={story.id} data-dragging={dragging} data-moved={moved} aria-busy={moving || undefined}
       className={cn("group/card relative shrink-0 border-b border-border/60 bg-card px-2.5 py-[7px] transition-colors duration-700 hover:bg-muted/40 [content-visibility:auto] [contain-intrinsic-size:auto_50px]", movable && !touch && "cursor-grab", "data-[dragging=true]:opacity-40 data-[moved=true]:bg-accent")}>
       <StoryHoverCard storyId={story.id} title={story.title} story={story}><StoryTitleButton story={story} onOpen={onOpenStory} className={cn("block w-full truncate pr-5 text-[13px] leading-[18px] font-medium any-pointer-coarse:min-h-11 any-pointer-coarse:pr-11", touch && movable && "pl-10")} data-story-title={story.id} /></StoryHoverCard>
       <div className="flex min-w-0 items-center gap-2 text-xs leading-4">
@@ -168,7 +168,7 @@ function DenseRow(props: StoryItemProps) {
       </div>
       {touch && movable ? <StoryDragHandle ref={setHandle} /> : null}
       <CornerMenu {...props} />
-    </div>
+    </div></StoryIntentArea>
   </StoryContextMenu>;
 }
 
