@@ -16,12 +16,16 @@ import { openTasks } from "../workspace/workspace-model";
 
 type StoryHoverSummary = Pick<PlanningStory, "id" | "title"> & Partial<Omit<PlanningStory, "id" | "title">>;
 
-type StoryHoverContextValue = { fetchers: StoryFetchers; preloadStory?: (storyId: number) => void };
+type StoryHoverContextValue = { fetchers: StoryFetchers; preloadStory: (storyId: number) => void };
 
 const StoryHoverContext = createContext<StoryHoverContextValue | null>(null);
 
-export function StoryHoverProvider({ fetchers, preloadStory, children }: StoryHoverContextValue & { children: ReactNode }) {
-  const value = useMemo(() => ({ fetchers, preloadStory }), [fetchers, preloadStory]);
+export function StoryHoverProvider({ fetchers, preloadStory, children }: { fetchers: StoryFetchers; preloadStory?: (storyId: number) => void; children: ReactNode }) {
+  const warmStory = useCallback((storyId: number) => {
+    if (preloadStory) preloadStory(storyId);
+    else if (fetchers.getWorkspace) void prefetchStoryWorkspace(queryClient, storyId, fetchers.getWorkspace);
+  }, [fetchers.getWorkspace, preloadStory, queryClient]);
+  const value = useMemo(() => ({ fetchers, preloadStory: warmStory }), [fetchers, warmStory]);
   return <StoryHoverContext value={value}>{children}</StoryHoverContext>;
 }
 
@@ -97,9 +101,8 @@ export function useStoryIntent(storyId: number): IntentProps & { preload: () => 
   const preload = useCallback(() => {
     cancelIntent();
     if (!context || storyId <= 0) return;
-    if (context.preloadStory) context.preloadStory(storyId);
-    else if (context.fetchers.getWorkspace) void prefetchStoryWorkspace(queryClient, storyId, context.fetchers.getWorkspace);
-  }, [cancelIntent, context, queryClient, storyId]);
+    context.preloadStory(storyId);
+  }, [cancelIntent, context, storyId]);
   const scheduleIntent = useCallback(() => {
     cancelIntent();
     if (!context || storyId <= 0) return;
