@@ -4,7 +4,6 @@ import { NewsroomCalendar } from "@byline/newsroom-screens/calendar/NewsroomCale
 import type { CalendarLinks } from "@byline/newsroom-screens/calendar/calendar-model";
 import { describePlanningError, EMPTY_PLANNING_FILTERS } from "@byline/newsroom-screens/planning/planning-model";
 import { usePlanningStories } from "@byline/newsroom-screens/planning/planning-query";
-import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { planningRootKey } from "@byline/newsroom-screens/story/story-query";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
@@ -25,6 +24,7 @@ import { useShellLayout } from "../shell/layout";
 import { useShellNavigation } from "../shell/navigation";
 import { useBylineSearch } from "../shell/search";
 import { useNewsroomTimeZone } from "../shell/timezone";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
 import { canReschedule, rescheduleRequest } from "./payload-reschedule";
 
@@ -44,18 +44,17 @@ export function NewsroomCalendarScreen({ currentUserId }: { currentUserId: numbe
   const admin = config.routes.admin;
   const fetchers = useMemo<Fetchers>(() => ({ ...createPayloadHomeFetchers(api), ...createPayloadPlanningFetchers(api, { getPreference, setPreference }) }), [api, getPreference, setPreference]);
   const storyUrl = useMemo(() => (storyId: number) => `${admin}/collections/stories/${storyId}`, [admin]);
+  const preloadStory = useStoryPreload(fetchers, storyUrl);
 
   // Byline's scoped Nova styles; the shell owns the one toaster.
   return (
     <AdminRoot className="byline-calendar" toaster={false}>
-      <StoryHoverProvider fetchers={fetchers}>
-        <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl}>
-          <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 lg:px-6" data-byline-calendar-screen="">
-            <h1 className="sr-only">Calendar</h1>
-            <CalendarBody fetchers={fetchers} currentUserId={currentUserId} admin={admin} />
-          </main>
-        </StoryPeekHost>
-      </StoryHoverProvider>
+      <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl} preloadStory={preloadStory}>
+        <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 lg:px-6" data-byline-calendar-screen="">
+          <h1 className="sr-only">Calendar</h1>
+          <CalendarBody fetchers={fetchers} currentUserId={currentUserId} admin={admin} />
+        </main>
+      </StoryPeekHost>
     </AdminRoot>
   );
 }
