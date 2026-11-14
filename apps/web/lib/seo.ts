@@ -1,6 +1,6 @@
 import { artDirectedSource } from "@byline/core";
 import type { Metadata } from "@/lib/metadata";
-import { getPrimaryVisibleCategory } from "@/lib/content";
+import { getPrimaryVisibleCategory, isProwlerPost } from "@/lib/content";
 import { getWordPressIsoTimestamp } from "@/lib/dates";
 import { decodeHtml, stripHtml } from "@/lib/format";
 import { getMeaningfulImageAlt } from "@/lib/image-alt";
@@ -603,7 +603,8 @@ export function getNewsArticleSchema(post: ArchivePost, { articleBody: includeBo
   return {
     "@context": "https://schema.org",
     // A live story is both: NewsArticle for news surfaces, LiveBlogPosting for the LIVE label.
-    "@type": liveBlog ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle",
+    // Satire is labeled for what it is so search engines never treat it as news.
+    "@type": isProwlerPost(post) ? "SatiricalArticle" : liveBlog ? ["NewsArticle", "LiveBlogPosting"] : "NewsArticle",
     "@id": `${articleUrl}#article`,
     mainEntityOfPage: {
       "@type": "WebPage",

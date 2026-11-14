@@ -19,7 +19,7 @@ describe("Live Preview site navigation", () => {
   const { siteNavigation } = previewPublicationFrom(WEEKLY_WILDCAT_PUBLICATION);
 
   it("lists the configured header sections, never a second list", () => {
-    expect(siteNavigation.sections.map((link) => link.label)).toEqual(["News", "Sports", "Opinion", "Features"]);
+    expect(siteNavigation.sections.map((link) => link.label)).toEqual(["News", "Sports", "Opinion", "Features", "The Prowler"]);
   });
 
   it("points at the public site, because Preview runs on the newsroom's origin", () => {

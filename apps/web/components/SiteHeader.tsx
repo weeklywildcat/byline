@@ -1,5 +1,6 @@
 import { StoryNavigation } from "@byline/ui";
 import { getNavigation, getPublicationConfig } from "@/lib/publication";
+import { THE_PROWLER } from "@/lib/the-prowler";
 
 const publication = getPublicationConfig();
 const headerNavigation = getNavigation("header");
@@ -44,27 +45,43 @@ type SiteHeaderProps = {
   // pages leave it out so the only date a crawler finds there is the story's.
   showDate?: boolean;
   // The homepage has no headline of its own, so its masthead is the page's h1.
+  // The Prowler's section page uses the same rule for its own wordmark.
   homepage?: boolean;
+  // "prowler" swaps in The Prowler wordmark on the satire section and its
+  // stories; the utility strip then links back to the publication's homepage.
+  masthead?: "publication" | "prowler";
 };
 
-export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, showDate = true, homepage = false }: SiteHeaderProps) {
+export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, showDate = true, homepage = false, masthead = "publication" }: SiteHeaderProps) {
+  const prowler = masthead === "prowler";
+  const brand = prowler
+    ? { name: THE_PROWLER.name, href: THE_PROWLER.path, logoUrl: THE_PROWLER.logo.src, alt: THE_PROWLER.name }
+    : { name: publication.identity.name, href: "/", logoUrl: publication.branding.masthead.url, alt: publication.branding.masthead.alt };
   if (mode === "story-overlay") {
     return (
       <StoryNavigation
         logoAlign={logoAlign}
-        publicationName={publication.identity.name}
-        logoUrl={publication.branding.masthead.url}
+        publicationName={brand.name}
+        homeHref={brand.href}
+        logoUrl={brand.logoUrl}
         sections={headerNavigation.map(({ label, url }) => ({ label, url }))}
         secondary={menuSecondaryNavigation.map(({ label, url }) => ({ label, url }))}
       />
     );
   }
-  const mastheadImage = <img src={publication.branding.masthead.url} alt={publication.branding.masthead.alt} />;
+  const mastheadImage = <img src={brand.logoUrl} alt={brand.alt} />;
+  const headerClass = [
+    "site-header",
+    sticky ? `site-header--flat site-header--${sticky}` : "",
+    prowler ? "site-header--prowler" : ""
+  ].filter(Boolean).join(" ");
 
   return (
-    <header className={sticky ? `site-header site-header--flat site-header--${sticky}` : "site-header"}>
+    <header className={headerClass}>
       <div className={showDate ? "site-utility" : "site-utility site-utility--undated"} aria-label="Publication details">
-        <span>{publication.location.display}</span>
+        {prowler
+          ? <a className="site-utility-home" href="/">{publication.identity.name}</a>
+          : <span>{publication.location.display}</span>}
         {showDate ? <time dateTime={dateTime}>{headerDate}</time> : null}
         <div className="header-tools" aria-label="Site tools">
           <a className="header-donate" href={DONATE_URL}>
@@ -82,10 +99,10 @@ export function SiteHeader({ mode = "standard", logoAlign = "center", sticky, sh
       {sticky === "logo" ? <div className="sticky-logo-bar" data-sticky-logo-bar aria-hidden="true" /> : null}
       {homepage ? (
         <h1 className="masthead-logo">
-          <a href="/">{mastheadImage}</a>
+          <a href={brand.href}>{mastheadImage}</a>
         </h1>
       ) : (
-        <a className="masthead-logo" href="/" aria-label={`${publication.identity.name} home`}>
+        <a className="masthead-logo" href={brand.href} aria-label={prowler ? THE_PROWLER.name : `${publication.identity.name} home`}>
           {mastheadImage}
         </a>
       )}

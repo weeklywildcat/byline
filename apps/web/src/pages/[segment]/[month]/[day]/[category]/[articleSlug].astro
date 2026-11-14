@@ -14,7 +14,8 @@ import BaseLayout from "@/src/layouts/BaseLayout.astro";
 import React from "react";
 import { getMetadata } from "@/views/[segment]/[month]/[day]/[category]/[articleSlug]/page";
 import { getBuildSnapshot } from "@/lib/build-snapshot";
-import { getPrimaryVisibleCategory, isVisibleContentPost } from "@/lib/content";
+import { getPrimaryVisibleCategory, isProwlerPost, isVisibleContentPost } from "@/lib/content";
+import { THE_PROWLER } from "@/lib/the-prowler";
 import { getPublicationConfig } from "@/lib/publication";
 import { absoluteUrl, getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo";
 import { getArticleJsonLd } from "@/lib/story-video";
@@ -75,6 +76,8 @@ const section = story ? { name: decodeHtml(story.section.name), href: story.sect
   : category ? { name: decodeHtml(category.name), href: `/category/${category.slug}/`, slug: category.slug } : null;
 const publication = getPublicationConfig();
 const visualStory = isVisualStory(getStoryPresentation(id));
+// The Prowler's stories carry its wordmark in the header, so satire looks like satire from the top.
+const masthead = (post ? isProwlerPost(post) : section?.slug === THE_PROWLER.slug) ? "prowler" : "publication";
 // The Site navigation choice reaches the layout before it renders, so no article component ever edits the header.
 const chrome = getStoryChrome(presentation) === "minimal" ? "story-overlay" : "standard";
 const slots = {
@@ -84,7 +87,7 @@ const slots = {
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
-<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo={chrome === "standard"} hideMastheadDate chrome={chrome} chromeLogo={getStoryLogoAlign(presentation)}>
+<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo={chrome === "standard"} hideMastheadDate chrome={chrome} chromeLogo={getStoryLogoAlign(presentation)} masthead={masthead}>
   <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(story ? nativeArticleJsonLd(story, !visualStory) : getArticleJsonLd(post!, { articleBody: !visualStory }))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },

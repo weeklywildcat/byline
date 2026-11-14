@@ -16,6 +16,7 @@ import path from "node:path";
 import { optionalBuildData, requireBuildData } from "@/lib/build-data";
 import { isHiddenCategory, isVisibleContentPost } from "@/lib/content";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
+import { THE_PROWLER } from "@/lib/the-prowler";
 import { type SportsGame, type SportsRoster, type SportsTeamMedia } from "@/lib/headless";
 import { CODE_ROUTED_PAGE_SLUGS, REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { getPublicationConfig } from "@/lib/publication";
@@ -98,7 +99,9 @@ function routeEntries(input: {
     path: `/category/${category.slug}/`,
     ...(category.slug === BEHIND_THE_SCENES.slug
       ? { kind: "redirect" as const, redirectTo: BEHIND_THE_SCENES.path }
-      : { kind: "category" as const }),
+      : category.slug === THE_PROWLER.slug
+        ? { kind: "redirect" as const, redirectTo: THE_PROWLER.path }
+        : { kind: "category" as const }),
     digest: archiveRouteDigest([category, input.posts.filter((post) => post.categories.includes(category.id)).map((post) => post.id)])
   }));
   const authors = input.contributors.map((contributor) => ({

@@ -31,7 +31,7 @@ export function buildRouteManifest(entries: Iterable<RouteManifestEntry>) {
 }
 
 /** Institutional addresses the public Astro application owns in code. */
-export const CODE_ROUTED_PAGE_SLUGS: readonly string[] = ["about", "join", "diversity-inclusion", "off-deadline"];
+export const CODE_ROUTED_PAGE_SLUGS: readonly string[] = ["about", "join", "diversity-inclusion", "off-deadline", "the-prowler"];
 export const REDIRECTED_PAGE_SLUGS: Readonly<Record<string, string>> = {
   "media-assets": "/media-kit/",
   "behind-the-scenes": "/off-deadline/"
