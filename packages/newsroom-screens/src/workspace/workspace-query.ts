@@ -5,6 +5,13 @@ import type { StoryWorkspace } from "./workspace-types";
 /** One query per story serves Home's Story Peek, hover previews and the full Story workspace. */
 export const workspaceKey = (storyId: number) => ["byline", "workspace", storyId] as const;
 
+/**
+ * Article Notes previews. A sibling of the workspace key, not a child: saving a
+ * task must not refetch Notes, and Notes are never edited from Byline. They go
+ * stale on their own and refetch when the window regains focus.
+ */
+export const articleNotesKey = (storyId: number) => ["byline", "article-notes", storyId] as const;
+
 /** A warmed workspace stays fresh long enough for hover -> Peek -> Story navigation to reuse one request. */
 export const WORKSPACE_STALE_TIME = 30_000;
 
