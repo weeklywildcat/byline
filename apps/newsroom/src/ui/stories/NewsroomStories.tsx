@@ -5,7 +5,6 @@ import { StoriesNavigator } from "@byline/newsroom-screens/planning/StoriesNavig
 import { StoriesPage } from "@byline/newsroom-screens/planning/StoriesPage";
 import { useStoriesWorkspace } from "@byline/newsroom-screens/planning/stories-workspace-context";
 import { preferredStoriesView, storiesViewFromRoute, type StoriesView } from "@byline/newsroom-screens/planning/stories-view";
-import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Button } from "@byline/newsroom-ui/ui/button";
@@ -18,6 +17,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useShellLayout } from "../shell/layout";
 import { useBylineSearch } from "../shell/search";
 import { createPayloadHomeFetchers } from "../home/payload-fetchers";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadPlanningFetchers } from "./payload-planning-fetchers";
 
 export type NewsroomStoriesProps = {
@@ -46,6 +46,7 @@ export function NewsroomStories({ currentUserId, view, initialFilters }: Newsroo
   const admin = config.routes.admin;
   const fetchers = useMemo(() => ({ ...createPayloadHomeFetchers(api), ...createPayloadPlanningFetchers(api, { getPreference, setPreference }) }), [api, getPreference, setPreference]);
   const workspaceUrl = useMemo(() => (storyId: number) => `${admin}/collections/stories/${storyId}`, [admin]);
+  const preloadStory = useStoryPreload(fetchers, workspaceUrl);
   // The reader's last view lives in this browser, so the screen decides it once it is in one.
   const inBrowser = useSyncExternalStore(subscribeNever, () => true, () => false);
   const initialView: StoriesView | null = inBrowser ? (storiesViewFromRoute(view) ?? preferredStoriesView("board", window.localStorage)) : null;
@@ -53,13 +54,11 @@ export function NewsroomStories({ currentUserId, view, initialFilters }: Newsroo
   // Byline's scoped Nova styles; the shell owns the one toaster.
   return (
     <AdminRoot className="byline-stories" toaster={false}>
-      <StoryHoverProvider fetchers={fetchers}>
-        <StoryPeekHost fetchers={fetchers} workspaceUrl={workspaceUrl}>
-          <main className="@container/planning mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 lg:px-6">
-            {initialView ? <StoriesBody fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} /> : <StoriesPlaceholder />}
-          </main>
-        </StoryPeekHost>
-      </StoryHoverProvider>
+      <StoryPeekHost fetchers={fetchers} workspaceUrl={workspaceUrl} preloadStory={preloadStory}>
+        <main className="@container/planning mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 lg:px-6">
+          {initialView ? <StoriesBody fetchers={fetchers} currentUserId={currentUserId} initialView={initialView} initialFilters={initialFilters} workspaceUrl={workspaceUrl} /> : <StoriesPlaceholder />}
+        </main>
+      </StoryPeekHost>
     </AdminRoot>
   );
 }
