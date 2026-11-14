@@ -182,13 +182,14 @@ export const PREFETCH_INTENT_MS = 80;
  * dynamic, and prefetching every visible link would render each of them
  * on the server for nothing.
  */
-export function usePrefetchOnIntent(href: string) {
+export function usePrefetchOnIntent(href: string, customPrefetch?: () => void) {
   const router = useRouter();
   const timer = useRef<number | null>(null);
   const prefetch = useCallback(() => {
+    if (customPrefetch) return customPrefetch();
     // "full": the dynamic screen itself, not only its loading shell (Next's PrefetchKind.FULL).
     prefetchFullRoute(router, href);
-  }, [router, href]);
+  }, [customPrefetch, router, href]);
   const cancel = useCallback(() => { if (timer.current !== null) window.clearTimeout(timer.current); timer.current = null; }, []);
   useEffect(() => cancel, [cancel]);
   return {
@@ -204,9 +205,9 @@ export function usePrefetchOnIntent(href: string) {
  * goes through `navigate` (wait, or ask); a new-tab click, or a click with
  * nothing pending, is an ordinary Link. Its screen is prefetched on intent.
  */
-export function ShellLink({ href, onClick, onPointerEnter, onPointerLeave, onFocus, onTouchStart, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
+export function ShellLink({ href, onClick, onPointerEnter, onPointerLeave, onFocus, onTouchStart, onPrefetchIntent, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string; onPrefetchIntent?: () => void }) {
   const { navigate, hasPendingWork } = useShellNavigation();
-  const intent = usePrefetchOnIntent(href);
+  const intent = usePrefetchOnIntent(href, onPrefetchIntent);
   return (
     <Link
       href={href}
