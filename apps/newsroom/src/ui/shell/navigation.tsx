@@ -85,7 +85,7 @@ export function ShellNavigationProvider({ children, warmHrefs = [] }: { children
 
     let active = true;
     const warm = () => {
-      if (!active) return;
+      if (!active || document.visibilityState !== "visible") return;
       for (const href of warmHrefs) {
         if (warmedRoutes.current.has(href) || href.split("?")[0] === pathname) continue;
         if (prefetchFullRoute(router, href)) warmedRoutes.current.add(href);
