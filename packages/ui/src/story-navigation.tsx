@@ -23,7 +23,8 @@ import type { ReactNode } from "react";
  * focus trapping, Escape, an inert page behind it and focus restoration
  * without a UI library on the static site.
  */
-export type StoryNavigationLink = { label: string; url: string };
+/** `current` is the link's aria-current: "page" for this page, "true" for the section it belongs to. */
+export type StoryNavigationLink = { label: string; url: string; current?: "page" | "true" };
 
 export type StoryNavigationProps = {
   /** "Weekly Wildcat": the accessible name of the logo link and the menu. */
@@ -108,13 +109,13 @@ export function StoryNavigation({ publicationName, logoUrl, homeHref = "/", sect
         <nav aria-label="Site sections" className="story-nav__sheet-nav">
           <ul className="story-nav__sections">
             {sections.map((section) => (
-              <li key={`${section.label}-${section.url}`}><a href={section.url}>{section.label}</a></li>
+              <li key={`${section.label}-${section.url}`}><a href={section.url} aria-current={section.current}>{section.label}</a></li>
             ))}
           </ul>
           {secondary.length > 0 ? (
             <ul className="story-nav__secondary" aria-label="More from the publication">
               {secondary.map((link) => (
-                <li key={`${link.label}-${link.url}`}><a href={link.url}>{link.label}</a></li>
+                <li key={`${link.label}-${link.url}`}><a href={link.url} aria-current={link.current}>{link.label}</a></li>
               ))}
             </ul>
           ) : null}

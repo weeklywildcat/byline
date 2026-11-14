@@ -1583,6 +1583,13 @@ h1.masthead-logo {
   color: var(--ink);
 }
 
+/* The section this page is, or belongs to. */
+.section-nav a[aria-current] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* Sticky header variants. The header's children are lifted into the body
    (display: contents) so position: sticky can last the whole page; sticky is
    handled by the compositor, so nothing lags or overshoots during fast or
@@ -2836,6 +2843,43 @@ h1.masthead-logo {
 
 .article-newsletter-kit > * {
   max-width: 100%;
+}
+
+/* Kit injects its own form styles (blue button, rounded input, 56px top padding, badge).
+   Every newsletter panel gets the publication's treatment, not only the homepage's. */
+.article-newsletter-kit .formkit-form,
+.article-newsletter-kit .formkit-form [data-style="clean"] {
+  background: transparent !important;
+  border: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+.article-newsletter-kit .formkit-input {
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--ink) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 1rem !important;
+  min-height: 50px;
+}
+
+.article-newsletter-kit .formkit-submit {
+  background: var(--ink) !important;
+  border-radius: 0 !important;
+  color: #ffffff !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 700 !important;
+  min-height: 50px;
+}
+
+.article-newsletter-kit .formkit-submit > span {
+  background: transparent !important;
+}
+
+.article-newsletter-kit .formkit-powered-by-convertkit-container {
+  display: none !important;
 }
 
 .article-after {
@@ -5351,12 +5395,26 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
     justify-content: safe center;
     margin: 0 -14px;
     overflow-x: auto;
-    padding: 0 14px;
+    padding: 0 max(14px, var(--byline-safe-right, 0px)) 0 max(14px, var(--byline-safe-left, 0px));
     scrollbar-width: none;
   }
 
   .section-nav::-webkit-scrollbar {
     display: none;
+  }
+
+  /* When the row scrolls, fade the clipped edge so a cut-off label reads as "more this way".
+     BaseLayout sets the flags from the scroll position. */
+  .section-nav[data-more-end] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  }
+
+  .section-nav[data-more-start] {
+    mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+  }
+
+  .section-nav[data-more-start][data-more-end] {
+    mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
   }
 
   .section-nav a {
@@ -5626,7 +5684,8 @@ body:has(.live-home-shell > .home-newsletter-section:last-child) .site-footer::b
 
   .article-newsletter-signup {
     margin-left: 50%;
-    padding: 16px 6px;
+    /* 4px panel inset + 16px padding puts the copy on the article's 20px gutter. */
+    padding: 18px 16px;
     transform: translateX(-50%);
     /* The article shell's content box plus its 20px gutters, less 4px a side.
        100vw would include a drawn scrollbar and overflow the page by 4px. */

@@ -108,10 +108,39 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
     {(stickyLogo || overlay) && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
-    <SiteHeader mode={overlay ? "story-overlay" : "standard"} logoAlign={chromeLogo} sticky={overlay ? undefined : stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} masthead={masthead} />
+    <SiteHeader mode={overlay ? "story-overlay" : "standard"} logoAlign={chromeLogo} sticky={overlay ? undefined : stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} masthead={masthead} currentPath={Astro.url.pathname} />
     {overlay && <script>
       import { startStoryNavigation } from "@byline/ui/story-navigation-client";
       startStoryNavigation(document);
+    </script>}
+    {!overlay && <script is:inline>
+      (function () {
+        // On phones the section row scrolls sideways: start with the current section in view
+        // and fade whichever edge hides more links.
+        var nav = document.querySelector(".section-nav");
+        if (!nav) return;
+        var current = nav.querySelector("[aria-current]");
+        function place() {
+          if (!current || nav.scrollWidth <= nav.clientWidth) return;
+          var offset = current.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+          var centered = offset - (nav.clientWidth - current.offsetWidth) / 2;
+          // Centre it if possible, but never leave it under the faded edge (40px).
+          var fullyVisibleMin = offset + current.offsetWidth + 40 - nav.clientWidth;
+          var fullyVisibleMax = offset - 40;
+          nav.scrollLeft = Math.max(0, Math.min(fullyVisibleMax, Math.max(fullyVisibleMin, centered)));
+        }
+        function edges() {
+          var max = nav.scrollWidth - nav.clientWidth;
+          nav.toggleAttribute("data-more-start", max > 1 && nav.scrollLeft > 1);
+          nav.toggleAttribute("data-more-end", max > 1 && nav.scrollLeft < max - 1);
+        }
+        place();
+        nav.addEventListener("scroll", edges, { passive: true });
+        window.addEventListener("resize", edges);
+        edges();
+        // The web font widens the row after first paint; place it again once it has loaded.
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { place(); edges(); });
+      })();
     </script>}
     <span id="main-content" tabindex="-1"></span>
     {stickyNav && <script is:inline>
