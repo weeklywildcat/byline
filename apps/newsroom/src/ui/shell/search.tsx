@@ -12,6 +12,7 @@ import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { useBylineCreate } from "./create";
 import { ShellLayer } from "./layer";
 import { useShellNavigation } from "./navigation";
+import { useStoryPreload } from "../story/preload";
 
 type StoryOpener = (storyId: number) => void;
 
@@ -39,6 +40,8 @@ export function BylineSearchProvider({ children }: { children: ReactNode }) {
   const { actions, openCreate, creating } = useBylineCreate();
   const { navigate } = useShellNavigation();
   const fetchers = useMemo(() => createPayloadHomeFetchers(routes.api), [routes.api]);
+  const storyUrl = useCallback((id: number) => `${routes.admin}/collections/stories/${id}`, [routes.admin]);
+  const preloadStory = useStoryPreload(fetchers, storyUrl);
   const [open, setOpen] = useState(false);
   const [recentIds, setRecentIds] = useState<number[]>([]);
   const opener = useRef<StoryOpener | null>(null);
@@ -60,6 +63,7 @@ export function BylineSearchProvider({ children }: { children: ReactNode }) {
   const setStoryOpener = useCallback((next: StoryOpener | null) => { opener.current = next; }, []);
   const value = useMemo<BylineSearch>(() => ({ openSearch: () => setOpen(true), setStoryOpener }), [setStoryOpener]);
   const openStory = (id: number) => {
+    preloadStory(id);
     setRecentIds((ids) => [id, ...ids.filter((item) => item !== id)].slice(0, 8));
     if (opener.current) opener.current(id);
     else navigate(routes.story(id));
