@@ -85,7 +85,9 @@ export const STORY_PREFETCH_INTENT_MS = 60;
 
 type IntentProps = Pick<ComponentProps<"div">, "onPointerEnter" | "onPointerLeave" | "onFocus" | "onTouchStart">;
 
-function useStoryIntent(storyId: number, context: StoryHoverContextValue): IntentProps & { preload: () => void } {
+/** Shared intent handlers for a Story row, card or headline. */
+export function useStoryIntent(storyId: number): IntentProps & { preload: () => void } {
+  const context = useContext(StoryHoverContext);
   const queryClient = useQueryClient();
   const intentTimer = useRef<number | null>(null);
   const cancelIntent = useCallback(() => {
@@ -94,33 +96,17 @@ function useStoryIntent(storyId: number, context: StoryHoverContextValue): Inten
   }, []);
   const preload = useCallback(() => {
     cancelIntent();
+    if (!context || storyId <= 0) return;
     if (context.preloadStory) context.preloadStory(storyId);
     else if (context.fetchers.getWorkspace) void prefetchStoryWorkspace(queryClient, storyId, context.fetchers.getWorkspace);
   }, [cancelIntent, context, queryClient, storyId]);
   const scheduleIntent = useCallback(() => {
     cancelIntent();
+    if (!context || storyId <= 0) return;
     intentTimer.current = window.setTimeout(preload, STORY_PREFETCH_INTENT_MS);
-  }, [cancelIntent, preload]);
+  }, [cancelIntent, context, preload, storyId]);
   useEffect(() => cancelIntent, [cancelIntent]);
   return { onPointerEnter: scheduleIntent, onPointerLeave: cancelIntent, onFocus: preload, onTouchStart: preload, preload };
-}
-
-/** Attach Story intent warming to an entire row/card without changing its DOM. */
-export function StoryIntentArea({ storyId, children }: { storyId: number; children: ReactElement }) {
-  const context = useContext(StoryHoverContext);
-  if (!context?.fetchers.getWorkspace || storyId <= 0) return children;
-  return <StoryIntentClone storyId={storyId} context={context}>{children}</StoryIntentClone>;
-}
-
-function StoryIntentClone({ storyId, context, children }: { storyId: number; context: StoryHoverContextValue; children: ReactElement }) {
-  const intent = useStoryIntent(storyId, context);
-  const child = children as ReactElement<IntentProps>;
-  return cloneElement(child, {
-    onPointerEnter: (event) => { child.props.onPointerEnter?.(event); intent.onPointerEnter?.(event); },
-    onPointerLeave: (event) => { child.props.onPointerLeave?.(event); intent.onPointerLeave?.(event); },
-    onFocus: (event) => { child.props.onFocus?.(event); intent.onFocus?.(event); },
-    onTouchStart: (event) => { child.props.onTouchStart?.(event); intent.onTouchStart?.(event); }
-  });
 }
 
 function StoryHoverCardQuery({ storyId, title, story, note, children, context, canHover }: {
@@ -133,7 +119,7 @@ function StoryHoverCardQuery({ storyId, title, story, note, children, context, c
   canHover: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const intent = useStoryIntent(storyId, context);
+  const intent = useStoryIntent(storyId);
   const blockOpenUntil = useRef(0);
   const suppressForSecondaryPress = () => {
     blockOpenUntil.current = performance.now() + 750;
