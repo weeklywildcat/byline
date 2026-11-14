@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ListTodo } from "lucide-react";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { useFineHoverPointer } from "@byline/newsroom-ui/lib/hooks";
@@ -11,17 +11,17 @@ import { exactDate, shortDateTime } from "../home/newsroom-model";
 import { reportingSummaryLine, type PlanningStory } from "../planning/planning-model";
 import { ProductionSummary, WorkflowBadge, plannedLabel } from "./story-parts";
 import type { StoryFetchers } from "./story-fetchers";
-import { workspaceKey } from "./story-query";
+import { prefetchStoryWorkspace, workspaceQueryOptions } from "../workspace/workspace-query";
 import { openTasks } from "../workspace/workspace-model";
 
 type StoryHoverSummary = Pick<PlanningStory, "id" | "title"> & Partial<Omit<PlanningStory, "id" | "title">>;
 
-type StoryHoverContextValue = { fetchers: StoryFetchers };
+type StoryHoverContextValue = { fetchers: StoryFetchers; preloadStory?: (storyId: number) => void };
 
 const StoryHoverContext = createContext<StoryHoverContextValue | null>(null);
 
-export function StoryHoverProvider({ fetchers, children }: StoryHoverContextValue & { children: ReactNode }) {
-  const value = useMemo(() => ({ fetchers }), [fetchers]);
+export function StoryHoverProvider({ fetchers, preloadStory, children }: StoryHoverContextValue & { children: ReactNode }) {
+  const value = useMemo(() => ({ fetchers, preloadStory }), [fetchers, preloadStory]);
   return <StoryHoverContext value={value}>{children}</StoryHoverContext>;
 }
 
@@ -81,6 +81,8 @@ export function StoryHoverCard(props: {
   return <StoryHoverCardQuery {...props} context={context} />;
 }
 
+export const STORY_PREFETCH_INTENT_MS = 60;
+
 function StoryHoverCardQuery({ storyId, title, story, note, children, context }: {
   storyId: number;
   title: string;
@@ -90,17 +92,28 @@ function StoryHoverCardQuery({ storyId, title, story, note, children, context }:
   context: StoryHoverContextValue;
 }) {
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const intentTimer = useRef<number | null>(null);
+  const cancelIntent = useCallback(() => {
+    if (intentTimer.current !== null) window.clearTimeout(intentTimer.current);
+    intentTimer.current = null;
+  }, []);
+  const preload = useCallback(() => {
+    cancelIntent();
+    if (context.preloadStory) context.preloadStory(storyId);
+    else void prefetchStoryWorkspace(queryClient, storyId, context.fetchers.getWorkspace!);
+  }, [cancelIntent, context, queryClient, storyId]);
+  const scheduleIntent = useCallback(() => {
+    cancelIntent();
+    intentTimer.current = window.setTimeout(preload, STORY_PREFETCH_INTENT_MS);
+  }, [cancelIntent, preload]);
+  useEffect(() => cancelIntent, [cancelIntent]);
   const blockOpenUntil = useRef(0);
   const suppressForSecondaryPress = () => {
     blockOpenUntil.current = performance.now() + 750;
     setOpen(false);
   };
-  const preview = useQuery({
-    queryKey: workspaceKey(storyId),
-    queryFn: () => context.fetchers.getWorkspace!(storyId),
-    enabled: open,
-    staleTime: 30_000
-  });
+  const preview = useQuery({ ...workspaceQueryOptions(storyId, context.fetchers.getWorkspace!), enabled: open });
 
   const workspace = preview.data;
   const resolved: StoryHoverSummary = workspace?.story || story || { id: storyId, title };
@@ -116,6 +129,10 @@ function StoryHoverCardQuery({ storyId, title, story, note, children, context }:
       delay={260}
       closeDelay={140}
       render={children}
+      onPointerEnter={scheduleIntent}
+      onPointerLeave={cancelIntent}
+      onFocus={preload}
+      onTouchStart={preload}
       onPointerDownCapture={(event) => {
         if (event.button === 2 || (event.button === 0 && event.ctrlKey)) suppressForSecondaryPress();
       }}
