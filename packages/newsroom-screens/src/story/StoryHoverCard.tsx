@@ -88,7 +88,12 @@ export function StoryHoverCard(props: {
 
 export const STORY_PREFETCH_INTENT_MS = 60;
 
-type IntentProps = Pick<ComponentProps<"div">, "onPointerEnter" | "onPointerLeave" | "onFocus" | "onTouchStart">;
+type IntentProps = {
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
+  onFocus?: () => void;
+  onTouchStart?: () => void;
+};
 
 /** Shared intent handlers for a Story row, card or headline. */
 export function useStoryIntent(storyId: number): IntentProps & { preload: () => void } {
