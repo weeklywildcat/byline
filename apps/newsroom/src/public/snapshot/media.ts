@@ -114,6 +114,17 @@ export class PreparedMediaCatalog {
   }
 
   /**
+   * A small prepared image for a byline avatar (40px, sharp at 2x): the smallest natural rendition at least
+   * `min` pixels wide, else the largest. Null unless the Media is a prepared image.
+   */
+  avatar(id: number, min = 96): { src: string; width: number; height: number } | null {
+    const manifest = this.prepared.get(id)?.manifest;
+    if (manifest?.kind !== "image" || !manifest.natural.length) return null;
+    const file = manifest.natural.find((entry) => entry.width >= min) ?? largestNaturalImage(manifest);
+    return { src: file.publicPath, width: file.width, height: file.height };
+  }
+
+  /**
    * The renderer's media record for the canonical ArticleBody, with the
    * prepared public file as its source (never a newsroom URL).
    */

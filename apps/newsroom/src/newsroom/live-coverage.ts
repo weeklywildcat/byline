@@ -1,14 +1,17 @@
 import type { LiveCoverage } from "@byline/core";
 import { APIError, type Payload, type PayloadRequest, type Where } from "payload";
-import { ASSIGNED_WORK_COLLECTIONS, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
+import { scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { atLeast, relationId, relationIds } from "../access/user";
 import { canPublishLive, canPublishLiveNow, liveGate, resetLivePublisherStories, storyIsPublic } from "../access/live-context";
 import { LiveTransitionError, normalizeLiveSettings, transition, type CoverageAction, type CoverageState, type LiveMode, type PublishBlock } from "../domain/live-coverage";
 import { PreparedMediaCatalog } from "../public/snapshot/media";
 import { hasLiveCoverage } from "../domain/live-coverage";
-import { liveCoverageProjection, readLivePlans, readLiveUpdates } from "../public/snapshot/live";
+import { liveCoverageProjection, liveUpdatePeople, readLivePlans, readLiveUpdates, type LiveBylinePerson } from "../public/snapshot/live";
+import { publicPeople } from "./public-people";
 import { recordStoryActivity } from "./story-activity";
 import { userAvatarUrls } from "./portraits";
+import { storyAccounts } from "./story-accounts";
+import { canPostAs, resolvePostingAs } from "./posting-as";
 import { lexicalToPlainText, LIVE_TEXT_MAX, plainTextToLexical } from "./live-text";
 import type { ScreenContext } from "./screen-models";
 
@@ -57,6 +60,10 @@ export type LiveDeskResponse = {
   publishBlock: PublishBlock | null;
   /** Editor-level: change mode, start, end, resume and manage direct publishers. */
   canControl: boolean;
+  /** Editor-level: may credit a new update to someone else (posting-as.ts). */
+  canPostAs: boolean;
+  /** The signed-in account, for "by you" and for telling a person's own drafts apart. */
+  me: { id: number; name: string; avatarUrl: string | null };
   /** Reporters who may also publish live updates directly on this Story. */
   publishers: LivePublisher[];
   updates: LiveDeskUpdate[];
@@ -65,7 +72,7 @@ export type LiveDeskResponse = {
 
 export type LivePostResult = { id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock };
 
-export type LiveUpdateInput = { title?: unknown; text?: unknown; photoId?: unknown; pinned?: unknown; state?: unknown; delivery?: unknown };
+export type LiveUpdateInput = { title?: unknown; text?: unknown; photoId?: unknown; pinned?: unknown; state?: unknown; delivery?: unknown; as?: unknown };
 
 const PAGE = 100;
 const as = (ctx: ScreenContext) => ({ req: ctx.req, overrideAccess: false as const, depth: 0 });
@@ -94,7 +101,7 @@ export async function liveDesk(ctx: ScreenContext, storyId: number): Promise<Liv
   const where: Where = { and: [{ story: { equals: storyId } }, ...(manager || publisher ? [] : [{ or: [{ state: { equals: "published" } }, { author: { equals: ctx.user.id } }] }])] };
   const page = await payload.find({ collection: "live-updates", where, sort: "-publishedAt", limit: PAGE, depth: 1, req: ctx.req, overrideAccess: false });
   const granted = relationIds(plan.docs[0]?.livePublishers).map(Number).filter(Boolean);
-  const authors = [...new Set([...page.docs.map((row) => relationId(row.author)).filter((id): id is number | string => id !== null), ...granted])];
+  const authors = [...new Set([...page.docs.map((row) => relationId(row.author)).filter((id): id is number | string => id !== null), ...granted, ctx.user.id])];
   const users = authors.length ? (await payload.find({ collection: "users", where: { id: { in: authors } }, select: { name: true, linkedPerson: true }, pagination: false, ...as(ctx) })).docs : [];
   const names = new Map(users.map((user) => [String(user.id), user.name]));
   const avatars = await userAvatarUrls(ctx, users);
@@ -111,6 +118,8 @@ export async function liveDesk(ctx: ScreenContext, storyId: number): Promise<Liv
     canPublishNow: publisher && gate.block === null,
     publishBlock: gate.block,
     canControl: atLeast(ctx.user, "editor"),
+    canPostAs: canPostAs(ctx),
+    me: { id: Number(ctx.user.id), name: names.get(String(ctx.user.id)) ?? "You", avatarUrl: avatars.get(Number(ctx.user.id)) ?? null },
     publishers: granted.flatMap((id) => (names.has(String(id)) ? [{ id, name: names.get(String(id))!, avatarUrl: avatars.get(id) ?? null }] : [])),
     hasMore: page.hasNextPage,
     updates: page.docs.map((row): LiveDeskUpdate => {
@@ -147,7 +156,7 @@ async function assertLivePhoto(ctx: ScreenContext, storyId: number, photo: numbe
 
 export type NewLiveUpdate = {
   text: unknown; headline?: unknown; photoId?: unknown; pinned?: unknown; clientKey?: string; queued?: boolean; source: "write" | "field"; wantsPublish: boolean;
-  /** Credit someone else (an editor's shared phone, field/posting-as.ts, already validated). Defaults to the signed-in account. */
+  /** Credit someone else (an editor posting for a reporter, posting-as.ts, already validated). Defaults to the signed-in account. */
   author?: number;
 };
 
@@ -186,7 +195,8 @@ export async function postLiveUpdate(ctx: ScreenContext, storyId: number, input:
   await authorize(ctx, storyId);
   // `delivery` is the intent. The older `state` field still maps to it for existing clients.
   const wantsPublish = input.delivery === "publish" || (input.delivery === undefined && input.state === "published");
-  return createLiveUpdate(ctx, storyId, { text: input.text, headline: input.title, photoId: input.photoId, pinned: input.pinned, source: "write", wantsPublish });
+  const author = await resolvePostingAs(ctx, input.as);
+  return createLiveUpdate(ctx, storyId, { text: input.text, headline: input.title, photoId: input.photoId, pinned: input.pinned, source: "write", wantsPublish, ...(author.self ? {} : { author: author.id }) });
 }
 
 export async function changeLiveUpdate(ctx: ScreenContext, storyId: number, updateId: number, input: LiveUpdateInput): Promise<{ id: number }> {
@@ -227,31 +237,6 @@ export async function deleteLiveUpdate(ctx: ScreenContext, storyId: number, upda
 
 export type LiveCandidate = { id: number; name: string; avatarUrl: string | null; granted: boolean; relation: string };
 
-/**
- * The accounts connected to a Story through the existing Story access model, each with why: its creator, a
- * contributor through their linked person, anyone holding assigned work, and anyone holding the live grant.
- */
-export async function storyAccounts(req: PayloadRequest, storyId: number): Promise<{ relation: Map<string, string>; granted: Set<string> }> {
-  const { payload } = req;
-  const base = { depth: 0, pagination: false, overrideAccess: true, req } as const;
-  const [plan, ...work] = await Promise.all([
-    payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, depth: 0, select: { createdBy: true, contributors: true, livePublishers: true }, overrideAccess: true, req }),
-    ...ASSIGNED_WORK_COLLECTIONS.map((collection) => payload.find({ collection, where: { story: { equals: storyId } }, select: { assignees: true } as never, ...base }))
-  ]);
-  const row = plan.docs[0];
-  const granted = new Set(relationIds(row?.livePublishers).map(String));
-  const relation = new Map<string, string>();
-  const note = (id: unknown, why: string) => { const key = String(relationId(id) ?? ""); if (key && !relation.has(key)) relation.set(key, why); };
-  note(row?.createdBy, "Started this story");
-  const contributorPeople = relationIds(row?.contributors);
-  if (contributorPeople.length) {
-    const linked = await payload.find({ collection: "users", where: { linkedPerson: { in: contributorPeople } }, select: { linkedPerson: true }, ...base });
-    for (const user of linked.docs) note(user.id, "On the byline");
-  }
-  for (const result of work) for (const record of result.docs as Array<{ assignees?: unknown }>) for (const user of relationIds(record.assignees)) note(user, "Has work on this story");
-  for (const id of granted) note(id, "May already publish");
-  return { relation, granted };
-}
 
 /**
  * Who an editor may offer direct publishing: staff accounts on this Story through the existing Story access
@@ -353,7 +338,7 @@ async function validPublishers(ctx: ScreenContext, storyId: number, value: unkno
 /**
  * The published-only projection: only a published, untrashed story with live
  * or ended coverage, and only its published updates. Raw text, drafts, account
- * IDs and author names never leave. This read-only endpoint uses the same
+ * IDs and account names never leave; a byline is the author's public Person, as on articles. This read-only endpoint uses the same
  * projection contract as the static build. Photos are prepared public
  * renditions; if one is not ready yet, the endpoint omits photos while the
  * snapshot pipeline waits and re-queues once preparation finishes.
@@ -370,8 +355,14 @@ export async function publicLiveFeed(payload: Payload, storyId: number): Promise
   const settings = (await readLivePlans(payload, [storyId])).get(storyId);
   if (!hasLiveCoverage(settings)) return null;
   const rows = await readLiveUpdates(payload, [storyId]);
-  const photoIds = [...new Set(rows.map((row) => Number(relationId(row.photo))).filter((id) => id > 0))];
-  const catalog = await PreparedMediaCatalog.load(payload, new Map(photoIds.map((id) => [id, { usage: `a live update on Story ${storyId}`, kind: "image" as const }])))
-    .catch(() => PreparedMediaCatalog.load(payload, new Map()));
-  return liveCoverageProjection(story, settings, rows, catalog);
+  const credits = await liveUpdatePeople(payload, rows);
+  const credited = new Set(credits.values());
+  const people = credited.size ? await publicPeople(payload) : { authors: [], guests: [] };
+  const byId = new Map([...people.authors, ...people.guests].filter((person) => credited.has(person.id)).map((person): [number, LiveBylinePerson] => [person.id, { ...person, portrait: person.portrait?.id ?? null }]));
+  const bylines = new Map([...credits].flatMap(([update, person]) => (byId.has(person) ? [[update, byId.get(person)!] as const] : [])));
+  const refs = new Map<number, { usage: string; kind: "image" }>();
+  for (const row of rows) { const photo = Number(relationId(row.photo)); if (photo > 0) refs.set(photo, { usage: `a live update on Story ${storyId}`, kind: "image" }); }
+  for (const person of byId.values()) if (person.portrait) refs.set(person.portrait, { usage: `the portrait of Person`, kind: "image" });
+  const catalog = await PreparedMediaCatalog.load(payload, refs).catch(() => PreparedMediaCatalog.load(payload, new Map()));
+  return liveCoverageProjection(story, settings, rows, catalog, bylines);
 }
