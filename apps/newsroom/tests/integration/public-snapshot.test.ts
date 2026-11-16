@@ -11,6 +11,7 @@ import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { lexicalFromArticleBody } from "../../../../packages/editor/tests/lexical-fixture";
 import { plainTextToLexical } from "../../src/newsroom/live-text";
+import { servePublicLiveMedia } from "../../src/newsroom/public-live";
 import { readCurrentRevision, readPublicationState } from "../../src/db/publication-state";
 import { drizzleFor } from "../../src/publication-media/state";
 import { serveBuildMedia } from "../../src/publication-media/build-endpoint";
@@ -594,6 +595,17 @@ describe("the projection", () => {
     expect(projected?.html).toContain(marker);
     expect(projected?.image?.src).toMatch(/^\/_byline\/media\//);
     expect(ready.datasets.media.some((entry) => entry.id === photo)).toBe(true);
+
+    // Before that photo's deploy lands, a reader's browser can load it from the newsroom: the same bytes, by the same path.
+    const req = await createLocalReq({}, payload);
+    Object.assign(req, { routeParams: { id: String(story) }, searchParams: new URLSearchParams({ path: projected!.image!.src }) });
+    const served = await servePublicLiveMedia(req);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    const blob = ready.datasets.media.find((entry) => entry.id === photo)!.manifest;
+    const expected = publicationManifestBlobs(blob).find((entry) => entry.publicPath === projected!.image!.src)!;
+    expect(served.headers.get("content-type")).toBe(expected.mimeType);
+    expect(createHash("sha256").update(Buffer.from(await served.arrayBuffer())).digest("hex")).toBe(expected.sha256);
   });
 });
 

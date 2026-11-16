@@ -2,7 +2,8 @@ import { body, handle, idParam, json } from "./http";
 import { relatedSuggestions } from "./related-suggestions";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
-import { changeLiveCoverage, changeLiveUpdate, deleteLiveUpdate, liveCandidates, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
+import { changeLiveCoverage, changeLiveUpdate, deleteLiveUpdate, liveCandidates, liveDesk, postLiveUpdate } from "./live-coverage";
+import { publicLiveEndpoints } from "./public-live";
 import { postingAsPeople } from "./posting-as";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
@@ -545,17 +546,8 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/live/publishers", method: "get", handler: handle(async (ctx, req) => ({ people: await liveCandidates(ctx, idParam(req)) })) },
   { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
   { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
-  // Public, read-only, published-only: what the Worker serves at /api/live/<id> between builds. No credentials, no cookies.
-  { path: "/byline/live/:id", method: "get", handler: async (req) => {
-    try {
-      const id = Number((req.routeParams as { id?: string } | undefined)?.id);
-      const feed = Number.isSafeInteger(id) && id > 0 ? await publicLiveFeed(req.payload, id) : null;
-      return feed ? json(feed, 200, { "Cache-Control": "no-store" }) : json({ message: "Coverage not found." }, 404, { "Cache-Control": "no-store" });
-    } catch (error) {
-      req.payload.logger.error({ err: error, msg: "Public live feed failed" });
-      return json({ message: "Live coverage is unavailable." }, 502, { "Cache-Control": "no-store" });
-    }
-  } },
+  // Public, read-only, published-only: what a reader's browser polls while coverage is live, and the photos it names. No credentials, no cookies.
+  ...publicLiveEndpoints,
   { path: "/byline/notifications", method: "get", handler: handle((ctx, req) => inbox(ctx, { unreadOnly: req.searchParams.get("unread") === "1", limit: Number(req.searchParams.get("limit")) || 20 })) },
   { path: "/byline/notifications/read", method: "post", handler: handle(async (ctx, req) => {
     const input = await body<{ ids?: unknown; all?: unknown }>(req);

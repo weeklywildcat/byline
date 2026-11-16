@@ -12,4 +12,26 @@ Write and Field share one desk: the same timeline actions (edit, publish or unpu
 
 Readers see a byline on each update: the author's linked public Person, exactly as on an article (name, newsroom role, a link when they have a profile page, and their prepared portrait as a small avatar). Only the Person's ID is read from the account; account names, emails and IDs never leave. An author without a linked Person has no public byline.
 
-Published updates advance the public revision. Each static deployment includes the full timeline in the article and a feed at `/_byline/live/<storyId>.json`. While coverage is live, the browser checks this feed in visible tabs and offers a button to show new or edited updates. A successful **Publish now** saves an update as published in Byline; it does **not** mean the update has already reached the public site. Delivery depends on successful snapshot preparation and deployment, and can lag behind the newsroom during builds. The article remains readable without JavaScript.
+Published updates advance the public revision. Each static deployment includes the full timeline in the article and a feed at `/_byline/live/<storyId>.json`. The article remains readable without JavaScript.
+
+## How readers get updates
+
+While coverage is **live**, the article page reads the newsroom directly. A published update reaches open pages on their next check, about 15 seconds later, instead of waiting for a deploy:
+
+- The page is rendered with `data-source="<cms>/api/byline/live/<storyId>"`, built from the Publication's newsroom URL (`urls.cms`, HTTPS, or `http://localhost` for development). Only Payload stories with running coverage get it.
+- In visible tabs the browser checks that feed every 15 seconds (`@byline/ui/live-updates`), validates it with `normalizeLiveCoverage`, and renders it with the same `createArticleLiveView`/`createLiveFeed` code as the static page. It offers a button to show new or edited updates. It never inserts them without being asked.
+- If the newsroom does not answer, that check reads the static `/_byline/live/<storyId>.json` instead. Repeated failures back off to five minutes.
+- A photo or byline portrait whose deploy has not landed yet fails to load from `/_byline/media/…`. The page then retries it once from `<cms>/api/byline/live/<storyId>/media?path=/_byline/media/…`, which serves the same content-addressed bytes.
+
+When the feed reports that coverage **ended**, the page stops checking. A page built after coverage ended has no `data-source` and never contacts the newsroom. From then on the static build is the only copy, as for any other article. Published updates still advance the public revision and deploy as before, so the static timeline, search engines and readers without JavaScript catch up as each deploy lands. A page opened from a deploy made before **Go live** has no live timeline, so its readers must refresh once.
+
+### The newsroom routes
+
+Both routes are anonymous, read-only and published-only (`apps/newsroom/src/newsroom/public-live.ts`). They answer any origin without credentials.
+
+| Route | Serves | Caching |
+| --- | --- | --- |
+| `GET /api/byline/live/:id` | The `LiveCoverage` projection the static build validates: a published, untrashed Story with live or ended coverage, and its published updates only. Otherwise 404. | `public, max-age=5` |
+| `GET /api/byline/live/:id/media?path=` | One prepared publication file that this projection names: an update photo or a byline portrait. Anything else is 404. | `public, max-age=31536000, immutable` |
+
+Every reader polls, so the newsroom reuses a Story's projection while the public revision is unchanged, for up to 30 seconds. Concurrent requests share one read. A photo still being prepared is left out of the feed until it is ready, without dropping the other photos. For large audiences, put a CDN in front of the newsroom: the five-second shared lifetime lets it absorb the polling.

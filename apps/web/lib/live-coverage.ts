@@ -6,16 +6,37 @@ import { getContributorHref, getPostLiveCoverage, type ArchiveContributor, type 
 
 const publication = getPublicationConfig();
 
-/** Permanent static JSON archive, also useful on hosts without the Worker. */
+/** Permanent static JSON archive; the live page falls back to it when the newsroom is unreachable. */
 export function liveFeedPath(postId: number | string) {
   return `/_byline/live/${postId}.json`;
 }
 
 export const formatLiveTime = (iso: string) => formatTime(iso, publication.locale, publication.timezone);
 
+/**
+ * The newsroom's public feed for a Payload story, which the page reads directly
+ * while coverage is live (docs/live-coverage.md). Null when the Publication has
+ * no usable newsroom URL: the page then re-reads only its static feed.
+ */
+export function liveSourceUrl(postId: number | string, cms = publication.urls.cms): string | null {
+  try {
+    const base = new URL(cms);
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname);
+    if (base.protocol !== "https:" && !(local && base.protocol === "http:")) return null;
+    return `${base.origin}${base.pathname.replace(/\/+$/, "")}/api/byline/live/${encodeURIComponent(String(postId))}`;
+  } catch {
+    return null;
+  }
+}
+
 export function buildArticleLiveView(post: ArchivePost) {
   const native = nativeStory(post.id);
-  if (native) return native.live;
+  if (native) {
+    const live = native.live;
+    // Only a Payload story has a newsroom feed, and only running coverage reads it; ended coverage is the build's alone.
+    const url = live?.status === "live" ? liveSourceUrl(post.id) : null;
+    return live && url ? { ...live, source: { url, locale: publication.locale, timeZone: publication.timezone } } : live;
+  }
   const live = getPostLiveCoverage(post);
   return live ? createArticleLiveView(live, {
     postId: post.id, locale: publication.locale, timeZone: publication.timezone,

@@ -173,9 +173,18 @@ export type ArticleLiveView = {
   updatedLabel: string;
   keyPoints?: ArticleLiveUpdateView | null;
   updates: ArticleLiveUpdateView[];
-  /** Static JSON the page re-reads while live. */
+  /** Static JSON the page re-reads while live, and falls back to. */
   feedUrl: string;
+  /**
+   * While live, the newsroom's public feed (`<cms>/api/byline/live/<id>`): the
+   * page reads it directly so an update appears before the next deploy. Never
+   * part of a snapshot; the site adds it at render time, and only while live.
+   */
+  source?: ArticleLiveSource | null;
 };
+
+/** What the browser needs to render the newsroom's feed exactly as the static page renders it. */
+export type ArticleLiveSource = { url: string; locale: string; timeZone: string };
 
 /**
  * The built-in openings an author chooses between ("how should this story

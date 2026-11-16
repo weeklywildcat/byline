@@ -1,5 +1,11 @@
-/** A visible live page polls the read-only Worker feed; static HTML remains the archive. */
-import type { LiveFeed } from "./live-feed";
+/**
+ * A visible live page polls the newsroom's public feed (`data-source`) so an
+ * update appears before the next deploy, falling back to the static
+ * `data-feed` when the newsroom is unreachable. Once coverage ends, polling
+ * stops and the static page is the archive.
+ */
+import { normalizeLiveCoverage } from "@byline/core";
+import { createArticleLiveView, createLiveFeed, type LiveFeed } from "./live-feed";
 export type { LiveFeed } from "./live-feed";
 
 export type LiveUpdatesOptions = { intervalMs?: number; fetch?: typeof fetch; now?: () => number };
@@ -39,6 +45,25 @@ function isLiveFeed(value: unknown): value is LiveFeed {
     && (feed.keyPoints == null || isEntry(feed.keyPoints)) && Array.isArray(feed.updates) && feed.updates.every(isEntry);
 }
 
+/** The newsroom's projection, rendered exactly as the static page renders it. */
+export function feedFromSource(value: unknown, options: { postId: string; locale: string; timeZone: string; feedUrl: string }): LiveFeed | null {
+  const live = normalizeLiveCoverage(value);
+  if (!live) return null;
+  return createLiveFeed(createArticleLiveView(live, {
+    postId: options.postId, locale: options.locale, timeZone: options.timeZone, feedUrl: options.feedUrl,
+    // The same profile route the snapshot's live view uses.
+    authorHref: (slug) => `/author/${slug}/`
+  }));
+}
+
+/** A prepared file the next deploy has not brought yet, from the newsroom that names it. */
+export function sourceMediaUrl(source: string, src: string, pageOrigin: string): string | null {
+  let url: URL;
+  try { url = new URL(src, pageOrigin); } catch { return null; }
+  if (url.origin !== pageOrigin || !url.pathname.startsWith("/_byline/media/")) return null;
+  return `${source}/media?path=${encodeURIComponent(url.pathname)}`;
+}
+
 function refreshRelativeTimes(root: HTMLElement, now: number) {
   root.querySelectorAll<HTMLTimeElement>("time[data-live-relative]").forEach((time) => {
     if (!time.dataset.liveAbsolute) time.dataset.liveAbsolute = time.textContent ?? "";
@@ -72,6 +97,35 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
   let stopped = false;
   let inFlight = false;
   const controller = new AbortController();
+  const source = root.dataset.source && root.dataset.locale && root.dataset.timeZone
+    ? { url: root.dataset.source, locale: root.dataset.locale, timeZone: root.dataset.timeZone }
+    : null;
+  const pageOrigin = view.location?.origin ?? "";
+  const onImageError = (event: Event) => {
+    const image = event.target;
+    if (!source || !(image instanceof view.HTMLImageElement) || image.dataset.liveSource) return;
+    const fallback = sourceMediaUrl(source.url, image.getAttribute("src") ?? "", pageOrigin);
+    if (!fallback) return;
+    image.dataset.liveSource = "1";
+    image.src = fallback;
+  };
+  const request = (url: string) => fetchFeed(url, {
+    cache: "no-store", credentials: "omit", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])
+  }).then((response) => {
+    if (!response.ok) throw new Error(String(response.status));
+    return response.json() as Promise<unknown>;
+  });
+  const readFeed = async (): Promise<unknown> => {
+    if (source) {
+      try {
+        const feed = feedFromSource(await request(source.url), { postId: root.dataset.bylineLive ?? "", locale: source.locale, timeZone: source.timeZone, feedUrl: root.dataset.feed! });
+        if (feed) return feed;
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+      }
+    }
+    return request(root.dataset.feed!);
+  };
   const canonicalHtml = (html: string) => {
     const template = doc.createElement("template");
     template.innerHTML = html;
@@ -127,9 +181,7 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
     inFlight = true;
     lastPoll = now();
     try {
-      const response = await fetchFeed(root.dataset.feed!, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) });
-      if (!response.ok) throw new Error(String(response.status));
-      const feed: unknown = await response.json();
+      const feed = await readFeed();
       if (stopped) return;
       if (!isLiveFeed(feed)) throw new Error("Invalid live feed");
       // A repeated ID must never become a repeated DOM anchor.
@@ -173,9 +225,14 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
     doc.removeEventListener("visibilitychange", onVisibility);
   }
   button.addEventListener("click", applyPending);
+  // Image errors do not bubble, so listen while capturing.
+  root.addEventListener("error", onImageError, true);
   doc.addEventListener("visibilitychange", onVisibility);
   refreshRelativeTimes(root, now());
   clock = view.setInterval(() => refreshRelativeTimes(root, now()), 60_000);
   schedule();
-  return () => { stopPolling(); controller.abort(); button.removeEventListener("click", applyPending); started.delete(root); };
+  return () => {
+    stopPolling(); controller.abort(); started.delete(root);
+    button.removeEventListener("click", applyPending); root.removeEventListener("error", onImageError, true);
+  };
 }

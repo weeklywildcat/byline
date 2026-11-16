@@ -13,8 +13,8 @@ import type { User } from "../../src/payload-types";
 /**
  * The live desk against real PostgreSQL: who may post and publish, drafts
  * versus published updates, pinning, what each person sees, and the public
- * feed's published-only projection (validated by the same normalizer the
- * Worker and the static build use).
+ * feed's published-only projection (validated by the same normalizer readers'
+ * browsers and the static build use).
  */
 let payload: Payload;
 const accounts: Record<string, User> = {};
@@ -227,12 +227,15 @@ describe("public bylines", () => {
 });
 
 describe("the public feed", () => {
-  it("is the published-only projection the Worker and static build both accept", async () => {
+  it("is the published-only projection readers' browsers and the static build both accept", async () => {
     await post("alice", "game", { text: "SENTINEL-DRAFT: do not publish" });
     await post("editor", "game", { text: "A <b>markup</b> & ampersand", state: "published" });
     const result = await feed("game");
     expect(result.status).toBe(200);
-    expect(result.headers.get("cache-control")).toBe("no-store");
+    // Readers' browsers call it from the public site's origin, with no credentials.
+    expect(result.headers.get("access-control-allow-origin")).toBe("*");
+    expect(result.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(result.headers.get("cache-control")).toBe("public, max-age=5");
     const live = normalizeLiveCoverage(result.body);
     expect(live).not.toBeNull();
     expect(live!.status).toBe("live");
@@ -262,6 +265,30 @@ describe("the public feed", () => {
     await setLive(trashed, { mode: "live", state: "live", startedAt: new Date().toISOString() });
     await payload.update({ collection: "stories", id: trashed, data: { deletedAt: new Date().toISOString() }, overrideAccess: true });
     expect((await call("get", "/byline/live/:id", null, { routeParams: { id: String(trashed) } })).status).toBe(404);
+  });
+
+  it("serves only the prepared files its own projection names", async () => {
+    const media = (storyKey: string, path: string) => {
+      const endpoint = newsroomEndpoints.find((candidate) => candidate.method === "get" && candidate.path === "/byline/live/:id/media")!;
+      return createLocalReq({}, payload).then(async (req) => {
+        Object.assign(req, { routeParams: { id: String(story[storyKey]) }, searchParams: new URLSearchParams({ path }) });
+        return (await endpoint.handler(req)) as Response;
+      });
+    };
+    for (const path of ["/_byline/media/images/aa/not-in-this-feed--1200--0123456789abcdef.webp", "/api/media/file/original.jpg", "../../etc/passwd", ""]) {
+      const refused = await media("game", path);
+      expect(refused.status).toBe(404);
+      expect(refused.headers.get("cache-control")).toBe("no-store");
+    }
+    expect((await media("off", "/_byline/media/images/aa/x.webp")).status).toBe(404);
+  });
+
+  it("shows a newly published update on the next read, despite the projection cache", async () => {
+    const before = (await feed("game")).body.updates.length;
+    await post("editor", "game", { text: "Fresh from the sideline", state: "published" });
+    expect((await feed("game")).body.updates.length).toBe(before + 1);
+    await post("alice", "game", { text: "A draft changes nothing public" });
+    expect((await feed("game")).body.updates.length).toBe(before + 1);
   });
 
   it("keeps ended coverage and its updates", async () => {
