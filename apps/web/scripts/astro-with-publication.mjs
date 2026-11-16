@@ -178,10 +178,12 @@ if (isBuild && publicationMediaDescriptors.length) {
     endpoint,
     token: process.env.BYLINE_BUILD_TOKEN ?? "",
     outDir: path.join(projectRoot, "out"),
+    // Verified blobs persist by SHA-256 beside Astro's incremental cache (which Workers Builds restores).
+    cacheDir: process.env.BYLINE_MEDIA_CACHE_DIR?.trim() ? path.resolve(process.env.BYLINE_MEDIA_CACHE_DIR) : path.join(projectRoot, "node_modules/.astro/byline-media"),
     concurrency: Math.min(16, Math.max(1, Number(process.env.BYLINE_MEDIA_CONCURRENCY) || 8))
   });
   publicationMediaMetrics = { descriptors: publicationMediaDescriptors.length, ...result, ms: performance.now() - started };
-  console.log(`[byline] Publication media: ${result.written} written, ${result.unchanged} unchanged, ${(result.bytes / 1024 / 1024).toFixed(1)} MB in ${publicationMediaDescriptors.length} files.`);
+  console.log(`[byline] Publication media: ${publicationMediaDescriptors.length} files, ${(result.bytes / 1024 / 1024).toFixed(1)} MB; ${result.downloaded} downloaded (${(result.downloadedBytes / 1024 / 1024).toFixed(1)} MB), ${result.fromCache} from cache, ${result.unchanged} already in place, ${result.pruned} stale cache entries pruned.`);
 }
 
 // The exact verified release bytes, public at /_byline/data/<sha256>.json for presentations' optional client code.

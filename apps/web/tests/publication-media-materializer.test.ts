@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -72,6 +72,60 @@ describe("publication media materialization", () => {
     const again = await materializePublicationMedia({ descriptors: wanted, endpoint, token: TOKEN, outDir: out });
     expect(again).toMatchObject({ written: 0, unchanged: 3 });
     expect(await verifyPublicationMedia(out)).toBe(3);
+  });
+
+  it("keeps verified blobs in a content-addressed cache and downloads only what it lacks", async () => {
+    freshOut();
+    const cacheDir = path.join(freshOut(), "cache");
+    const first = [descriptor(webp, "image/webp", "w640"), descriptor(jpeg, "image/jpeg", "social")];
+    const run1 = await materializePublicationMedia({ descriptors: first, endpoint, token: TOKEN, outDir: out, cacheDir });
+    expect(run1).toMatchObject({ written: 2, downloaded: 2, fromCache: 0, unchanged: 0 });
+    expect(readdirSync(cacheDir).sort()).toEqual(first.map((blob) => blob.sha256).sort());
+
+    // A fresh output (Astro empties it every build): the cache serves both, no request is made.
+    rmSync(path.join(out, "_byline"), { recursive: true, force: true });
+    requests.length = 0;
+    const second = [...first, descriptor(pdf, "application/pdf", "file", "document")];
+    const run2 = await materializePublicationMedia({ descriptors: second, endpoint, token: TOKEN, outDir: out, cacheDir });
+    expect(run2).toMatchObject({ written: 3, downloaded: 1, fromCache: 2, unchanged: 0, downloadedBytes: pdf.length });
+    expect(requests).toEqual([`/api/byline/build/media/${sha(pdf)}`]);
+    expect(readFileSync(outputPathFor(out, first[0].publicPath)).equals(webp)).toBe(true);
+    expect(await verifyPublicationMedia(out)).toBe(3);
+
+    // The files left in the output are links to the cache entries: same bytes, no second copy.
+    expect(statSync(outputPathFor(out, first[0].publicPath)).ino).toBe(statSync(path.join(cacheDir, first[0].sha256)).ino);
+  });
+
+  it("re-downloads a corrupted cache entry and prunes blobs the build no longer names", async () => {
+    const cacheDir = path.join(freshOut(), "cache");
+    const wanted = [descriptor(webp, "image/webp", "w640"), descriptor(jpeg, "image/jpeg", "social")];
+    await materializePublicationMedia({ descriptors: wanted, endpoint, token: TOKEN, outDir: out, cacheDir });
+    rmSync(path.join(out, "_byline"), { recursive: true, force: true });
+    requests.length = 0;
+
+    // Same size, different bytes: only the hash can catch it.
+    writeFileSync(path.join(cacheDir, wanted[0].sha256), Buffer.concat([webp.subarray(0, webp.length - 1), Buffer.from([webp[webp.length - 1] ^ 0xff])]));
+    // Not ours to touch.
+    writeFileSync(path.join(cacheDir, "notes.txt"), "keep");
+    const stale = sha(Buffer.from("stale"));
+    writeFileSync(path.join(cacheDir, stale), "old");
+
+    const result = await materializePublicationMedia({ descriptors: [wanted[0]], endpoint, token: TOKEN, outDir: out, cacheDir });
+    expect(result).toMatchObject({ downloaded: 1, fromCache: 0, pruned: 2 });
+    expect(requests).toEqual([`/api/byline/build/media/${wanted[0].sha256}`]);
+    expect(readFileSync(outputPathFor(out, wanted[0].publicPath)).equals(webp)).toBe(true);
+    expect(readdirSync(cacheDir).sort()).toEqual(["notes.txt", wanted[0].sha256].sort());
+    expect(existsSync(path.join(cacheDir, stale))).toBe(false);
+  });
+
+  it("does not cache a download that fails verification", async () => {
+    const cacheDir = path.join(freshOut(), "cache");
+    const swapped = descriptor(jpeg, "image/jpeg", "social");
+    objects.set(swapped.sha256, Buffer.concat([jpeg.subarray(0, jpeg.length - 1), Buffer.from([0])]));
+    await expect(materializePublicationMedia({ descriptors: [swapped], endpoint, token: TOKEN, outDir: out, cacheDir })).rejects.toThrow(/SHA-256/);
+    objects.set(swapped.sha256, jpeg);
+    expect(readdirSync(cacheDir)).toEqual([]);
+    expect(listOut()).toEqual([]);
   });
 
   it("fails on a missing or wrong credential", async () => {

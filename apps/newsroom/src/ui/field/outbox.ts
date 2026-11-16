@@ -39,8 +39,13 @@ export type OutboxItem = {
   context: { appointmentId?: number; sourceId?: number; assignmentId?: number };
   /** A live update's explicit intent. Missing (an item queued before this existed) is the desk: stale material is never silently published. */
   delivery?: Delivery;
+  /** A live update's optional headline, and whether a Publish now asked to pin it as the key update. */
+  title?: string;
+  pinned?: boolean;
   /** A live update waits for this photo item and attaches its Media. */
   photoKey?: string;
+  /** Credited to someone else on a shared phone (an editor's "Posting as"). Frozen at tap time; the server re-checks it. */
+  as?: { id: number; name: string };
   state: OutboxState;
   attempts: number;
   /** 0..1 while uploading. */
