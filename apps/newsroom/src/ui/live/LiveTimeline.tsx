@@ -20,6 +20,8 @@ export type TimelineControls = {
   canChange: (update: LiveDeskUpdate) => boolean;
   /** May publish, unpublish and pin. */
   canPublish: boolean;
+  /** A draft may become public only during active coverage. Unpublishing remains available after it ends. */
+  canPublishNow?: boolean;
   busy: boolean;
   editingId: number | null;
   renderEditor: (update: LiveDeskUpdate) => ReactNode;
@@ -65,7 +67,7 @@ export function LiveTimeline({ updates, timeZone, storyPublished, controls, tap 
                   <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" className={tap ? "size-11" : undefined} aria-label={`Actions for the update at ${liveTime(update.publishedAt, timeZone)}`} disabled={controls.busy} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => controls.onEdit(update)}>Edit</DropdownMenuItem>
-                    {controls.canPublish ? <DropdownMenuItem onClick={() => controls.onPublish(update)}>{update.state === "draft" ? "Publish" : "Unpublish"}</DropdownMenuItem> : null}
+                    {controls.canPublish && (update.state === "published" || controls.canPublishNow !== false) ? <DropdownMenuItem onClick={() => controls.onPublish(update)}>{update.state === "draft" ? "Publish" : "Unpublish"}</DropdownMenuItem> : null}
                     {controls.canPublish && update.state === "published" ? <DropdownMenuItem onClick={() => controls.onPin(update)}>{update.pinned ? "Unpin" : "Pin as key update"}</DropdownMenuItem> : null}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem variant="destructive" onClick={() => controls.onDelete(update)}>Delete</DropdownMenuItem>
