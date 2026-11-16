@@ -186,13 +186,21 @@ for (const story of stories) for (const viewport of viewports) {
 test('respects reduced motion on the scroll cue', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  // Story reveals have no scroll cue (see above); the Diversity & Inclusion page is the one that keeps it.
+  // Story reveals have no scroll cue (see below); the Diversity & Inclusion page is the one that keeps it.
   await openReveal(page, diversityPage);
   const animation = () => page.locator('.hero-reveal-scroll svg').evaluate((svg) => getComputedStyle(svg).animationName);
   expect(await animation()).toBe('hero-reveal-bob');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   expect(await animation()).toBe('none');
   // The reveal itself is ordinary sticky scrolling, so it needs no motion fallback.
+  await expectRevealGeometry(page);
+});
+
+test('reduced motion keeps the cue-free immersive reveal usable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openReveal(page, stories[0].url);
+  await expect(page.locator('.hero-reveal-scroll')).toHaveCount(0);
   await expectRevealGeometry(page);
 });
 

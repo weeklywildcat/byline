@@ -2,16 +2,20 @@
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { Field, FieldGroup, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import type { DeskView, DistributionDeskPayload } from "../../distribution/server";
 import { getJson } from "../story/api";
 import { formatDay } from "../story/parts";
@@ -72,6 +76,8 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
   const [filters, update] = useDeskFilters();
   const [text, setText] = useState("");
   const [open, setOpen] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterRef, filterWidth] = useElementWidth<HTMLDivElement>();
   useEffect(() => setText(filters.q), [filters.q]);
   useEffect(() => {
     if (text === filters.q) return;
@@ -89,6 +95,8 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
   const destinations = [{ value: ANY, label: "All destinations" }, ...(data?.destinations ?? []).map((entry) => ({ value: entry.kind, label: entry.label }))];
   const sections = [{ value: ANY, label: "All sections" }, ...(data?.sections ?? []).map((entry) => ({ value: String(entry.id), label: entry.name }))];
   const filtered = Boolean(filters.destination || filters.owner || filters.section || filters.when || filters.q);
+  const structuredCount = [filters.destination, filters.owner, filters.section, filters.when].filter(Boolean).length;
+  const compactFilters = filterWidth > 0 && filterWidth < 720;
   const choose = (key: keyof Filters) => (value: unknown) => update({ [key]: !value || value === ANY ? "" : String(value) });
 
   if (desk.isError && !data) return <div className="p-6"><InlineAlert title="Distribution isn't available" onAction={() => void desk.refetch()}>{(desk.error as Error).message}</InlineAlert></div>;
@@ -100,21 +108,41 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
       </header>
 
       <Tabs value={filters.view} onValueChange={(value) => update({ view: value as DeskView })}>
-        <TabsList className="max-w-full flex-wrap justify-start gap-y-1 group-data-horizontal/tabs:h-auto">
-          {VIEWS.map((entry) => <TabsTrigger key={entry.id} value={entry.id} className="h-auto min-h-6">{entry.label}{data ? <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{data.counts[entry.id]}</span> : null}</TabsTrigger>)}
-        </TabsList>
+        <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="w-max min-w-full justify-start">
+            {VIEWS.map((entry) => <TabsTrigger key={entry.id} value={entry.id}>{entry.label}{data ? <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{data.counts[entry.id]}</span> : null}</TabsTrigger>)}
+          </TabsList>
+        </div>
       </Tabs>
 
-      <div className="flex flex-wrap items-center gap-2" role="search">
-        <InputGroup className="min-w-48 flex-1 sm:max-w-xs">
+      <div ref={filterRef} className="flex items-center gap-2" role="search" aria-label="Filter distribution work">
+        <InputGroup className="min-w-0 flex-1 sm:max-w-xs">
           <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
           <InputGroupInput type="search" value={text} placeholder="Search Stories…" aria-label="Search Stories" onChange={(event) => setText(event.target.value)} />
+          {text ? <InputGroupAddon align="inline-end"><InputGroupButton type="button" size="icon-xs" aria-label="Clear distribution search" onClick={() => { setText(""); update({ q: "" }, true); }}><X /></InputGroupButton></InputGroupAddon> : null}
         </InputGroup>
-        <Select items={destinations} value={filters.destination || ANY} onValueChange={choose("destination")}><SelectTrigger aria-label="Destination" className="w-44"><SelectValue /></SelectTrigger><SelectContent>{destinations.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-        <Select items={owners} value={filters.owner || ANY} onValueChange={choose("owner")}><SelectTrigger aria-label="Owner" className="w-40"><SelectValue /></SelectTrigger><SelectContent>{owners.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-        <Select items={sections} value={filters.section || ANY} onValueChange={choose("section")}><SelectTrigger aria-label="Section" className="w-40"><SelectValue /></SelectTrigger><SelectContent>{sections.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-        <Select items={WHEN} value={filters.when || ANY} onValueChange={choose("when")}><SelectTrigger aria-label="When" className="w-36"><SelectValue /></SelectTrigger><SelectContent>{WHEN.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-        {filtered ? <Button type="button" variant="ghost" size="sm" onClick={() => update({ destination: "", owner: "", section: "", when: "", q: "" })}><X data-icon="inline-start" />Clear</Button> : null}
+        {compactFilters ? <Drawer open={filterOpen} onOpenChange={setFilterOpen}>
+          <DrawerTrigger render={<Button type="button" variant="outline" className="shrink-0" />}><SlidersHorizontal data-icon="inline-start" />Filters{structuredCount ? <Badge variant="secondary" className="ml-1">{structuredCount}</Badge> : null}</DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader><DrawerTitle>Filter distribution</DrawerTitle><DrawerDescription>Destination, owner, section and timing.</DrawerDescription></DrawerHeader>
+            <div className="px-4"><FieldGroup className="gap-3">
+              <Field><FieldLabel>Destination</FieldLabel><Select items={destinations} value={filters.destination || ANY} onValueChange={choose("destination")}><SelectTrigger aria-label="Destination" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{destinations.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>
+              <Field><FieldLabel>Owner</FieldLabel><Select items={owners} value={filters.owner || ANY} onValueChange={choose("owner")}><SelectTrigger aria-label="Owner" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{owners.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>
+              <Field><FieldLabel>Section</FieldLabel><Select items={sections} value={filters.section || ANY} onValueChange={choose("section")}><SelectTrigger aria-label="Section" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{sections.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>
+              <Field><FieldLabel>When</FieldLabel><Select items={WHEN} value={filters.when || ANY} onValueChange={choose("when")}><SelectTrigger aria-label="When" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{WHEN.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></Field>
+            </FieldGroup></div>
+            <DrawerFooter className="flex-row">
+              {structuredCount ? <Button type="button" variant="ghost" className="flex-1" onClick={() => update({ destination: "", owner: "", section: "", when: "" })}>Clear filters</Button> : null}
+              <DrawerClose render={<Button type="button" className="flex-1" />}>Done</DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer> : <>
+          <Select items={destinations} value={filters.destination || ANY} onValueChange={choose("destination")}><SelectTrigger aria-label="Destination" className="w-44"><SelectValue /></SelectTrigger><SelectContent>{destinations.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <Select items={owners} value={filters.owner || ANY} onValueChange={choose("owner")}><SelectTrigger aria-label="Owner" className="w-40"><SelectValue /></SelectTrigger><SelectContent>{owners.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <Select items={sections} value={filters.section || ANY} onValueChange={choose("section")}><SelectTrigger aria-label="Section" className="w-40"><SelectValue /></SelectTrigger><SelectContent>{sections.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          <Select items={WHEN} value={filters.when || ANY} onValueChange={choose("when")}><SelectTrigger aria-label="When" className="w-36"><SelectValue /></SelectTrigger><SelectContent>{WHEN.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+          {filtered ? <Button type="button" variant="ghost" size="sm" onClick={() => { setText(""); update({ destination: "", owner: "", section: "", when: "", q: "" }); }}><X data-icon="inline-start" />Clear</Button> : null}
+        </>}
       </div>
 
       {!data ? <div className="grid gap-2" aria-busy="true"><Skeleton className="h-9" /><Skeleton className="h-9" /><Skeleton className="h-9" /></div> : !data.rows.length ? (
@@ -138,7 +166,7 @@ function DeskBody({ api, admin, timeZone, userId }: { api: string; admin: string
               {data.rows.map((row) => (
                 <TableRow key={row.id} className="cursor-pointer" onClick={() => setOpen(row.id)}>
                   <TableCell className="max-w-72 min-w-0 whitespace-normal sm:min-w-32">
-                    <button type="button" className="touch-hit text-left font-medium [overflow-wrap:anywhere] hover:underline focus-visible:underline" onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.story}</button>
+                    <Button type="button" variant="ghost" size="sm" className="h-auto min-h-0 justify-start rounded-none p-0 text-left font-medium whitespace-normal [overflow-wrap:anywhere] hover:bg-transparent hover:underline any-pointer-coarse:min-h-0" onClick={(event) => { event.stopPropagation(); setOpen(row.id); }}>{row.story}</Button>
                     <span className="block text-xs text-muted-foreground">{[row.section, row.published ? null : "Unpublished"].filter(Boolean).join(" · ")}</span>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:hidden">
                       <span>{row.label}</span>

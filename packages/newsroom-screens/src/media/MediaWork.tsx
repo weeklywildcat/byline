@@ -13,6 +13,7 @@ import { useElementWidth } from "@byline/newsroom-ui/lib/hooks";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@byline/newsroom-ui/ui/attachment";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@byline/newsroom-ui/ui/drawer";
@@ -280,7 +281,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
 
     {!visible.length
       ? <NothingHere title={rows.length ? "No assignments match" : scope === "all" ? "No production assignments yet" : `Nothing in ${scopeLabel}`} description={rows.length ? "Try clearing a filter." : scope === "all" ? "Photo, video, graphic and audio work appears here once it is assigned from a story." : "Assignments appear here as soon as they match this view."} />
-      : <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+      : <Card className="gap-0 py-0 shadow-xs">
         {table
           ? <Table aria-label={"Production assignments"}>
             <TableHeader className="bg-muted/20"><TableRow className="hover:bg-transparent"><TableHead>{"Assignment"}</TableHead><TableHead>{"Story"}</TableHead><TableHead>{"Assignee"}</TableHead><TableHead>{"Due"}</TableHead><TableHead>{"Status"}</TableHead><TableHead>{"Files"}</TableHead><TableHead className="w-10"><span className="sr-only">{"Actions"}</span></TableHead></TableRow></TableHeader>
@@ -326,7 +327,7 @@ function MediaDeskContent({ data, fetchers, workspaceUrl, onOpenStory, media, sc
               </Item>
             </MediaRowContext>;
           })}</ItemGroup>}
-      </div>}
+      </Card>}
   </div>;
 }
 

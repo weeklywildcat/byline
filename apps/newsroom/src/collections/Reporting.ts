@@ -330,6 +330,23 @@ export const TranscriptSelections: CollectionConfig = {
     beforeChange: [
       stampCreator,
       async ({ data, originalDoc, operation, req }) => {
+        const verificationAllowed = verificationWrite({ req });
+        // Verification provenance is server-owned. Keep these fields in the
+        // collection shape so system writes are deterministic, but ignore any
+        // direct form/API attempt to set or clear them. The verify endpoint
+        // marks its request with bylineVerification; system/import writes use
+        // the existing privileged contexts.
+        if (!verificationAllowed) {
+          if (operation === "create") {
+            data.state = "saved";
+            data.verifiedBy = null;
+            data.verifiedAt = null;
+          } else if (originalDoc) {
+            if (data.state !== undefined) data.state = originalDoc.state;
+            if (data.verifiedBy !== undefined) data.verifiedBy = originalDoc.verifiedBy ?? null;
+            if (data.verifiedAt !== undefined) data.verifiedAt = originalDoc.verifiedAt ?? null;
+          }
+        }
         const transcriptId = relationId(data.transcript);
         if (operation === "create" && transcriptId !== null) {
           await lockRow(req, "reporting_transcripts", transcriptId);
@@ -396,9 +413,9 @@ export const TranscriptSelections: CollectionConfig = {
     { name: "note", label: "Private note", type: "textarea", maxLength: 2000 },
     groundRulesField,
     { ...confidentialField, access: { update: systemWrite } } as Field,
-    { name: "state", type: "select", required: true, defaultValue: "saved", index: true, options: [{ value: "saved", label: "Saved" }, { value: "verified", label: "Verified" }], access: { create: verificationWrite, update: verificationWrite } },
-    { name: "verifiedBy", type: "relationship", relationTo: "users", admin: { readOnly: true }, access: { create: verificationWrite, update: verificationWrite } },
-    { name: "verifiedAt", type: "date", admin: { readOnly: true }, access: { create: verificationWrite, update: verificationWrite } },
+    { name: "state", type: "select", required: true, defaultValue: "saved", index: true, admin: { readOnly: true }, options: [{ value: "saved", label: "Saved" }, { value: "verified", label: "Verified" }] },
+    { name: "verifiedBy", type: "relationship", relationTo: "users", admin: { readOnly: true } },
+    { name: "verifiedAt", type: "date", admin: { readOnly: true } },
     {
       // An editor's explicit, audited decision to allow public use of off-the-record words.
       name: "offRecordOverride",

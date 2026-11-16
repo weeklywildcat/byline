@@ -3,6 +3,7 @@
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card, CardContent, CardFooter } from "@byline/newsroom-ui/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { RadioTower, Smartphone } from "lucide-react";
@@ -131,21 +132,23 @@ export function LiveCoverageSection() {
 
       {desk.status === "live" && desk.canCompose && !readOnly ? (
         // Not a <form>: this renders inside Payload's document form, and forms cannot nest.
-        <div role="group" aria-label="Post a live update" className="grid gap-3 rounded-lg border p-4" data-live-composer="">
-          <LiveFields value={draft} onChange={setDraft} name="live-new" canPin={desk.canPublishNow} />
-          {postAs ? (
-            <PostingAsRow author={author} me={desk.me} switchButton={(
-              <Popover open={choosing} onOpenChange={setChoosing}>
-                <PopoverTrigger render={<Button type="button" variant="ghost" size="sm" className="shrink-0 max-sm:min-h-11" aria-label={`Switch who this live update is by (now ${author ? author.name : "you"})`} />}>Switch</PopoverTrigger>
-                <PopoverContent align="end" className="w-80 p-0">
-                  <p className="px-3 pt-3 text-xs text-muted-foreground">{POSTING_AS_HELP}</p>
-                  <PostingAsList api={api} storyId={storyId} me={desk.me} current={author?.id ?? null} enabled={choosing} onPick={(person) => { setAuthor(person); setChoosing(false); }} />
-                </PopoverContent>
-              </Popover>
-            )} />
-          ) : null}
-          <LiveDeliveryButtons canPublishNow={desk.canPublishNow} disabled={working || !draft.text.trim()} onDeliver={(delivery) => void deliver(delivery)} helperId="live-composer-helper" />
-        </div>
+        <Card role="group" aria-label="Post a live update" size="sm" data-live-composer="">
+          <CardContent className="grid gap-3">
+            <LiveFields value={draft} onChange={setDraft} name="live-new" canPin={desk.canPublishNow} />
+            {postAs ? (
+              <PostingAsRow author={author} me={desk.me} switchButton={(
+                <Popover open={choosing} onOpenChange={setChoosing}>
+                  <PopoverTrigger render={<Button type="button" variant="ghost" size="sm" className="shrink-0 max-sm:min-h-11" aria-label={`Switch who this live update is by (now ${author ? author.name : "you"})`} />}>Switch</PopoverTrigger>
+                  <PopoverContent align="end" className="w-80 p-0">
+                    <p className="px-3 pt-3 text-xs text-muted-foreground">{POSTING_AS_HELP}</p>
+                    <PostingAsList api={api} storyId={storyId} me={desk.me} current={author?.id ?? null} enabled={choosing} onPick={(person) => { setAuthor(person); setChoosing(false); }} />
+                  </PopoverContent>
+                </Popover>
+              )} />
+            ) : null}
+          </CardContent>
+          <CardFooter className="border-t-0 bg-transparent pt-0"><LiveDeliveryButtons canPublishNow={desk.canPublishNow} disabled={working || !draft.text.trim()} onDeliver={(delivery) => void deliver(delivery)} helperId="live-composer-helper" /></CardFooter>
+        </Card>
       ) : null}
 
       {started || desk.updates.length ? <LiveTimeline updates={desk.updates} timeZone={timeZone} storyPublished={desk.storyPublished} controls={controls} /> : null}
