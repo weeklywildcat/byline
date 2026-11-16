@@ -3,6 +3,7 @@
  *
  *   npm run publication:snapshot:status --workspace @byline/newsroom
  *   npm run publication:snapshot:prepare --workspace @byline/newsroom
+ *   npm run publication:deploy:now --workspace @byline/newsroom
  *
  * `prepare` runs the SAME preparation as the `prepare-public-snapshot` job
  * (same collector, validation, revision fence and conditional promotion), in
@@ -19,13 +20,47 @@ import { readPublicationState } from "../src/db/publication-state";
 import { isPublicSnapshotError } from "../src/public/snapshot/errors";
 import { runPublicSnapshotPreparation, usableCompletedPointer } from "../src/public/snapshot/prepare";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK, queuePublicSnapshot } from "../src/public/queue";
-import { DEPLOY_PUBLIC_SITE_TASK, deployHookConfigured } from "../src/public/deployment";
+import { DEPLOY_PUBLIC_SITE_TASK, deployHookConfigured, reconcilePublicDeployment, triggerPublicDeployment } from "../src/public/deployment";
 import { SnapshotStore } from "../src/public/snapshot/store";
 import { PUBLIC_SNAPSHOT_SCHEMA_VERSION, PUBLIC_SNAPSHOT_PRODUCER_VERSION } from "../src/public/snapshot/version";
 
 const command = process.argv[2];
 const payload = await getPayload({ config });
 const store = new SnapshotStore();
+
+async function currentUsableSnapshot() {
+  const state = await readPublicationState(payload);
+  const pointer = usableCompletedPointer(state);
+  if (!pointer) return { state, pointer: null, present: false };
+  const present = await store.verify(pointer.filename, pointer.sha256, pointer.bytes);
+  return { state, pointer, present };
+}
+
+async function reconcile() {
+  const current = await currentUsableSnapshot();
+  if (!current.pointer || !current.present) {
+    const queued = await queuePublicSnapshot(payload, { revision: current.state.currentRevision, reason: "publication worker startup reconciliation" });
+    return { snapshot: "queued", revision: current.state.currentRevision, jobId: queued.id, deployment: null };
+  }
+  const deployment = await reconcilePublicDeployment(payload, {
+    revision: current.pointer.revision,
+    sha256: current.pointer.sha256,
+    reason: "publication worker startup reconciliation"
+  });
+  return { snapshot: "ready", revision: current.pointer.revision, deployment };
+}
+
+async function deployNow() {
+  const current = await currentUsableSnapshot();
+  if (!current.pointer || !current.present) {
+    throw new Error(`Current public revision ${current.state.currentRevision} does not have a usable snapshot artifact. Prepare the snapshot before forcing deployment.`);
+  }
+  return triggerPublicDeployment(payload, {
+    revision: current.pointer.revision,
+    sha256: current.pointer.sha256,
+    reason: "manual publication recovery"
+  });
+}
 
 async function status() {
   const state = await readPublicationState(payload);
@@ -73,13 +108,19 @@ try {
   } else if (command === "queue") {
     const state = await readPublicationState(payload);
     if (!usableCompletedPointer(state)) await queuePublicSnapshot(payload, { revision: state.currentRevision, reason: "publication worker startup" });
+  } else if (command === "reconcile") {
+    console.log(JSON.stringify(await reconcile(), null, 2));
+  } else if (command === "deploy") {
+    const result = await deployNow();
+    console.log(JSON.stringify(result, null, 2));
+    if (result.outcome !== "triggered") process.exitCode = 2;
   } else if (command === "prepare") {
     const result = await runPublicSnapshotPreparation(payload, { store });
     console.log(JSON.stringify(result, null, 2));
     if (result.outcome === "not-ready") process.exitCode = 2;
     if (result.outcome === "stale") process.exitCode = 3;
   } else {
-    console.error("Usage: publication-snapshot.ts <status|prepare|queue>");
+    console.error("Usage: publication-snapshot.ts <status|prepare|queue|reconcile|deploy>");
     process.exitCode = 64;
   }
 } catch (error) {
