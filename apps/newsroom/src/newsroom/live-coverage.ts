@@ -1,5 +1,5 @@
 import type { LiveCoverage } from "@byline/core";
-import { APIError, type Payload, type Where } from "payload";
+import { APIError, type Payload, type PayloadRequest, type Where } from "payload";
 import { ASSIGNED_WORK_COLLECTIONS, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
 import { atLeast, relationId, relationIds } from "../access/user";
 import { canPublishLive, canPublishLiveNow, liveGate, resetLivePublisherStories, storyIsPublic } from "../access/live-context";
@@ -145,7 +145,11 @@ async function assertLivePhoto(ctx: ScreenContext, storyId: number, photo: numbe
   if (!ok) throw new APIError("That photo isn't from this story.", 400);
 }
 
-export type NewLiveUpdate = { text: unknown; headline?: unknown; photoId?: unknown; pinned?: unknown; clientKey?: string; queued?: boolean; source: "write" | "field"; wantsPublish: boolean };
+export type NewLiveUpdate = {
+  text: unknown; headline?: unknown; photoId?: unknown; pinned?: unknown; clientKey?: string; queued?: boolean; source: "write" | "field"; wantsPublish: boolean;
+  /** Credit someone else (an editor's shared phone, field/posting-as.ts, already validated). Defaults to the signed-in account. */
+  author?: number;
+};
 
 /**
  * The one way a live update is created, from Write or Field. The reporter's intent is explicit
@@ -168,6 +172,7 @@ export async function createLiveUpdate(ctx: ScreenContext, storyId: number, inpu
     data: {
       ...(deskReason ? { deskReason } : {}),
       story: storyId, headline: clean(input.headline, 200) || undefined, body: plainTextToLexical(text) as never, photo: photo ?? undefined,
+      ...(input.author ? { author: input.author } : {}),
       // A key update is a publisher's call; a draft is never pinned (publishing it later is a separate decision).
       pinned: input.pinned === true && publish, state: publish ? "published" : "draft", ...(input.clientKey ? { clientKey: input.clientKey } : {})
     }
@@ -223,17 +228,14 @@ export async function deleteLiveUpdate(ctx: ScreenContext, storyId: number, upda
 export type LiveCandidate = { id: number; name: string; avatarUrl: string | null; granted: boolean; relation: string };
 
 /**
- * Who an editor may offer direct publishing: staff accounts on this Story through the existing Story access
- * model (its creator, a contributor through their linked person, anyone holding assigned work), plus anyone who
- * already has the grant, so it can always be taken away. Never every account, never editors or administrators
- * (they already have the authority), and not required to be public byline contributors.
+ * The accounts connected to a Story through the existing Story access model, each with why: its creator, a
+ * contributor through their linked person, anyone holding assigned work, and anyone holding the live grant.
  */
-export async function liveCandidates(ctx: ScreenContext, storyId: number): Promise<LiveCandidate[]> {
-  if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors can choose who publishes live updates.", 403);
-  const { payload } = ctx.req;
-  const base = { depth: 0, pagination: false, overrideAccess: true, req: ctx.req } as const;
+export async function storyAccounts(req: PayloadRequest, storyId: number): Promise<{ relation: Map<string, string>; granted: Set<string> }> {
+  const { payload } = req;
+  const base = { depth: 0, pagination: false, overrideAccess: true, req } as const;
   const [plan, ...work] = await Promise.all([
-    payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, depth: 0, select: { createdBy: true, contributors: true, livePublishers: true }, overrideAccess: true, req: ctx.req }),
+    payload.find({ collection: "story-plans", where: { story: { equals: storyId } }, limit: 1, depth: 0, select: { createdBy: true, contributors: true, livePublishers: true }, overrideAccess: true, req }),
     ...ASSIGNED_WORK_COLLECTIONS.map((collection) => payload.find({ collection, where: { story: { equals: storyId } }, select: { assignees: true } as never, ...base }))
   ]);
   const row = plan.docs[0];
@@ -248,6 +250,20 @@ export async function liveCandidates(ctx: ScreenContext, storyId: number): Promi
   }
   for (const result of work) for (const record of result.docs as Array<{ assignees?: unknown }>) for (const user of relationIds(record.assignees)) note(user, "Has work on this story");
   for (const id of granted) note(id, "May already publish");
+  return { relation, granted };
+}
+
+/**
+ * Who an editor may offer direct publishing: staff accounts on this Story through the existing Story access
+ * model (its creator, a contributor through their linked person, anyone holding assigned work), plus anyone who
+ * already has the grant, so it can always be taken away. Never every account, never editors or administrators
+ * (they already have the authority), and not required to be public byline contributors.
+ */
+export async function liveCandidates(ctx: ScreenContext, storyId: number): Promise<LiveCandidate[]> {
+  if (!atLeast(ctx.user, "editor")) throw new APIError("Only editors can choose who publishes live updates.", 403);
+  const { payload } = ctx.req;
+  const base = { depth: 0, pagination: false, overrideAccess: true, req: ctx.req } as const;
+  const { relation, granted } = await storyAccounts(ctx.req, storyId);
   const ids = [...relation.keys()].map(Number).filter(Boolean);
   if (!ids.length) return [];
   const users = (await payload.find({ collection: "users", where: { id: { in: ids } }, select: { name: true, role: true, linkedPerson: true, enabled: true }, sort: "name", ...base })).docs;

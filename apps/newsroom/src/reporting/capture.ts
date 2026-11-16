@@ -9,6 +9,7 @@ import { REPORTING_LIMITS, validClientKey } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { existingCapture, isDuplicateKey, resolveCaptureContext } from "./context";
+import { resolvePostingAs } from "../field/posting-as";
 
 /**
  * Reporting captures on the server: notes and private files. Each resolves
@@ -129,7 +130,11 @@ export async function setSourceGroundRules(ctx: ScreenContext, sourceId: number,
 
 /* ------------------------------------------------------------------ photos */
 
-export type PhotoInput = { assignmentId?: unknown; clientKey?: unknown; capturedAt?: unknown };
+export type PhotoInput = {
+  assignmentId?: unknown; clientKey?: unknown; capturedAt?: unknown;
+  /** The account to credit, for a photo going with a live update posted for someone else on a shared phone (editors only). */
+  as?: unknown;
+};
 
 /**
  * A photograph for the Story. Photos go to Media, the one asset system
@@ -139,6 +144,8 @@ export type PhotoInput = { assignmentId?: unknown; clientKey?: unknown; captured
  * (else the device's file time), and, for staff photography, the
  * photographer's Person name as creator and credit. Rights and alt text stay
  * deliberate: an outside photo is never marked cleared because it uploaded.
+ * Credited to someone else (`as`, field/posting-as.ts), it carries their name and no inferred assignment;
+ * `uploadedBy` stays the signed-in account.
  */
 export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, input: PhotoInput): Promise<CaptureResult & { assignment: { id: number; title: string } | null }> {
   const file = ctx.req.file;
@@ -146,7 +153,8 @@ export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, in
   assertNotRawPhoto(file);
   // iPhone cameras (and some browsers' file pickers) send HEIC with no type or a generic one; Media decodes it to JPEG.
   if (!String(file.mimetype ?? "").toLowerCase().startsWith("image/") && !isHeifUpload(file)) throw new APIError("That file is not a photo. Attach it as a file instead.", 400);
-  const context = await resolveCaptureContext(ctx.req, { storyId, assignmentId: input.assignmentId, inferAssignment: true });
+  const photographer = await resolvePostingAs(ctx, input.as);
+  const context = await resolveCaptureContext(ctx.req, { storyId, assignmentId: photographer.self ? input.assignmentId : undefined, inferAssignment: photographer.self });
   const { payload } = ctx.req;
   const clientKey = validClientKey(input.clientKey);
   if (clientKey) {
@@ -167,7 +175,7 @@ export async function uploadCapturePhoto(ctx: ScreenContext, storyId: number, in
     capturedAt = null;
   }
   if (!capturedAt && typeof input.capturedAt === "string" && !Number.isNaN(Date.parse(input.capturedAt))) capturedAt = new Date(input.capturedAt).toISOString();
-  const person = ctx.user.linkedPerson === null ? null : await payload.findByID({ collection: "people", id: ctx.user.linkedPerson, depth: 0, overrideAccess: true, req: ctx.req, disableErrors: true, select: { name: true } });
+  const person = photographer.linkedPerson === null ? null : await payload.findByID({ collection: "people", id: photographer.linkedPerson, depth: 0, overrideAccess: true, req: ctx.req, disableErrors: true, select: { name: true } });
   const publication = publicationConfigFromGlobal(await readPublishedPublication(payload, ctx.req), 0);
   const name = typeof person?.name === "string" ? person.name : "";
   const created = await payload.create({

@@ -7,14 +7,16 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Camera, ChevronRight, Mic, MoreVertical, Paperclip, Search, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, ChevronRight, Mic, MoreVertical, Paperclip, Search, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deskNote, type PublishBlock } from "../../domain/live-coverage";
+import type { PostingAsPerson } from "../../field/posting-as";
 import type { FieldFeed, FieldItem, FieldSession } from "../../field/server";
 import { ApiError, getJson, postJson } from "../story/api";
 import { useCoverageChange, useLiveDesk } from "../live/api";
@@ -108,13 +110,13 @@ function useOutbox(api: string, account: string) {
       }
       if (item.kind === "live") {
         // The reporter's tapped intent travels with the item (IndexedDB, offline, retries); the server decides again at send time.
-        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk" });
+        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk", ...(item.as ? { as: item.as.id } : {}) });
         return { id: result.id, status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
       }
       if (!item.blob) throw new SendError("The file is no longer on this device.", 410);
       const route = item.kind === "photo" ? "photos" : "files";
       const extra = item.kind === "photo"
-        ? { ...(item.context.assignmentId ? { assignmentId: item.context.assignmentId } : {}), ...(item.capturedAt ? { capturedAt: item.capturedAt } : {}) }
+        ? { ...(item.context.assignmentId ? { assignmentId: item.context.assignmentId } : {}), ...(item.capturedAt ? { capturedAt: item.capturedAt } : {}), ...(item.as ? { as: item.as.id } : {}) }
         : { ...context, ...(item.durationMs ? { durationMs: item.durationMs } : {}) };
       const result = await uploadFile<{ id: number }>(api, `/byline/stories/${item.storyId}/reporting/${route}`, item.blob, item.filename ?? "capture", { clientKey: item.key, ...extra }, onProgress);
       return { id: result.id, status: "saved" };
@@ -133,6 +135,8 @@ function useOutbox(api: string, account: string) {
     try {
       const changed = await processOutbox(store, memory.current, send, { online: navigator.onLine, onChange: (item) => setItems((list) => list.map((entry) => (entry.key === item.key ? item : entry))) });
       if (changed.some((item) => item.state === "done")) await queries.invalidateQueries({ queryKey: ["byline", "field"] });
+      // A live update just sent shows in the timeline now, not on its next poll.
+      if (changed.some((item) => item.state === "done" && item.kind === "live")) await queries.invalidateQueries({ queryKey: ["byline", "story-live"] });
     } finally {
       running.current = false;
       await refresh();
@@ -369,13 +373,17 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
   const [recording, setRecording] = useState(false);
   const [choosing, setChoosing] = useState<File | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // A shared phone: an editor credits the live update to whoever is holding it. Kept until switched back.
+  const [author, setAuthor] = useState<{ id: number; name: string; avatarUrl: string | null } | null>(null);
+  const [switching, setSwitching] = useState(false);
   const photoInput = useRef<HTMLInputElement | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const storyId = session.story.id;
   // Live updates exist only while the Story is in Live mode and coverage is Live now; every other state is private capture only.
   const live = session.story.live;
+  const postAs = live && session.canPostAs;
+  const as = postAs && author ? { as: { id: author.id, name: author.name } } : {};
   const context = { ...(appointmentId ? { appointmentId } : {}), ...(session.appointment?.sourceId ? { sourceId: session.appointment.sourceId } : {}) };
-  void api;
 
   const queue = async (item: OutboxItem) => {
     const safe = await outbox.add(item);
@@ -409,9 +417,9 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     let photoKey: string | undefined;
     if (photo) {
       photoKey = newClientKey();
-      await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {} }));
+      await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {}, ...as }));
     }
-    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), photoKey, context }));
+    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), photoKey, context, ...as }));
     setText("");
     setPhoto(null);
   };
@@ -432,6 +440,13 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           <Button type="button" variant="ghost" className={TAP} onClick={() => fileInput.current?.click()}><Paperclip data-icon="inline-start" />Attach</Button>
         </InputGroupAddon>
       </InputGroup>
+      {postAs ? (
+        <div className={`-mt-1 flex items-center gap-2 rounded-md px-2 py-1 ${author ? "border border-primary/40 bg-primary/5" : ""}`} data-posting-as={author ? "other" : "self"}>
+          {author ? <ProfilePicture name={author.name} url={author.avatarUrl} /> : session.me ? <ProfilePicture name={session.me.name} url={session.me.avatarUrl} /> : <UserRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+          <p className="min-w-0 flex-1 truncate text-sm" aria-live="polite">Live update by <span className="font-semibold">{author ? author.name : "you"}</span></p>
+          <Button type="button" variant="ghost" className={`${TAP} -mr-2 shrink-0`} aria-label={`Switch who this live update is by (now ${author ? author.name : "you"})`} onClick={() => setSwitching(true)}>Switch</Button>
+        </div>
+      ) : null}
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
       <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
 
@@ -465,6 +480,8 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         </DrawerContent>
       </Drawer>
 
+      {postAs ? <PostingAsPicker api={api} storyId={storyId} me={session.me} open={switching} onOpenChange={setSwitching} current={author?.id ?? null} onPick={(person) => { setAuthor(person); setSwitching(false); }} /> : null}
+
       <Drawer open={choosing !== null} onOpenChange={(open) => { if (!open) setChoosing(null); }}>
         <DrawerContent>
           <DrawerHeader><DrawerTitle>Which assignment is this photo for?</DrawerTitle><DrawerDescription>You have more than one photo assignment on this story.</DrawerDescription></DrawerHeader>
@@ -475,6 +492,60 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         </DrawerContent>
       </Drawer>
     </section>
+  );
+}
+
+const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((word) => Array.from(word)[0]?.toUpperCase()).join("") || "?";
+
+/** A person's profile picture (their linked Person's portrait), with initials until they have one, as in the shell's account menu. */
+function ProfilePicture({ name, url }: { name: string; url: string | null }) {
+  return (
+    <Avatar size="sm" aria-hidden="true" className="shrink-0">
+      {url ? <AvatarImage src={url} alt="" /> : null}
+      <AvatarFallback>{initials(name)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+/**
+ * Who a live update is by, on a shared phone (editors only; field/posting-as.ts). The Story's own people come first.
+ * It credits the update and its photo; publishing is still decided by the signed-in account.
+ */
+function PostingAsPicker({ api, storyId, me, open, onOpenChange, current, onPick }: { api: string; storyId: number; me: FieldSession["me"]; open: boolean; onOpenChange: (open: boolean) => void; current: number | null; onPick: (person: { id: number; name: string; avatarUrl: string | null } | null) => void }) {
+  const people = useQuery({ queryKey: ["byline", "field", "people", storyId], queryFn: () => getJson<{ people: PostingAsPerson[] }>(api, `/byline/field/stories/${storyId}/people`), enabled: open, staleTime: 5 * 60_000 });
+  const list = people.data?.people ?? [];
+  const onStory = list.filter((person) => person.onStory);
+  const others = list.filter((person) => !person.onStory);
+  const row = (person: PostingAsPerson) => (
+    <CommandItem key={person.id} value={`${person.name} ${person.id}`} onSelect={() => onPick({ id: person.id, name: person.name, avatarUrl: person.avatarUrl })} className="min-h-11 gap-3 text-base" data-posting-as-person={person.id}>
+      <ProfilePicture name={person.name} url={person.avatarUrl} />
+      <span className="min-w-0 flex-1"><span className="block truncate">{person.name}</span>{person.onStory ? <span className="block truncate text-xs text-muted-foreground">{person.onStory}</span> : null}</span>
+      {current === person.id ? <Check aria-label="Selected" className="size-4" /> : null}
+    </CommandItem>
+  );
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Who is this update by?</DrawerTitle>
+          <DrawerDescription>For a phone you're passing around. Live updates and their photos are credited to who you pick until you switch back. You're still the one publishing, and notes stay under your account.</DrawerDescription>
+        </DrawerHeader>
+        <Command className="px-2 pb-[max(0.5rem,var(--byline-safe-bottom))]">
+          <CommandInput placeholder="Search people" className="bg-transparent text-base" />
+          <CommandList className="max-h-[50dvh]">
+            <CommandEmpty>{people.isError ? (people.error as Error).message : people.isPending ? "Loading people…" : "Nobody matches."}</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="me you myself" onSelect={() => onPick(null)} className="min-h-11 gap-3 text-base" data-posting-as-person="self">
+                {me ? <ProfilePicture name={me.name} url={me.avatarUrl} /> : <UserRound aria-hidden="true" className="size-4" />}
+                <span className="min-w-0 flex-1"><span className="block truncate">You</span>{me ? <span className="block truncate text-xs text-muted-foreground">{me.name}</span> : null}</span>{current === null ? <Check aria-label="Selected" className="size-4" /> : null}
+              </CommandItem>
+            </CommandGroup>
+            {onStory.length ? <CommandGroup heading="On this story">{onStory.map(row)}</CommandGroup> : null}
+            {others.length ? <CommandGroup heading="Everyone else">{others.map(row)}</CommandGroup> : null}
+          </CommandList>
+        </Command>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
@@ -494,7 +565,7 @@ function Recent({ session, outbox }: { session: FieldSession; outbox: Outbox }) 
         {pending.map((item) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5" data-outbox={item.state}>
             <span className="w-16 shrink-0 text-xs tabular-nums text-muted-foreground">{timeOf(new Date(item.createdAt).toISOString(), tz)}</span>
-            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]} · {item.text ?? item.filename}</span>
+            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]}{item.as && item.kind === "live" ? ` by ${item.as.name}` : ""} · {item.text ?? item.filename}</span>
             <span role="status" className={`text-sm font-medium ${item.state === "failed" || item.memoryOnly ? "text-destructive" : ""}`}>{outboxLabel(item, outbox.online)}</span>
             {item.state === "failed" ? <div className="flex w-full gap-2"><Button type="button" className={TAP} onClick={() => void outbox.again(item)}>Retry</Button><Button type="button" variant="ghost" className={TAP} onClick={() => void outbox.dismiss(item)}>Discard</Button></div> : null}
             {item.error && item.state === "failed" ? <p className="w-full text-xs text-destructive">{item.error}</p> : null}

@@ -80,6 +80,27 @@ Offline at 9:51 tapping Publish now, coverage ended at 10:00, reconnect at 10:05
 update does not go public; it becomes a desk draft and Recent says so. An item with no
 recorded intent (queued by an older version) is a desk draft.
 
+## Shared phones
+
+A newsroom phone often gets passed around at an event while an editor stays signed
+in. While coverage is Live now, editors and administrators see **Live update by you ·
+Switch** under the text field. **Switch** opens a Drawer of people with their profile
+pictures (the Story's own people first, then every other active account). The chosen
+person is credited with each live update, and with the photo that goes with it (Media
+creator and credit), until someone switches back. Staff never see the switch.
+
+It changes attribution only (`field/posting-as.ts`):
+
+- Publishing is still the signed-in account's right; Publish now / Send to desk work
+  exactly as above.
+- The outbox item freezes who it is by (`as`), like `delivery`, and the server checks it
+  again at send time: still an editor, and the person's account still active.
+- The Story's activity keeps the signed-in account as the actor, and the photo's
+  `uploadedBy` stays that account, so the record shows who credited whom.
+- Notes, recordings and files stay under the signed-in account.
+- The `live-updates` collection refuses any non-editor request naming another author,
+  and only editors may change an update's author.
+
 ## Outbox
 
 Every capture goes into one IndexedDB outbox per account first

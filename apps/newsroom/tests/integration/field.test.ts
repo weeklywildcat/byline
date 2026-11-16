@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fieldEndpoints } from "../../src/field/endpoints";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
+import { plainTextToLexical } from "../../src/newsroom/live-text";
 import type { User } from "../../src/payload-types";
 
 /**
@@ -134,5 +135,53 @@ describe("photos from the field", () => {
     // A photo from somewhere else is refused.
     const other = (await payload.create({ collection: "media", data: {}, file: await jpeg("elsewhere.jpg"), overrideAccess: true })).id;
     expect((await call("post", "/byline/field/stories/:id/live", "photographer", { params: { id: ids.game }, data: { text: "x", photoId: other } })).status).toBe(400);
+  });
+});
+
+describe("a shared phone: an editor credits someone else", () => {
+  it("offers the switch to editors only, with the Story's own people first", async () => {
+    const editorSession = (await call("get", "/byline/field/stories/:id", "editor", { params: { id: ids.game } })).body;
+    expect(editorSession.canPostAs).toBe(true);
+    expect(editorSession.me).toMatchObject({ name: "editor Account" });
+    expect((await call("get", "/byline/field/stories/:id", "reporter", { params: { id: ids.game } })).body).toMatchObject({ canPostAs: false, me: null });
+    const people = (await call("get", "/byline/field/stories/:id/people", "editor", { params: { id: ids.game } })).body.people as Array<{ id: number; onStory: string | null }>;
+    const at = (key: string) => people.findIndex((person) => person.id === accounts[key].id);
+    expect(people[at("reporter")]).toMatchObject({ onStory: "On the byline" });
+    expect(people[at("photographer")]).toMatchObject({ onStory: "Has work on this story" });
+    expect(people[at("stranger")]).toMatchObject({ onStory: null });
+    expect(at("stranger")).toBeGreaterThan(Math.max(at("reporter"), at("photographer")));
+    expect(people.some((person) => person.id === accounts.editor.id)).toBe(false);
+    expect((await call("get", "/byline/field/stories/:id/people", "reporter", { params: { id: ids.game } })).status).toBe(403);
+  });
+
+  it("credits the update to the chosen person, publishes on the editor's right, and keeps the editor as the actor", async () => {
+    const posted = await call("post", "/byline/field/stories/:id/live", "editor", { params: { id: ids.game }, data: { text: "Interception at the 20", clientKey: "field-live-as-0001", delivery: "publish", as: accounts.reporter.id } });
+    expect(posted.body).toMatchObject({ status: "posted", duplicate: false });
+    const update = await payload.findByID({ collection: "live-updates", id: posted.body.id, depth: 0 });
+    expect(update.author).toBe(accounts.reporter.id);
+    const activity = await payload.find({ collection: "story-activity", where: { recordId: { equals: posted.body.id } }, depth: 0 });
+    expect(activity.docs.map((row) => row.actor)).toEqual([accounts.editor.id]);
+    // A retry from the outbox finds the same update.
+    const retried = await call("post", "/byline/field/stories/:id/live", "editor", { params: { id: ids.game }, data: { text: "Interception at the 20", clientKey: "field-live-as-0001", delivery: "publish", as: accounts.reporter.id } });
+    expect(retried.body).toMatchObject({ id: posted.body.id, duplicate: true });
+  });
+
+  it("refuses staff crediting someone else, and inactive accounts", async () => {
+    expect((await call("post", "/byline/field/stories/:id/live", "reporter", { params: { id: ids.game }, data: { text: "Not me", as: accounts.photographer.id } })).status).toBe(403);
+    // Not through the collection either: only an editor's request may name another author.
+    await expect(payload.create({ collection: "live-updates", data: { story: ids.game, body: plainTextToLexical("Not me either") as never, author: accounts.photographer.id, state: "draft" }, req: await reqAs("reporter"), overrideAccess: false })).rejects.toThrow(/Only editors can post a live update for someone else/);
+    const gone = await payload.create({ collection: "users", data: { email: "field-gone@example.test", password: "pw-gone-123456", name: "Gone Account", role: "staff", enabled: false } });
+    expect((await call("post", "/byline/field/stories/:id/live", "editor", { params: { id: ids.game }, data: { text: "x", as: gone.id } })).status).toBe(400);
+  });
+
+  it("credits the photo that goes with it to that person, uploaded by the editor and not tied to anyone's assignment", async () => {
+    const result = await call("post", "/byline/stories/:id/reporting/photos", "editor", { params: { id: ids.game }, data: { clientKey: "field-photo-as-0001", as: accounts.photographer.id }, file: await jpeg("IMG_3001.jpg") });
+    expect(result.status).toBe(200);
+    expect(result.body.assignment).toBeNull();
+    const media = await payload.findByID({ collection: "media", id: result.body.id, depth: 0 });
+    expect(media.creator).toBe("photographer Shooter");
+    expect(media.credit).toMatch(/^photographer Shooter \/ /);
+    expect(media.uploadedBy).toBe(accounts.editor.id);
+    expect((await call("post", "/byline/stories/:id/reporting/photos", "reporter", { params: { id: ids.game }, data: { as: accounts.photographer.id }, file: await jpeg("IMG_3002.jpg") })).status).toBe(403);
   });
 });

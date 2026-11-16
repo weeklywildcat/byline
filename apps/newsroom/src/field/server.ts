@@ -6,6 +6,8 @@ import { type CoverageState, type LiveMode, type PublishBlock } from "../domain/
 import { addDays, localDay } from "../domain/dates";
 import { validClientKey } from "../domain/reporting";
 import { createLiveUpdate } from "../newsroom/live-coverage";
+import { canPostAs, resolvePostingAs } from "./posting-as";
+import { userAvatarUrls } from "../newsroom/portraits";
 import { lexicalToPlainText } from "../newsroom/live-text";
 import type { ScreenContext } from "../newsroom/screen-models";
 
@@ -128,6 +130,10 @@ export type FieldSession = {
   publishBlock: PublishBlock | null;
   /** Editor-level: start, end, resume coverage and choose direct publishers. */
   canControl: boolean;
+  /** Editor-level: may credit a live update to someone else (a shared phone, field/posting-as.ts). */
+  canPostAs: boolean;
+  /** The signed-in account's name and profile picture, shown as "You" when an editor may switch (else null). */
+  me: { name: string; avatarUrl: string | null } | null;
   appointment: { id: number; title: string; startAt: string | null; location: string; sourceId: number | null; source: string | null } | null;
   assignments: Array<{ id: number; title: string; type: string; deadline: string | null }>;
   recent: FieldRecent[];
@@ -152,6 +158,10 @@ export async function fieldSession(ctx: ScreenContext, storyId: number, appointm
     payload.find({ collection: "media", where: { and: [{ "capture.story": { equals: storyId } }, { uploadedBy: { equals: ctx.user.id } }] }, limit: 10, sort: "-createdAt", select: { filename: true, createdAt: true }, ...as(ctx) }),
     payload.find({ collection: "live-updates", where: { and: [byStory, { author: { equals: ctx.user.id } }] }, limit: 10, sort: "-publishedAt", ...as(ctx) })
   ]);
+  const me = canPostAs(ctx)
+    ? await payload.findByID({ collection: "users", id: ctx.user.id, depth: 0, select: { name: true, linkedPerson: true }, overrideAccess: true, req: ctx.req })
+      .then(async (user) => ({ name: user.name, avatarUrl: (await userAvatarUrls(ctx, [user])).get(user.id) ?? null }))
+    : null;
   const source = appointment && num(appointment.source)
     ? await payload.find({ collection: "sources", where: { id: { equals: num(appointment.source) } }, limit: 1, ...as(ctx) }).then((result) => result.docs[0] ?? null)
     : null;
@@ -170,6 +180,8 @@ export async function fieldSession(ctx: ScreenContext, storyId: number, appointm
     canPublishNow: postLive && gate.block === null,
     publishBlock: gate.block,
     canControl: atLeast(ctx.user, "editor"),
+    canPostAs: canPostAs(ctx),
+    me,
     appointment: appointment ? { id: appointment.id, title: appointment.title, startAt: appointment.scheduleMode === "exact" ? appointment.startAt ?? null : null, location: appointment.location ?? "", sourceId: source?.id ?? null, source: source?.label ?? null } : null,
     assignments: assignments.docs.map((row) => ({ id: row.id, title: row.title, type: row.type, deadline: row.deadline ?? null })),
     recent,
@@ -204,24 +216,29 @@ export async function fieldStorySearch(ctx: ScreenContext, query: string) {
  * a draft for the live desk and the answer says why, so a stale queued "Publish now" can never go public after
  * coverage ended or a grant was removed. A missing intent is a desk draft. Idempotent on the client key: a
  * retried submission returns the first update and its real state.
+ *
+ * `as` credits the update to someone else on a shared phone (editors only, decided again here); publishing is
+ * still the signed-in account's right, and the Story's activity records that account.
  */
-export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown; delivery?: unknown }) {
+export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown; delivery?: unknown; as?: unknown }) {
   const scope = await storyScope(ctx.req);
   const publisher = await canPublishLive(ctx.req, storyId);
   if (!scopeManages(scope, storyId) && !scopeParticipates(scope, storyId) && !publisher) throw new APIError("You are not part of this story.", 403);
+  const author = await resolvePostingAs(ctx, input.as);
   const { payload } = ctx.req;
   const clientKey = validClientKey(input.clientKey);
   if (clientKey) {
     const existing = (await payload.find({ collection: "live-updates", where: { clientKey: { equals: clientKey } }, limit: 1, depth: 0, overrideAccess: true, req: ctx.req })).docs[0];
     if (existing) {
-      if (String(relationId(existing.author)) !== String(ctx.user.id)) throw new APIError("That capture key is already in use.", 409);
+      if (String(relationId(existing.author)) !== String(author.id)) throw new APIError("That capture key is already in use.", 409);
       // The reason was decided and stored with the first request; a retry repeats it rather than recalculating against newer state.
       return { id: existing.id, status: existing.state === "published" ? "posted" as const : "sent-to-desk" as const, ...(existing.deskReason ? { reason: existing.deskReason } : {}), duplicate: true };
     }
   }
   try {
     const created = await createLiveUpdate(ctx, storyId, {
-      text: input.text, photoId: input.photoId, ...(clientKey ? { clientKey } : {}), queued: input.queued === true, source: "field", wantsPublish: input.delivery === "publish"
+      text: input.text, photoId: input.photoId, ...(clientKey ? { clientKey } : {}), queued: input.queued === true, source: "field", wantsPublish: input.delivery === "publish",
+      ...(author.self ? {} : { author: author.id })
     });
     return { ...created, duplicate: false };
   } catch (error) {

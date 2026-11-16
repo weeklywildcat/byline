@@ -41,6 +41,8 @@ export type OutboxItem = {
   delivery?: Delivery;
   /** A live update waits for this photo item and attaches its Media. */
   photoKey?: string;
+  /** Credited to someone else on a shared phone (an editor's "Posting as"). Frozen at tap time; the server re-checks it. */
+  as?: { id: number; name: string };
   state: OutboxState;
   attempts: number;
   /** 0..1 while uploading. */
