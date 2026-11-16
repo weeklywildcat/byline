@@ -108,21 +108,20 @@ const storyIsPublished = storyIsPublic;
  */
 const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
   const user = requestUser(req);
-  if (!user || atLeast(user, "editor") || req.context?.bylineImport === true) return data;
+  if (!user || req.context?.bylineImport === true) return data;
   // An update never moves between Stories (a later hook restores the original), so every decision below is about the
   // Story the update is already on, never a Story named in the request: no permission or coverage check can be
   // satisfied by a different Story than the one that gets written.
   const story = originalDoc ? originalDoc.story : data.story;
-  // The Story-level live grant publishes live updates on this Story only (access/live-context.ts), and only
-  // while the Story's coverage accepts public updates: the shared rule the live desk and Field use too.
-  if (await canPublishLive(req, story)) {
-    const becomesPublished = (data.state ?? originalDoc?.state ?? "published") === "published" && originalDoc?.state !== "published";
-    if (becomesPublished) {
-      const gate = await liveGate(req, story);
-      if (gate.block) throw new APIError(`Readers can't see a new live update right now: ${PUBLISH_BLOCK_COPY[gate.block]}. Send it to the desk as a draft instead.`, 403);
-    }
-    return data;
+  // No one, including editors, can make a new update public before coverage starts or
+  // after it ends. Editors may still correct or unpublish an already-published update.
+  // This guard applies to the collection API, not just Write and Field Mode.
+  const becomesPublished = (data.state ?? originalDoc?.state ?? "published") === "published" && originalDoc?.state !== "published";
+  if (becomesPublished) {
+    const gate = await liveGate(req, story);
+    if (gate.block) throw new APIError(`Readers can't see a new live update right now: ${PUBLISH_BLOCK_COPY[gate.block]}. Start or resume coverage before publishing.`, 403);
   }
+  if (atLeast(user, "editor") || (await canPublishLive(req, story))) return data;
   const state = data.state ?? originalDoc?.state ?? "published";
   if ((state === "published" || originalDoc?.state === "published") && (await storyIsPublished(req, story))) throw new APIError(PUBLIC_UPDATE, 403);
   return data;
