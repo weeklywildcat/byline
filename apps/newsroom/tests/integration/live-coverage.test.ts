@@ -186,6 +186,46 @@ describe("pinning", () => {
   });
 });
 
+describe("crediting someone else from the desk", () => {
+  it("lets an editor credit a reporter's update to them, and the desk shows it", async () => {
+    expect((await desk("editor", "game")).body).toMatchObject({ canPostAs: true, me: { id: accounts.editor.id, name: "editor Account" } });
+    expect((await desk("alice", "game")).body).toMatchObject({ canPostAs: false, me: { id: accounts.alice.id } });
+    const posted = await post("editor", "game", { text: "Phoned in from the press box", delivery: "publish", as: accounts.bob.id });
+    expect(posted.body.status).toBe("posted");
+    const row = (await desk("editor", "game")).body.updates.find((update: { id: number }) => update.id === posted.body.id);
+    expect(row.author).toMatchObject({ id: accounts.bob.id, name: "bob Account" });
+    const activity = await payload.find({ collection: "story-activity", where: { recordId: { equals: posted.body.id } }, depth: 0 });
+    expect(activity.docs.map((entry) => entry.actor)).toEqual([accounts.editor.id]);
+  });
+
+  it("refuses staff, and lists the Story's people first for editors only", async () => {
+    expect((await post("alice", "game", { text: "Not mine", as: accounts.bob.id })).status).toBe(403);
+    const people = await call("get", "/byline/stories/:id/live/people", "editor", { routeParams: { id: String(story.game) } });
+    expect(people.body.people.slice(0, 2).map((person: { id: number }) => person.id).sort()).toEqual([accounts.alice.id, accounts.bob.id].sort());
+    expect((await call("get", "/byline/stories/:id/live/people", "alice", { routeParams: { id: String(story.game) } })).status).toBe(403);
+  });
+});
+
+describe("public bylines", () => {
+  it("credits each published update to its author's public Person, with a profile link only when they have a page", async () => {
+    await payload.update({ collection: "people", id: people.bob, data: { hasProfilePage: false } as never, overrideAccess: true, context: { bylineSystem: true } });
+    const posted = await post("editor", "game", { text: "Bob's byline", delivery: "publish", as: accounts.bob.id });
+    let live = normalizeLiveCoverage((await feed("game")).body)!;
+    expect(live.updates.find((update) => update.id === posted.body.id)).toMatchObject({ author: "bob Writer" });
+    expect(live.updates.find((update) => update.id === posted.body.id)?.authorSlug).toBeUndefined();
+    await payload.update({ collection: "people", id: people.bob, data: { hasProfilePage: true, newsroomRole: "Sports reporter" } as never, overrideAccess: true, context: { bylineSystem: true } });
+    live = normalizeLiveCoverage((await feed("game")).body)!;
+    expect(live.updates.find((update) => update.id === posted.body.id)).toMatchObject({ author: "bob Writer", authorSlug: "live-bob", authorRole: "Sports reporter" });
+  });
+
+  it("leaves an author without a linked Person unbylined", async () => {
+    await account("nolink", "editor", false);
+    const posted = await post("nolink", "game", { text: "No public person", delivery: "publish" });
+    const live = normalizeLiveCoverage((await feed("game")).body)!;
+    expect(live.updates.find((update) => update.id === posted.body.id)?.author).toBe("");
+  });
+});
+
 describe("the public feed", () => {
   it("is the published-only projection the Worker and static build both accept", async () => {
     await post("alice", "game", { text: "SENTINEL-DRAFT: do not publish" });
@@ -202,9 +242,11 @@ describe("the public feed", () => {
     // Text is escaped HTML, never editor markup.
     expect(json).toContain("A &lt;b&gt;markup&lt;/b&gt; &amp; ampersand");
     expect(json).not.toContain("<b>markup");
-    // No account details.
+    // No account details: a byline is the author's public Person, never the account.
     expect(json).not.toContain("example.test");
-    expect(live!.updates.every((update) => update.author === "")).toBe(true);
+    expect(json).not.toContain(" Account");
+    expect(live!.updates.every((update) => update.author === "" || update.author.endsWith(" Writer"))).toBe(true);
+    expect(live!.updates.some((update) => update.author.endsWith(" Writer"))).toBe(true);
     expect(live!.updates.filter((update) => update.pinned)).toHaveLength(1);
     // Newest first.
     const dates = live!.updates.map((update) => update.date);
