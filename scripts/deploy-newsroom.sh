@@ -96,5 +96,23 @@ services_to_recreate=(
 )
 compose up -d --no-deps --force-recreate "${services_to_recreate[@]}"
 
+printf '\nChecking publication deployment configuration...\n'
+if ! compose exec -T publication-worker sh -lc 'test -n "$BYLINE_DEPLOY_HOOK_URL"'; then
+  fail "publication-worker is missing BYLINE_DEPLOY_HOOK_URL; public changes will not trigger the static-site build"
+fi
+if ! compose exec -T publication-worker npm run publication:snapshot:status --workspace @byline/newsroom >/tmp/byline-publication-status.json; then
+  fail "publication-worker could not report public snapshot status"
+fi
+if ! python3 -c '
+import json, sys
+data = json.load(open("/tmp/byline-publication-status.json"))
+if not data.get("deployment", {}).get("configured"):
+    sys.exit("public deploy hook is not configured")
+' 2>/dev/null; then
+  rm -f /tmp/byline-publication-status.json
+  fail "publication-worker started without a configured public deploy hook"
+fi
+rm -f /tmp/byline-publication-status.json
+
 printf '\nByline %s deployed successfully.\n' "$commit"
 compose ps "${services_to_recreate[@]}"
