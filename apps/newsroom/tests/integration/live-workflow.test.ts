@@ -137,6 +137,36 @@ describe("starting, ending and resuming", () => {
   });
 });
 
+describe("publishing-window guard", () => {
+  it("blocks an editor from publishing a draft before start or after end, but permits corrections to published updates", async () => {
+    await newStory("publishing-window", "Live window test", true);
+    await coverage("editor", "publishing-window", { action: "setup", publishers: [] });
+    const before = await post("editor", "publishing-window", { text: "Held before the start", delivery: "desk" });
+    const publish = async (id: number) => payload.update({
+      collection: "live-updates", id, data: { state: "published" },
+      req: await reqAs("editor"), overrideAccess: false
+    });
+    await expect(publish(before.body.id)).rejects.toThrow(/coverage hasn't started/);
+    expect((await feed("publishing-window")).status).toBe(404);
+
+    await coverage("editor", "publishing-window", { action: "start" });
+    await expect(publish(before.body.id)).resolves.toMatchObject({ state: "published" });
+    const after = await post("editor", "publishing-window", { text: "Held after the end", delivery: "desk" });
+    await coverage("editor", "publishing-window", { action: "end" });
+    await expect(publish(after.body.id)).rejects.toThrow(/coverage ended/);
+
+    // Ending coverage must not prevent corrections and unpublishing of an existing public update.
+    await expect(payload.update({
+      collection: "live-updates", id: before.body.id, data: { headline: "Corrected headline" },
+      req: await reqAs("editor"), overrideAccess: false
+    })).resolves.toMatchObject({ headline: "Corrected headline", state: "published" });
+    await expect(payload.update({
+      collection: "live-updates", id: before.body.id, data: { state: "draft" },
+      req: await reqAs("editor"), overrideAccess: false
+    })).resolves.toMatchObject({ state: "draft" });
+  });
+});
+
 describe("delivery intent from Write", () => {
   it("lets a participant send only to the desk, whatever they ask for", async () => {
     const asked = await post("bob", "game", { text: "SENTINEL-BOB asked to publish", delivery: "publish" });
