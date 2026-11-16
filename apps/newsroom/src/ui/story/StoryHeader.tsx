@@ -254,10 +254,13 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
     });
   }
 
+  // Live coverage is time-sensitive: editors may publish its Story shell directly after publication
+  // checks instead of moving it through the ordinary review lifecycle first.
+  const liveDraft = liveCoverage?.desk?.mode === "live" && !hasPublishedDoc;
   // Exactly one primary lifecycle action for this reader, now.
   const busy = actions.submit.isPending || actions.lifecycle.isPending;
   let primary: { label: string; run: () => void } | null = null;
-  if (!context.readOnly && id != null && !hasPublishedDoc) {
+  if (!context.readOnly && id != null && !hasPublishedDoc && !liveDraft) {
     const canSubmit = Boolean(reviewState?.viewer.canSubmit);
     if (phase === "pitch" && storyEditor) primary = { label: "Accept pitch", run: () => move("accept-pitch", "Pitch accepted. It's in Reporting.") };
     else if (phase === "reporting" && manages) primary = { label: "Start drafting", run: () => move("start-drafting", "Moved to Drafting.") };
@@ -297,8 +300,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
     }
   }
   const canMove = Boolean(primary) || sidelineActions.length > 0 || canJump;
-  const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc);
-  const statusLine = changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
+  const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc || liveDraft);
+  const statusLine = liveDraft ? "Live story · review optional" : changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
   const phaseContent = <>
     <PhaseBadge phase={phase} />
     {statusLine && !run ? <span className="text-sm text-muted-foreground" data-story-status="">{statusLine}</span> : null}
@@ -397,7 +400,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
           {showPublish ? (
             <Button ref={publishTrigger} type="button" size="sm" className="max-sm:flex-1" onClick={startPublish} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
               {publishing ? <Spinner /> : null}
-              {hasPublishedDoc ? "Publish changes" : "Publish"}
+              {hasPublishedDoc ? "Publish changes" : liveDraft ? "Publish for later" : "Publish"}
             </Button>
           ) : null}
         </div>
