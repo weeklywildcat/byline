@@ -31,7 +31,7 @@ export function LiveDeliveryButtons({ canPublishNow, disabled, tap, onDeliver, h
       )}
       <p id={helperId} className="text-xs text-muted-foreground" data-live-helper="">
         {canPublishNow
-          ? "Publish now appears immediately to readers. Send to desk creates a draft for an editor."
+          ? "Publish now submits this update for publication. It appears on the public site after the next successful build. Send to desk creates a draft for an editor."
           : "An editor will review this before readers see it."}
       </p>
     </div>

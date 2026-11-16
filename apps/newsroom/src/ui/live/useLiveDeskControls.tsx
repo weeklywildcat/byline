@@ -56,6 +56,7 @@ export function useLiveDeskControls({ api, storyId, desk, readOnly = false, busy
   const size = tap ? "min-h-11 px-4 text-base" : "";
   const controls: TimelineControls | undefined = desk ? {
     canPublish: desk.canPublish && !readOnly,
+    canPublishNow: desk.canPublishNow && !readOnly,
     busy: working || busy,
     editingId: editing?.id ?? null,
     // An update readers can see belongs to editors and direct publishers; staff change their own drafts.
