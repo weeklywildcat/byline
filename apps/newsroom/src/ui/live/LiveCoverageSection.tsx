@@ -96,6 +96,7 @@ export function LiveCoverageSection() {
 
   const controls: TimelineControls = {
     canPublish: desk.canPublish && !readOnly,
+    canPublishNow: desk.canPublishNow && !readOnly,
     busy: working || live.busy,
     editingId: editing?.id ?? null,
     // An update readers can see belongs to editors and direct publishers; staff change their own drafts.
