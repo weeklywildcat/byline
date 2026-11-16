@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enqueue, memoryOutbox, newItem, outboxLabel, processOutbox, QuotaError, retry, SendError, type OutboxItem, type OutboxResult, type OutboxStore, type Sender } from "../src/ui/field/outbox";
+import { enqueue, isPhotoFile, memoryOutbox, newItem, outboxLabel, processOutbox, QuotaError, retry, SendError, type OutboxItem, type OutboxResult, type OutboxStore, type Sender } from "../src/ui/field/outbox";
 
 const blob = () => new Blob(["x"], { type: "image/jpeg" });
 
@@ -116,5 +116,16 @@ describe("Field outbox", () => {
       await processOutbox(store, memory, send, { online: true });
       expect(calls.map((call) => call.delivery)).toEqual(["desk", undefined]);
     });
+  });
+});
+
+describe("attach: which files ask 'is this a photo?'", () => {
+  it("asks for photographs, including HEIC with no type, and not for documents, audio or raw", () => {
+    expect(isPhotoFile({ name: "IMG_1.jpg", type: "image/jpeg" })).toBe(true);
+    expect(isPhotoFile({ name: "IMG_2.HEIC", type: "" })).toBe(true);
+    expect(isPhotoFile({ name: "IMG_3.heif", type: "image/heif" })).toBe(true);
+    expect(isPhotoFile({ name: "notes.pdf", type: "application/pdf" })).toBe(false);
+    expect(isPhotoFile({ name: "interview.m4a", type: "audio/mp4" })).toBe(false);
+    expect(isPhotoFile({ name: "IMG_4.dng", type: "image/x-adobe-dng" })).toBe(false);
   });
 });
