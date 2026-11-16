@@ -41,6 +41,8 @@ async function servePhotos(page: Page, replacement?: Buffer, type = 'image/svg+x
 async function open(page: Page, url: string) {
   await servePhotos(page);
   await page.goto(url);
+  // A lazy image below the fold never loads on its own, so ask for every image before waiting on them.
+  await page.evaluate(() => document.querySelectorAll('img').forEach((image) => { image.loading = 'eager'; }));
   await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete));
 }
 

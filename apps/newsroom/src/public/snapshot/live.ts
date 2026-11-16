@@ -5,6 +5,7 @@ import { hasLiveCoverage, normalizeLiveSettings, type LiveSettings } from "../..
 import type { Story } from "../../payload-types";
 import { id, iso, publicRead, text } from "./datasets";
 import type { PreparedMediaCatalog } from "./media";
+import { relationId } from "../../access/user";
 import { pageBodyHtml } from "./page-html";
 
 /** Mode and coverage state for these Stories, from their unversioned plans (never from article drafts). */
@@ -18,9 +19,25 @@ export async function readLiveUpdates(payload: Payload, storyIds: number[]) {
   if (!storyIds.length) return [];
   const { docs } = await payload.find({ collection: "live-updates", ...publicRead,
     where: { story: { in: storyIds }, state: { equals: "published" } },
-    select: { story: true, headline: true, body: true, photo: true, publishedAt: true, updatedAt: true, pinned: true }
+    select: { story: true, headline: true, body: true, photo: true, publishedAt: true, updatedAt: true, pinned: true, author: true }
   });
   return docs.sort((a, b) => Date.parse(b.publishedAt ?? "") - Date.parse(a.publishedAt ?? "") || b.id - a.id);
+}
+
+/** The public facts a live update's byline uses: the same public People projection article bylines use. */
+export type LiveBylinePerson = { name: string; slug: string; hasProfilePage: boolean; newsroomRole: string; portrait: number | null };
+
+/**
+ * Which Person each update is credited to: its author account's linked Person. Only the Person's ID is read
+ * from the account; the account's own name, email and ID never enter the projection. An account with no
+ * linked Person gets no public byline.
+ */
+export async function liveUpdatePeople(payload: Payload, rows: Awaited<ReturnType<typeof readLiveUpdates>>): Promise<Map<number, number>> {
+  const accounts = [...new Set(rows.map((row) => Number(relationId(row.author))).filter((value) => value > 0))];
+  if (!accounts.length) return new Map();
+  const { docs } = await payload.find({ collection: "users", ...publicRead, where: { id: { in: accounts } }, select: { linkedPerson: true } });
+  const person = new Map(docs.flatMap((user) => { const linked = Number(relationId(user.linkedPerson)); return linked > 0 ? [[user.id, linked] as const] : []; }));
+  return new Map(rows.flatMap((row) => { const linked = person.get(Number(relationId(row.author))); return linked ? [[row.id, linked] as const] : []; }));
 }
 
 /**
@@ -29,16 +46,22 @@ export async function readLiveUpdates(payload: Payload, storyIds: number[]) {
  * published update, newest first, as escaped HTML. Null unless coverage is
  * live or ended.
  */
-export function liveCoverageProjection(story: Pick<Story, "publishedAt" | "updatedAt">, settings: LiveSettings | undefined | null, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: Pick<PreparedMediaCatalog, "articleAsset">): LiveCoverage | null {
+export function liveCoverageProjection(story: Pick<Story, "publishedAt" | "updatedAt">, settings: LiveSettings | undefined | null, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: Pick<PreparedMediaCatalog, "articleAsset" | "avatar">, bylines: ReadonlyMap<number, LiveBylinePerson> = new Map()): LiveCoverage | null {
   if (!hasLiveCoverage(settings)) return null;
   const state = settings!.state as "live" | "ended";
   const updates: LiveCoverage["updates"] = rows.map((row) => {
     const title = text(row.headline);
     const image = catalog.articleAsset(id(row.photo) ?? -1);
+    const person = bylines.get(row.id);
+    const portrait = person?.portrait ? catalog.avatar(person.portrait) : null;
     return {
       id: row.id, title, html: pageBodyHtml(row.body, { id: row.id, title }),
       date: iso(row.publishedAt ?? row.updatedAt), modified: iso(row.updatedAt), pinned: row.pinned === true,
-      author: "", image: image ? { url: image.src, alt: image.alt, width: image.width, height: image.height, credit: image.credit } : null
+      author: person?.name ?? "",
+      ...(person?.hasProfilePage && person.slug ? { authorSlug: person.slug } : {}),
+      ...(person?.newsroomRole ? { authorRole: person.newsroomRole } : {}),
+      ...(portrait ? { authorPhoto: { url: portrait.src, width: portrait.width, height: portrait.height } } : {}),
+      image: image ? { url: image.src, alt: image.alt, width: image.width, height: image.height, credit: image.credit } : null
     };
   });
   return {
@@ -49,10 +72,11 @@ export function liveCoverageProjection(story: Pick<Story, "publishedAt" | "updat
   };
 }
 
-export function collectLiveCoverage(story: Pick<Story, "id" | "publishedAt" | "updatedAt">, settings: LiveSettings | undefined, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig) {
-  const live = liveCoverageProjection(story, settings, rows, catalog);
+export function collectLiveCoverage(story: Pick<Story, "id" | "publishedAt" | "updatedAt">, settings: LiveSettings | undefined, rows: Awaited<ReturnType<typeof readLiveUpdates>>, catalog: PreparedMediaCatalog, publication: BylinePublicationConfig, bylines: ReadonlyMap<number, LiveBylinePerson> = new Map()) {
+  const live = liveCoverageProjection(story, settings, rows, catalog, bylines);
   if (!live) return null;
   return createArticleLiveView(live, {
-    postId: story.id, locale: publication.locale, timeZone: publication.timezone, feedUrl: `/_byline/live/${story.id}.json`
+    postId: story.id, locale: publication.locale, timeZone: publication.timezone, feedUrl: `/_byline/live/${story.id}.json`,
+    authorHref: (slug) => `/author/${slug}/`
   });
 }

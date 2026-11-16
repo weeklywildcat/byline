@@ -4,7 +4,7 @@ import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHo
 import { canPublishLive, liveGate, livePublisherStories, storyIsPublic } from "../access/live-context";
 import { DESK_REASON_OPTIONS, PUBLISH_BLOCK_COPY } from "../domain/live-coverage";
 import { inIds, scopeManages, scopeParticipates, storyScope } from "../access/story-context";
-import { administratorsOnly, atLeast, editorsOnly, relationId, requestUser, sameId, signedIn } from "../access/user";
+import { administratorsOnly, atLeast, editorsOnly, editorsOnlyField, relationId, requestUser, sameId, signedIn } from "../access/user";
 import { proseEditor } from "../editor/prose";
 import { CORRECTION_TYPE_OPTIONS } from "../domain/vocabulary";
 import { legacyIdField, slugField } from "../fields/slug";
@@ -187,7 +187,12 @@ export const LiveUpdates: CollectionConfig = {
       guardPublicUpdate,
       ({ data, operation, req, originalDoc }) => {
         if (operation === "create") {
-          data.author = data.author ?? requestUser(req)?.id ?? null;
+          const user = requestUser(req);
+          // Crediting someone else is an editor's call (Field's "Posting as", field/posting-as.ts); everyone else writes as themselves.
+          if (user && relationId(data.author) !== null && !sameId(data.author, user.id) && !atLeast(user, "editor") && req.context?.bylineImport !== true) {
+            throw new APIError("Only editors can post a live update for someone else.", 403);
+          }
+          data.author = data.author ?? user?.id ?? null;
           data.publishedAt = data.publishedAt ?? new Date().toISOString();
         } else if (relationId(data.story) !== null && relationId(data.story) !== relationId(originalDoc?.story)) {
           data.story = originalDoc?.story;
@@ -201,7 +206,7 @@ export const LiveUpdates: CollectionConfig = {
     { name: "headline", type: "text", maxLength: 200 },
     { name: "body", type: "richText", editor: proseEditor, required: true },
     { name: "photo", type: "upload", relationTo: "media" },
-    { name: "author", type: "relationship", relationTo: "users", admin: { readOnly: true } },
+    { name: "author", type: "relationship", relationTo: "users", admin: { readOnly: true }, access: { update: editorsOnlyField } },
     { name: "state", type: "select", defaultValue: "published", options: [{ value: "draft", label: "Draft" }, { value: "published", label: "Published" }], index: true },
     { name: "publishedAt", type: "date", index: true },
     { name: "pinned", type: "checkbox", defaultValue: false, admin: { description: "Pinning replaces the previous key update." } },

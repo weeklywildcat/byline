@@ -46,6 +46,18 @@ actions: Open full story, and for editors Set up live coverage, Manage direct
 publishers and End live coverage (an `AlertDialog`). The main live posting action is
 never in the menu. Private notes and public live updates are always labelled apart.
 
+While coverage is Live now the composer has an optional **Headline** line above the
+text, and people who may publish see **Pin as the key update**, which applies only to
+Publish now (a desk draft is never pinned). A headline kept with **Save note** stays
+at the top of the note.
+
+The timeline is the same desk as Write's (`ui/live/useLiveDeskControls.tsx`): each
+update has an actions menu with Edit (headline and text; photos are changed in
+Write), Publish or Unpublish, Pin as key update and Delete, offered by the same rules
+and decided again on the server. So an editor at the event can publish a student's
+desk draft or fix a typo without a laptop. Field mounts its own toaster for these and
+for coverage changes.
+
 Routing (`routeCapture`, docs/reporting.md):
 
 | Action | Goes to |
@@ -79,6 +91,28 @@ right; otherwise it stores a desk draft and answers `{ status: "sent-to-desk", r
 Offline at 9:51 tapping Publish now, coverage ended at 10:00, reconnect at 10:05: the
 update does not go public; it becomes a desk draft and Recent says so. An item with no
 recorded intent (queued by an older version) is a desk draft.
+
+## Shared phones
+
+A newsroom phone often gets passed around at an event while an editor stays signed
+in. While coverage is Live now, editors and administrators see **Live update by you ·
+Switch** under the text field. **Switch** opens a Drawer of people with their profile
+pictures (the Story's own people first, then every other active account). The chosen
+person is credited with each live update, and with the photo that goes with it (Media
+creator and credit), until someone switches back. Staff never see the switch.
+
+It changes attribution only (`newsroom/posting-as.ts`, the same switch Write's live
+desk has):
+
+- Publishing is still the signed-in account's right; Publish now / Send to desk work
+  exactly as above.
+- The outbox item freezes who it is by (`as`), like `delivery`, and the server checks it
+  again at send time: still an editor, and the person's account still active.
+- The Story's activity keeps the signed-in account as the actor, and the photo's
+  `uploadedBy` stays that account, so the record shows who credited whom.
+- Notes, recordings and files stay under the signed-in account.
+- The `live-updates` collection refuses any non-editor request naming another author,
+  and only editors may change an update's author.
 
 ## Outbox
 
