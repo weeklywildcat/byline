@@ -207,6 +207,9 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
   editor-only through `changeLiveCoverage`; "may this go public now" is the one
   `publishBlock`/`canPublishLiveNow` rule shared by Write, Field and the
   `live-updates` guard. Write and Field share `src/ui/live`; do not fork the desk.
+  Readers' browsers poll `GET /api/byline/live/:id` while coverage is live
+  (`newsroom/public-live.ts`): anonymous, published-only, the same projection as
+  the snapshot. Its media route serves only files that projection names.
 - **Front Page** ([docs/front-page.md](../../docs/front-page.md)) is editorial
   priority, not design: placements (slot id → Story id) through the one
   resolver; revisions are activated only by Publish or the scheduled job, which

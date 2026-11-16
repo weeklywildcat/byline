@@ -340,11 +340,12 @@ async function validPublishers(ctx: ScreenContext, storyId: number, value: unkno
  * or ended coverage, and only its published updates. Raw text, drafts, account
  * IDs and account names never leave; a byline is the author's public Person, as on articles. This read-only endpoint uses the same
  * projection contract as the static build. Photos are prepared public
- * renditions; if one is not ready yet, the endpoint omits photos while the
+ * renditions; one that is not ready yet is left out until it is, while the
  * snapshot pipeline waits and re-queues once preparation finishes.
- * Null when there is no coverage to show.
+ * Null when there is no coverage to show. The catalog holds exactly the
+ * prepared files the projection names (see `public-live.ts`).
  */
-export async function publicLiveFeed(payload: Payload, storyId: number): Promise<LiveCoverage | null> {
+export async function loadPublicLive(payload: Payload, storyId: number): Promise<{ coverage: LiveCoverage; catalog: PreparedMediaCatalog } | null> {
   const { docs } = await payload.find({
     collection: "stories", where: { id: { equals: storyId } }, draft: false, limit: 1, depth: 0, overrideAccess: true,
     select: { _status: true, publishedAt: true, updatedAt: true, deletedAt: true }
@@ -363,6 +364,12 @@ export async function publicLiveFeed(payload: Payload, storyId: number): Promise
   const refs = new Map<number, { usage: string; kind: "image" }>();
   for (const row of rows) { const photo = Number(relationId(row.photo)); if (photo > 0) refs.set(photo, { usage: `a live update on Story ${storyId}`, kind: "image" }); }
   for (const person of byId.values()) if (person.portrait) refs.set(person.portrait, { usage: `the portrait of Person`, kind: "image" });
-  const catalog = await PreparedMediaCatalog.load(payload, refs).catch(() => PreparedMediaCatalog.load(payload, new Map()));
-  return liveCoverageProjection(story, settings, rows, catalog, bylines);
+  // A photo still being prepared is left out until it is ready, without dropping the others.
+  const catalog = await PreparedMediaCatalog.load(payload, refs, { skipUnready: true });
+  const coverage = liveCoverageProjection(story, settings, rows, catalog, bylines);
+  return coverage ? { coverage, catalog } : null;
+}
+
+export async function publicLiveFeed(payload: Payload, storyId: number): Promise<LiveCoverage | null> {
+  return (await loadPublicLive(payload, storyId))?.coverage ?? null;
 }

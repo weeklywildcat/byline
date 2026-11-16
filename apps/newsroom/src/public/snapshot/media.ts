@@ -4,6 +4,7 @@ import {
   largestNaturalImage,
   publicationManifestBlobs,
   publicationMediaReadiness,
+  type PublicationBlob,
   type PublicMediaSnapshot
 } from "@byline/content";
 import type { Payload } from "payload";
@@ -49,9 +50,9 @@ export class PreparedMediaCatalog {
   /**
    * Loads and checks every referenced asset. `usage` names why each is
    * referenced, for an actionable not-ready message. Throws `media-not-ready`
-   * listing every problem at once.
+   * listing every problem at once, unless `skipUnready` leaves those assets out.
    */
-  static async load(payload: Payload, references: Map<number, { usage: string; kind: "image" | "any" }>, options: { store?: PublicationStore } = {}): Promise<PreparedMediaCatalog> {
+  static async load(payload: Payload, references: Map<number, { usage: string; kind: "image" | "any" }>, options: { store?: PublicationStore; skipUnready?: boolean } = {}): Promise<PreparedMediaCatalog> {
     const catalog = new PreparedMediaCatalog(options.store ?? publicationStore());
     const ids = [...references.keys()].sort((a, b) => a - b);
     const found = ids.length
@@ -103,7 +104,8 @@ export class PreparedMediaCatalog {
         manifest
       });
     }
-    if (catalog.problems.length) {
+    // The live feed shows what is ready now and picks up the rest on a later poll; a snapshot never does.
+    if (catalog.problems.length && !options.skipUnready) {
       throw new PublicSnapshotError("media-not-ready", `${catalog.problems.length} referenced Media asset(s) are not ready for publication.`, catalog.problems);
     }
     return catalog;
@@ -111,6 +113,20 @@ export class PreparedMediaCatalog {
 
   records(): PublicMediaSnapshot[] {
     return [...this.prepared.values()];
+  }
+
+  /** The prepared file at this public path, among the catalog's own assets only. */
+  blobAt(publicPath: string): PublicationBlob | null {
+    for (const media of this.prepared.values()) {
+      const blob = publicationManifestBlobs(media.manifest).find((entry) => entry.publicPath === publicPath);
+      if (blob) return blob;
+    }
+    return null;
+  }
+
+  /** The store that holds the catalog's prepared files. */
+  objectPath(sha256: string): string | null {
+    return this.store.objectPath(sha256);
   }
 
   /**

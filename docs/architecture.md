@@ -18,7 +18,7 @@ A committed public change advances the publication revision. The publication wor
 
 ## Public site
 
-Astro acquires the snapshot over a build-only API and renders from a local file. After rendering, the build materializes the exact media named by the snapshot and verifies its routes, assets, redirects, sitemaps, and metadata. The site serves static files, including live coverage feeds updated on deployment. Poll blocks can show choices and released results; public vote submission is unavailable.
+Astro acquires the snapshot over a build-only API and renders from a local file. After rendering, the build materializes the exact media named by the snapshot and verifies its routes, assets, redirects, sitemaps, and metadata. The site serves static files, including live coverage feeds updated on deployment. While a Story's coverage is live, its page also reads the newsroom's public, published-only live feed directly, and stops once coverage ends ([live coverage](live-coverage.md#how-readers-get-updates)). Poll blocks can show choices and released results; public vote submission is unavailable.
 
 `@byline/content` defines the public data contract; `@byline/article-body` defines the semantic article body. [Byline Data](byline-data.md) adds datasets the newsroom keeps and reader-facing projects: an editor's Publish makes an immutable release, the snapshot names the releases published projects use, and the build verifies and materializes them before rendering `/data/<slug>/`. The newsroom preview and Astro share the article renderer and story presentation registry. The Weekly Wildcat theme defines the homepage layout in code; editors can place published stories into its existing slots in the [Front Page desk](front-page.md).
 

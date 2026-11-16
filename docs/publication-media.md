@@ -10,6 +10,10 @@ The invariant:
 > those immutable files. The public site never needs Payload, PostgreSQL, R2,
 > an image proxy or camera originals at reader request time.
 
+One narrow exception: while a Story's coverage is live, its page may load a live
+update's photo or byline portrait from the newsroom by the same public path,
+until the deploy that carries it lands ([live-coverage.md](live-coverage.md#how-readers-get-updates)).
+
 ```text
 upload (private original) ──► artDirection intent (focal point, custom crops)
         │                              │

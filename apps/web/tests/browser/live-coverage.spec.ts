@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 const ARTICLE = "/2026/08/15/news/weekly-wildcat-browser-fixture-six/";
@@ -72,9 +74,57 @@ for (const width of [390, 1280]) {
   });
 }
 
+test("a running Payload story reads the newsroom directly and loads an undeployed photo from it", async ({ page }) => {
+  // The fixture's live story is a legacy post, so mark it the way a Payload story is rendered before the script runs.
+  const SOURCE = "https://newsroom.test/api/byline/live/9";
+  await page.addInitScript((source) => {
+    new MutationObserver((_, observer) => {
+      const live = document.querySelector<HTMLElement>("[data-byline-live]");
+      if (!live) return;
+      Object.assign(live.dataset, { source, locale: "en-US", timeZone: "America/New_York" });
+      observer.disconnect();
+    }).observe(document, { childList: true, subtree: true });
+  }, SOURCE);
+  const fixture = JSON.parse(readFileSync(path.resolve(__dirname, "../fixtures/weekly-wildcat-content.json"), "utf8")) as { posts: Array<{ id: number; live?: { updates: unknown[] } }> };
+  const coverage = fixture.posts.find((post) => post.id === 9)!.live!;
+  const photo = "/_byline/media/images/aa/live-904--1600--0123456789abcdef.jpg";
+  const fresh = { id: 904, title: "Kickoff", html: "<p>We are underway.</p>", date: "2026-08-15T14:12:00Z", modified: "2026-08-15T14:12:00Z", pinned: false, author: "Weekly Wildcat Staff", authorSlug: "weekly-wildcat-staff", image: { url: photo, alt: "The opening kickoff", width: 640, height: 427 } };
+  let withFresh = false;
+  const cors = { "Access-Control-Allow-Origin": "*" };
+  let sourcePolls = 0;
+  await page.route(SOURCE, (route) => (sourcePolls++, route.fulfill({ headers: cors, json: withFresh ? { ...coverage, updates: [fresh, ...coverage.updates] } : coverage })));
+  const served: string[] = [];
+  await page.route(`${SOURCE}/media?*`, (route) => {
+    served.push(new URL(route.request().url()).searchParams.get("path") ?? "");
+    return route.fulfill({ headers: { ...cors, "Content-Type": "image/jpeg" }, body: readFileSync(path.resolve(__dirname, "../../public/newsroom/newsroom-laughing-640.jpg")) });
+  });
+  let staticPolls = 0;
+  await page.route("**/_byline/live/9.json", (route) => { staticPolls++; return route.continue(); });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.clock.install();
+  await page.goto(ARTICLE);
+  await expect(page.locator("time[data-live-updated]")).toHaveAttribute("data-live-absolute", /Aug/);
+
+  // The newsroom says what the static page already shows: nothing to offer.
+  await page.clock.fastForward(15_000);
+  await expect.poll(() => sourcePolls).toBe(1);
+  await expect(page.locator(".article-live-new")).toHaveAttribute("hidden");
+
+  withFresh = true;
+  await page.clock.fastForward(15_000);
+  await page.getByRole("button", { name: "1 new update", exact: true }).click();
+  const image = page.locator("#update-904 .article-live-update-image img");
+  await expect(image).toHaveAttribute("src", `${SOURCE}/media?path=${encodeURIComponent(photo)}`);
+  await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBeGreaterThan(0);
+  expect(served).toEqual([photo]);
+  expect(staticPolls).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test("ordinary articles do not download or run the live enhancement", async ({ page }) => {
   const liveRequests: string[] = [];
-  page.on('request', (request) => { if (/live-updates|\/api\/live\//.test(request.url())) liveRequests.push(request.url()); });
+  page.on('request', (request) => { if (/live-updates|\/api\/byline\/live\//.test(request.url())) liveRequests.push(request.url()); });
   await page.goto('/2026/08/20/news/weekly-wildcat-fixture-story/');
   await expect(page.locator('article h1')).toBeVisible();
   expect(liveRequests).toEqual([]);

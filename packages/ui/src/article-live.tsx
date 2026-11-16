@@ -6,8 +6,9 @@ import type { ReactNode } from "react";
  * Live coverage on an article (NYT-style live page): a status bar, an optional
  * pinned "key points" summary, and every update newest first. Rendered into the
  * static page, so it is complete without JavaScript and stays when coverage
- * ends. While live, `@byline/ui/live-updates` re-reads `feedUrl` and inserts
- * new updates rendered by the same `ArticleLiveUpdate` component.
+ * ends. While live, `@byline/ui/live-updates` reads the newsroom's feed
+ * (`source`, falling back to the static `feedUrl`) and inserts new updates
+ * rendered by the same `ArticleLiveUpdate` component.
  */
 import type { ArticleLiveImageView, ArticleLiveUpdateView, ArticleLiveView } from "@byline/content/story";
 export type { ArticleLiveImageView, ArticleLiveUpdateView, ArticleLiveView } from "@byline/content/story";
@@ -38,6 +39,9 @@ export function ArticleLiveCoverage({ live }: { live?: ArticleLiveView | null })
       data-byline-live={live.postId}
       data-status={live.status}
       data-feed={live.feedUrl}
+      data-source={isLive && live.source ? live.source.url : undefined}
+      data-locale={isLive && live.source ? live.source.locale : undefined}
+      data-time-zone={isLive && live.source ? live.source.timeZone : undefined}
     >
       <header className="article-live-header">
         <h2 id="article-live-heading" className="article-live-heading">{isLive ? "Live updates" : "Updates"}</h2>
