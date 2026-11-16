@@ -2,10 +2,11 @@ import type { Metadata } from "@/lib/metadata";
 import { HomepagePackages, ThisWeekCard as SharedThisWeekCard, packageHeadingId } from "@byline/ui";
 import { HomepageHeroRailLimiter } from "@/components/HomepageHeroRailLimiter";
 import { BehindTheScenesSection } from "@/components/BehindTheScenesSection";
+import { ProwlerSection } from "@/components/ProwlerSection";
 import { NewsletterSignupForm } from "@/components/NewsletterSignupForm";
 import { optionalBuildData } from "@/lib/build-data";
 import { getNativeSnapshot } from "@/lib/native-snapshot";
-import { filterPublicHomepagePosts, getBehindTheScenesPosts } from "@/lib/content";
+import { filterPublicHomepagePosts, getBehindTheScenesPosts, getProwlerPosts } from "@/lib/content";
 import {
   getSchoolEvents,
   type SchoolEvent
@@ -63,6 +64,7 @@ export default async function HomePage() {
           newsletter: ({ package: resolvedPackage, packageId }) => "label" in resolvedPackage ? <NewsletterSignupForm headingId={packageHeadingId(`${packageId}-heading`, "article-newsletter-heading")} heading={resolvedPackage.heading} showLabel={resolvedPackage.presentation.showLabel} /> : null
         }}
       />
+      <ProwlerSection posts={data.prowlerPosts} />
       <BehindTheScenesSection posts={data.behindTheScenesPosts} />
     </main>
   );
@@ -91,5 +93,5 @@ export async function getHomepagePageData() {
     ...(placements ? { placements } : {})
   });
 
-  return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema, behindTheScenesPosts: getBehindTheScenesPosts(allPosts).slice(0, 2) };
+  return { resolvedHome, sportsSchedule, websiteSchema, organizationSchema, behindTheScenesPosts: getBehindTheScenesPosts(allPosts).slice(0, 2), prowlerPosts: getProwlerPosts(allPosts).slice(0, 2) };
 }

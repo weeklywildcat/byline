@@ -16,6 +16,7 @@ import { BylineMark } from "./DefaultSidebar";
 import { NAV_ICONS, type ShellSidebarProps } from "./nav-items";
 import { ShellLink } from "./navigation";
 import { NavUser } from "./NavUser";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 /**
  * The global Byline navigation as an icon rail: shadcn sidebar-09's first
@@ -53,7 +54,7 @@ export function BylineIconRail({ items, active, homeHref, user, systemHref, logo
                         isActive={current}
                         tooltip={{ children: item.label, hidden: false }}
                         className="px-2.5 md:px-2 any-pointer-coarse:justify-center"
-                        render={<ShellLink href={item.href} aria-current={current ? "page" : undefined} />}
+                        render={<ShellLink href={item.href} aria-current={current ? "page" : undefined} {...tourAnchor(`nav-${item.key}`)} />}
                       >
                         {Icon ? <Icon aria-hidden="true" /> : null}
                         <span className="sr-only">{item.label}</span>

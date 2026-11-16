@@ -222,9 +222,10 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
   }
   // Publish & go live runs exactly this action (its readiness checks, nothing weaker).
   if (liveCoverage) liveCoverage.publishRef.current = publish;
+  const publishFromHeader = () => liveCoverage?.desk?.mode === "live" && !hasPublishedDoc ? liveCoverage.publishForLater() : publish();
   const startPublish = () => {
     if (changedPath) setConfirmURL(true);
-    else void publish();
+    else void publishFromHeader();
   };
 
   /** Submit or resubmit: wait for Payload's autosave so the sealed version is what the writer sees. */
@@ -256,6 +257,9 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
     });
   }
 
+  // Live coverage is time-sensitive: editors may publish its Story shell directly after publication
+  // checks instead of moving it through the ordinary review lifecycle first.
+  const liveDraft = liveCoverage?.desk?.mode === "live" && !hasPublishedDoc;
   // Exactly one primary lifecycle action for this reader, now.
   const busy = actions.submit.isPending || actions.lifecycle.isPending;
   let primary: { label: string; run: () => void } | null = null;
@@ -299,8 +303,8 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
     }
   }
   const canMove = Boolean(primary) || sidelineActions.length > 0 || canJump;
-  const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc);
-  const statusLine = changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
+  const showPublish = canEditPublication && (phase === "ready" || hasPublishedDoc || liveDraft);
+  const statusLine = liveDraft ? "Live story · review optional" : changesRequested ? "Changes requested" : waitingFor ? `Waiting for ${waitingFor}` : stale && phase === "ready" ? "Changed since approval" : phase === "pitch" && !storyEditor ? "Waiting for an editor" : null;
   const phaseContent = <>
     <PhaseBadge phase={phase} />
     {statusLine && !run ? <span className="text-sm text-muted-foreground" data-story-status="">{statusLine}</span> : null}
@@ -399,7 +403,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
           {showPublish ? (
             <Button ref={publishTrigger} type="button" size="sm" className="max-sm:flex-1" onClick={startPublish} disabled={!canPublish || publishing || saving || Boolean(scheduledAt) || !url.config}>
               {publishing ? <Spinner /> : null}
-              {hasPublishedDoc ? "Publish changes" : "Publish"}
+              {hasPublishedDoc ? "Publish changes" : liveDraft ? "Publish for later" : "Publish"}
             </Button>
           ) : null}
         </div>
@@ -501,7 +505,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
           </dl>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <Button type="button" onClick={() => { setConfirmURL(false); void publish(); }}>Publish with redirect</Button>
+            <Button type="button" onClick={() => { setConfirmURL(false); void publishFromHeader(); }}>Publish with redirect</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

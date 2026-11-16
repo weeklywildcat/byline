@@ -4,6 +4,7 @@ import { normalizeArtDirection, normalizeLiveCoverage, normalizePrimaryVideo, no
 import { assertPreparedBuildMode, getPreparedDatasets, hasPreparedSnapshot } from "./prepared-data";
 import { REDIRECTED_PAGE_SLUGS } from "@/lib/code-routes";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
+import { THE_PROWLER } from "@/lib/the-prowler";
 import { stripHtml } from "@/lib/format";
 import { getPublicationConfig } from "@/lib/publication";
 import weeklyWildcatContent from "@/tests/fixtures/weekly-wildcat-content.json";
@@ -1277,7 +1278,9 @@ export function getPostHref(post: ArchivePost) {
 }
 
 export function getCategoryHref(category: ArchiveCategory) {
-  return category.slug === BEHIND_THE_SCENES.slug ? BEHIND_THE_SCENES.path : `/category/${category.slug}/`;
+  if (category.slug === BEHIND_THE_SCENES.slug) return BEHIND_THE_SCENES.path;
+  if (category.slug === THE_PROWLER.slug) return THE_PROWLER.path;
+  return `/category/${category.slug}/`;
 }
 
 export function getCoverageHref(coverage: Pick<ArchiveCoverage, "slug">) {

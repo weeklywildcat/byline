@@ -1881,6 +1881,85 @@ h1.masthead-logo {
   }
 }
 
+/* The Prowler: the satire section. The wordmark is the heading; article
+   kickers carry a "Satire" tag so a joke is never read as news. */
+
+
+
+
+
+
+/* The Prowler's wordmark is taller than the publication's, so it runs narrower. */
+.site-header--prowler .masthead-logo {
+  max-width: 340px;
+}
+
+.site-utility-home {
+  color: var(--ink);
+  font-weight: 700;
+  justify-self: start;
+  text-decoration: none;
+}
+
+.site-utility-home::before {
+  content: "\2190\00a0";
+}
+
+@media (max-width: 640px) {
+  .site-header--prowler .masthead-logo {
+    max-width: 220px;
+  }
+
+  /* Phones have room for two items: the way home and the tools. */
+  .site-header--prowler .site-utility time {
+    display: none;
+  }
+}
+
+.home-prowler-section {
+  border-top: 3px solid var(--rule-strong);
+  margin-top: 40px;
+  padding-top: 18px;
+}
+
+.home-prowler-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 20px;
+}
+
+.home-prowler-heading h2 {
+  line-height: 0;
+  margin: 0;
+}
+
+.home-prowler-logo {
+  height: auto;
+  width: min(260px, 60vw);
+}
+
+
+.home-prowler-more {
+  margin-left: auto;
+  color: var(--link);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.article-section-label[href="/the-prowler/"]::after,
+.article-section-label[href="/category/the-prowler/"]::after {
+  background: var(--ink);
+  color: var(--paper);
+  content: "Satire";
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  margin-left: 8px;
+  padding: 3px 5px 2px;
+}
+
 .category-more > h2 {
   font-family: var(--font-ui);
   font-size: 0.9rem;

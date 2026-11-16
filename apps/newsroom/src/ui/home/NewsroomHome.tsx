@@ -9,6 +9,7 @@ import { useNewsroomAccount } from "../shell/account";
 import { createBylineRequest } from "./payload-fetchers";
 import { useBylineCreate } from "../shell/create";
 import { useBylineSearch } from "../shell/search";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadHomeFetchers } from "./payload-fetchers";
 
 /**
@@ -35,8 +36,10 @@ export function NewsroomHome({ currentUserId }: { currentUserId: number | null }
     save: (value) => setPreference(HOME_PREFERENCES_KEY, normalizeHomePreferences(value))
   }), [getPreference, setPreference]);
   const queryClient = useQueryClient();
+  const workspaceUrl = useMemo(() => (storyId: number) => `${admin}/collections/stories/${storyId}`, [admin]);
+  const preloadStory = useStoryPreload(fetchers, workspaceUrl);
   const { openCreate } = useBylineCreate();
   const { setStoryOpener } = useBylineSearch();
-  const shell = useMemo<HomeShell>(() => ({ queryClient, openCreate, setStoryOpener }), [queryClient, openCreate, setStoryOpener]);
-  return <HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} preferences={preferences} actionUrls={{ planning: `${admin}/stories`, calendar: `${admin}/calendar`, contentHealth: editor ? `${admin}/content-health` : undefined, workspace: (storyId) => `${admin}/collections/stories/${storyId}` }} />;
+  const shell = useMemo<HomeShell>(() => ({ queryClient, openCreate, setStoryOpener, preloadStory }), [queryClient, openCreate, setStoryOpener, preloadStory]);
+  return <HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} preferences={preferences} actionUrls={{ planning: `${admin}/stories`, calendar: `${admin}/calendar`, contentHealth: editor ? `${admin}/content-health` : undefined, workspace: workspaceUrl }} />;
 }

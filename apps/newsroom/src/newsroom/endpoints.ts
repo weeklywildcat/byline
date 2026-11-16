@@ -3,6 +3,7 @@ import { relatedSuggestions } from "./related-suggestions";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
 import { changeLiveCoverage, changeLiveUpdate, deleteLiveUpdate, liveCandidates, liveDesk, postLiveUpdate, publicLiveFeed } from "./live-coverage";
+import { postingAsPeople } from "./posting-as";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
 import { publicationSettings, savePublicationSettings, saveSiteRow, sectionImpact, siteGroup, siteRows } from "./site";
@@ -79,7 +80,7 @@ import type { AssignmentInput } from "../domain/role-admin";
 import { addReviewComment, cancelOpenRun, changeReviewComment, claimReview, decideReview, reviewState, submitForReview, submittedVersion } from "./review";
 import { relationId, sameId } from "../access/user";
 import { parsePreviewContextQuery, storyPreviewContext } from "../preview/context";
-import { createPerson, ownProfile, peopleList, personDetail, savePersonAccess, updatePerson } from "./people";
+import { createPerson, ownProfile, peopleList, personDetail, restartPersonOnboarding, savePersonAccess, updatePerson } from "./people";
 import { presenceHeartbeat, presenceSnapshot } from "./presence";
 import { peopleQuery, type NewPerson, type PersonAccessInput, type PersonPatch } from "@byline/newsroom-screens/people/people-model";
 
@@ -540,6 +541,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
   { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
   { path: "/byline/stories/:id/live/coverage", method: "post", handler: handle(async (ctx, req) => changeLiveCoverage(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live/people", method: "get", handler: handle(async (ctx, req) => ({ people: await postingAsPeople(ctx, idParam(req)) })) },
   { path: "/byline/stories/:id/live/publishers", method: "get", handler: handle(async (ctx, req) => ({ people: await liveCandidates(ctx, idParam(req)) })) },
   { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
   { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
@@ -613,6 +615,7 @@ export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/people/:id", method: "get", handler: handle((ctx, req) => personDetail(ctx, idParam(req))) },
   { path: "/byline/people/:id", method: "patch", handler: handle(async (ctx, req) => updatePerson(ctx, idParam(req), await body<PersonPatch>(req))) },
   { path: "/byline/people/:id/access", method: "put", handler: handle(async (ctx, req) => savePersonAccess(ctx, idParam(req), await body<PersonAccessInput>(req))) },
+  { path: "/byline/people/:id/onboarding/restart", method: "post", handler: handle((ctx, req) => restartPersonOnboarding(ctx, idParam(req))) },
   { path: "/byline/profile", method: "get", handler: handle((ctx) => ownProfile(ctx)) },
   { path: "/byline/home", method: "get", handler: handle((ctx) => homeBootstrap(ctx)) },
   { path: "/byline/command-search", method: "get", handler: handle((ctx, req) => commandSearch(ctx, req.searchParams.get("query") ?? "")) },

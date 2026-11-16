@@ -18,7 +18,7 @@ export function useStoryPeek(): StoryPeekApi {
  * focus returns. Every row, card and calendar event only calls
  * `openStory(id)`; there is one Peek.
  */
-export function StoryPeekHost({ fetchers, workspaceUrl, children }: { fetchers: StoryFetchers; workspaceUrl?: (storyId: number) => string; children: ReactNode }) {
+export function StoryPeekHost({ fetchers, workspaceUrl, preloadStory, children }: { fetchers: StoryFetchers; workspaceUrl?: (storyId: number) => string; preloadStory?: (storyId: number) => void; children: ReactNode }) {
   const [peekId, setPeekId] = useState<number | null>(null);
   const [origin, setOrigin] = useState<HTMLElement | null>(null);
   const [now, setNow] = useState(new Date());
@@ -26,14 +26,17 @@ export function StoryPeekHost({ fetchers, workspaceUrl, children }: { fetchers: 
   // `openStory` keeps one identity so libraries that capture it once (the calendar) never go stale.
   const open = useRef(false);
   open.current = peekId !== null;
+  const preload = useRef(preloadStory);
+  preload.current = preloadStory;
   const openStory = useCallback((storyId: number) => {
+    preload.current?.(storyId);
     setOrigin((current) => (open.current ? current : document.activeElement instanceof HTMLElement ? document.activeElement : null));
     setPeekId(storyId);
   }, []);
   const api = useMemo(() => ({ openStory }), [openStory]);
 
   return <StoryPeekContext value={api}>
-    <StoryHoverProvider fetchers={fetchers}>{children}</StoryHoverProvider>
+    <StoryHoverProvider fetchers={fetchers} preloadStory={preloadStory}>{children}</StoryHoverProvider>
     <StoryPeek storyId={peekId} fetchers={fetchers} onClose={() => setPeekId(null)} origin={origin} now={now} workspaceUrl={workspaceUrl} />
   </StoryPeekContext>;
 }

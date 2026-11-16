@@ -192,7 +192,7 @@ function CalendarSurface({ collectionId, stories, timezone, getSchedule, current
   const legend = useMemo(() => Array.from(new Set(events.map((event) => CATEGORY_BY_EVENT_TYPE[event.type]))), [events]);
 
   return <div className="flex min-w-0 flex-col gap-3" data-calendar="" data-calendar-controls-placement={controls}>
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2" data-byline-tour="calendar-screen">
       <h2 className="mr-2 min-w-40 text-lg font-medium tracking-tight" aria-live="polite">{heading || <Skeleton className="h-6 w-40" />}</h2>
       <ButtonGroup aria-label="Calendar navigation">
         <Button variant="outline" onClick={() => workspace.today()}>Today</Button>

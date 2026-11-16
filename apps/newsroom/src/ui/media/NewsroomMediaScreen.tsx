@@ -11,7 +11,6 @@ import { mediaAssetKey } from "@byline/newsroom-screens/media/media-library-api"
 import { invalidateMediaLibrary, useMediaNavigator } from "@byline/newsroom-screens/media/media-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { MediaWork } from "@byline/newsroom-screens/media/MediaWork";
-import { StoryHoverProvider } from "@byline/newsroom-screens/story/StoryHoverCard";
 import { StoryPeekHost, useStoryPeek } from "@byline/newsroom-screens/story/StoryPeekHost";
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
@@ -37,12 +36,14 @@ import { useLeaveGuard, useShellNavigation } from "../shell/navigation";
 import { useBylineSearch } from "../shell/search";
 import { MEDIA_INSPECTOR_QUERY } from "../shell/shell-config";
 import { useNewsroomTimeZone } from "../shell/timezone";
+import { useStoryPreload } from "../story/preload";
 import { createPayloadPlanningFetchers } from "../stories/payload-planning-fetchers";
 import { MediaNavigator } from "./MediaNavigator";
 import { useMediaNavigate, useMediaRoute } from "./media-route";
 import { useMediaUnsaved } from "./media-unsaved";
 import { useBylineMediaPicker, useMediaPreferences, useMediaWorkspace } from "./MediaWorkspaceShell";
 import { createPayloadMediaWorkFetchers } from "./payload-media-fetchers";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 /**
  * Byline Media (`/admin/media`): one destination for the newsroom's files
@@ -66,13 +67,12 @@ export function NewsroomMediaScreen({ currentUserId }: { currentUserId: number }
   const admin = config.routes.admin;
   const fetchers = useMemo(() => ({ ...createPayloadHomeFetchers(api), ...createPayloadPlanningFetchers(api, { getPreference, setPreference }), ...createPayloadMediaWorkFetchers(api) }), [api, getPreference, setPreference]);
   const storyUrl = useMemo(() => (storyId: number) => `${admin}/collections/stories/${storyId}`, [admin]);
+  const preloadStory = useStoryPreload(fetchers, storyUrl);
   return (
     <AdminRoot className="byline-media" toaster={false}>
-      <StoryHoverProvider fetchers={fetchers}>
-        <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl}>
-          <MediaBody fetchers={fetchers} currentUserId={currentUserId} storyUrl={storyUrl} />
-        </StoryPeekHost>
-      </StoryHoverProvider>
+      <StoryPeekHost fetchers={fetchers} workspaceUrl={storyUrl} preloadStory={preloadStory}>
+        <MediaBody fetchers={fetchers} currentUserId={currentUserId} storyUrl={storyUrl} />
+      </StoryPeekHost>
     </AdminRoot>
   );
 }
@@ -274,7 +274,7 @@ function MediaBody({ fetchers, currentUserId, storyUrl }: { fetchers: Fetchers; 
 
   return (
     <main className={cn("mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-4 py-4 sm:py-6 lg:px-6")} data-byline-media-screen="" data-media-view={route.view}>
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2" {...tourAnchor("media-screen")}>
         {!paneShowing ? (
           <Button variant="outline" size="sm" className="order-2 mt-0.5 sm:order-none" onClick={() => workspace.setSheetOpen(true)} aria-label="Media navigation" data-media-browse="">
             <PanelLeft data-icon="inline-start" aria-hidden="true" />Browse

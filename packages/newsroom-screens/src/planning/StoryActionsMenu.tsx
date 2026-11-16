@@ -7,6 +7,7 @@ import { useAnyCoarsePointer } from "@byline/newsroom-ui/lib/hooks";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactElement } from "react";
 import { movableWorkflowStatuses, type PlanningStory, type PlanningWorkflowStatus } from "../planning/planning-model";
+import { useStoryIntent } from "../story/StoryHoverCard";
 
 export type StoryActionsMenuProps = {
   additionalActions?: Array<{ id: string; label: string; run: () => void }>;
@@ -139,6 +140,7 @@ export type StoryContextMenuProps = StoryActionsMenuProps & {
  */
 export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, workspaceUrl, onOpenStory, children, additionalActions }: StoryContextMenuProps) {
   const title = story.title || "Untitled story";
+  const intent = useStoryIntent(story.id);
   const movable = canMoveFromMenu(story, canMove);
   const stages = movableWorkflowStatuses(statuses);
   const destinations = destinationActions(story, workspaceUrl);
@@ -160,6 +162,10 @@ export function StoryContextMenu({ story, statuses, canMove, disabled, onMove, w
   return <ContextMenu>
     <ContextMenuTrigger
       render={children}
+      onPointerEnter={intent.onPointerEnter}
+      onPointerLeave={intent.onPointerLeave}
+      onFocus={intent.onFocus}
+      onTouchStart={intent.onTouchStart}
       onPointerDownCapture={(event) => {
         if (event.button === 2 || (event.button === 0 && event.ctrlKey)) markSecondaryPress();
       }}

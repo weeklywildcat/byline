@@ -18,6 +18,11 @@ export default defineConfig({
   use: {
     baseURL,
     channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
+    // The site sets `html { scrollbar-gutter: stable }`. Headless Linux Chromium hides the bar but still reserves a
+    // 15px gutter for it, so every viewport-width assertion (an edge-to-edge photo, a full-width opening) would be
+    // 15px short there while passing on macOS and on phones, which use overlay scrollbars. Overlay scrollbars make
+    // all three agree. Specs that need a drawn classic scrollbar style `::-webkit-scrollbar`, which is never overlay.
+    launchOptions: { args: ["--enable-features=CDPScreenshotNewSurface,OverlayScrollbar"] },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: process.env.BYLINE_BROWSER_VIDEO === "0" ? "off" : "retain-on-failure",

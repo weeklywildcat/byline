@@ -140,6 +140,17 @@ export const Users: CollectionConfig = {
       access: { read: ({ req, id }) => selfOrAdministrator({ req, id }), update: administratorsOnlyField, create: administratorsOnlyField }
     },
     {
+      // Account metadata, not a UI preference: when an administrator last asked
+      // for this account's welcome introduction to show again (People → Newsroom
+      // access → Restart welcome tour). Whether the welcome was finished or
+      // skipped is the account's own Payload Preference
+      // (`byline:onboarding:welcome:v1`), which acknowledges this timestamp.
+      name: "welcomeOnboardingRequestedAt",
+      type: "date",
+      admin: { hidden: true },
+      access: { read: ({ req, id }) => selfOrAdministrator({ req, id }), update: administratorsOnlyField, create: () => false }
+    },
+    {
       name: "preferences",
       type: "group",
       access: { read: ({ req, id }) => selfOrAdministrator({ req, id }) },

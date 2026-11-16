@@ -2,12 +2,12 @@
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { useRouteTransition } from "@payloadcms/ui";
-import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ShellLayer } from "./layer";
+import { prefetchFullRoute } from "./prefetch";
 
 /**
  * What a screen with a document open reports about it: edited since the last
@@ -69,10 +69,39 @@ export const useShellNavigation = () => use(NavigationContext);
  * otherwise it waits for Payload's own autosave, and asks before leaving
  * anything that still is not saved. It is not a second save system.
  */
-export function ShellNavigationProvider({ children }: { children: ReactNode }) {
+export function ShellNavigationProvider({ children, warmHrefs = [] }: { children: ReactNode; warmHrefs?: readonly string[] }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
+  const warmedRoutes = useRef(new Set<string>());
   const { startRouteTransition } = useRouteTransition();
   const guard = useRef<LeaveGuard | null>(null);
+
+  // The primary shell has only four destinations, so warm them after the
+  // current screen settles. Large story/media lists stay intent-only.
+  useEffect(() => {
+    if (!warmHrefs.length) return;
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return;
+
+    let active = true;
+    const warm = () => {
+      if (!active || document.visibilityState !== "visible") return;
+      for (const href of warmHrefs) {
+        if (warmedRoutes.current.has(href) || href.split("?")[0] === pathname) continue;
+        if (prefetchFullRoute(router, href)) warmedRoutes.current.add(href);
+      }
+    };
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const id = idleWindow.requestIdleCallback(warm, { timeout: 1200 });
+      return () => { active = false; idleWindow.cancelIdleCallback?.(id); };
+    }
+    const id = window.setTimeout(warm, 400);
+    return () => { active = false; window.clearTimeout(id); };
+  }, [pathname, router, warmHrefs]);
   const waiting = useRef(false);
   const [unsavedAction, setUnsavedAction] = useState<(() => void) | null>(null);
   const [unsavedText, setUnsavedText] = useState("");
@@ -153,13 +182,14 @@ export const PREFETCH_INTENT_MS = 80;
  * dynamic, and prefetching every visible link would render each of them
  * on the server for nothing.
  */
-export function usePrefetchOnIntent(href: string) {
+export function usePrefetchOnIntent(href: string, customPrefetch?: () => void) {
   const router = useRouter();
   const timer = useRef<number | null>(null);
   const prefetch = useCallback(() => {
+    if (customPrefetch) return customPrefetch();
     // "full": the dynamic screen itself, not only its loading shell (Next's PrefetchKind.FULL).
-    router.prefetch(href, { kind: "full" } as unknown as PrefetchOptions);
-  }, [router, href]);
+    prefetchFullRoute(router, href);
+  }, [customPrefetch, router, href]);
   const cancel = useCallback(() => { if (timer.current !== null) window.clearTimeout(timer.current); timer.current = null; }, []);
   useEffect(() => cancel, [cancel]);
   return {
@@ -175,9 +205,9 @@ export function usePrefetchOnIntent(href: string) {
  * goes through `navigate` (wait, or ask); a new-tab click, or a click with
  * nothing pending, is an ordinary Link. Its screen is prefetched on intent.
  */
-export function ShellLink({ href, onClick, onPointerEnter, onPointerLeave, onFocus, onTouchStart, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string }) {
+export function ShellLink({ href, onClick, onPointerEnter, onPointerLeave, onFocus, onTouchStart, onPrefetchIntent, ...props }: Omit<ComponentProps<typeof Link>, "href"> & { href: string; onPrefetchIntent?: () => void }) {
   const { navigate, hasPendingWork } = useShellNavigation();
-  const intent = usePrefetchOnIntent(href);
+  const intent = usePrefetchOnIntent(href, onPrefetchIntent);
   return (
     <Link
       href={href}
