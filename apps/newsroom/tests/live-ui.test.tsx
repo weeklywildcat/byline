@@ -12,7 +12,7 @@ const { LiveCoverageValue } = await import("../src/ui/live/LiveCoverageProvider"
 const { StoryModeControl } = await import("../src/ui/live/LiveModeControl");
 const { LiveCoverageSection } = await import("../src/ui/live/LiveCoverageSection");
 const { LiveTimeline } = await import("../src/ui/live/LiveTimeline");
-const { parseRoute } = await import("../src/ui/field/FieldApp");
+const { parseRoute, readRoute } = await import("../src/ui/field/FieldApp");
 
 const desk = (over: Partial<LiveDeskResponse> = {}): LiveDeskResponse => ({
   storyId: 1, mode: "live", status: "live", startedAt: "2026-11-06T23:00:00.000Z", endedAt: null, storyPublished: true,
@@ -161,6 +161,19 @@ describe("Field routing", () => {
     expect(parseRoute("?story=12&from=story")).toEqual({ story: 12, appointment: null, from: "story" });
     expect(parseRoute("?story=12&appointment=3")).toEqual({ story: 12, appointment: 3, from: null });
     expect(parseRoute("")).toEqual({ story: null, appointment: null, from: null });
+  });
+
+  it("re-reads the browser URL after the server-side empty route", () => {
+    const previous = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { search: "?story=42&from=story" } }
+    });
+    try {
+      expect(readRoute()).toEqual({ story: 42, appointment: null, from: "story" });
+    } finally {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: previous });
+    }
   });
 
   it("never accepts a free-form return address (no open redirect)", () => {

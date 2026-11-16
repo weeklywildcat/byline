@@ -49,18 +49,22 @@ export function parseRoute(search: string): Route {
   return { story, appointment: id("appointment"), from: story && params.get("from") === "story" ? "story" : null };
 }
 
-function readRoute(): Route {
+export function readRoute(): Route {
   return typeof window === "undefined" ? { story: null, appointment: null, from: null } : parseRoute(window.location.search);
 }
 
 const TAP = "min-h-11 px-4 text-base";
 
 export function FieldApp({ api, admin, account, signedIn }: { api: string; admin: string; account: string; signedIn: boolean }) {
+  // The client component is also rendered on the server, where `window` does not exist.
+  // Re-read the real browser URL on mount so /field?story=<id>&from=story opens
+  // the requested Story instead of hydrating forever on the generic Field landing.
   const [route, setRoute] = useState<Route>(readRoute);
   useEffect(() => {
-    const pop = () => setRoute(readRoute());
-    window.addEventListener("popstate", pop);
-    return () => window.removeEventListener("popstate", pop);
+    const sync = () => setRoute(readRoute());
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
   }, []);
   const go = useCallback((next: Route) => {
     const params = new URLSearchParams();
