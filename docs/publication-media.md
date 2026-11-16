@@ -304,6 +304,17 @@ BYLINE_NEWSROOM_BUILD_MEDIA_URL=https://newsroom.example/api/byline/build/media 
 BYLINE_BUILD_TOKEN=… npm run materialize:publication-media --workspace @byline/web -- --descriptors media.json
 ```
 
+Verified blobs also persist in a content-addressed build cache,
+`apps/web/node_modules/.astro/byline-media/<sha256>` (override with
+`BYLINE_MEDIA_CACHE_DIR`), beside Astro's incremental cache. A build checks
+the SHA-256, re-verifies a cached blob (size, hash, type) before using it,
+downloads only what is missing, and hardlinks (or copies) each blob into
+`out/_byline/media`. Blobs the current snapshot no longer names are pruned. The
+log line reports downloaded, cached and pruned counts. On Cloudflare Workers
+Builds, `scripts/build-cloudflare.mjs` keeps `.astro` across `npm ci` and
+mirrors it to `node_modules/.astro` at the repository root, which is where
+Workers Builds saves the Astro cache.
+
 It runs inside the Astro build wrapper for a Payload snapshot (Phase 7): after
 Astro succeeds and before `postbuild`, the closed descriptor set named by the
 native snapshot's Media manifests is acquired from
