@@ -37,6 +37,8 @@ type LiveCoverageContext = {
   setMode: (next: LiveMode) => void;
   openSetup: () => void;
   openPublishers: () => void;
+  /** Publish the Story shell for sharing without starting coverage. */
+  publishForLater: () => Promise<boolean>;
   goLive: () => Promise<boolean>;
   requestEnd: () => void;
 };
@@ -69,11 +71,22 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
   const [confirm, setConfirm] = useState<Confirm>(null);
   const desk = query.data;
 
-  /** Start (or resume) coverage. A Story that is not public is published first through the normal checks. */
+  /** Publish the Story shell through the normal publication checks, without touching coverage state. */
+  const publishForLater = useCallback(async (): Promise<boolean> => {
+    if (!desk) return false;
+    if (desk.storyPublished) return true;
+    if (!publishRef.current) {
+      toast.error("Publishing isn't ready yet. Try again.");
+      return false;
+    }
+    return publishRef.current().catch(() => false);
+  }, [desk, publishRef]);
+
+  /** Start (or resume) coverage. A Story that is not public is published first through the same direct Live path. */
   const goLive = useCallback(async (): Promise<boolean> => {
     if (!desk) return false;
     if (!desk.storyPublished) {
-      const published = await publishRef.current?.().catch(() => false);
+      const published = await publishForLater();
       if (!published) {
         toast.error("The story wasn't published, so coverage hasn't started. Fix the publication checks, then try again.");
         return false;
@@ -81,7 +94,7 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
     }
     const result = await change({ action: "start" }, desk.startedAt ? "Live coverage resumed." : "You're live. Readers see the LIVE badge now.");
     return result !== null;
-  }, [change, desk, publishRef]);
+  }, [change, desk, publishForLater]);
 
   const setMode = useCallback((next: LiveMode) => {
     if (!desk || next === desk.mode) return;
@@ -99,15 +112,21 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
   const value = useMemo<LiveCoverageContext>(() => ({
     api, admin, storyId, timeZone, readOnly, userId, desk, loading: query.isPending, error: query.error, retry: () => void query.refetch(), busy,
     fieldHref: `${admin}/field?story=${storyId}&from=story`,
-    publishRef, setMode, goLive,
+    publishRef, setMode, publishForLater, goLive,
     openSetup: () => setSetup("setup"), openPublishers: () => setSetup("manage"), requestEnd: () => setConfirm("end")
-  }), [admin, api, busy, desk, goLive, publishRef, query.error, query.isPending, query.refetch, readOnly, setMode, storyId, timeZone, userId]);
+  }), [admin, api, busy, desk, goLive, publishForLater, publishRef, query.error, query.isPending, query.refetch, readOnly, setMode, storyId, timeZone, userId]);
 
   return (
     <Context value={value}>
       {children}
       {desk ? <LiveSetupDialog open={setup !== null} intent={setup ?? "setup"} onOpenChange={(open) => { if (!open) setSetup(null); }} api={api} desk={desk} busy={busy} readOnly={readOnly}
         onSetUp={async (publishers) => { const done = await change({ action: "setup", publishers }, "Live mode is set up. Coverage hasn't started."); if (done) setSetup(null); }}
+        onPublishForLater={async (publishers) => {
+          const configured = await change({ action: "setup", publishers });
+          if (!configured) return;
+          const published = await publishForLater();
+          if (published) setSetup(null);
+        }}
         onManage={async (publishers) => { const done = await change({ action: "publishers", publishers }, "Direct publishers updated."); if (done) setSetup(null); }}
         onGoLive={async (publishers) => {
           // Save the setup, then publish the Story if needed (the normal checks), then start. Never LIVE on a Story readers cannot see.
