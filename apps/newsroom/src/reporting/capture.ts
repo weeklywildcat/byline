@@ -9,7 +9,7 @@ import { REPORTING_LIMITS, validClientKey } from "../domain/reporting";
 import { recordStoryActivity } from "../newsroom/story-activity";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { existingCapture, isDuplicateKey, resolveCaptureContext } from "./context";
-import { resolvePostingAs } from "../newsroom/posting-as";
+import { resolvePostingAs } from "../field/posting-as";
 
 /**
  * Reporting captures on the server: notes and private files. Each resolves

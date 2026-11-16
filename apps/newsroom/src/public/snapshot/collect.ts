@@ -19,7 +19,7 @@ import { collectCollections, collectCorrections, collectEvents, collectPages, co
 import { PublicSnapshotError } from "./errors";
 import { PreparedMediaCatalog } from "./media";
 import { hasLiveCoverage } from "../../domain/live-coverage";
-import { collectLiveCoverage, liveUpdatePeople, readLivePlans, readLiveUpdates, type LiveBylinePerson } from "./live";
+import { collectLiveCoverage, readLivePlans, readLiveUpdates } from "./live";
 import { collectPolls } from "./polls";
 import { activePlacements } from "../../front-page/server";
 
@@ -101,19 +101,16 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const storyIds = rows.map((row) => row.id);
   const pollIds = [...new Set(rows.flatMap((row) => row.contentFormat === "legacy-html" ? [] : collectReferenceIds(row.body).polls.map(Number)))];
   const liveSettings = await readLivePlans(payload, storyIds);
-  const liveUpdates = await readLiveUpdates(payload, rows.filter((row) => hasLiveCoverage(liveSettings.get(row.id))).map(({ id }) => id));
-  // A live update's byline is its author's linked Person: credited like an article contributor, so they are projected.
-  const liveCredits = await liveUpdatePeople(payload, liveUpdates);
-  const [people, corrections, collections, polls, videoFacts] = await Promise.all([
-    collectPeople(payload, new Set([...rows.flatMap((row) => ids(row.contributors)), ...liveCredits.values()])),
+  const [people, corrections, collections, polls, liveUpdates, videoFacts] = await Promise.all([
+    collectPeople(payload, new Set(rows.flatMap((row) => ids(row.contributors)))),
     collectCorrections(payload, storyIds, options.asOf ?? now),
     collectCollections(payload, new Set(storyIds)),
     collectPolls(payload, pollIds, options.asOf ?? now),
+    readLiveUpdates(payload, rows.filter((row) => hasLiveCoverage(liveSettings.get(row.id))).map(({ id }) => id)),
     videoFactsFor(payload, rows.flatMap((row) => { const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null; return videoId ? [videoId] : []; }))
   ]);
   await options.afterRead?.();
   const personById = new Map(people.map((row) => [row.id, row]));
-  const liveBylines = new Map<number, LiveBylinePerson>([...liveCredits].flatMap(([update, person]) => { const row = personById.get(person); return row ? [[update, row] as const] : []; }));
   const correctionByStory = new Map<number, StoryFacts["corrections"]>();
   for (const { storyId, ...entry } of corrections) {
     const list = correctionByStory.get(storyId) ?? [];
@@ -175,7 +172,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     });
     const problems = contentLosingIssues(issues);
     if (problems.length) throw new PublicSnapshotError("invalid-projection", `Story ${row.id} cannot be projected without losing article content.`, problems);
-    return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, liveSettings.get(row.id), updatesByStory.get(row.id) ?? [], catalog, publication, liveBylines) };
+    return { ...facts.get(row.id)!, body, live: collectLiveCoverage(row, liveSettings.get(row.id), updatesByStory.get(row.id) ?? [], catalog, publication) };
   });
   const paths = new Set([
     ...FIXED_PUBLIC_CONTENT_ROUTES.map(({ path }) => path),

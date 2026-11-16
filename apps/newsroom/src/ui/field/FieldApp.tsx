@@ -7,25 +7,22 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
-import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
-import { Label } from "@byline/newsroom-ui/ui/label";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { Avatar, AvatarFallback, AvatarImage } from "@byline/newsroom-ui/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Camera, ChevronRight, Mic, MoreVertical, Paperclip, Search, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, ChevronRight, Mic, MoreVertical, Paperclip, Search, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deskNote, type PublishBlock } from "../../domain/live-coverage";
+import type { PostingAsPerson } from "../../field/posting-as";
 import type { FieldFeed, FieldItem, FieldSession } from "../../field/server";
 import { ApiError, getJson, postJson } from "../story/api";
 import { useCoverageChange, useLiveDesk } from "../live/api";
 import { LiveDeliveryButtons } from "../live/LiveDelivery";
 import { LiveSetupDialog } from "../live/LiveSetup";
-import { LiveTextFields } from "../live/LiveTextFields";
 import { LiveTimeline } from "../live/LiveTimeline";
-import { POSTING_AS_HELP, PostingAsList, PostingAsRow } from "../live/PostingAs";
-import { useLiveDeskControls, type LiveFieldsComponent } from "../live/useLiveDeskControls";
 import { newClientKey, uploadFile } from "../reporting/api";
 import { RecorderPanel, type Recording } from "../reporting/Recorder";
 import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
@@ -81,8 +78,7 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
   useScreenWakeLock(outbox.online && outbox.items.some((item) => item.state === "sending"));
   if (!signedIn) return null;
   return (
-    // Field has no desktop shell, so it owns its toaster: coverage changes and timeline actions report through it.
-    <AdminRoot className="byline-field">
+    <AdminRoot className="byline-field" toaster={false}>
       <div className="min-h-dvh bg-background pt-(--byline-safe-top) pr-[max(1rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1rem,var(--byline-safe-left))] text-foreground" data-field-shell="">
         <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
           {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
@@ -114,7 +110,7 @@ function useOutbox(api: string, account: string) {
       }
       if (item.kind === "live") {
         // The reporter's tapped intent travels with the item (IndexedDB, offline, retries); the server decides again at send time.
-        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, ...(item.title ? { title: item.title } : {}), ...(item.pinned ? { pinned: true } : {}), clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk", ...(item.as ? { as: item.as.id } : {}) });
+        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk", ...(item.as ? { as: item.as.id } : {}) });
         return { id: result.id, status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
       }
       if (!item.blob) throw new SendError("The file is no longer on this device.", 410);
@@ -261,8 +257,6 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
   // The shared live desk (the same record Write reads): the timeline, and the setup sheet's data for editors.
   const desk = useLiveDesk(api, storyId, { enabled: Boolean(data) && (data!.story.coverage.mode === "live" || data!.canControl), refetchMs: 15_000 });
   const { change, busy } = useCoverageChange(api, storyId);
-  // The same timeline actions as Write's desk (edit, publish a desk draft, pin, delete), with Field-sized controls.
-  const deskControls = useLiveDeskControls({ api, storyId, desk: desk.data, busy, tap: true, Fields: FieldEditFields });
   const [sheet, setSheet] = useState<"setup" | "manage" | null>(null);
   const [ending, setEnding] = useState(false);
   // Back returns to where Field was opened from: the Story (a fixed address built here, never a URL taken from the page) or the assignments.
@@ -330,7 +324,7 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
       {coverage.mode === "live" && desk.data ? (
         <section aria-label="Live timeline" className="grid grid-cols-[minmax(0,1fr)] gap-2" data-field-timeline="">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live timeline</h2>
-          <LiveTimeline updates={desk.data.updates} timeZone={tz} storyPublished={desk.data.storyPublished} controls={deskControls.controls} tap />
+          <LiveTimeline updates={desk.data.updates} timeZone={tz} storyPublished={desk.data.storyPublished} tap />
         </section>
       ) : null}
       <Recent session={data} outbox={outbox} />
@@ -350,8 +344,6 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
           onGoLive={async (publishers) => { if (await change({ action: "setup", publishers, start: true }, "You're live.")) setSheet(null); }}
         />
       ) : null}
-
-      {deskControls.dialog}
 
       <AlertDialog open={ending} onOpenChange={setEnding}>
         <AlertDialogContent>
@@ -377,8 +369,6 @@ function BackBar({ onBack, href }: { onBack: () => void; href?: string }) {
 
 function Composer({ api, session, appointmentId, outbox }: { api: string; session: FieldSession; appointmentId: number | null; outbox: Outbox }) {
   const [text, setText] = useState("");
-  const [title, setTitle] = useState("");
-  const [keyUpdate, setKeyUpdate] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [choosing, setChoosing] = useState<File | null>(null);
@@ -414,13 +404,12 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     setRecording(false);
     void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, ...(result.durationMs ? { durationMs: result.durationMs } : {}), context }));
   };
-  const clear = () => { setText(""); setTitle(""); setKeyUpdate(false); setPhoto(null); };
   const saveNote = async () => {
     if (!text.trim()) return;
-    // A headline typed for a live update stays with the words when they're kept as a private note instead.
-    await queue(newItem({ key: newClientKey(), storyId, kind: "note", text: [title.trim(), text.trim()].filter(Boolean).join("\n\n"), context }));
+    await queue(newItem({ key: newClientKey(), storyId, kind: "note", text: text.trim(), context }));
     if (photo) await sendPhoto(photo, session.assignments.length === 1 ? session.assignments[0].id : null);
-    clear();
+    setText("");
+    setPhoto(null);
   };
   // The tapped intent is frozen into the outbox item, so a queued "Publish now" is still a publish request when it reaches the server (which re-checks).
   const postLive = async (delivery: Delivery) => {
@@ -430,16 +419,14 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
       photoKey = newClientKey();
       await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {}, ...as }));
     }
-    // A key update is only asked for with Publish now; the server pins only what it actually publishes.
-    const pinned = keyUpdate && delivery === "publish" && session.canPublishNow;
-    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), ...(title.trim() ? { title: title.trim() } : {}), ...(pinned ? { pinned } : {}), photoKey, context, ...as }));
-    clear();
+    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), photoKey, context, ...as }));
+    setText("");
+    setPhoto(null);
   };
 
   return (
     <section aria-label="Capture" className="grid grid-cols-[minmax(0,1fr)] gap-3" data-field-composer={live ? "live" : "capture"}>
       <InputGroup className="h-auto flex-col items-stretch">
-        {live ? <InputGroupInput value={title} maxLength={200} placeholder="Headline (optional)" aria-label="Live update headline (optional)" className="h-11 border-b px-3 text-base font-medium" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => setTitle(event.target.value)} data-field-headline="" /> : null}
         <InputGroupTextarea value={text} rows={4} placeholder={live ? "What's happening?" : "What did you see or hear?"} aria-label={live ? "What's happening?" : "What did you see or hear?"} className="min-h-28! px-3 text-base [@media(max-height:480px)]:min-h-16!" onChange={(event) => setText(event.target.value)} />
         {photo ? (
           <div className="mx-3 flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm" data-attached-photo="">
@@ -453,7 +440,13 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           <Button type="button" variant="ghost" className={TAP} onClick={() => fileInput.current?.click()}><Paperclip data-icon="inline-start" />Attach</Button>
         </InputGroupAddon>
       </InputGroup>
-      {postAs ? <div className="-mt-1"><PostingAsRow tap author={author} me={session.me} onSwitch={() => setSwitching(true)} /></div> : null}
+      {postAs ? (
+        <div className={`-mt-1 flex items-center gap-2 rounded-md px-2 py-1 ${author ? "border border-primary/40 bg-primary/5" : ""}`} data-posting-as={author ? "other" : "self"}>
+          {author ? <ProfilePicture name={author.name} url={author.avatarUrl} /> : session.me ? <ProfilePicture name={session.me.name} url={session.me.avatarUrl} /> : <UserRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+          <p className="min-w-0 flex-1 truncate text-sm" aria-live="polite">Live update by <span className="font-semibold">{author ? author.name : "you"}</span></p>
+          <Button type="button" variant="ghost" className={`${TAP} -mr-2 shrink-0`} aria-label={`Switch who this live update is by (now ${author ? author.name : "you"})`} onClick={() => setSwitching(true)}>Switch</Button>
+        </div>
+      ) : null}
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
       <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
 
@@ -466,12 +459,6 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           </div>
           <div role="group" aria-labelledby="field-live-label" className="grid gap-1.5">
             <p id="field-live-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live update</p>
-            {session.canPublishNow ? (
-              <Label className="flex min-h-11 items-center gap-3 text-base font-normal" data-field-key-update="">
-                <Checkbox checked={keyUpdate} onCheckedChange={(checked) => setKeyUpdate(checked === true)} />
-                Pin as the key update <span className="text-sm text-muted-foreground">(with Publish now)</span>
-              </Label>
-            ) : null}
             <LiveDeliveryButtons tap canPublishNow={session.canPublishNow} disabled={!text.trim()} onDeliver={(delivery) => void postLive(delivery)} helperId="field-live-helper" />
           </div>
         </div>
@@ -493,17 +480,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         </DrawerContent>
       </Drawer>
 
-      {postAs ? (
-        <Drawer open={switching} onOpenChange={setSwitching}>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Who is this update by?</DrawerTitle>
-              <DrawerDescription>For a phone you're passing around. {POSTING_AS_HELP} Notes stay under your account.</DrawerDescription>
-            </DrawerHeader>
-            <PostingAsList tap api={api} storyId={storyId} me={session.me} current={author?.id ?? null} enabled={switching} onPick={(person) => { setAuthor(person); setSwitching(false); }} />
-          </DrawerContent>
-        </Drawer>
-      ) : null}
+      {postAs ? <PostingAsPicker api={api} storyId={storyId} me={session.me} open={switching} onOpenChange={setSwitching} current={author?.id ?? null} onPick={(person) => { setAuthor(person); setSwitching(false); }} /> : null}
 
       <Drawer open={choosing !== null} onOpenChange={(open) => { if (!open) setChoosing(null); }}>
         <DrawerContent>
@@ -518,8 +495,59 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
   );
 }
 
-/** Editing an update from Field: the headline and words only (no Media picker in this bundle). */
-const FieldEditFields: LiveFieldsComponent = (props) => <div className="grid gap-3"><LiveTextFields {...props} tap /></div>;
+const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((word) => Array.from(word)[0]?.toUpperCase()).join("") || "?";
+
+/** A person's profile picture (their linked Person's portrait), with initials until they have one, as in the shell's account menu. */
+function ProfilePicture({ name, url }: { name: string; url: string | null }) {
+  return (
+    <Avatar size="sm" aria-hidden="true" className="shrink-0">
+      {url ? <AvatarImage src={url} alt="" /> : null}
+      <AvatarFallback>{initials(name)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+/**
+ * Who a live update is by, on a shared phone (editors only; field/posting-as.ts). The Story's own people come first.
+ * It credits the update and its photo; publishing is still decided by the signed-in account.
+ */
+function PostingAsPicker({ api, storyId, me, open, onOpenChange, current, onPick }: { api: string; storyId: number; me: FieldSession["me"]; open: boolean; onOpenChange: (open: boolean) => void; current: number | null; onPick: (person: { id: number; name: string; avatarUrl: string | null } | null) => void }) {
+  const people = useQuery({ queryKey: ["byline", "field", "people", storyId], queryFn: () => getJson<{ people: PostingAsPerson[] }>(api, `/byline/field/stories/${storyId}/people`), enabled: open, staleTime: 5 * 60_000 });
+  const list = people.data?.people ?? [];
+  const onStory = list.filter((person) => person.onStory);
+  const others = list.filter((person) => !person.onStory);
+  const row = (person: PostingAsPerson) => (
+    <CommandItem key={person.id} value={`${person.name} ${person.id}`} onSelect={() => onPick({ id: person.id, name: person.name, avatarUrl: person.avatarUrl })} className="min-h-11 gap-3 text-base" data-posting-as-person={person.id}>
+      <ProfilePicture name={person.name} url={person.avatarUrl} />
+      <span className="min-w-0 flex-1"><span className="block truncate">{person.name}</span>{person.onStory ? <span className="block truncate text-xs text-muted-foreground">{person.onStory}</span> : null}</span>
+      {current === person.id ? <Check aria-label="Selected" className="size-4" /> : null}
+    </CommandItem>
+  );
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Who is this update by?</DrawerTitle>
+          <DrawerDescription>For a phone you're passing around. Live updates and their photos are credited to who you pick until you switch back. You're still the one publishing, and notes stay under your account.</DrawerDescription>
+        </DrawerHeader>
+        <Command className="px-2 pb-[max(0.5rem,var(--byline-safe-bottom))]">
+          <CommandInput placeholder="Search people" className="bg-transparent text-base" />
+          <CommandList className="max-h-[50dvh]">
+            <CommandEmpty>{people.isError ? (people.error as Error).message : people.isPending ? "Loading people…" : "Nobody matches."}</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="me you myself" onSelect={() => onPick(null)} className="min-h-11 gap-3 text-base" data-posting-as-person="self">
+                {me ? <ProfilePicture name={me.name} url={me.avatarUrl} /> : <UserRound aria-hidden="true" className="size-4" />}
+                <span className="min-w-0 flex-1"><span className="block truncate">You</span>{me ? <span className="block truncate text-xs text-muted-foreground">{me.name}</span> : null}</span>{current === null ? <Check aria-label="Selected" className="size-4" /> : null}
+              </CommandItem>
+            </CommandGroup>
+            {onStory.length ? <CommandGroup heading="On this story">{onStory.map(row)}</CommandGroup> : null}
+            {others.length ? <CommandGroup heading="Everyone else">{others.map(row)}</CommandGroup> : null}
+          </CommandList>
+        </Command>
+      </DrawerContent>
+    </Drawer>
+  );
+}
 
 const KIND_LABEL: Record<string, string> = { note: "Note", live: "Live", photo: "Photo", media: "Photo", recording: "Recording", file: "File" };
 

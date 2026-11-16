@@ -6,7 +6,7 @@ import { type CoverageState, type LiveMode, type PublishBlock } from "../domain/
 import { addDays, localDay } from "../domain/dates";
 import { validClientKey } from "../domain/reporting";
 import { createLiveUpdate } from "../newsroom/live-coverage";
-import { canPostAs, resolvePostingAs } from "../newsroom/posting-as";
+import { canPostAs, resolvePostingAs } from "./posting-as";
 import { userAvatarUrls } from "../newsroom/portraits";
 import { lexicalToPlainText } from "../newsroom/live-text";
 import type { ScreenContext } from "../newsroom/screen-models";
@@ -220,7 +220,7 @@ export async function fieldStorySearch(ctx: ScreenContext, query: string) {
  * `as` credits the update to someone else on a shared phone (editors only, decided again here); publishing is
  * still the signed-in account's right, and the Story's activity records that account.
  */
-export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; title?: unknown; pinned?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown; delivery?: unknown; as?: unknown }) {
+export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: { text?: unknown; photoId?: unknown; clientKey?: unknown; queued?: unknown; delivery?: unknown; as?: unknown }) {
   const scope = await storyScope(ctx.req);
   const publisher = await canPublishLive(ctx.req, storyId);
   if (!scopeManages(scope, storyId) && !scopeParticipates(scope, storyId) && !publisher) throw new APIError("You are not part of this story.", 403);
@@ -237,8 +237,7 @@ export async function fieldLivePost(ctx: ScreenContext, storyId: number, input: 
   }
   try {
     const created = await createLiveUpdate(ctx, storyId, {
-      // A key update is a publisher's call; createLiveUpdate pins only what it actually publishes.
-      text: input.text, headline: input.title, pinned: input.pinned === true, photoId: input.photoId, ...(clientKey ? { clientKey } : {}), queued: input.queued === true, source: "field", wantsPublish: input.delivery === "publish",
+      text: input.text, photoId: input.photoId, ...(clientKey ? { clientKey } : {}), queued: input.queued === true, source: "field", wantsPublish: input.delivery === "publish",
       ...(author.self ? {} : { author: author.id })
     });
     return { ...created, duplicate: false };

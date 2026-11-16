@@ -1,12 +1,12 @@
 import { APIError } from "payload";
 import { atLeast } from "../access/user";
-import { storyAccounts } from "./story-accounts";
-import { userAvatarUrls } from "./portraits";
-import type { ScreenContext } from "./screen-models";
+import { storyAccounts } from "../newsroom/live-coverage";
+import { userAvatarUrls } from "../newsroom/portraits";
+import type { ScreenContext } from "../newsroom/screen-models";
 
 /**
- * "Posting as" (docs/field-mode.md#shared-phones, docs/live-coverage.md). A newsroom phone is often passed
- * around at an event while an editor stays signed in, and a desk editor often types up what a reporter phoned in. An editor may credit a live update (and the photo that goes with it) to the person
+ * "Posting as" (docs/field-mode.md#shared-phones). A newsroom phone is often passed around at an event while
+ * an editor stays signed in. An editor may credit a live update (and the photo that goes with it) to the person
  * who actually wrote it. It changes attribution only: whether the update publishes is still decided by the
  * signed-in account, and the Story's activity keeps that account as the actor, so the record shows both.
  */

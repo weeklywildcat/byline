@@ -3,7 +3,6 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fieldEndpoints } from "../../src/field/endpoints";
 import { reportingEndpoints } from "../../src/reporting/endpoints";
-import { newsroomEndpoints } from "../../src/newsroom/endpoints";
 import { plainTextToLexical } from "../../src/newsroom/live-text";
 import type { User } from "../../src/payload-types";
 
@@ -17,7 +16,7 @@ let payload: Payload;
 const accounts: Record<string, User> = {};
 const people: Record<string, number> = {};
 const ids: Record<string, number> = {};
-const endpoints = [...fieldEndpoints, ...reportingEndpoints, ...newsroomEndpoints];
+const endpoints = [...fieldEndpoints, ...reportingEndpoints];
 
 async function account(key: string, role: User["role"]) {
   people[key] = (await payload.create({ collection: "people", data: { name: `${key} Shooter`, slug: `field-${key}`, status: "active" } })).id;
@@ -139,31 +138,20 @@ describe("photos from the field", () => {
   });
 });
 
-describe("a headline and a key update from the field", () => {
-  it("publishes the headline and pins only what it actually publishes", async () => {
-    const pinned = await call("post", "/byline/field/stories/:id/live", "editor", { params: { id: ids.game }, data: { text: "Final: 35-14", title: "Wildcats win", pinned: true, delivery: "publish", clientKey: "field-live-key-0001" } });
-    const update = await payload.findByID({ collection: "live-updates", id: pinned.body.id, depth: 0 });
-    expect(update).toMatchObject({ headline: "Wildcats win", pinned: true, state: "published" });
-    // A desk draft is never pinned, whatever was asked.
-    const draft = await call("post", "/byline/field/stories/:id/live", "editor", { params: { id: ids.game }, data: { text: "Draft", pinned: true, delivery: "desk", clientKey: "field-live-key-0002" } });
-    expect((await payload.findByID({ collection: "live-updates", id: draft.body.id, depth: 0 })).pinned).toBe(false);
-  });
-});
-
 describe("a shared phone: an editor credits someone else", () => {
   it("offers the switch to editors only, with the Story's own people first", async () => {
     const editorSession = (await call("get", "/byline/field/stories/:id", "editor", { params: { id: ids.game } })).body;
     expect(editorSession.canPostAs).toBe(true);
     expect(editorSession.me).toMatchObject({ name: "editor Account" });
     expect((await call("get", "/byline/field/stories/:id", "reporter", { params: { id: ids.game } })).body).toMatchObject({ canPostAs: false, me: null });
-    const people = (await call("get", "/byline/stories/:id/live/people", "editor", { params: { id: ids.game } })).body.people as Array<{ id: number; onStory: string | null }>;
+    const people = (await call("get", "/byline/field/stories/:id/people", "editor", { params: { id: ids.game } })).body.people as Array<{ id: number; onStory: string | null }>;
     const at = (key: string) => people.findIndex((person) => person.id === accounts[key].id);
     expect(people[at("reporter")]).toMatchObject({ onStory: "On the byline" });
     expect(people[at("photographer")]).toMatchObject({ onStory: "Has work on this story" });
     expect(people[at("stranger")]).toMatchObject({ onStory: null });
     expect(at("stranger")).toBeGreaterThan(Math.max(at("reporter"), at("photographer")));
     expect(people.some((person) => person.id === accounts.editor.id)).toBe(false);
-    expect((await call("get", "/byline/stories/:id/live/people", "reporter", { params: { id: ids.game } })).status).toBe(403);
+    expect((await call("get", "/byline/field/stories/:id/people", "reporter", { params: { id: ids.game } })).status).toBe(403);
   });
 
   it("credits the update to the chosen person, publishes on the editor's right, and keeps the editor as the actor", async () => {

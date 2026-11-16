@@ -1,22 +1,22 @@
 "use client";
 
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { useQueryClient } from "@tanstack/react-query";
 import { RadioTower, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { LiveDeskResponse, LivePostResult } from "../../newsroom/live-coverage";
+import { toast } from "sonner";
+import type { LiveDeskResponse, LiveDeskUpdate, LivePostResult } from "../../newsroom/live-coverage";
 import { ShellLink } from "../shell/navigation";
-import { postJson } from "../story/api";
-import { EMPTY_DRAFT, liveEndpoint, postedMessage, type LiveDraft } from "./api";
+import { deleteJson, patchJson, postJson } from "../story/api";
+import { EMPTY_DRAFT, liveEndpoint, liveKey, postedMessage, type LiveDraft } from "./api";
 import { LiveDeliveryButtons } from "./LiveDelivery";
 import { LiveFields } from "./LiveFields";
 import { useLiveCoverage } from "./LiveCoverageProvider";
-import { LiveTimeline, liveTime } from "./LiveTimeline";
-import { POSTING_AS_HELP, PostingAsList, PostingAsRow, type PostingAuthor } from "./PostingAs";
-import { useLiveDeskControls, type LiveFieldsComponent } from "./useLiveDeskControls";
+import { LiveTimeline, liveTime, type TimelineControls } from "./LiveTimeline";
 
 /** The "● LIVE" badge: the word is always there, never color alone. */
 export function LiveBadge({ desk, timeZone }: { desk: Pick<LiveDeskResponse, "status" | "endedAt">; timeZone: string }) {
@@ -34,9 +34,6 @@ export function OpenFieldButton({ href, prominent }: { href: string; prominent?:
   );
 }
 
-/** Editing an update in Write: words and photo; pinning is the timeline's own action. */
-const EditFields: LiveFieldsComponent = ({ value, onChange, name }) => <LiveFields value={value} onChange={onChange} name={name} canPin={false} />;
-
 const names = (desk: LiveDeskResponse) => (desk.publishers.length ? desk.publishers.map((person) => person.name).join(", ") : "none yet");
 
 /**
@@ -45,13 +42,13 @@ const names = (desk: LiveDeskResponse) => (desk.publishers.length ? desk.publish
  */
 export function LiveCoverageSection() {
   const live = useLiveCoverage();
+  const cache = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
   const [draft, setDraft] = useState<LiveDraft>(EMPTY_DRAFT);
-  // Typing up what a reporter phoned in: credit them (editors only, posting-as.ts). Kept until switched back.
-  const [author, setAuthor] = useState<PostingAuthor | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const [editing, setEditing] = useState<{ id: number; draft: LiveDraft } | null>(null);
+  const [removing, setRemoving] = useState<LiveDeskUpdate | null>(null);
+  const [working, setWorking] = useState(false);
   const desk = live?.desk;
-  const { controls, dialog, run, working } = useLiveDeskControls({ api: live?.api ?? "", storyId: live?.storyId ?? 0, desk, readOnly: live?.readOnly, busy: live?.busy, Fields: EditFields, withPhoto: true });
   const mode = desk?.mode;
 
   // `?tab=live` (the old Live tab's address) and Field's "Open full story" land here, on this section.
@@ -71,16 +68,52 @@ export function LiveCoverageSection() {
   if (!live || !desk || desk.mode !== "live") return null;
   const { api, storyId, timeZone, readOnly } = live;
   const endpoint = liveEndpoint(storyId);
+  const refresh = () => cache.invalidateQueries({ queryKey: liveKey(storyId) });
   const control = desk.canControl && !readOnly;
-  const postAs = desk.canPostAs && !readOnly;
+
+  async function run<T>(work: () => Promise<T>, success: string | ((result: T) => string)): Promise<T | undefined> {
+    setWorking(true);
+    try {
+      const result = await work();
+      await refresh();
+      toast.success(typeof success === "function" ? success(result) : success);
+      return result;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Byline could not save that update.");
+      return undefined;
+    } finally {
+      setWorking(false);
+    }
+  }
 
   const body = (value: LiveDraft) => ({ title: value.title, text: value.text, photoId: value.photo?.id ?? null, pinned: value.pinned });
 
   async function deliver(delivery: "publish" | "desk") {
     if (!draft.text.trim()) return;
-    const result = await run(() => postJson<LivePostResult>(api, endpoint, { ...body(draft), delivery, ...(postAs && author ? { as: author.id } : {}) }), (posted) => postedMessage(posted, delivery));
+    const result = await run(() => postJson<LivePostResult>(api, endpoint, { ...body(draft), delivery }), (posted) => postedMessage(posted, delivery));
     if (result) setDraft(EMPTY_DRAFT);
   }
+
+  const controls: TimelineControls = {
+    canPublish: desk.canPublish && !readOnly,
+    busy: working || live.busy,
+    editingId: editing?.id ?? null,
+    // An update readers can see belongs to editors and direct publishers; staff change their own drafts.
+    canChange: (update) => !readOnly && (desk.canPublish || (update.state === "draft" && (desk.canManage || update.author?.id === live.userId))),
+    renderEditor: (update) => (
+      <div role="group" className="grid gap-3" aria-label="Edit live update">
+        <LiveFields value={editing!.draft} onChange={(next) => setEditing({ id: update.id, draft: next })} name={`edit-${update.id}`} canPin={false} />
+        <div className="flex gap-2">
+          <Button type="button" size="sm" disabled={working || !editing!.draft.text.trim()} onClick={() => void run(() => patchJson(api, `${endpoint}/${update.id}`, { title: editing!.draft.title, text: editing!.draft.text, photoId: editing!.draft.photo?.id ?? null }), "Update saved.").then((saved) => { if (saved) setEditing(null); })}>Save</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+        </div>
+      </div>
+    ),
+    onEdit: (update) => setEditing({ id: update.id, draft: { title: update.title, text: update.text, photo: update.photo, pinned: update.pinned } }),
+    onPublish: (update) => void run(() => patchJson(api, `${endpoint}/${update.id}`, { state: update.state === "draft" ? "published" : "draft" }), update.state === "draft" ? "Update published." : "Update moved to drafts."),
+    onPin: (update) => void run(() => patchJson(api, `${endpoint}/${update.id}`, { pinned: !update.pinned }), update.pinned ? "Update unpinned." : "Pinned as the key update."),
+    onDelete: (update) => setRemoving(update)
+  };
 
   const started = desk.status !== "off";
   return (
@@ -132,17 +165,6 @@ export function LiveCoverageSection() {
         // Not a <form>: this renders inside Payload's document form, and forms cannot nest.
         <div role="group" aria-label="Post a live update" className="grid gap-3 rounded-lg border p-4" data-live-composer="">
           <LiveFields value={draft} onChange={setDraft} name="live-new" canPin={desk.canPublishNow} />
-          {postAs ? (
-            <PostingAsRow author={author} me={desk.me} switchButton={(
-              <Popover open={choosing} onOpenChange={setChoosing}>
-                <PopoverTrigger render={<Button type="button" variant="ghost" size="sm" className="shrink-0 max-sm:min-h-11" aria-label={`Switch who this live update is by (now ${author ? author.name : "you"})`} />}>Switch</PopoverTrigger>
-                <PopoverContent align="end" className="w-80 p-0">
-                  <p className="px-3 pt-3 text-xs text-muted-foreground">{POSTING_AS_HELP}</p>
-                  <PostingAsList api={api} storyId={storyId} me={desk.me} current={author?.id ?? null} enabled={choosing} onPick={(person) => { setAuthor(person); setChoosing(false); }} />
-                </PopoverContent>
-              </Popover>
-            )} />
-          ) : null}
           <LiveDeliveryButtons canPublishNow={desk.canPublishNow} disabled={working || !draft.text.trim()} onDeliver={(delivery) => void deliver(delivery)} helperId="live-composer-helper" />
         </div>
       ) : null}
@@ -150,7 +172,18 @@ export function LiveCoverageSection() {
       {started || desk.updates.length ? <LiveTimeline updates={desk.updates} timeZone={timeZone} storyPublished={desk.storyPublished} controls={controls} /> : null}
       {desk.hasMore ? <p className="text-center text-xs text-muted-foreground">Showing the latest {desk.updates.length} updates.</p> : null}
 
-      {dialog}
+      <AlertDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this live update?</AlertDialogTitle>
+            <AlertDialogDescription>{removing?.state === "published" && desk.storyPublished ? "It disappears from the live coverage readers see." : "This draft is removed."} This can't be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" disabled={working}>Cancel</AlertDialogCancel>
+            <Button type="button" variant="destructive" disabled={working} onClick={() => { const target = removing; if (target) void run(() => deleteJson(api, `${endpoint}/${target.id}`, {}), "Update deleted.").then(() => setRemoving(null)); }}>Delete update</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

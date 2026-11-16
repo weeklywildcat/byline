@@ -46,18 +46,6 @@ actions: Open full story, and for editors Set up live coverage, Manage direct
 publishers and End live coverage (an `AlertDialog`). The main live posting action is
 never in the menu. Private notes and public live updates are always labelled apart.
 
-While coverage is Live now the composer has an optional **Headline** line above the
-text, and people who may publish see **Pin as the key update**, which applies only to
-Publish now (a desk draft is never pinned). A headline kept with **Save note** stays
-at the top of the note.
-
-The timeline is the same desk as Write's (`ui/live/useLiveDeskControls.tsx`): each
-update has an actions menu with Edit (headline and text; photos are changed in
-Write), Publish or Unpublish, Pin as key update and Delete, offered by the same rules
-and decided again on the server. So an editor at the event can publish a student's
-desk draft or fix a typo without a laptop. Field mounts its own toaster for these and
-for coverage changes.
-
 Routing (`routeCapture`, docs/reporting.md):
 
 | Action | Goes to |
@@ -101,8 +89,7 @@ pictures (the Story's own people first, then every other active account). The ch
 person is credited with each live update, and with the photo that goes with it (Media
 creator and credit), until someone switches back. Staff never see the switch.
 
-It changes attribution only (`newsroom/posting-as.ts`, the same switch Write's live
-desk has):
+It changes attribution only (`field/posting-as.ts`):
 
 - Publishing is still the signed-in account's right; Publish now / Send to desk work
   exactly as above.
