@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, open, rename, rm, stat } from "node:fs/promises";
+import { copyFile, link, mkdir, open, readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import {
@@ -23,6 +23,11 @@ import {
  * count and file type while streaming, stages it, and atomically promotes it
  * to its fingerprinted `publicPath` under `out/_byline/media/`.
  *
+ * With a `cacheDir`, verified blobs are kept there by SHA-256 (`<cacheDir>/<sha256>`),
+ * so a later build downloads only the blobs it does not already hold and links the
+ * rest into the output. Every cached blob is re-verified (size, SHA-256, type) before
+ * it is used, and blobs the current descriptors no longer name are pruned.
+ *
  * Only named files are written; nothing is listed or copied wholesale. Any
  * missing blob, wrong hash, wrong size, wrong type, unsafe path or
  * authentication failure fails the build: there is no fallback to a private
@@ -38,11 +43,14 @@ export type MaterializeOptions = {
   /** The static output root (apps/web/out). */
   outDir: string;
   concurrency?: number;
+  /** A persistent content-addressed blob cache, e.g. apps/web/node_modules/.astro/byline-media. */
+  cacheDir?: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
 };
 
-export type MaterializeResult = { written: number; unchanged: number; bytes: number };
+/** `written` counts files placed in the output (`fromCache` + `downloaded`); `unchanged` were already there. */
+export type MaterializeResult = { written: number; unchanged: number; fromCache: number; downloaded: number; downloadedBytes: number; pruned: number; bytes: number };
 
 export class PublicationMediaBuildError extends Error {}
 
@@ -92,18 +100,60 @@ export function outputPathFor(outDir: string, publicPath: string): string {
   return target;
 }
 
+/** True when the file is exactly this blob: size, SHA-256 and real type. */
 async function fileMatches(file: string, blob: PublicationBlob) {
   const info = await stat(file).catch(() => null);
   if (!info?.isFile() || info.size !== blob.bytes) return false;
   const hash = createHash("sha256");
-  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
-  return hash.digest("hex") === blob.sha256;
+  let head = Buffer.alloc(0);
+  for await (const chunk of createReadStream(file)) {
+    const data = chunk as Buffer;
+    if (head.length < 16) head = Buffer.concat([head, data.subarray(0, 16 - head.length)]);
+    hash.update(data);
+  }
+  return hash.digest("hex") === blob.sha256 && sniffPublicationType(head) === blob.mimeType;
 }
 
-async function acquire(blob: PublicationBlob, options: Required<Pick<MaterializeOptions, "endpoint" | "token" | "outDir" | "timeoutMs">> & { fetch: typeof fetch; staging: string }): Promise<"written" | "unchanged"> {
+/** Puts a verified cached blob at its public path: a hardlink where possible, else a copy. */
+async function placeFromCache(cached: string, target: string) {
+  await mkdir(path.dirname(target), { recursive: true });
+  await rm(target, { force: true });
+  try {
+    await link(cached, target);
+  } catch (error) {
+    if (!["EXDEV", "EPERM", "EMLINK", "ENOTSUP"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+    await copyFile(cached, target);
+  }
+}
+
+/** Removes cached blobs (and abandoned staging) the current descriptor set no longer names. */
+async function pruneCache(cacheDir: string, keep: Set<string>) {
+  let pruned = 0;
+  for (const entry of await readdir(cacheDir, { withFileTypes: true }).catch(() => [])) {
+    // Only things this cache wrote: blobs named by SHA-256 and abandoned staging directories.
+    const ours = (entry.isFile() && isSha256(entry.name)) || (entry.isDirectory() && entry.name.startsWith(".staging-"));
+    if (!ours || (entry.isFile() && keep.has(entry.name))) continue;
+    await rm(path.join(cacheDir, entry.name), { recursive: true, force: true });
+    pruned++;
+  }
+  return pruned;
+}
+
+type Outcome = "unchanged" | "fromCache" | "downloaded";
+
+async function acquire(blob: PublicationBlob, options: Required<Pick<MaterializeOptions, "endpoint" | "token" | "outDir" | "timeoutMs">> & { fetch: typeof fetch; staging: string; cacheDir?: string }): Promise<Outcome> {
   const target = outputPathFor(options.outDir, blob.publicPath);
   // A fingerprinted path is immutable: identical bytes already there are kept.
   if (await fileMatches(target, blob)) return "unchanged";
+  // The same bytes may be held in the content-addressed cache under their SHA-256.
+  const cached = options.cacheDir ? path.join(options.cacheDir, blob.sha256) : null;
+  if (cached) {
+    if (await fileMatches(cached, blob)) {
+      await placeFromCache(cached, target);
+      return "fromCache";
+    }
+    await rm(cached, { force: true });
+  }
   const url = `${options.endpoint.replace(/\/+$/, "")}/${blob.sha256}`;
   let response: Response;
   try {
@@ -135,9 +185,15 @@ async function acquire(blob: PublicationBlob, options: Required<Pick<Materialize
     if (hash.digest("hex") !== blob.sha256) throw new PublicationMediaBuildError(`${blob.publicPath}: SHA-256 does not match its descriptor.`);
     const type = sniffPublicationType(head);
     if (type !== blob.mimeType) throw new PublicationMediaBuildError(`${blob.publicPath}: content is ${type ?? "unrecognized"}, expected ${blob.mimeType}.`);
-    await mkdir(path.dirname(target), { recursive: true });
-    await rename(temp, target);
-    return "written";
+    if (cached) {
+      // Cache first (same filesystem as the staging directory, so the rename is atomic), then link.
+      await rename(temp, cached);
+      await placeFromCache(cached, target);
+    } else {
+      await mkdir(path.dirname(target), { recursive: true });
+      await rename(temp, target);
+    }
+    return "downloaded";
   } catch (error) {
     out.destroy();
     await rm(temp, { force: true });
@@ -149,10 +205,11 @@ export async function materializePublicationMedia(options: MaterializeOptions): 
   if (!options.token) throw new PublicationMediaBuildError("BYLINE_BUILD_TOKEN is required to acquire publication media.");
   if (!/^https?:\/\//.test(options.endpoint)) throw new PublicationMediaBuildError("The newsroom build media endpoint must be an http(s) URL.");
   const descriptors = closedDescriptorSet(options.descriptors);
-  const staging = path.join(options.outDir, "_byline", `.media-staging-${randomUUID()}`);
+  // Staging lives beside what it will be renamed into: the cache when there is one, else the output.
+  const staging = options.cacheDir ? path.join(options.cacheDir, `.staging-${randomUUID()}`) : path.join(options.outDir, "_byline", `.media-staging-${randomUUID()}`);
   await mkdir(staging, { recursive: true });
-  const settings = { endpoint: options.endpoint, token: options.token, outDir: options.outDir, timeoutMs: options.timeoutMs ?? 60_000, fetch: options.fetch ?? fetch, staging };
-  const result: MaterializeResult = { written: 0, unchanged: 0, bytes: 0 };
+  const settings = { endpoint: options.endpoint, token: options.token, outDir: options.outDir, timeoutMs: options.timeoutMs ?? 60_000, fetch: options.fetch ?? fetch, staging, cacheDir: options.cacheDir };
+  const result: MaterializeResult = { written: 0, unchanged: 0, fromCache: 0, downloaded: 0, downloadedBytes: 0, pruned: 0, bytes: 0 };
   const failures: Error[] = [];
   let next = 0;
   const worker = async () => {
@@ -160,7 +217,12 @@ export async function materializePublicationMedia(options: MaterializeOptions): 
       const blob = descriptors[next++];
       try {
         const outcome = await acquire(blob, settings);
-        result[outcome]++;
+        if (outcome === "unchanged") result.unchanged++;
+        else {
+          result.written++;
+          result[outcome]++;
+          if (outcome === "downloaded") result.downloadedBytes += blob.bytes;
+        }
         result.bytes += blob.bytes;
       } catch (error) {
         failures.push(error as Error);
@@ -173,5 +235,6 @@ export async function materializePublicationMedia(options: MaterializeOptions): 
     await rm(staging, { recursive: true, force: true });
   }
   if (failures.length) throw failures[0] instanceof PublicationMediaBuildError ? failures[0] : new PublicationMediaBuildError(failures[0].message);
+  if (options.cacheDir) result.pruned = await pruneCache(options.cacheDir, new Set(descriptors.map((blob) => blob.sha256)));
   return result;
 }
