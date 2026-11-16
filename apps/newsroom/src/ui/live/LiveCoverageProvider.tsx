@@ -67,6 +67,7 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
 }) {
   const query = useLiveDesk(api, storyId);
   const { change, busy } = useCoverageChange(api, storyId);
+  const [publishingStory, setPublishingStory] = useState(false);
   const [setup, setSetup] = useState<"setup" | "manage" | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const desk = query.data;
@@ -79,8 +80,15 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
       toast.error("Publishing isn't ready yet. Try again.");
       return false;
     }
-    return publishRef.current().catch(() => false);
-  }, [desk, publishRef]);
+    setPublishingStory(true);
+    try {
+      const published = await publishRef.current().catch(() => false);
+      if (published) await query.refetch();
+      return published;
+    } finally {
+      setPublishingStory(false);
+    }
+  }, [desk, publishRef, query.refetch]);
 
   /** Start (or resume) coverage. A Story that is not public is published first through the same direct Live path. */
   const goLive = useCallback(async (): Promise<boolean> => {
@@ -110,16 +118,16 @@ export function LiveCoverageProvider({ api, admin, storyId, timeZone, readOnly, 
   }, [change, desk]);
 
   const value = useMemo<LiveCoverageContext>(() => ({
-    api, admin, storyId, timeZone, readOnly, userId, desk, loading: query.isPending, error: query.error, retry: () => void query.refetch(), busy,
+    api, admin, storyId, timeZone, readOnly, userId, desk, loading: query.isPending, error: query.error, retry: () => void query.refetch(), busy: busy || publishingStory,
     fieldHref: `${admin}/field?story=${storyId}&from=story`,
     publishRef, setMode, publishForLater, goLive,
     openSetup: () => setSetup("setup"), openPublishers: () => setSetup("manage"), requestEnd: () => setConfirm("end")
-  }), [admin, api, busy, desk, goLive, publishForLater, publishRef, query.error, query.isPending, query.refetch, readOnly, setMode, storyId, timeZone, userId]);
+  }), [admin, api, busy, desk, goLive, publishForLater, publishRef, publishingStory, query.error, query.isPending, query.refetch, readOnly, setMode, storyId, timeZone, userId]);
 
   return (
     <Context value={value}>
       {children}
-      {desk ? <LiveSetupDialog open={setup !== null} intent={setup ?? "setup"} onOpenChange={(open) => { if (!open) setSetup(null); }} api={api} desk={desk} busy={busy} readOnly={readOnly}
+      {desk ? <LiveSetupDialog open={setup !== null} intent={setup ?? "setup"} onOpenChange={(open) => { if (!open) setSetup(null); }} api={api} desk={desk} busy={busy || publishingStory} readOnly={readOnly}
         onSetUp={async (publishers) => { const done = await change({ action: "setup", publishers }, "Live mode is set up. Coverage hasn't started."); if (done) setSetup(null); }}
         onPublishForLater={async (publishers) => {
           const configured = await change({ action: "setup", publishers });
