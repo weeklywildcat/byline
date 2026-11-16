@@ -59,7 +59,7 @@ export const EMPTY_DRAFT: LiveDraft = { title: "", text: "", photo: null, pinned
 
 /** What Write says after a post, honestly: never "Published" for something readers cannot see. */
 export function postedMessage(result: LivePostResult, intended: "publish" | "desk"): string {
-  if (result.status === "posted") return "Published. Readers see it now.";
+  if (result.status === "posted") return "Published in Byline. Readers will see it after the next successful site build.";
   if (intended === "publish") return `Sent to the live desk instead: ${reasonLine(result.reason)}.`;
   return "Sent to the live desk as a draft.";
 }
