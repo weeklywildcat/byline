@@ -18,7 +18,7 @@
     "migrate:status": "payload migrate:status",
     "jobs": "payload jobs:run --cron '* * * * *' --all-queues --handle-schedules",
     "jobs:media": "payload jobs:run --cron '*/5 * * * * *' --queue media --limit 4",
-    "jobs:publication": "payload run scripts/publication-snapshot.ts queue && payload jobs:run --cron '*/5 * * * * *' --queue publication --limit 1",
+    "jobs:publication": "payload run scripts/publication-snapshot.ts reconcile && payload jobs:run --cron '*/5 * * * * *' --queue publication --limit 1",
     "jobs:maintenance": "payload jobs:run --cron '* * * * *' --queue maintenance --limit 5 --handle-schedules",
     "jobs:scheduled": "payload jobs:run --cron '* * * * *' --queue default --limit 10",
     "publication-media:requeue": "payload run scripts/requeue-publication-media.ts",
@@ -34,7 +34,8 @@
     "test:login:browser": "playwright test --config playwright.login.config.ts",
     "migrate:check": "node scripts/check-migrations.mjs",
     "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
-    "test:people:browser": "playwright test --config playwright.people.config.ts"
+    "test:people:browser": "playwright test --config playwright.people.config.ts",
+    "publication:deploy:now": "payload run scripts/publication-snapshot.ts deploy"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

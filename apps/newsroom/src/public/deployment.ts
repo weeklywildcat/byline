@@ -85,6 +85,72 @@ export type DeployHookResult =
   | { outcome: "stale"; revision: number; status: 0 }
   | { outcome: "triggered"; revision: number; status: number };
 
+export type DeployReconcileResult =
+  | { outcome: "disabled"; revision: number }
+  | { outcome: "pending"; revision: number; jobId: number | string }
+  | { outcome: "already-triggered"; revision: number; jobId: number | string }
+  | { outcome: "queued"; revision: number; jobId: number | string };
+
+type DeployJob = {
+  id: number | string;
+  input?: unknown;
+  completedAt?: string | null;
+  hasError?: boolean | null;
+  log?: unknown;
+};
+
+function deployInputMatches(job: DeployJob, input: DeployPublicSiteInput): boolean {
+  if (!job.input || typeof job.input !== "object" || Array.isArray(job.input)) return false;
+  const stored = job.input as Record<string, unknown>;
+  return stored.revision === input.revision && stored.sha256 === input.sha256;
+}
+
+function deployJobTriggered(job: DeployJob): boolean {
+  if (!Array.isArray(job.log)) return false;
+  return job.log.some((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const record = entry as Record<string, unknown>;
+    if (record.taskSlug !== DEPLOY_PUBLIC_SITE_TASK || record.state !== "succeeded") return false;
+    const output = record.output;
+    return Boolean(output && typeof output === "object" && !Array.isArray(output) && (output as Record<string, unknown>).outcome === "triggered");
+  });
+}
+
+/**
+ * Repair the handoff between a promoted snapshot and provider deployment.
+ *
+ * Snapshot preparation normally queues the deploy job itself. This reconciler
+ * is for worker restarts/crashes: it does nothing when the exact snapshot has
+ * already been accepted or still has pending work, and queues only when that
+ * handoff is missing or previously failed.
+ */
+export async function reconcilePublicDeployment(
+  payload: Payload,
+  input: DeployPublicSiteInput,
+  env: DeployEnvironment = process.env
+): Promise<DeployReconcileResult> {
+  if (!deployHookConfigured(env)) return { outcome: "disabled", revision: input.revision };
+
+  const recent = await payload.find({
+    collection: "payload-jobs",
+    where: { taskSlug: { equals: DEPLOY_PUBLIC_SITE_TASK } },
+    depth: 0,
+    limit: 50,
+    sort: "-createdAt",
+    overrideAccess: true,
+    select: { input: true, completedAt: true, hasError: true, log: true }
+  });
+  const matching = (recent.docs as DeployJob[]).filter((job) => deployInputMatches(job, input));
+  const pending = matching.find((job) => !job.completedAt && job.hasError !== true);
+  if (pending) return { outcome: "pending", revision: input.revision, jobId: pending.id };
+  const triggered = matching.find(deployJobTriggered);
+  if (triggered) return { outcome: "already-triggered", revision: input.revision, jobId: triggered.id };
+
+  const queued = await queuePublicDeployment(payload, input, env);
+  if (!queued) return { outcome: "disabled", revision: input.revision };
+  return { outcome: "queued", revision: input.revision, jobId: queued.id };
+}
+
 /**
  * POST the configured deploy hook for exactly the current promoted snapshot.
  *

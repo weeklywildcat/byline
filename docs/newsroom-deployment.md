@@ -56,6 +56,25 @@ snapshot queues a coalescing `deploy-public-site` job; transient HTTP/network
 failures retry in the publication queue. The URL must be HTTPS and must not be
 committed to the repository.
 
+On startup the publication worker reconciles the current snapshot and deployment
+handoff. If the current snapshot artifact is missing it requeues snapshot
+preparation. If the exact current snapshot has no pending or successfully
+triggered deploy job, it requeues deployment. This makes worker restarts repair
+a crash between snapshot promotion and provider delivery without creating a new
+Cloudflare build when that snapshot was already accepted.
+
+For an event-night recovery, inspect status and, only when the current snapshot
+is ready, trigger the same validated deploy hook directly:
+
+```sh
+npm run publication:snapshot:status --workspace @byline/newsroom
+npm run publication:deploy:now --workspace @byline/newsroom
+```
+
+`publication:deploy:now` never prints the hook URL. It refuses to deploy if the
+current revision lacks a verified snapshot artifact, and it uses the same
+revision/digest checks and request headers as the queued deploy task.
+
 ## Updating production
 
 The canonical production update command is:
