@@ -7,6 +7,7 @@ import {
   deployHookUrl,
   deployPublicSiteTask,
   queuePublicDeployment,
+  reconcilePublicDeployment,
   triggerPublicDeployment,
   type DeployPublicSiteInput
 } from "../src/public/deployment";
@@ -63,6 +64,54 @@ describe("public deploy hook configuration", () => {
     const concurrency = deployPublicSiteTask.concurrency as { key: () => string; exclusive: boolean; supersedes: boolean };
     expect(concurrency.key()).toBe(PUBLIC_DEPLOY_CONCURRENCY_KEY);
     expect(concurrency).toMatchObject({ exclusive: true, supersedes: true });
+  });
+});
+
+
+describe("public deploy reconciliation", () => {
+  const job = (patch: Record<string, unknown> = {}) => ({
+    id: 10,
+    input,
+    completedAt: null,
+    hasError: false,
+    log: [],
+    ...patch
+  });
+
+  function reconciler(docs: unknown[]) {
+    const queue = vi.fn(async () => ({ id: 99 }));
+    const find = vi.fn(async () => ({ docs }));
+    return { payload: { jobs: { queue }, find } as unknown as Payload, queue, find };
+  }
+
+  it("does not duplicate an exact deployment that is still pending", async () => {
+    const { payload, queue } = reconciler([job()]);
+    await expect(reconcilePublicDeployment(payload, input, ENV)).resolves.toEqual({ outcome: "pending", revision: 49, jobId: 10 });
+    expect(queue).not.toHaveBeenCalled();
+  });
+
+  it("does not redeploy an exact snapshot already accepted by the provider", async () => {
+    const completed = job({
+      completedAt: "2026-11-16T18:00:00.000Z",
+      log: [{ taskSlug: DEPLOY_PUBLIC_SITE_TASK, state: "succeeded", output: { outcome: "triggered", revision: 49, status: 200 } }]
+    });
+    const { payload, queue } = reconciler([completed]);
+    await expect(reconcilePublicDeployment(payload, input, ENV)).resolves.toEqual({ outcome: "already-triggered", revision: 49, jobId: 10 });
+    expect(queue).not.toHaveBeenCalled();
+  });
+
+  it("requeues a missing or exhausted deployment for the current snapshot", async () => {
+    const failed = job({ completedAt: "2026-11-16T18:00:00.000Z", hasError: true });
+    const { payload, queue } = reconciler([failed]);
+    await expect(reconcilePublicDeployment(payload, input, ENV)).resolves.toEqual({ outcome: "queued", revision: 49, jobId: 99 });
+    expect(queue).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays disabled when no provider hook is configured", async () => {
+    const { payload, queue, find } = reconciler([]);
+    await expect(reconcilePublicDeployment(payload, input, {})).resolves.toEqual({ outcome: "disabled", revision: 49 });
+    expect(find).not.toHaveBeenCalled();
+    expect(queue).not.toHaveBeenCalled();
   });
 });
 
