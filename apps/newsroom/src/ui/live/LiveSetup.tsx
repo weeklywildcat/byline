@@ -108,7 +108,7 @@ export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, r
   busy: boolean;
   readOnly: boolean;
   onSetUp: (publishers: number[]) => void | Promise<void>;
-  onPublishForLater: (publishers: number[]) => void | Promise<void>;
+  onPublishForLater?: (publishers: number[]) => void | Promise<void>;
   onManage: (publishers: number[]) => void | Promise<void>;
   onGoLive: (publishers: number[]) => void | Promise<void>;
   /** Field can start coverage only for a Story that is already public; publishing the article is Write's. */
@@ -135,7 +135,7 @@ export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, r
         <>
           <Button type="button" variant="ghost" className="max-sm:min-h-11" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="button" variant={desk.storyPublished ? "outline" : "ghost"} className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onSetUp(ids)}>{desk.storyPublished ? "Set up for later" : "Set up without publishing"}</Button>
-          {!desk.storyPublished && goLiveHere ? <Button type="button" className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onPublishForLater(ids)}>{busy ? <Spinner /> : null}Publish for later</Button> : null}
+          {!desk.storyPublished && goLiveHere && onPublishForLater ? <Button type="button" className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onPublishForLater(ids)}>{busy ? <Spinner /> : null}Publish for later</Button> : null}
           {goLiveHere ? <Button type="button" variant={desk.storyPublished ? "default" : "outline"} className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onGoLive(ids)}>{busy ? <Spinner /> : null}{desk.storyPublished ? "Go live" : "Publish & go live"}</Button> : null}
         </>
       )}
