@@ -17,6 +17,7 @@ const { parseRoute, readRoute } = await import("../src/ui/field/FieldApp");
 const desk = (over: Partial<LiveDeskResponse> = {}): LiveDeskResponse => ({
   storyId: 1, mode: "live", status: "live", startedAt: "2026-11-06T23:00:00.000Z", endedAt: null, storyPublished: true,
   canCompose: true, canManage: true, canPublish: true, canPublishNow: true, publishBlock: null, canControl: true,
+  canPostAs: true, me: { id: 1, name: "Edna Editor", avatarUrl: null },
   publishers: [{ id: 4, name: "Carol Reporter", avatarUrl: null }], updates: [], hasMore: false, ...over
 });
 

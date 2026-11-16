@@ -7,10 +7,12 @@ import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
+import { Label } from "@byline/newsroom-ui/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Camera, ChevronRight, Mic, MoreVertical, Paperclip, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +22,10 @@ import { ApiError, getJson, postJson } from "../story/api";
 import { useCoverageChange, useLiveDesk } from "../live/api";
 import { LiveDeliveryButtons } from "../live/LiveDelivery";
 import { LiveSetupDialog } from "../live/LiveSetup";
+import { LiveTextFields } from "../live/LiveTextFields";
 import { LiveTimeline } from "../live/LiveTimeline";
+import { POSTING_AS_HELP, PostingAsList, PostingAsRow } from "../live/PostingAs";
+import { useLiveDeskControls, type LiveFieldsComponent } from "../live/useLiveDeskControls";
 import { newClientKey, uploadFile } from "../reporting/api";
 import { RecorderPanel, type Recording } from "../reporting/Recorder";
 import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
@@ -80,7 +85,8 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
   useScreenWakeLock(outbox.online && outbox.items.some((item) => item.state === "sending"));
   if (!signedIn) return null;
   return (
-    <AdminRoot className="byline-field" toaster={false}>
+    // Field has no desktop shell, so it owns its toaster: coverage changes and timeline actions report through it.
+    <AdminRoot className="byline-field">
       <div className="min-h-dvh bg-background pt-(--byline-safe-top) pr-[max(1rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1rem,var(--byline-safe-left))] text-foreground" data-field-shell="">
         <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
           {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
@@ -112,13 +118,13 @@ function useOutbox(api: string, account: string) {
       }
       if (item.kind === "live") {
         // The reporter's tapped intent travels with the item (IndexedDB, offline, retries); the server decides again at send time.
-        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk" });
+        const result = await postJson<{ id: number; status: "posted" | "sent-to-desk"; reason?: PublishBlock }>(api, `/byline/field/stories/${item.storyId}/live`, { text: item.text, ...(item.title ? { title: item.title } : {}), ...(item.pinned ? { pinned: true } : {}), clientKey: item.key, photoId, queued: item.attempts > 0, delivery: item.delivery ?? "desk", ...(item.as ? { as: item.as.id } : {}) });
         return { id: result.id, status: result.status, ...(result.reason ? { reason: result.reason } : {}) };
       }
       if (!item.blob) throw new SendError("The file is no longer on this device.", 410);
       const route = item.kind === "photo" ? "photos" : "files";
       const extra = item.kind === "photo"
-        ? { ...(item.context.assignmentId ? { assignmentId: item.context.assignmentId } : {}), ...(item.capturedAt ? { capturedAt: item.capturedAt } : {}) }
+        ? { ...(item.context.assignmentId ? { assignmentId: item.context.assignmentId } : {}), ...(item.capturedAt ? { capturedAt: item.capturedAt } : {}), ...(item.as ? { as: item.as.id } : {}) }
         : { ...context, ...(item.durationMs ? { durationMs: item.durationMs } : {}) };
       const result = await uploadFile<{ id: number }>(api, `/byline/stories/${item.storyId}/reporting/${route}`, item.blob, item.filename ?? "capture", { clientKey: item.key, ...extra }, onProgress);
       return { id: result.id, status: "saved" };
@@ -137,6 +143,8 @@ function useOutbox(api: string, account: string) {
     try {
       const changed = await processOutbox(store, memory.current, send, { online: navigator.onLine, onChange: (item) => setItems((list) => list.map((entry) => (entry.key === item.key ? item : entry))) });
       if (changed.some((item) => item.state === "done")) await queries.invalidateQueries({ queryKey: ["byline", "field"] });
+      // A live update just sent shows in the timeline now, not on its next poll.
+      if (changed.some((item) => item.state === "done" && item.kind === "live")) await queries.invalidateQueries({ queryKey: ["byline", "story-live"] });
     } finally {
       running.current = false;
       await refresh();
@@ -257,6 +265,8 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
   // The shared live desk (the same record Write reads): the timeline, and the setup sheet's data for editors.
   const desk = useLiveDesk(api, storyId, { enabled: Boolean(data) && (data!.story.coverage.mode === "live" || data!.canControl), refetchMs: 15_000 });
   const { change, busy } = useCoverageChange(api, storyId);
+  // The same timeline actions as Write's desk (edit, publish a desk draft, pin, delete), with Field-sized controls.
+  const deskControls = useLiveDeskControls({ api, storyId, desk: desk.data, busy, tap: true, Fields: FieldEditFields });
   const [sheet, setSheet] = useState<"setup" | "manage" | null>(null);
   const [ending, setEnding] = useState(false);
   // Back returns to where Field was opened from: the Story (a fixed address built here, never a URL taken from the page) or the assignments.
@@ -324,7 +334,7 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
       {coverage.mode === "live" && desk.data ? (
         <section aria-label="Live timeline" className="grid grid-cols-[minmax(0,1fr)] gap-2" data-field-timeline="">
           <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live timeline</h2>
-          <LiveTimeline updates={desk.data.updates} timeZone={tz} storyPublished={desk.data.storyPublished} tap />
+          <LiveTimeline updates={desk.data.updates} timeZone={tz} storyPublished={desk.data.storyPublished} controls={deskControls.controls} tap />
         </section>
       ) : null}
       <Recent session={data} outbox={outbox} />
@@ -344,6 +354,8 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
           onGoLive={async (publishers) => { if (await change({ action: "setup", publishers, start: true }, "You're live.")) setSheet(null); }}
         />
       ) : null}
+
+      {deskControls.dialog}
 
       <AlertDialog open={ending} onOpenChange={setEnding}>
         <AlertDialogContent>
@@ -369,17 +381,23 @@ function BackBar({ onBack, href }: { onBack: () => void; href?: string }) {
 
 function Composer({ api, session, appointmentId, outbox }: { api: string; session: FieldSession; appointmentId: number | null; outbox: Outbox }) {
   const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
+  const [keyUpdate, setKeyUpdate] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [choosing, setChoosing] = useState<File | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // A shared phone: an editor credits the live update to whoever is holding it. Kept until switched back.
+  const [author, setAuthor] = useState<{ id: number; name: string; avatarUrl: string | null } | null>(null);
+  const [switching, setSwitching] = useState(false);
   const photoInput = useRef<HTMLInputElement | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const storyId = session.story.id;
   // Live updates exist only while the Story is in Live mode and coverage is Live now; every other state is private capture only.
   const live = session.story.live;
+  const postAs = live && session.canPostAs;
+  const as = postAs && author ? { as: { id: author.id, name: author.name } } : {};
   const context = { ...(appointmentId ? { appointmentId } : {}), ...(session.appointment?.sourceId ? { sourceId: session.appointment.sourceId } : {}) };
-  void api;
 
   const queue = async (item: OutboxItem) => {
     const safe = await outbox.add(item);
@@ -400,12 +418,13 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     setRecording(false);
     void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, ...(result.durationMs ? { durationMs: result.durationMs } : {}), context }));
   };
+  const clear = () => { setText(""); setTitle(""); setKeyUpdate(false); setPhoto(null); };
   const saveNote = async () => {
     if (!text.trim()) return;
-    await queue(newItem({ key: newClientKey(), storyId, kind: "note", text: text.trim(), context }));
+    // A headline typed for a live update stays with the words when they're kept as a private note instead.
+    await queue(newItem({ key: newClientKey(), storyId, kind: "note", text: [title.trim(), text.trim()].filter(Boolean).join("\n\n"), context }));
     if (photo) await sendPhoto(photo, session.assignments.length === 1 ? session.assignments[0].id : null);
-    setText("");
-    setPhoto(null);
+    clear();
   };
   // The tapped intent is frozen into the outbox item, so a queued "Publish now" is still a publish request when it reaches the server (which re-checks).
   const postLive = async (delivery: Delivery) => {
@@ -413,16 +432,18 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     let photoKey: string | undefined;
     if (photo) {
       photoKey = newClientKey();
-      await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {} }));
+      await queue(newItem({ key: photoKey, storyId, kind: "photo", blob: photo, filename: photo.name || "photo.jpg", capturedAt: photo.lastModified ? new Date(photo.lastModified).toISOString() : undefined, context: {}, ...as }));
     }
-    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), photoKey, context }));
-    setText("");
-    setPhoto(null);
+    // A key update is only asked for with Publish now; the server pins only what it actually publishes.
+    const pinned = keyUpdate && delivery === "publish" && session.canPublishNow;
+    await queue(newItem({ key: newClientKey(), storyId, kind: "live", delivery, text: text.trim(), ...(title.trim() ? { title: title.trim() } : {}), ...(pinned ? { pinned } : {}), photoKey, context, ...as }));
+    clear();
   };
 
   return (
     <section aria-label="Capture" className="grid grid-cols-[minmax(0,1fr)] gap-3" data-field-composer={live ? "live" : "capture"}>
       <InputGroup className="h-auto flex-col items-stretch">
+        {live ? <InputGroupInput value={title} maxLength={200} placeholder="Headline (optional)" aria-label="Live update headline (optional)" className="h-11 border-b px-3 text-base font-medium" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => setTitle(event.target.value)} data-field-headline="" /> : null}
         <InputGroupTextarea value={text} rows={4} placeholder={live ? "What's happening?" : "What did you see or hear?"} aria-label={live ? "What's happening?" : "What did you see or hear?"} className="min-h-28! px-3 text-base [@media(max-height:480px)]:min-h-16!" onChange={(event) => setText(event.target.value)} />
         {photo ? (
           <div className="mx-3 flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm" data-attached-photo="">
@@ -436,6 +457,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           <Button type="button" variant="ghost" className={TAP} onClick={() => fileInput.current?.click()}><Paperclip data-icon="inline-start" />Attach</Button>
         </InputGroupAddon>
       </InputGroup>
+      {postAs ? <div className="-mt-1"><PostingAsRow tap author={author} me={session.me} onSwitch={() => setSwitching(true)} /></div> : null}
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
       <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
 
@@ -448,6 +470,12 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           </div>
           <div role="group" aria-labelledby="field-live-label" className="grid gap-1.5">
             <p id="field-live-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live update</p>
+            {session.canPublishNow ? (
+              <Label className="flex min-h-11 items-center gap-3 text-base font-normal" data-field-key-update="">
+                <Checkbox checked={keyUpdate} onCheckedChange={(checked) => setKeyUpdate(checked === true)} />
+                Pin as the key update <span className="text-sm text-muted-foreground">(with Publish now)</span>
+              </Label>
+            ) : null}
             <LiveDeliveryButtons tap canPublishNow={session.canPublishNow} disabled={!text.trim()} onDeliver={(delivery) => void postLive(delivery)} helperId="field-live-helper" />
           </div>
         </div>
@@ -469,6 +497,18 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         </DrawerContent>
       </Drawer>
 
+      {postAs ? (
+        <Drawer open={switching} onOpenChange={setSwitching}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Who is this update by?</DrawerTitle>
+              <DrawerDescription>For a phone you're passing around. {POSTING_AS_HELP} Notes stay under your account.</DrawerDescription>
+            </DrawerHeader>
+            <PostingAsList tap api={api} storyId={storyId} me={session.me} current={author?.id ?? null} enabled={switching} onPick={(person) => { setAuthor(person); setSwitching(false); }} />
+          </DrawerContent>
+        </Drawer>
+      ) : null}
+
       <Drawer open={choosing !== null} onOpenChange={(open) => { if (!open) setChoosing(null); }}>
         <DrawerContent>
           <DrawerHeader><DrawerTitle>Which assignment is this photo for?</DrawerTitle><DrawerDescription>You have more than one photo assignment on this story.</DrawerDescription></DrawerHeader>
@@ -481,6 +521,9 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     </section>
   );
 }
+
+/** Editing an update from Field: the headline and words only (no Media picker in this bundle). */
+const FieldEditFields: LiveFieldsComponent = (props) => <div className="grid gap-3"><LiveTextFields {...props} tap /></div>;
 
 const KIND_LABEL: Record<string, string> = { note: "Note", live: "Live", photo: "Photo", media: "Photo", recording: "Recording", file: "File" };
 
@@ -498,7 +541,7 @@ function Recent({ session, outbox }: { session: FieldSession; outbox: Outbox }) 
         {pending.map((item) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5" data-outbox={item.state}>
             <span className="w-16 shrink-0 text-xs tabular-nums text-muted-foreground">{timeOf(new Date(item.createdAt).toISOString(), tz)}</span>
-            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]} · {item.text ?? item.filename}</span>
+            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]}{item.as && item.kind === "live" ? ` by ${item.as.name}` : ""} · {item.text ?? item.filename}</span>
             <span role="status" className={`text-sm font-medium ${item.state === "failed" || item.memoryOnly ? "text-destructive" : ""}`}>{outboxLabel(item, outbox.online)}</span>
             {item.state === "failed" ? <div className="flex w-full gap-2"><Button type="button" className={TAP} onClick={() => void outbox.again(item)}>Retry</Button><Button type="button" variant="ghost" className={TAP} onClick={() => void outbox.dismiss(item)}>Discard</Button></div> : null}
             {item.error && item.state === "failed" ? <p className="w-full text-xs text-destructive">{item.error}</p> : null}
