@@ -52,6 +52,16 @@
   z-index: 25;
 }
 
+// A sticky box sticks only within its containing block. The header's wrapper
+// is `display: contents`, so that block is <body>, which Payload fixes at
+// `height: 100%`: the header used to let go after one screen of scrolling on
+// every long page. The body grows with the page instead (the viewport still
+// scrolls, as before), so the header, and anything pinned under it, stays put.
+body {
+  height: auto;
+  min-height: 100%;
+}
+
 // The Byline Story screen (src/ui/story) presents the whole document. Payload's
 // document header, tabs and controls stay mounted, because autosave, locking and
 // stale-data detection live there, but they are not shown.

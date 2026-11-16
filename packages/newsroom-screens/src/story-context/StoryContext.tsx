@@ -347,7 +347,7 @@ export function MediaContext({ leadImage, title = "Media", level = 2, id = "cont
  * spelling. (Interviews are sources and appointments, photos are media,
  * writing is the Story, editing is review.) Stored as the Story's tasks.
  */
-export function Checklist({ startAdding, onAdded, title = "Checklist", level = 2, id = "context-checklist" }: { startAdding?: boolean; onAdded?: () => void; title?: string; level?: 2 | 3; id?: string }) {
+export function Checklist({ startAdding, onAdded, title = "Checklist", addLabel = "Add checklist item", level = 2, id = "context-checklist" }: { startAdding?: boolean; onAdded?: () => void; title?: string; addLabel?: string; level?: 2 | 3; id?: string }) {
   const { editorial, data, timezone, now, caps, announce } = useWorkspace();
   const cache = useWorkspaceCache();
   const dialog = useDialogTarget<EditorialTask>("[data-context-add=checklist]");
@@ -397,7 +397,7 @@ export function Checklist({ startAdding, onAdded, title = "Checklist", level = 2
   };
 
   return (
-    <ContextSection id={id} title={title} level={level} action={caps.addTask ? <Button type="button" variant="ghost" size="icon-xs" aria-label="Add checklist item" data-context-add="checklist" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus aria-hidden="true" /></Button> : null}>
+    <ContextSection id={id} title={title} level={level}>
       {open.length ? <ItemGroup className="gap-0" aria-label={`${title}: open`}>{open.map(row)}</ItemGroup> : <p className="text-sm text-muted-foreground">{done.length ? "All done." : "Nothing on the checklist."}</p>}
       {done.length ? (
         <Collapsible>
@@ -407,6 +407,8 @@ export function Checklist({ startAdding, onAdded, title = "Checklist", level = 2
           <CollapsibleContent><ItemGroup className="gap-0" aria-label="Completed">{done.map(row)}</ItemGroup></CollapsibleContent>
         </Collapsible>
       ) : null}
+      {/* A labelled add, like Add media assignment: an icon-only "+" beside the heading was easy to miss and unclear. */}
+      {caps.addTask ? <Button type="button" variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" data-context-add="checklist" onClick={(event) => dialog.openWith(null, event.currentTarget)}><Plus data-icon="inline-start" aria-hidden="true" />{addLabel}</Button> : null}
       <TaskDialog key={`task-${dialog.session}`} open={dialog.open} task={dialog.target} wording="checklist" onClose={() => { dialog.close(); onAdded?.(); }} finalFocus={dialog.finalFocus} />
     </ContextSection>
   );
