@@ -220,9 +220,10 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
   }
   // Publish & go live runs exactly this action (its readiness checks, nothing weaker).
   if (liveCoverage) liveCoverage.publishRef.current = publish;
+  const publishFromHeader = () => liveCoverage?.desk?.mode === "live" && !hasPublishedDoc ? liveCoverage.publishForLater() : publish();
   const startPublish = () => {
     if (changedPath) setConfirmURL(true);
-    else void publish();
+    else void publishFromHeader();
   };
 
   /** Submit or resubmit: wait for Payload's autosave so the sealed version is what the writer sees. */
@@ -260,7 +261,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
   // Exactly one primary lifecycle action for this reader, now.
   const busy = actions.submit.isPending || actions.lifecycle.isPending;
   let primary: { label: string; run: () => void } | null = null;
-  if (!context.readOnly && id != null && !hasPublishedDoc && !liveDraft) {
+  if (!context.readOnly && id != null && !hasPublishedDoc) {
     const canSubmit = Boolean(reviewState?.viewer.canSubmit);
     if (phase === "pitch" && storyEditor) primary = { label: "Accept pitch", run: () => move("accept-pitch", "Pitch accepted. It's in Reporting.") };
     else if (phase === "reporting" && manages) primary = { label: "Start drafting", run: () => move("start-drafting", "Moved to Drafting.") };
@@ -502,7 +503,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
           </dl>
           <AlertDialogFooter>
             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-            <Button type="button" onClick={() => { setConfirmURL(false); void publish(); }}>Publish with redirect</Button>
+            <Button type="button" onClick={() => { setConfirmURL(false); void publishFromHeader(); }}>Publish with redirect</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
