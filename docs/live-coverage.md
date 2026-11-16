@@ -2,6 +2,8 @@
 
 Turn on live coverage with Story mode (Standard / Live) in Write. Write and Field Mode share the Story's updates. Staff can submit drafts; editors and staff with the Story's explicit live publishing grant can publish updates. See [Reporting](reporting.md) and [Field Mode](field-mode.md) for capture and delivery.
 
+Live stories have a time-sensitive publication path. An editor can **Publish for later** from Live setup, the prepared Live panel, or the Story header. That publishes the Story shell after the normal publication/readiness checks and leaves coverage **Not started**, producing the stable public URL without requiring the ordinary Pitch → Reporting → Drafting → Review → Ready sequence. **Publish & go live** uses the same publication checks and then starts coverage. The review workflow remains available when the newsroom wants it; Live mode does not silently publish or start coverage.
+
 An update contains bounded prose, an optional headline and photo, and a publication time. A single update can be pinned as key points. Ending coverage keeps the timeline, and resuming preserves the original start time. Draft updates, private account information, and updates on unpublished or trashed stories stay out of the public projection.
 
 Write and Field share one desk: the same timeline actions (edit, publish or unpublish, pin, delete) through `ui/live/useLiveDeskControls.tsx`, and the same **Live update by … · Switch** for editors (`newsroom/posting-as.ts`), which credits an update to the reporter it came from. Crediting changes only the author: publishing is still the signed-in account's right, and the Story's activity records that account.

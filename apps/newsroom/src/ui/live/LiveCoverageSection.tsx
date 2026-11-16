@@ -106,12 +106,13 @@ export function LiveCoverageSection() {
           <AlertTitle>{control ? "Ready for live coverage" : "Live coverage is ready"}</AlertTitle>
           <AlertDescription>
             {control ? (
-              <p>Direct publishers: {names(desk)}.{desk.storyPublished ? "" : " This story isn't published yet; going live publishes it through the normal checks."}</p>
+              <p>Direct publishers: {names(desk)}.{desk.storyPublished ? "" : " This story isn't published yet. Publish it for sharing without starting coverage, or publish and go live now."}</p>
             ) : (
               <p>Live coverage is ready but hasn't started yet. You can continue reporting and use Field Mode.</p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {control ? <Button type="button" size="sm" className="max-sm:min-h-11" disabled={live.busy} onClick={() => void live.goLive()}>{live.busy ? <Spinner /> : null}{desk.storyPublished ? "Go live" : "Publish & go live"}</Button> : null}
+              {control && !desk.storyPublished ? <Button type="button" size="sm" className="max-sm:min-h-11" disabled={live.busy} onClick={() => void live.publishForLater()}>{live.busy ? <Spinner /> : null}Publish for later</Button> : null}
+              {control ? <Button type="button" variant={desk.storyPublished ? "default" : "outline"} size="sm" className="max-sm:min-h-11" disabled={live.busy} onClick={() => void live.goLive()}>{live.busy ? <Spinner /> : null}{desk.storyPublished ? "Go live" : "Publish & go live"}</Button> : null}
               <OpenFieldButton href={live.fieldHref} />
               {control ? <Button type="button" variant="ghost" size="sm" className="max-sm:min-h-11" onClick={live.openPublishers}>Manage publishers</Button> : null}
             </div>

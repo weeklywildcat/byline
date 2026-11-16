@@ -24,7 +24,7 @@ const desk = (over: Partial<LiveDeskResponse> = {}): LiveDeskResponse => ({
 function render(value: LiveDeskResponse | undefined, node: ReactNode, over: Record<string, unknown> = {}) {
   const state = {
     api: "/api", admin: "/admin", storyId: 1, timeZone: "America/New_York", readOnly: false, userId: 2, desk: value, loading: false, error: null, busy: false,
-    fieldHref: "/admin/field?story=1&from=story", publishRef: createRef<never>(), setMode: () => {}, openSetup: () => {}, openPublishers: () => {}, goLive: async () => true, requestEnd: () => {}, ...over
+    fieldHref: "/admin/field?story=1&from=story", publishRef: createRef<never>(), setMode: () => {}, openSetup: () => {}, openPublishers: () => {}, publishForLater: async () => true, goLive: async () => true, requestEnd: () => {}, ...over
   };
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
@@ -97,9 +97,11 @@ describe("live coverage section under Write", () => {
     expect(html).not.toContain("Post a live update");
   });
 
-  it("says Publish & go live for a Story that was never published", () => {
+  it("lets an editor publish an unpublished live Story for sharing without starting coverage", () => {
     const html = render(desk({ status: "off", startedAt: null, storyPublished: false, canPublishNow: false, publishBlock: "story-not-public" }), <LiveCoverageSection />);
+    expect(html).toContain("Publish for later");
     expect(html).toContain("Publish &amp; go live");
+    expect(html).toContain("without starting coverage");
   });
 
   it("gives staff the prepared message and no way to start coverage", () => {
