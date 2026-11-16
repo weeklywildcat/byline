@@ -186,7 +186,8 @@ for (const story of stories) for (const viewport of viewports) {
 test('respects reduced motion on the scroll cue', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openReveal(page, stories[0].url);
+  // Stories have no scroll cue; the Diversity & Inclusion reveal keeps one.
+  await openReveal(page, diversityPage);
   const animation = () => page.locator('.hero-reveal-scroll svg').evaluate((svg) => getComputedStyle(svg).animationName);
   expect(await animation()).toBe('hero-reveal-bob');
   await page.emulateMedia({ reducedMotion: 'reduce' });

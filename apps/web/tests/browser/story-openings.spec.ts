@@ -41,7 +41,8 @@ async function servePhotos(page: Page, replacement?: Buffer, type = 'image/svg+x
 async function open(page: Page, url: string) {
   await servePhotos(page);
   await page.goto(url);
-  await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete));
+  // Lazy photographs below the fold are not fetched until scrolled to, so they never complete here.
+  await page.waitForFunction(() => Array.from(document.images).every((image) => image.loading === 'lazy' || image.complete));
 }
 
 const box = async (page: Page, selector: string) => (await page.locator(selector).first().boundingBox())!;
