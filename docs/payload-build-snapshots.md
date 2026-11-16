@@ -50,9 +50,11 @@ The version numbers serve separate purposes.
   immutable files.
 
 A completed pointer from another schema or producer version is treated as
-`byline_snapshot_not_ready`. The publication worker queues preparation on
-startup if it needs a current pointer. Replacing the pointer at the same
-content revision requires no publication-state migration or revision bump.
+`byline_snapshot_not_ready`. The publication worker reconciles publication
+state on startup: it queues preparation if the current pointer or immutable
+artifact is missing, and it repairs a missing deployment handoff for a verified
+current snapshot. Replacing the pointer at the same content revision requires
+no publication-state migration or revision bump.
 
 ## The revision fence
 
@@ -212,6 +214,10 @@ before bytes can be promoted or served directly.
 - `npm run publication:snapshot:prepare --workspace @byline/newsroom` runs
   the same builder and promotion as the worker. A not-ready outcome identifies
   the missing prepared asset. A stale outcome means a newer revision won.
+- `npm run publication:deploy:now --workspace @byline/newsroom` is the
+  event-night recovery path. It verifies that the current promoted snapshot
+  artifact exists, then calls the configured deploy hook immediately with the
+  same revision/digest fence used by the queued deployment task.
 
 The Phase 9 gate is `apps/newsroom/scripts/payload-snapshot-parity.ts`. Use an
 empty migrated PostgreSQL database, disposable original and publication
