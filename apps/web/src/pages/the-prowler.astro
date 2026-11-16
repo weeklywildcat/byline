@@ -1,0 +1,6 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { getMetadata } from "@/views/the-prowler/page";
+const metadata = await getMetadata();
+---
+<BaseLayout metadata={metadata} masthead="prowler" homepage><Page /></BaseLayout>

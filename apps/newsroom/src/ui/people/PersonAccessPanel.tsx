@@ -59,7 +59,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@byline/newsroom-ui/ui/select";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound, RotateCcw, ShieldCheck } from "lucide-react";
+import { firstName } from "../onboarding/first-name";
 
 type AccessDraft = {
   email: string;
@@ -85,6 +86,7 @@ export function PersonAccessPanel({
   const id = useId();
   const [editing, setEditing] = useState(false);
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
   const [draft, setDraft] = useState<AccessDraft>({
     email: access?.email ?? "",
     role: access?.role ?? "staff",
@@ -157,6 +159,23 @@ export function PersonAccessPanel({
     }
   };
 
+  const restartTour = async () => {
+    if (!access || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      onSaved(await api.restartOnboarding(detail.person.id));
+      setConfirmRestart(false);
+      toast.success("Welcome tour will show again.");
+    } catch (caught) {
+      setError(message(caught));
+      setConfirmRestart(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const calledBy = firstName(detail.person.name) ?? detail.person.name;
+
   return (
     <Card size="sm" role="region" aria-labelledby={id + "-access"} className="min-w-0">
       <CardHeader>
@@ -211,6 +230,12 @@ export function PersonAccessPanel({
           ) : access ? (
             <Button type="button" size="sm" onClick={() => void setEnabled(true)} disabled={busy}>
               {busy ? "Enabling…" : "Enable access"}
+            </Button>
+          ) : null}
+          {access?.enabled ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmRestart(true)} disabled={busy} data-person-restart-tour="">
+              <RotateCcw data-icon="inline-start" aria-hidden="true" />
+              Restart welcome tour
             </Button>
           ) : null}
         </div>
@@ -313,6 +338,23 @@ export function PersonAccessPanel({
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmRestart} onOpenChange={(open) => !busy && setConfirmRestart(open)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart welcome tour for {calledBy}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The welcome introduction will appear the next time {calledBy} opens or reloads Byline. Their account, profile and work won’t be changed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={() => void restartTour()}>
+              {busy ? "Restarting…" : "Restart tour"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmDisable} onOpenChange={(open) => !busy && setConfirmDisable(open)}>
         <AlertDialogContent size="sm">

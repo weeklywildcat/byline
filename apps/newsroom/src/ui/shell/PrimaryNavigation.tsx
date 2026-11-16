@@ -5,6 +5,7 @@ import { primaryNavigationFor, type primaryLocationFor } from "../../domain/navi
 import { NAV_ICONS } from "./nav-items";
 import { MoreNavigation, type MoreAccount } from "./MoreNavigation";
 import { ShellLink } from "./navigation";
+import { tourAnchor } from "../onboarding/tour-targets";
 
 export function PrimaryNavigation({ admin, role, active, ...account }: MoreAccount & {
   active: NonNullable<ReturnType<typeof primaryLocationFor>>["key"];
@@ -18,6 +19,7 @@ export function PrimaryNavigation({ admin, role, active, ...account }: MoreAccou
             key={key}
             href={`${admin}${path}` || "/"}
             aria-current={active === key ? "page" : undefined}
+            {...tourAnchor(`nav-${key}`)}
             className={cn("byline-primary-link text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring", key === "media" && "byline-tablet-media")}
           >
             <Icon className="size-5 shrink-0" aria-hidden="true" />

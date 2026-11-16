@@ -106,6 +106,12 @@ function typesOf(node: Record<string, unknown>) {
   return ([] as unknown[]).concat(node["@type"] ?? []).map(String);
 }
 
+/** A story page's article entity. Satire (The Prowler) is a SatiricalArticle, never a NewsArticle. */
+const ARTICLE_TYPES = ["NewsArticle", "SatiricalArticle"];
+function isArticleNode(node: Record<string, unknown>) {
+  return typesOf(node).some((type) => ARTICLE_TYPES.includes(type));
+}
+
 function* urlStrings(value: unknown, key = ""): Generator<[string, string]> {
   if (typeof value === "string") {
     if (["url", "@id", "contentUrl", "item", "logo", "image", "acquireLicensePage", "license", "sameAs"].includes(key)) yield [key, value];
@@ -201,9 +207,9 @@ export function auditPage(html: string, route: string, { origin, siteName }: Pag
       if (!/^https?:\/\//i.test(author) || !absolute(author) || !author.includes("/author/")) fail(`article:author should be a profile URL on ${origin}: ${author}`);
     }
 
-    const article = nodes.find((node) => typesOf(node).includes("NewsArticle"));
+    const article = nodes.find(isArticleNode);
     if (!article) {
-      fail("missing NewsArticle JSON-LD");
+      fail("missing NewsArticle (or SatiricalArticle) JSON-LD");
     } else {
       for (const key of ["datePublished", "dateModified"]) {
         const value = String(article[key] ?? "");
@@ -312,7 +318,7 @@ function auditVideoWatchPage(html: string, page: ParsedPage, canonical: string):
   if (video["@id"] !== `${canonical}#video`) issues.push(`VideoObject.@id should be ${canonical}#video`);
   const sources = youTubeIframeSources(html);
   if (!primaryPlayer || !sources.includes(flat.embedUrl)) issues.push(`the rendered page has no primary player iframe for ${flat.embedUrl}`);
-  const article = nodes.find((node) => typesOf(node).includes("NewsArticle"));
+  const article = nodes.find(isArticleNode);
   if ((article?.video as Record<string, unknown> | undefined)?.["@id"] !== video["@id"]) issues.push("NewsArticle.video does not reference the VideoObject");
   return issues;
 }

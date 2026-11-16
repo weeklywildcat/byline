@@ -378,8 +378,9 @@ export async function verifySelection(ctx: ScreenContext, id: number, verified: 
   if (!row) throw new APIError("That quote is not available.", 404);
   if (!canChangeMaterial(audience, row, row.createdBy)) throw new APIError("You cannot verify that quote.", 403);
   if (verified) {
-    const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, url: true }, ...as(ctx) })).docs[0];
-    if (!file || file.kind !== "audio" || !file.url) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
+    const file = (await payload.find({ collection: "reporting-files", where: { id: { equals: num(row.file) } }, limit: 1, select: { kind: true, filename: true, url: true }, ...as(ctx) })).docs[0];
+    // `url` is derived from `filename`, so a select that omits the filename would always read as missing.
+    if (!file || file.kind !== "audio" || !file.filename) throw new APIError("A recording is required to verify a quote. Add the recording and listen to it first.", 409);
   }
 
   const verifiedAt = verified ? new Date().toISOString() : null;

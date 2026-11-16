@@ -1,6 +1,7 @@
 import { nativeStory } from "./native-snapshot";
 import { getWordPressInstant } from "@/lib/dates";
 import { stripHtml } from "@/lib/format";
+import { isProwlerPost } from "@/lib/content";
 import { getPostHref, getPostRouteParts, type ArchivePost } from "@/lib/public-content";
 
 const NEWS_NAMESPACE = "http://www.google.com/schemas/sitemap-news/0.9";
@@ -37,8 +38,10 @@ function publishedAt(post: ArchivePost, timeZone: string) {
  * published within the news window, with a canonical article URL, are listed.
  */
 export function buildNewsSitemapXml(posts: ArchivePost[], { siteUrl, publicationName, timeZone, now }: NewsSitemapOptions) {
+  // Satire is not news: The Prowler never reaches Google News.
   const urls = posts
     .flatMap((post) => {
+      if (isProwlerPost(post)) return [];
       const published = publishedAt(post, timeZone);
       if (!published || !getPostRouteParts(post)) return [];
       const age = now - published.getTime();

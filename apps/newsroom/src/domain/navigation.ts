@@ -13,7 +13,13 @@ export type NavItem = {
 };
 
 const RANK: Record<Role, number> = { staff: 1, editor: 2, administrator: 3 };
-const allowed = (role: Role) => (item: { minimumRole: Role }) => RANK[role] >= RANK[item.minimumRole];
+
+/** Whether a role reaches a minimum role (staff < editor < administrator). */
+export function roleAllows(role: Role, minimumRole: Role): boolean {
+  return RANK[role] >= RANK[minimumRole];
+}
+
+const allowed = (role: Role) => (item: { minimumRole: Role }) => roleAllows(role, item.minimumRole);
 
 /** Stories' address below the admin route: Board, List and the filters are its query. */
 export const STORIES_PATH = "/stories";

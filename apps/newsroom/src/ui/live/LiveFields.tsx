@@ -2,13 +2,11 @@
 
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { Input } from "@byline/newsroom-ui/ui/input";
 import { Label } from "@byline/newsroom-ui/ui/label";
-import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { ImagePlus, X } from "lucide-react";
-import { LIVE_TEXT_MAX } from "../../newsroom/live-text";
 import { useBylineMediaPicker } from "../media/MediaWorkspaceShell";
 import type { LiveDraft } from "./api";
+import { LiveTextFields } from "./LiveTextFields";
 
 /**
  * The optional headline, update text, optional photo and (for people who may publish) the key-update pin.
@@ -22,14 +20,7 @@ export function LiveFields({ value, onChange, name, canPin, placeholder }: { val
   }
   return (
     <div className="grid gap-3">
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${name}-title`}>Headline <span className="font-normal text-muted-foreground">(optional)</span></Label>
-        <Input id={`${name}-title`} maxLength={200} value={value.title} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} onChange={(event) => onChange({ ...value, title: event.target.value })} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${name}-text`}>Live update</Label>
-        <Textarea id={`${name}-text`} rows={4} required maxLength={LIVE_TEXT_MAX} value={value.text} placeholder={placeholder ?? "What's happening? Blank line for a new paragraph, “- ” for a list; links become links."} onChange={(event) => onChange({ ...value, text: event.target.value })} />
-      </div>
+      <LiveTextFields value={value} onChange={onChange} name={name} placeholder={placeholder} />
       <div className="flex flex-wrap items-center gap-3">
         {value.photo ? (
           <div className="flex items-center gap-2 rounded-md border p-1 pr-2 text-sm">

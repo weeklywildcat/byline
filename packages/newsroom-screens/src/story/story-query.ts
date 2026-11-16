@@ -2,12 +2,12 @@ import { collectionsKey } from "../collections/collection-api";
 import { QueryClient } from "@tanstack/react-query";
 import { workloadHintsKey } from "../editorial/workload-hints";
 import { homeKey } from "../home/home-query";
-import { workspaceKey } from "../workspace/workspace-query";
+import { WORKSPACE_STALE_TIME, workspaceKey } from "../workspace/workspace-query";
 
 export { workspaceKey, replaceWorkspaceTask } from "../workspace/workspace-query";
 
 /** The one QueryClient configuration for every React 19 admin screen. */
-export const createAdminQueryClient = () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: true } } });
+export const createAdminQueryClient = () => new QueryClient({ defaultOptions: { queries: { staleTime: WORKSPACE_STALE_TIME, retry: 1, refetchOnWindowFocus: true } } });
 
 /**
  * Server-state keys. A story lives in several collections at once (Home, the

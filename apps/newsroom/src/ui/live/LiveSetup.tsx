@@ -100,10 +100,10 @@ export function PublisherFields({ api, storyId, selected, onChange, disabled }: 
 
 /**
  * "Set up live coverage" (first time) and "Manage direct publishers". Setup configures Live mode and who may
- * publish directly; it never silently starts coverage. Its primary action is Go live (a public Story) or
- * Publish & go live (a Story that was never published: it runs the normal publication checks first).
+ * publish directly; it never silently starts coverage. An unpublished live Story can be published for sharing
+ * without starting coverage, so Live does not have to travel through the ordinary review workflow first.
  */
-export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, readOnly, onSetUp, onManage, onGoLive, goLiveHere = true }: {
+export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, readOnly, onSetUp, onPublishForLater, onManage, onGoLive, goLiveHere = true }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intent: "setup" | "manage";
@@ -112,6 +112,7 @@ export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, r
   busy: boolean;
   readOnly: boolean;
   onSetUp: (publishers: number[]) => void | Promise<void>;
+  onPublishForLater?: (publishers: number[]) => void | Promise<void>;
   onManage: (publishers: number[]) => void | Promise<void>;
   onGoLive: (publishers: number[]) => void | Promise<void>;
   /** Field can start coverage only for a Story that is already public; publishing the article is Write's. */
@@ -137,13 +138,14 @@ export function LiveSetupDialog({ open, onOpenChange, intent, api, desk, busy, r
       ) : (
         <>
           <Button type="button" variant="ghost" className="max-sm:min-h-11" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" variant="outline" className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onSetUp(ids)}>Set up for later</Button>
-          {goLiveHere ? <Button type="button" className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onGoLive(ids)}>{busy ? <Spinner /> : null}{desk.storyPublished ? "Go live" : "Publish & go live"}</Button> : null}
+          <Button type="button" variant={desk.storyPublished ? "outline" : "ghost"} className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onSetUp(ids)}>{desk.storyPublished ? "Set up for later" : "Set up without publishing"}</Button>
+          {!desk.storyPublished && goLiveHere && onPublishForLater ? <Button type="button" className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onPublishForLater(ids)}>{busy ? <Spinner /> : null}Publish for later</Button> : null}
+          {goLiveHere ? <Button type="button" variant={desk.storyPublished ? "default" : "outline"} className="max-sm:min-h-11" disabled={busy || blocked} onClick={() => void onGoLive(ids)}>{busy ? <Spinner /> : null}{desk.storyPublished ? "Go live" : "Publish & go live"}</Button> : null}
         </>
       )}
     >
       <div className="grid gap-4">
-        {!manage && !desk.storyPublished ? <p className="text-sm text-muted-foreground">This story isn't published yet. Publish & go live runs the normal publication checks first; if the story can't be published, coverage doesn't start.</p> : null}
+        {!manage && !desk.storyPublished ? <p className="text-sm text-muted-foreground">This story isn't published yet. Publish for later makes the story shareable but keeps coverage Not started. Publish & go live starts coverage now. Both run the normal publication checks; the ordinary review workflow is optional for Live stories.</p> : null}
         {!manage && !goLiveHere ? <p className="text-sm text-muted-foreground">Publish this story from Write to go live. You can still set up Live mode and direct publishers now.</p> : null}
         {blocked ? <Alert variant="destructive"><CircleAlert aria-hidden="true" /><AlertTitle>Live coverage is read-only</AlertTitle><AlertDescription>Only editors can change live coverage.</AlertDescription></Alert> : null}
         <PublisherFields api={api} storyId={desk.storyId} selected={selected} onChange={setSelected} disabled={busy || blocked} />

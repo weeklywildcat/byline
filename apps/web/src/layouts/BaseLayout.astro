@@ -30,8 +30,10 @@ interface Props {
   // "story-overlay" is the Minimal navigation: menu, logo and search over the story opening.
   chrome?: "standard" | "story-overlay";
   chromeLogo?: "center" | "start";
+  // The Prowler's satire section and stories wear its own wordmark.
+  masthead?: "publication" | "prowler";
 }
-const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false, hideMastheadDate = false, homepage = false, chrome = "standard", chromeLogo = "center" } = Astro.props;
+const { metadata = {}, themeColor, noCanonical = false, stickyLogo = false, stickyNav = false, hideMastheadDate = false, homepage = false, chrome = "standard", chromeLogo = "center", masthead = "publication" } = Astro.props;
 const overlay = chrome === "story-overlay";
 const publication = getPublicationConfig();
 const activeTheme = getActiveTheme();
@@ -106,7 +108,7 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
     {(stickyLogo || overlay) && <div class="read-progress" aria-hidden="true"><span data-read-progress></span></div>}
-    <SiteHeader mode={overlay ? "story-overlay" : "standard"} logoAlign={chromeLogo} sticky={overlay ? undefined : stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} />
+    <SiteHeader mode={overlay ? "story-overlay" : "standard"} logoAlign={chromeLogo} sticky={overlay ? undefined : stickyLogo ? "logo" : stickyNav ? "nav" : undefined} showDate={!hideMastheadDate} homepage={homepage} masthead={masthead} />
     {overlay && <script>
       import { startStoryNavigation } from "@byline/ui/story-navigation-client";
       startStoryNavigation(document);

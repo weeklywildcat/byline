@@ -503,6 +503,7 @@ export interface User {
    */
   googleSubject?: string | null;
   discordUserId?: string | null;
+  welcomeOnboardingRequestedAt?: string | null;
   preferences?: {
     notifyAssignments?: boolean | null;
     notifyAppointments?: boolean | null;
@@ -2808,6 +2809,7 @@ export interface UsersSelect<T extends boolean = true> {
   linkedPerson?: T;
   googleSubject?: T;
   discordUserId?: T;
+  welcomeOnboardingRequestedAt?: T;
   preferences?:
     | T
     | {

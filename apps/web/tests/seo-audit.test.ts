@@ -79,7 +79,9 @@ describe("page audit", () => {
   });
 
   it("requires NewsArticle and breadcrumb JSON-LD with the shared publisher and canonical entity", () => {
-    expect(messages(articlePage({}, ""))).toEqual(expect.arrayContaining(["missing NewsArticle JSON-LD", "missing BreadcrumbList JSON-LD"]));
+    expect(messages(articlePage({}, ""))).toEqual(expect.arrayContaining(["missing NewsArticle (or SatiricalArticle) JSON-LD", "missing BreadcrumbList JSON-LD"]));
+    // The Prowler's satire is a SatiricalArticle and passes the same checks.
+    expect(messages(articlePage({}, `${ld({ ...articleJson, "@type": "SatiricalArticle" })}${ld(breadcrumbJson)}`))).toEqual([]);
     const anonymous = articlePage({}, `${ld({ ...articleJson, publisher: { "@type": "Organization", name: "Weekly Wildcat" } })}${ld(breadcrumbJson)}`);
     expect(messages(anonymous)).toEqual(expect.arrayContaining([expect.stringContaining("shared organization entity")]));
     const relativeImage = articlePage({}, `${ld({ ...articleJson, image: [{ url: "/_byline/media/a.jpg" }] })}${ld(breadcrumbJson)}`);
