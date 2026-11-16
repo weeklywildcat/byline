@@ -6,6 +6,9 @@ import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { Crop, ImagePlus, X } from "lucide-react";
 import { relationIdOf, useStoryField } from "./form";
+import type { Id } from "./types";
+
+export const leadImageCaptionShouldReset = (currentId: Id | null, nextId: Id | null) => currentId !== nextId;
 
 /**
  * The lead image, chosen through Byline Media (never Payload's upload
@@ -23,7 +26,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
   const asset = entry.asset;
 
   const setLeadImage = (nextId: number | null) => {
-    if (nextId !== id) caption.setValue("");
+    if (leadImageCaptionShouldReset(id, nextId)) caption.setValue("");
     media.setValue(nextId);
   };
 
