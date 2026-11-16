@@ -112,7 +112,8 @@ const guardPublicUpdate: CollectionBeforeChangeHook = async ({ data, originalDoc
   // An update never moves between Stories (a later hook restores the original), so every decision below is about the
   // Story the update is already on, never a Story named in the request: no permission or coverage check can be
   // satisfied by a different Story than the one that gets written.
-  const story = originalDoc ? originalDoc.story : data.story;
+  // Payload passes an empty originalDoc on create, so the Story comes from the request only when there is none.
+  const story = originalDoc?.story ?? data.story;
   // No one, including editors, can make a new update public before coverage starts or
   // after it ends. Editors may still correct or unpublish an already-published update.
   // This guard applies to the collection API, not just Write and Field Mode.
