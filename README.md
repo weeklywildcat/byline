@@ -1,6 +1,6 @@
 # Byline
 
-Byline powers [The Weekly Wildcat](https://weeklywildcat.com), the student newspaper of Ninety Six High School. Staff report, edit, and publish in the private [Byline newsroom](https://byline.weeklywildcat.com/). Readers get a static site built from published content.
+Byline powers the [Weekly Wildcat](https://weeklywildcat.com), the student newspaper of Ninety Six High School. Staff report, edit, and publish in the private [Byline newsroom](https://byline.weeklywildcat.com/). Readers get a static site built from published content.
 
 - [`apps/newsroom`](apps/newsroom) is the private newsroom, built with Payload, Next.js, and PostgreSQL. It owns stories, planning, media, and publishing.
 - [`apps/web`](apps/web) is the public Astro site. It reads a validated publication snapshot, materializes prepared media, and writes the site to `apps/web/out/`.
