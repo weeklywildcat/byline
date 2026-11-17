@@ -256,6 +256,35 @@ function failureMessage(reason: PopulationFailure, detail: string): { title: str
   }
 }
 
+/* ---------------------------------------------------------------- site chrome */
+
+/** The public site's standard article header, using the same classes/styles but preview-safe links. */
+function PreviewStandardHeader({ publication }: { publication: PreviewPublication }) {
+  const navigation = publication.siteNavigation;
+  return (
+    <header className="site-header" data-preview-site-header>
+      <div className="site-utility site-utility--undated" aria-label="Publication details">
+        <span>{navigation.location}</span>
+        <div className="header-tools" aria-label="Site tools">
+          <a className="header-donate" href={publication.contactHref}>Donate</a>
+          <a className="search-button" href={navigation.searchHref} aria-label="Search" title="Search">
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </a>
+        </div>
+      </div>
+      <a className="masthead-logo" href={navigation.homeHref} aria-label={`${navigation.name} home`}>
+        <img src={navigation.logoUrl} alt={navigation.name} />
+      </a>
+      <nav aria-label="Sections" className="section-nav">
+        {navigation.sections.map((section) => <a key={`${section.label}-${section.url}`} href={section.url}>{section.label}</a>)}
+      </nav>
+    </header>
+  );
+}
+
 /* --------------------------------------------------------------------- page */
 
 function LivePreviewPage({ origin, publication, fixtures }: { origin: string; publication: PreviewPublication; fixtures: boolean }) {
@@ -285,9 +314,8 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
   useKeepPreviewInPlace(publication.publicSite);
   useArticleEnhancements(presentation, interactives, trackers);
 
-  // The same rule the public page uses: the layout (here, this page) resolves the story's Site navigation
-  // before it renders, and draws the same minimal bar. A repository presentation keeps the Standard header,
-  // which Preview has never drawn.
+  // The same rule the public page uses: resolve the story's Site navigation before render.
+  // Minimal stories get the overlay bar; Standard stories get the publication masthead and section row.
   const minimalNavigation = presentation ? resolveStoryChrome(presentation, registry) === "minimal" : false;
   const navigationReady = Boolean(presentation) && assets.ready;
   useEffect(() => {
@@ -327,7 +355,7 @@ function LivePreviewPage({ origin, publication, fixtures }: { origin: string; pu
           sections={publication.siteNavigation.sections}
           secondary={publication.siteNavigation.secondary.filter((link) => !link.url.endsWith("/diversity-inclusion/"))}
         />
-      ) : null}
+      ) : <PreviewStandardHeader publication={publication} />}
       <StoryArticle presentation={presentation} slots={slots} registry={registry} host={assets.host} />
     </div>
   );
