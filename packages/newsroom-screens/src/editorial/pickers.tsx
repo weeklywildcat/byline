@@ -14,6 +14,7 @@ import { Button } from "@byline/newsroom-ui/ui/button";
 import { Calendar } from "@byline/newsroom-ui/ui/calendar";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger } from "@byline/newsroom-ui/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Input } from "@byline/newsroom-ui/ui/input";
 import { PeopleAvatars } from "@byline/newsroom-ui/components/people-avatars";
 import { PersonAvatar } from "@byline/newsroom-ui/components/person-avatar";
 
@@ -73,10 +74,23 @@ export function WritersPicker({ people, value, onChange, disabled, appearance = 
   </Combobox>;
 }
 
+const SITE_WALL_TIME = /^\\d{4}-\\d{2}-\\d{2}T(\\d{2}):(\\d{2})(?::\\d{2})?$/;
+
+/** The newsroom-local HH:MM shown by a date-and-time picker. */
+export function pickerTime(value: string | null | undefined, timezone: string): string {
+  if (!value) return "12:00";
+  const wall = SITE_WALL_TIME.exec(value);
+  if (wall) return `${wall[1]}:${wall[2]}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "12:00";
+  return new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+}
+
 /** A date (or date and time) stored as an offset-free site-local value. */
 export function DatePicker({ id, label, value, timezone, onChange, disabled, dateOnly = false, appearance = "field", placeholder = "Set date", displayValue }: { id?: string; label: string; value?: string | null; timezone: string; onChange: (date: string | null) => void; disabled?: boolean; dateOnly?: boolean; appearance?: PickerAppearance; placeholder?: string; displayValue?: string }) {
   const [open, setOpen] = useState(false);
   const day = value ? siteDay(value, timezone) : "";
+  const time = pickerTime(value, timezone);
   const selected = day ? new Date(`${day}T12:00:00`) : undefined;
   const text = value ? (displayValue ?? exactDate(value, timezone)) : "";
   return <Popover open={open} onOpenChange={setOpen}>
@@ -89,15 +103,34 @@ export function DatePicker({ id, label, value, timezone, onChange, disabled, dat
       <Calendar mode="single" selected={selected} defaultMonth={selected} onSelect={(date) => {
         if (date) {
           const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-          // Offset-free timestamps are interpreted by the canonical PHP domain in
-          // the site timezone, independent of this browser's timezone.
-          let time = "12:00:00";
-          if (!dateOnly && value?.includes("T")) time = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date(value));
-          onChange(dateOnly ? key : `${key}T${time}`);
-        } else onChange(null);
-        setOpen(false);
+          // Date-and-time pickers keep the newsroom-local clock time while the
+          // day changes. The server converts this offset-free wall time to UTC.
+          onChange(dateOnly ? key : `${key}T${time}:00`);
+          if (dateOnly) setOpen(false);
+        } else {
+          onChange(null);
+          setOpen(false);
+        }
       }} />
-      {value ? <div className="border-t p-1.5"><Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => { onChange(null); setOpen(false); }}>Clear date</Button></div> : null}
+      {!dateOnly ? <div className="flex items-center gap-2 border-t p-2">
+        <span className="text-sm text-muted-foreground">Time</span>
+        <Input
+          type="time"
+          step={60}
+          value={time}
+          aria-label={`${label} time`}
+          disabled={disabled || !day}
+          className="w-32"
+          onChange={(event) => {
+            if (!day || !event.target.value) return;
+            onChange(`${day}T${event.target.value}:00`);
+          }}
+        />
+      </div> : null}
+      <div className="flex items-center justify-end gap-1 border-t p-1.5">
+        {value ? <Button type="button" variant="ghost" size="sm" onClick={() => { onChange(null); setOpen(false); }}>Clear date</Button> : null}
+        {!dateOnly ? <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>Done</Button> : null}
+      </div>
     </PopoverContent>
   </Popover>;
 }
