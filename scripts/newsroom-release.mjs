@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { copyFile, link, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -35,10 +36,10 @@ async function cloneTree(source, target) {
     if (entry.isDirectory()) {
       await cloneTree(from, to);
     } else if (entry.isFile()) {
-      await link(from, to).catch((error) => {
-        if (error.code === "EXDEV" || error.code === "EPERM" || error.code === "EMLINK") return copyFile(from, to);
-        throw error;
-      });
+      // Ask the filesystem for a copy-on-write clone where it supports one.
+      // COPYFILE_FICLONE falls back to a normal copy, unlike hardlinks which
+      // would let the new build mutate cache bytes visible to the live release.
+      await copyFile(from, to, constants.COPYFILE_FICLONE);
     }
   }
 }
