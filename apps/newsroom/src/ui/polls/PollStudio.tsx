@@ -2,17 +2,19 @@
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { StatusBadge, type StatusTone } from "@byline/newsroom-ui/components/status-badge";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@byline/newsroom-ui/ui/breadcrumb";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Card } from "@byline/newsroom-ui/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Download, FileSpreadsheet, MapPin, MoreHorizontal, Plus, Radio } from "lucide-react";
+import { Copy, FileSpreadsheet, FileText, MapPin, MoreHorizontal, Plus, Radio, Vote } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, type ReactNode } from "react";
 import { EXAMPLE_WORKBOOK_FILE, SPREADSHEET_GUIDE_FILE, TEMPLATE_WORKBOOK_FILE } from "../../polls/workbooks/example";
 import { useNewsroomRoutes } from "../shell/account";
 import { useShellNavigation } from "../shell/navigation";
@@ -63,9 +65,7 @@ export function PollStudio(_props: { api: string; admin: string }) {
   }, []);
   return (
     <AdminRoot toaster={false} className="byline-polls-studio">
-      <div className="byline-polls min-h-full">
-        <PollsRouter />
-      </div>
+      <PollsRouter />
     </AdminRoot>
   );
 }
@@ -82,37 +82,60 @@ function PollsRouter() {
   return <PollsHome />;
 }
 
-export function PageHeader({ kicker = "Wildcat Polls", title, description, actions, back }: { kicker?: string; title: string; description?: ReactNode; actions?: ReactNode; back?: ReactNode }) {
+/** The workspace header, as Data draws it: a title, a short muted line, actions on the right. */
+export function PageHeader({ title, description, actions, status, level = "page" }: { title: string; description?: ReactNode; actions?: ReactNode; status?: ReactNode; level?: "page" | "detail" }) {
   return (
-    <header className="flex flex-col gap-3">
-      {back}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold tracking-[0.12em] text-(--poll-accent) uppercase">{kicker}</p>
-          <h1 className="mt-1.5 font-(family-name:--poll-serif) text-[2rem] leading-tight font-medium text-balance">{title}</h1>
-          {description ? <div className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{description}</div> : null}
+    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className={level === "page" ? "text-2xl font-semibold tracking-tight" : "text-xl font-semibold tracking-tight"}>{title}</h1>
+          {status}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {description ? <div className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</div> : null}
       </div>
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
 
-export function StatusBadge({ status }: { status: string }) {
-  return <Badge variant={status === "open" ? "default" : "outline"} className={status === "open" ? "bg-(--poll-accent) text-white" : undefined}>{STATUS_LABEL[status] ?? status}</Badge>;
+/** Where a Poll Studio page sits, as the Data workspace shows it: Polls, then the poll, then the page. */
+export function PollsBreadcrumb({ trail }: { trail: Array<{ label: string; target?: PollsTarget }> }) {
+  const go = usePollsNavigation();
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem><BreadcrumbLink render={<button type="button" onClick={() => go({})} />}>Polls</BreadcrumbLink></BreadcrumbItem>
+        {trail.map((crumb, index) => (
+          <Fragment key={`${crumb.label}-${index}`}>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              {crumb.target && index < trail.length - 1
+                ? <BreadcrumbLink className="max-w-[24ch] truncate" render={<button type="button" onClick={() => go(crumb.target!)} />}>{crumb.label}</BreadcrumbLink>
+                : <BreadcrumbPage className="max-w-[32ch] truncate">{crumb.label}</BreadcrumbPage>}
+            </BreadcrumbItem>
+          </Fragment>
+        ))}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
 }
 
-export function TemplatesMenu({ api, align = "end" }: { api: string; align?: "start" | "end" }) {
+const STATUS_TONE: Record<string, StatusTone> = { draft: "neutral", open: "done", closed: "neutral", archived: "neutral" };
+
+/** A poll's status in the newsroom's three looks. */
+export function PollStatus({ status }: { status: string }) {
+  return <StatusBadge tone={STATUS_TONE[status] ?? "neutral"} data-polls-status={status}>{STATUS_LABEL[status] ?? status}</StatusBadge>;
+}
+
+/** The spreadsheet format's downloads, as items of a menu that already exists. */
+export function TemplateItems({ api }: { api: string }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button type="button" variant="outline" />}><Download data-icon="inline-start" />Templates<ChevronDown data-icon="inline-end" /></DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="w-80">
-        <DropdownMenuLabel>Spreadsheet format</DropdownMenuLabel>
-        <DropdownMenuItem render={<a href={fileHref(api, TEMPLATE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Blank template (.xlsx)</DropdownMenuItem>
-        <DropdownMenuItem render={<a href={fileHref(api, EXAMPLE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Example: AI at Ninety Six High School</DropdownMenuItem>
-        <DropdownMenuItem render={<a href={fileHref(api, SPREADSHEET_GUIDE_FILE)} download />}><Download />Guide for people and AI assistants (.md)</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <DropdownMenuGroup>
+      <DropdownMenuLabel>Spreadsheet format</DropdownMenuLabel>
+      <DropdownMenuItem render={<a href={fileHref(api, TEMPLATE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Blank template (.xlsx)</DropdownMenuItem>
+      <DropdownMenuItem render={<a href={fileHref(api, EXAMPLE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Example workbook (.xlsx)</DropdownMenuItem>
+      <DropdownMenuItem render={<a href={fileHref(api, SPREADSHEET_GUIDE_FILE)} download />}><FileText />Format guide (.md)</DropdownMenuItem>
+    </DropdownMenuGroup>
   );
 }
 
@@ -129,26 +152,28 @@ function PollsHome() {
   const canFieldwork = data?.surveys.some((survey) => survey.canInterview) ?? false;
 
   return (
-    <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-8 px-4 py-6 lg:px-6" data-polls-home="">
+    <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-6 px-4 py-6 lg:px-6" data-polls-home="">
       <PageHeader
         title="Polls"
-        description={manage ? "Write a poll as a spreadsheet or here, test every path, publish it, then run fieldwork on an iPad." : "Run fieldwork for the polls you've been given, and read the results you have access to."}
+        description={manage ? "Create and run student surveys, then analyze the results." : "Run fieldwork for the polls you've been given, and read the results you can see."}
         actions={data ? (
           <>
             {canFieldwork ? <Button type="button" variant={manage ? "outline" : "default"} onClick={() => go({ view: "fieldwork" })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
             {manage ? (
               <>
-                <TemplatesMenu api={api} />
+                <Button type="button" onClick={() => go({ view: "import" })}><FileSpreadsheet data-icon="inline-start" />Import spreadsheet</Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="More poll actions" />}><MoreHorizontal /></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => blank.mutate()}><Plus />New blank poll</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => example.mutate()}><FileSpreadsheet />Add the example poll</DropdownMenuItem>
+                  <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onClick={() => blank.mutate()}><Plus />New blank poll</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => example.mutate()}><Copy />Add the example poll</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => go({ view: "locations" })}><MapPin />Polling locations</DropdownMenuItem>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => go({ view: "locations" })}><MapPin />Polling locations</DropdownMenuItem>
+                    <TemplateItems api={api} />
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button type="button" onClick={() => go({ view: "import" })}><FileSpreadsheet data-icon="inline-start" />Import spreadsheet</Button>
               </>
             ) : null}
           </>
@@ -168,15 +193,16 @@ function PollsHome() {
       <section className="flex flex-col gap-3" aria-labelledby="polls-list">
         <h2 id="polls-list" className="sr-only">Polls</h2>
         {!data ? <ListSkeleton /> : data.surveys.length ? <SurveyTable data={data} onOpen={(id) => go({ poll: id })} /> : (
-          <Empty className="border border-dashed py-14">
+          <Empty className="border border-dashed">
             <EmptyHeader>
-              <EmptyTitle className="font-(family-name:--poll-serif) text-2xl font-medium">{manage ? "No polls yet" : "No polls for you yet"}</EmptyTitle>
-              <EmptyDescription className="max-w-md">{manage ? "Import a workbook (an AI assistant can write one from the guide in Templates), start from the example, or build one here." : "When an editor gives you fieldwork or results for a poll, it appears here."}</EmptyDescription>
+              <EmptyMedia variant="icon"><Vote /></EmptyMedia>
+              <EmptyTitle>{manage ? "No polls yet" : "No polls for you yet"}</EmptyTitle>
+              <EmptyDescription>{manage ? "Import a workbook, or start from the example poll." : "When an editor gives you fieldwork or results for a poll, it appears here."}</EmptyDescription>
             </EmptyHeader>
             {manage ? (
               <EmptyContent className="flex-row flex-wrap justify-center">
-                <Button type="button" onClick={() => go({ view: "import" })}><FileSpreadsheet data-icon="inline-start" />Import spreadsheet</Button>
-                <Button type="button" variant="outline" disabled={example.isPending} onClick={() => example.mutate()}>{example.isPending ? <Spinner /> : null}Add the example poll</Button>
+                <Button type="button" onClick={() => go({ view: "import" })}>Import spreadsheet</Button>
+                <Button type="button" variant="outline" disabled={example.isPending} onClick={() => example.mutate()}>{example.isPending ? <Spinner data-icon="inline-start" /> : null}Add the example poll</Button>
               </EmptyContent>
             ) : null}
           </Empty>
@@ -186,38 +212,49 @@ function PollsHome() {
   );
 }
 
+/** A row that opens on click anywhere; its title button is the keyboard and screen-reader target. */
+function openable(onOpen: () => void) {
+  return {
+    className: "cursor-pointer",
+    onClick: (event: { target: EventTarget }) => {
+      if ((event.target as HTMLElement).closest("a,button")) return;
+      onOpen();
+    }
+  };
+}
+
 function SurveyTable({ data, onOpen }: { data: PollsOverview; onOpen: (id: number) => void }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <Card className="gap-0 py-0">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[46%]">Poll</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Version</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Version</TableHead>
             <TableHead className="text-right">Responses</TableHead>
             <TableHead className="hidden text-right md:table-cell">Updated</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.surveys.map((survey) => (
-            <TableRow key={survey.id} className="cursor-pointer" onClick={() => onOpen(survey.id)}>
-              <TableCell className="py-3">
-                <button type="button" className="text-left text-[0.9375rem] font-medium outline-none hover:underline focus-visible:underline" onClick={(event) => { event.stopPropagation(); onOpen(survey.id); }}>{survey.title}</button>
-                {survey.description ? <p className="mt-0.5 line-clamp-1 max-w-xl text-xs text-muted-foreground">{survey.description}</p> : null}
+            <TableRow key={survey.id} {...openable(() => onOpen(survey.id))} data-polls-row={survey.id}>
+              <TableCell className="max-w-0 whitespace-normal">
+                <Button type="button" variant="ghost" size="sm" className="h-auto min-h-0 justify-start rounded-none p-0 text-left font-medium whitespace-normal hover:bg-transparent hover:underline any-pointer-coarse:min-h-0" onClick={() => onOpen(survey.id)}>{survey.title}</Button>
+                {survey.description ? <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{survey.description}</p> : null}
               </TableCell>
-              <TableCell><StatusBadge status={survey.status} /></TableCell>
-              <TableCell className="text-right tabular-nums">{survey.versionNumber ? `v${survey.versionNumber}` : "—"}</TableCell>
-              <TableCell className="text-right tabular-nums">{survey.canViewResults ? survey.responses : "—"}</TableCell>
-              <TableCell className="hidden text-right text-muted-foreground md:table-cell">{formatWhen(survey.updatedAt, data.timeZone)}</TableCell>
+              <TableCell><PollStatus status={survey.status} /></TableCell>
+              <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">{survey.versionNumber ? `v${survey.versionNumber}` : "—"}</TableCell>
+              <TableCell className="text-right tabular-nums">{survey.canViewResults ? survey.responses.toLocaleString("en-US") : "—"}</TableCell>
+              <TableCell className="hidden text-right text-muted-foreground tabular-nums md:table-cell">{formatWhen(survey.updatedAt, data.timeZone)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }
 
 export function ListSkeleton() {
-  return <div className="flex flex-col gap-2">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-14 w-full" />)}</div>;
+  return <div className="grid gap-2" aria-hidden="true">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-12 w-full" />)}</div>;
 }

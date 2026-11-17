@@ -4,7 +4,7 @@ import { markWelcomeSeen } from "./helpers";
 
 /**
  * The whole Wildcat Polls workflow (docs/wildcat-polls.md): sign in → Polls →
- * import the example workbook → validate → preview a branch → publish → start
+ * import the example workbook → review → preview a branch → publish → start
  * fieldwork → kiosk → decline → a student's response → submit → back to the
  * interviewer with the PIN → end → results → export. Accounts come from
  * scripts/seed-polls-browser.ts (test values for that fixture only).
@@ -39,11 +39,10 @@ test("import, preview, publish, run fieldwork on a kiosk, and read the results",
   await signIn(page, "/admin/polls");
   await expect(page.getByRole("heading", { level: 1, name: "Polls", exact: true })).toBeVisible();
 
-  // Import → validate → review → preview → publish.
+  // Import → review (validation and every question) → preview → publish.
   await page.getByRole("button", { name: "Import spreadsheet" }).first().click();
   await page.locator("[data-polls-upload]").setInputFiles(WORKBOOK);
   await expect(page.getByText("No errors.")).toBeVisible();
-  await page.getByRole("button", { name: "Review questions" }).click();
   await expect(page.getByText(/Shown when .*Have you been assigned a book report this year\?.* is .*Yes/)).toBeVisible();
   await page.getByRole("button", { name: "Try it" }).click();
   await runner(page).getByRole("button", { name: "Start" }).click();
@@ -110,7 +109,8 @@ test("import, preview, publish, run fieldwork on a kiosk, and read the results",
   await page.getByRole("tab", { name: "Results" }).click();
   await expect(page.locator("[data-polls-results]").getByText("response", { exact: true })).toBeVisible();
   await expect(page.getByText("2 approached in person · 1 declined · 0 incomplete.", { exact: false })).toBeVisible();
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Responses CSV" }).click()]);
+  await page.getByRole("button", { name: "Export" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Responses CSV" }).click()]);
   expect(download.suggestedFilename()).toMatch(/^ai-at-ninety-six-high-school-responses-\d{4}-\d{2}-\d{2}\.csv$/);
   const { readFile } = await import("node:fs/promises");
   const text = await readFile(await download.path(), "utf8");

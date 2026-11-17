@@ -2,7 +2,11 @@
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
+import { ChoiceCards } from "@byline/newsroom-ui/components/choice-cards";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { cn } from "@byline/newsroom-ui/lib/utils";
@@ -201,8 +205,8 @@ export function KioskApp({ api, loginHref }: { api: string; loginHref: string })
             onSubmit={submit}
             outcomeOverride={outcome}
             onStop={() => setHandBack("stopped")}
-            headerAction={<Button type="button" variant="ghost" size="icon" className="size-11 text-(--poll-muted)" aria-label="Interviewer" onClick={() => setHandBack("stopped")}><Lock className="size-5" /></Button>}
-            doneAction={<div className="pt-4"><Button type="button" variant="outline" className="h-14 gap-2 rounded-full px-6 text-base" onClick={() => setHandBack("finished")}><Lock className="size-4" />Return to interviewer</Button></div>}
+            headerAction={<Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Interviewer" onClick={() => setHandBack("stopped")}><Lock /></Button>}
+            doneAction={<div className="pt-2"><Button type="button" variant="outline" size="lg" className="h-12 px-5 text-base" onClick={() => setHandBack("finished")}><Lock data-icon="inline-start" />Return to interviewer</Button></div>}
           />
         ) : state.mode === "interviewer" ? (
           <InterviewerPanel state={state} pending={pending.length} durable={store?.durable ?? false} rejected={rejected} onAct={act} onEnd={end} onLock={() => void act("/lock")} />
@@ -223,7 +227,7 @@ export function KioskApp({ api, loginHref }: { api: string; loginHref: string })
 
 function Shell({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("byline-polls min-h-dvh bg-(--poll-paper) pt-(--byline-safe-top) pr-[max(1.5rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1.5rem,var(--byline-safe-left))] text-(--poll-ink)", className)}>
+    <div className={cn("min-h-dvh bg-background pt-(--byline-safe-top) pr-[max(1.25rem,var(--byline-safe-right))] pb-[max(1.25rem,var(--byline-safe-bottom))] pl-[max(1.25rem,var(--byline-safe-left))] text-foreground", className)}>
       {children}
     </div>
   );
@@ -233,11 +237,14 @@ function Loading({ offline, onRetry }: { offline: boolean; onRetry: () => void }
   return (
     <Shell className="grid place-items-center">
       {offline ? (
-        <div className="flex max-w-md flex-col items-center gap-4 text-center">
-          <CloudOff className="size-8 text-(--poll-muted)" aria-hidden="true" />
-          <p className="text-xl">This iPad can't reach Byline. Check the Wi-Fi, then try again.</p>
-          <Button type="button" className="h-14 rounded-full px-8 text-base" onClick={onRetry}>Try again</Button>
-        </div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><CloudOff /></EmptyMedia>
+            <EmptyTitle>This iPad can't reach Byline</EmptyTitle>
+            <EmptyDescription>Check the Wi-Fi, then try again.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent><Button type="button" size="lg" className="h-12 px-5 text-base" onClick={onRetry}>Try again</Button></EmptyContent>
+        </Empty>
       ) : <Spinner className="size-6" />}
     </Shell>
   );
@@ -246,11 +253,11 @@ function Loading({ offline, onRetry }: { offline: boolean; onRetry: () => void }
 function Ended({ loginHref, message, counts }: { loginHref: string; message: string; counts?: Counts }) {
   return (
     <Shell className="grid place-items-center">
-      <div className="flex max-w-xl flex-col gap-6">
-        <h1 className="font-(family-name:--poll-serif) text-5xl font-medium">Session ended</h1>
-        <p className="text-xl leading-relaxed">{message}</p>
-        {counts ? <p className="text-lg text-(--poll-muted) tabular-nums">{counts.completed} completed · {counts.declined} declined · {counts.abandoned} incomplete</p> : null}
-        <div><Button nativeButton={false} size="lg" className="h-14 px-8 text-base" render={<a href={loginHref} />}>Sign in to Byline</Button></div>
+      <div className="flex max-w-xl flex-col gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight">Session ended</h1>
+        <p className="text-lg leading-relaxed">{message}</p>
+        {counts ? <p className="text-muted-foreground tabular-nums">{counts.completed} completed · {counts.declined} declined · {counts.abandoned} incomplete</p> : null}
+        <div className="pt-2"><Button nativeButton={false} size="lg" className="h-12 px-5 text-base" render={<a href={loginHref} />}>Sign in to Byline</Button></div>
       </div>
     </Shell>
   );
@@ -282,69 +289,71 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
   const started = new Date(state.session.startedAt);
   return (
     <Shell>
-      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-4xl flex-col gap-8 py-6">
+      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-3xl flex-col gap-6 py-6">
         <header className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[0.8125rem] font-semibold tracking-[0.12em] text-(--poll-accent) uppercase">Interviewer</p>
-            <h1 className="mt-2 font-(family-name:--poll-serif) text-[2rem] leading-tight font-medium text-balance">{state.survey.title}</h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-(--poll-muted)">
-              <span className="inline-flex items-center gap-1.5"><MapPin className="size-4" aria-hidden="true" />{state.session.locationName}</span>
-              {state.session.period ? <span>{state.session.period}</span> : null}
-              <span>Since {started.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
-              <span>Version {state.version.number}</span>
+            <p className="text-sm text-muted-foreground">Interviewer</p>
+            <h1 className="mt-1 text-2xl leading-tight font-semibold tracking-tight text-balance">{state.survey.title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {[state.session.locationName, state.session.period || null, `since ${started.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`, `version ${state.version.number}`].filter(Boolean).join(" · ")}
             </p>
           </div>
-          <Button type="button" variant="outline" className="h-12 gap-2 rounded-full px-5 text-base" onClick={onLock}><Lock className="size-4" />Lock</Button>
+          <Button type="button" variant="outline" size="lg" onClick={onLock}><Lock data-icon="inline-start" />Lock</Button>
         </header>
 
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-(--poll-rule) py-5 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y py-4 sm:grid-cols-4">
           <Stat label="Completed" value={counts.completed} />
           <Stat label="Declined" value={counts.declined} />
           <Stat label="Incomplete" value={counts.abandoned} />
-          <Stat label="Waiting to upload" value={pending} tone={pending ? "accent" : undefined} />
+          <Stat label="Waiting to upload" value={pending} attention={pending > 0} />
         </dl>
 
         {paused ? (
-          <div className="flex flex-wrap items-center gap-4 rounded-xl bg-(--poll-accent-soft) px-5 py-4">
-            <p className="flex-1 text-lg font-medium">Session paused. Nothing can be recorded until you resume.</p>
-            <Button type="button" className="h-12 gap-2 rounded-full px-6" disabled={busy !== null} onClick={() => void run("resume", () => onAct("/resume"))}><Play className="size-4" />Resume</Button>
-          </div>
+          <Alert>
+            <Pause />
+            <AlertTitle>Session paused</AlertTitle>
+            <AlertDescription>Nothing can be recorded until you resume.</AlertDescription>
+            <AlertAction><Button type="button" size="sm" disabled={busy !== null} onClick={() => void run("resume", () => onAct("/resume"))}><Play data-icon="inline-start" />Resume</Button></AlertAction>
+          </Alert>
         ) : null}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <Button
             type="button"
-            className="h-28 rounded-2xl bg-(--poll-ink) text-[1.625rem] font-medium text-(--poll-paper) hover:bg-(--poll-ink)/90 disabled:opacity-40"
+            size="lg"
+            className="h-24 text-xl"
             disabled={paused || busy !== null || !state.survey.open}
             onClick={() => void run("begin", async () => { await onAct("/begin", { eventKey: beginKey.current }); beginKey.current = newKey(); })}
           >
-            {busy === "begin" ? <Spinner className="size-6" /> : null}Student agreed — begin survey
+            {busy === "begin" ? <Spinner data-icon="inline-start" /> : null}Student agreed — begin survey
           </Button>
           <Button
             type="button"
             variant="outline"
-            className="h-20 rounded-2xl border-2 text-xl"
+            size="lg"
+            className="h-16 text-lg"
             disabled={paused || busy !== null}
             onClick={() => void run("decline", async () => { await onAct("/decline", { eventKey: declineKey.current }); declineKey.current = newKey(); }, "Decline recorded.")}
           >
             Student declined
           </Button>
-          <p className="min-h-6 text-center text-base text-(--poll-muted)" role="status">{notice ?? (state.survey.open ? "Record a decline without noting anything about the student." : "This poll has been closed in Poll Studio.")}</p>
-          {error ? <p className="text-center text-base font-medium text-(--poll-accent)" role="alert">{error}</p> : null}
+          <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">{notice ?? (state.survey.open ? "A decline records nothing about the student." : "This poll has been closed in Poll Studio.")}</p>
+          {error ? <p className="text-center text-sm font-medium text-destructive" role="alert">{error}</p> : null}
         </div>
 
-        <div className="mt-auto flex flex-col gap-5">
-          <div className="flex flex-wrap gap-3">
-            {!paused ? <Button type="button" variant="outline" className="h-12 gap-2 rounded-full px-5" disabled={busy !== null} onClick={() => void run("pause", () => onAct("/pause"))}><Pause className="size-4" />Pause</Button> : null}
-            <Button type="button" variant="outline" className="h-12 gap-2 rounded-full px-5" disabled={busy !== null} onClick={() => setMoving(true)}><MapPin className="size-4" />Change location</Button>
-            <Button type="button" variant="outline" className="h-12 gap-2 rounded-full px-5" disabled={busy !== null} onClick={() => setEnding(true)}><Square className="size-4" />End session</Button>
+        <div className="mt-auto flex flex-col gap-4">
+          <Separator />
+          <div className="flex flex-wrap gap-2">
+            {!paused ? <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void run("pause", () => onAct("/pause"))}><Pause data-icon="inline-start" />Pause</Button> : null}
+            <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setMoving(true)}><MapPin data-icon="inline-start" />Change location</Button>
+            <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setEnding(true)}><Square data-icon="inline-start" />End session</Button>
           </div>
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-(--poll-muted)">
+          <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
             {durable ? <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <CloudOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
             <span>
               {durable ? "Answers waiting to upload are encrypted on this iPad and deleted once Byline has them." : "Online only: this browser can't store answers securely, so keep the iPad connected until “Waiting to upload” is 0."}
               {rejected ? ` ${rejected} response${rejected === 1 ? " was" : "s were"} refused by the server and not saved.` : ""}
-              {" "}Before handing the iPad over, turn on Guided Access (Settings → Accessibility) to keep it in this page.
+              {" "}Before handing the iPad over, turn on Guided Access (Settings → Accessibility) to keep it on this page.
             </span>
           </p>
         </div>
@@ -353,15 +362,11 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
       <Dialog open={moving} onOpenChange={setMoving}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Change location</DialogTitle><DialogDescription>Responses from now on are counted at the new place.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-2">
-            {state.locations.map((location) => (
-              <Button key={location.id} type="button" variant={location.id === state.session.locationId ? "default" : "outline"} className="h-14 justify-start text-base"
-                onClick={() => void run("move", async () => { await onAct("/location", { locationId: location.id }); setMoving(false); }, `Now at ${location.name}.`)}>
-                {location.name}
-              </Button>
-            ))}
-            {!state.locations.length ? <p className="text-sm text-muted-foreground">An editor adds locations in Poll Studio.</p> : null}
-          </div>
+          {state.locations.length ? (
+            <ChoiceCards label="Location" value={state.session.locationId ? String(state.session.locationId) : ""} disabled={busy !== null}
+              onChange={(value) => { const location = state.locations.find((entry) => String(entry.id) === value); if (location) void run("move", async () => { await onAct("/location", { locationId: location.id }); setMoving(false); }, `Now at ${location.name}.`); }}
+              options={state.locations.map((location) => ({ value: String(location.id), title: location.name }))} />
+          ) : <p className="text-sm text-muted-foreground">An editor adds locations in Poll Studio.</p>}
         </DialogContent>
       </Dialog>
 
@@ -374,8 +379,8 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-12">Keep polling</AlertDialogCancel>
-            <AlertDialogAction className="h-12" variant={pending ? "destructive" : "default"} onClick={() => void run("end", onEnd)}>{pending ? "End and discard" : "End session"}</AlertDialogAction>
+            <AlertDialogCancel>Keep polling</AlertDialogCancel>
+            <AlertDialogAction variant={pending ? "destructive" : "default"} onClick={() => void run("end", onEnd)}>{pending ? "End and discard" : "End session"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -383,11 +388,11 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "accent" }) {
+function Stat({ label, value, attention }: { label: string; value: number; attention?: boolean }) {
   return (
     <div>
-      <dt className="text-sm text-(--poll-muted)">{label}</dt>
-      <dd className={cn("mt-1 text-[2rem] leading-none font-medium tabular-nums", tone === "accent" && "text-(--poll-accent)")}>{value}</dd>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-1 text-3xl font-semibold tabular-nums", attention && "text-warning")}>{value}</dd>
     </div>
   );
 }
@@ -433,26 +438,26 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
   const title = reason === "finished" ? "Please hand the iPad back." : reason === "stopped" ? "Hand the iPad back to the interviewer." : "Interviewer PIN";
   return (
     <Shell className="grid place-items-center">
-      <div className="flex w-full max-w-sm flex-col items-center gap-8 py-8">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Lock className="size-6 text-(--poll-muted)" aria-hidden="true" />
-          <h1 className="font-(family-name:--poll-serif) text-3xl font-medium text-balance">{title}</h1>
-          <p className="text-base text-(--poll-muted)">{reason === "locked" ? state.survey.title : "Interviewer: enter your PIN."}</p>
-          {surveyRunning ? <p className="text-sm font-medium text-(--poll-accent)">Unlocking ends the current survey as incomplete. Its answers are not saved.</p> : null}
+      <div className="flex w-full max-w-sm flex-col items-center gap-6 py-8">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <Lock className="size-5 text-muted-foreground" aria-hidden="true" />
+          <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+          <p className="text-muted-foreground">{reason === "locked" ? state.survey.title : "Interviewer: enter your PIN."}</p>
+          {surveyRunning ? <p className="text-sm font-medium text-destructive">Unlocking ends the current survey as incomplete. Its answers are not saved.</p> : null}
         </div>
         <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} digits entered`} role="status">
-          {Array.from({ length: Math.max(4, pin.length) }, (_, i) => <span key={i} className={cn("size-3.5 rounded-full border-2 border-(--poll-ink)", i < pin.length && "bg-(--poll-ink)")} />)}
+          {Array.from({ length: Math.max(4, pin.length) }, (_, i) => <span key={i} className={cn("size-3 rounded-full border border-foreground", i < pin.length && "bg-foreground")} />)}
         </div>
-        <p className="min-h-6 text-center text-base font-medium text-(--poll-accent)" role="alert">{waiting ? `Too many tries. Wait ${waiting} s.` : error}</p>
-        <div className="grid w-full grid-cols-3 gap-3">
+        <p className="min-h-5 text-center text-sm font-medium text-destructive" role="alert">{waiting ? `Too many tries. Wait ${waiting} s.` : error}</p>
+        <div className="grid w-full grid-cols-3 gap-2.5">
           {KEYS.map((digit) => <PinKey key={digit} label={digit} onPress={() => press(digit)} disabled={checking || waiting > 0} />)}
-          <PinKey label="Delete" icon={<Delete className="size-6" />} onPress={() => setPin((value) => value.slice(0, -1))} disabled={checking || !pin} />
+          <PinKey label="Delete" icon={<Delete className="size-5" />} onPress={() => setPin((value) => value.slice(0, -1))} disabled={checking || !pin} />
           <PinKey label="0" onPress={() => press("0")} disabled={checking || waiting > 0} />
-          <Button type="button" className="h-18 rounded-2xl text-lg" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
+          <Button type="button" className="h-16 text-base" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
             {checking ? <Spinner /> : "Unlock"}
           </Button>
         </div>
-        {onCancel ? <Button type="button" variant="ghost" className="h-12 text-base" onClick={onCancel}>Back to the poll</Button> : null}
+        {onCancel ? <Button type="button" variant="ghost" size="lg" onClick={onCancel}>Back to the poll</Button> : null}
       </div>
     </Shell>
   );
@@ -461,7 +466,7 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
 function PinKey({ label, icon, onPress, disabled }: { label: string; icon?: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   // The kit's outline Button, sized for a thumb: the keypad is the one place the kiosk asks for a precise tap.
   return (
-    <Button type="button" variant="outline" aria-label={label} onClick={onPress} disabled={disabled} className="h-18 rounded-2xl bg-white text-2xl tabular-nums [&_svg:not([class*='size-'])]:size-6">
+    <Button type="button" variant="outline" aria-label={label} onClick={onPress} disabled={disabled} className="h-16 text-2xl font-normal tabular-nums">
       {icon ?? label}
     </Button>
   );

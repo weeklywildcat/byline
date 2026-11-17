@@ -14,12 +14,12 @@ export const metadata: Metadata = {
   referrer: "no-referrer"
 };
 // `cover` so the respondent screens can reach the edges and clear the insets themselves.
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#fbf9f5" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
 
 export default function PollsLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: "#fbf9f5" }}>{children}</body>
+      <body className="bg-background text-foreground" style={{ margin: 0 }}>{children}</body>
     </html>
   );
 }

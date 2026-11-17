@@ -2,6 +2,8 @@
 
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Field, FieldError, FieldLabel } from "@byline/newsroom-ui/ui/field";
+import { Input } from "@byline/newsroom-ui/ui/input";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { useEffect, useRef, useState } from "react";
 import type { Answers, SurveyDefinition } from "../../../polls/engine/types";
@@ -83,27 +85,27 @@ export function PublicPollApp({ api, pollKey }: { api: string; pollKey: string }
       {poll && token ? (
         <SurveyRunner definition={poll.definition} mode="public" onSubmit={(answers) => submit(answers)} />
       ) : (
-        <div className="byline-polls grid min-h-dvh place-items-center bg-(--poll-paper) px-6 text-(--poll-ink)">
-          <div className="flex w-full max-w-lg flex-col gap-6 py-12">
+        <div className="grid min-h-dvh place-items-center bg-background px-[max(1.25rem,var(--byline-safe-left))] text-foreground">
+          <div className="flex w-full max-w-md flex-col gap-5 py-12">
             {error && !poll ? (
-              <><h1 className="font-(family-name:--poll-serif) text-4xl font-medium">Wildcat Polls</h1><p className="text-xl leading-relaxed">{error}</p></>
+              <><p className="text-sm text-muted-foreground">The Weekly Wildcat</p><h1 className="text-2xl font-semibold tracking-tight">This poll isn't available</h1><p className="text-lg leading-relaxed text-muted-foreground">{error}</p></>
             ) : !poll ? <Spinner className="size-6" /> : already ? (
               <>
-                <h1 className="font-(family-name:--poll-serif) text-4xl font-medium text-balance">{poll.title}</h1>
-                <p className="text-xl leading-relaxed">You've already answered this poll on this device. Thank you.</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-balance">{poll.title}</h1>
+                <p className="text-lg leading-relaxed text-muted-foreground">You've already answered this poll on this device. Thank you.</p>
               </>
             ) : poll.needsCode ? (
-              <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void start(); }}>
-                <h1 className="font-(family-name:--poll-serif) text-4xl font-medium text-balance">{poll.title}</h1>
-                <label className="flex flex-col gap-2 text-lg">
-                  Access code
-                  <input value={code} onChange={(event) => setCode(event.target.value)} autoComplete="off" autoCapitalize="none" className="h-14 rounded-xl border-2 border-(--poll-rule) bg-white px-4 text-xl outline-none focus:border-(--poll-ink)" />
-                </label>
-                {error ? <p role="alert" className="font-medium text-(--poll-accent)">{error}</p> : null}
-                <Button type="submit" className="h-14 rounded-full text-base" disabled={starting || !code.trim()}>{starting ? <Spinner /> : null}Continue</Button>
+              <form className="flex flex-col gap-5" onSubmit={(event) => { event.preventDefault(); void start(); }}>
+                <h1 className="text-2xl font-semibold tracking-tight text-balance">{poll.title}</h1>
+                <Field data-invalid={error ? true : undefined}>
+                  <FieldLabel htmlFor="poll-access-code">Access code</FieldLabel>
+                  <Input id="poll-access-code" value={code} onChange={(event) => setCode(event.target.value)} autoComplete="off" autoCapitalize="none" aria-invalid={error ? true : undefined} className="h-12 px-3.5 text-lg md:text-lg" />
+                  {error ? <FieldError>{error}</FieldError> : null}
+                </Field>
+                <Button type="submit" size="lg" className="h-12 text-base" disabled={starting || !code.trim()}>{starting ? <Spinner data-icon="inline-start" /> : null}Continue</Button>
               </form>
             ) : error ? (
-              <><p className="text-xl">{error}</p><Button type="button" className="h-14 rounded-full" onClick={() => void start()}>Try again</Button></>
+              <><p className="text-lg">{error}</p><div><Button type="button" size="lg" className="h-12 px-5 text-base" onClick={() => void start()}>Try again</Button></div></>
             ) : <Spinner className="size-6" />}
           </div>
         </div>

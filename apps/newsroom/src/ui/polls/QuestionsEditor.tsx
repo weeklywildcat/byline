@@ -2,16 +2,20 @@
 
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@byline/newsroom-ui/ui/sheet";
+import { useMediaQuery } from "@byline/newsroom-ui/lib/hooks";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
 import { FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
 import { FormField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
-import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Plus, Trash2, X } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ChevronDown, Copy, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { choicesFor } from "../../polls/engine/logic";
 import { isAnswerable, KIND_LABELS, type Choice, type Question, type QuestionKind, type SurveyDefinition } from "../../polls/engine/types";
 import { hasErrors, validateDefinition } from "../../polls/engine/xlsform";
@@ -67,7 +71,11 @@ export function QuestionsEditor({ id, data }: { id: number; data: SurveyDetail }
   const queries = useQueryClient();
   const [draft, setDraft] = useState<SurveyDefinition>(() => structuredClone(data.draft!));
   const [dirty, setDirty] = useState(false);
-  const [selected, setSelected] = useState<string | null>(draft.questions[0]?.name ?? null);
+  const [selected, choose] = useState<string | null>(draft.questions[0]?.name ?? null);
+  // Below lg the inspector is a Sheet over the list rather than a column beside it.
+  const wide = useMediaQuery("(min-width: 1024px)", true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const setSelected = useCallback((name: string | null) => { choose(name); setSheetOpen(name !== null); }, []);
   const issues = useMemo(() => validateDefinition(draft), [draft]);
   const published = useMemo(() => new Set((data.versions.length && data.current ? data.current.definition.questions : []).map((question) => question.name)), [data]);
   const save = useMutation({
@@ -85,7 +93,7 @@ export function QuestionsEditor({ id, data }: { id: number; data: SurveyDetail }
   const rename = (name: string) => {
     if (!question) return;
     replace({ name });
-    setSelected(name);
+    choose(name);
   };
   const add = (kind: QuestionKind) => {
     const taken = new Set([...draft.questions.map((entry) => entry.name), ...draft.groups.map((entry) => entry.name)]);
@@ -116,7 +124,8 @@ export function QuestionsEditor({ id, data }: { id: number; data: SurveyDetail }
     if (!question) return;
     const questions = draft.questions.filter((_entry, i) => i !== index);
     change({ ...draft, questions });
-    setSelected(questions[Math.min(index, questions.length - 1)]?.name ?? null);
+    choose(questions[Math.min(index, questions.length - 1)]?.name ?? null);
+    setSheetOpen(false);
   };
   const duplicate = () => {
     if (!question) return;
@@ -126,79 +135,158 @@ export function QuestionsEditor({ id, data }: { id: number; data: SurveyDetail }
     setSelected(copy.name);
   };
 
+  const inspector = question ? (
+    <QuestionInspector
+      key={question.name}
+      draft={draft}
+      question={question}
+      index={index}
+      published={published.has(question.name)}
+      onChange={change}
+      onReplace={replace}
+      onRename={rename}
+      onMove={move}
+      onDuplicate={duplicate}
+      onRemove={remove}
+    />
+  ) : null;
+
   return (
     <div className="flex flex-col gap-4" data-polls-editor="">
-      <div className="sticky top-[var(--byline-header-height,0px)] z-10 -mx-4 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur lg:-mx-6 lg:px-6">
+      <div className="sticky top-[var(--byline-header-height,0px)] z-10 -mx-4 flex flex-wrap items-center gap-2 border-b bg-background px-4 py-2 lg:-mx-6 lg:px-6">
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button type="button" />}><Plus data-icon="inline-start" />Add question</DropdownMenuTrigger>
+          <DropdownMenuTrigger render={<Button type="button" variant="outline" />}><Plus data-icon="inline-start" />Add question<ChevronDown data-icon="inline-end" /></DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             {NEW_KINDS.map((kind) => <DropdownMenuItem key={kind} onClick={() => add(kind)}>{KIND_LABELS[kind]}</DropdownMenuItem>)}
           </DropdownMenuContent>
         </DropdownMenu>
-        <span className="flex-1 text-sm text-muted-foreground" role="status">{save.isPending ? "Saving…" : dirty ? "Unsaved changes" : "Draft saved"}{hasErrors(issues) ? " · has errors" : ""}</span>
+        <span className="flex-1 text-sm text-muted-foreground" role="status">{save.isPending ? "Saving…" : dirty ? "Unsaved changes" : "Draft saved"}{hasErrors(issues) ? <span className="text-destructive"> · has errors</span> : null}</span>
         {dirty ? <Button type="button" variant="ghost" onClick={() => { setDraft(structuredClone(data.draft!)); setDirty(false); }}>Discard</Button> : null}
-        <Button type="button" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner /> : null}Save draft</Button>
+        <Button type="button" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save draft</Button>
       </div>
       {save.isError ? <InlineAlert title="The draft wasn't saved">{(save.error as Error).message}</InlineAlert> : null}
       {issues.some((issue) => issue.severity === "error") ? <IssueList issues={issues.filter((issue) => issue.severity === "error")} max={6} /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
-        <div className={cn("min-w-0", question && "hidden lg:block")}>
-          {draft.questions.length ? <QuestionMap definition={draft} onSelect={setSelected} selected={selected} /> : <p className="text-muted-foreground">No questions yet. Add one, or import a spreadsheet.</p>}
-          <FieldSet className="mt-6 max-w-xl border-t pt-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
+        <div className="flex min-w-0 flex-col gap-8">
+          {draft.questions.length ? <QuestionMap definition={draft} onSelect={setSelected} selected={wide ? selected : null} compact /> : (
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyTitle>No questions yet</EmptyTitle>
+                <EmptyDescription>Add one, or import a spreadsheet.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          <Separator />
+          <FieldSet className="max-w-xl">
             <FieldLegend>Respondent screens</FieldLegend>
             <FieldGroup>
               <TextAreaField label="Welcome text" hint="Say it's voluntary and anonymous, and how long it takes." value={draft.settings.welcome} rows={3} maxLength={2000} onChange={(welcome) => change({ ...draft, settings: { ...draft.settings, welcome } })} />
               <TextAreaField label="Thank-you text" value={draft.settings.thankYou} rows={2} maxLength={1000} onChange={(thankYou) => change({ ...draft, settings: { ...draft.settings, thankYou } })} />
-              <TextField label="Break results down by" hint="Single-choice questions such as grade, separated by spaces." value={draft.settings.breakdowns.join(" ")} onChange={(value) => change({ ...draft, settings: { ...draft.settings, breakdowns: value.split(/[\s,]+/).filter(Boolean) } })} />
+              <TextField label="Break results down by" hint="Names of single-choice questions, such as grade, separated by spaces." value={draft.settings.breakdowns.join(" ")} onChange={(value) => change({ ...draft, settings: { ...draft.settings, breakdowns: value.split(/[\s,]+/).filter(Boolean) } })} />
             </FieldGroup>
           </FieldSet>
         </div>
 
-        {question ? (
-          <aside className="flex min-w-0 flex-col gap-5 rounded-lg border p-4 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto" aria-label="Edit question">
-            <div className="flex items-center gap-1">
-              <p className="flex-1 text-xs font-semibold tracking-[0.1em] text-(--poll-accent) uppercase">{KIND_LABELS[question.kind]}</p>
-              <Button type="button" variant="ghost" size="icon" aria-label="Move up" disabled={index === 0} onClick={() => move(-1)}><ArrowUp /></Button>
-              <Button type="button" variant="ghost" size="icon" aria-label="Move down" disabled={index === draft.questions.length - 1} onClick={() => move(1)}><ArrowDown /></Button>
-              <Button type="button" variant="ghost" size="icon" aria-label="Duplicate" onClick={duplicate}><Copy /></Button>
-              <Button type="button" variant="ghost" size="icon" className="text-destructive" aria-label="Delete question" onClick={remove}><Trash2 /></Button>
-              <Button type="button" variant="ghost" size="icon" className="lg:hidden" aria-label="Close" onClick={() => setSelected(null)}><X /></Button>
-            </div>
-            <TextAreaField label={question.kind === "note" ? "Text" : "Question"} value={question.label} rows={3} maxLength={1000} onChange={(label) => replace({ label })} />
-            <TextField label="Hint" optional hint="Shown under the question." value={question.hint ?? ""} maxLength={1000} onChange={(hint) => replace({ hint: hint || undefined })} />
-            <TextField label="Name" autoCapitalize="none" autoCorrect="off" spellCheck={false} hint={published.has(question.name) ? "Published questions keep their name, so results stay comparable." : "A permanent identifier used by results and conditions."}
-              value={question.name} disabled={published.has(question.name)} onChange={(name) => rename(name.replace(/\s+/g, "_"))} />
-            {isAnswerable(question) ? <SwitchField label="Required" description="Optional questions get a Skip button." checked={question.required} onChange={(required) => replace({ required })} /> : null}
-            {question.kind === "select_one" || question.kind === "select_multiple" ? <ChoicesEditor draft={draft} question={question} onChange={change} /> : null}
-            {question.kind === "range" ? (
-              <div className="grid grid-cols-3 gap-3">
-                <TextField label="From" type="number" inputMode="numeric" value={String(question.start)} onChange={(value) => replace({ start: Number(value) })} />
-                <TextField label="To" type="number" inputMode="numeric" value={String(question.end)} onChange={(value) => replace({ end: Number(value) })} />
-                <TextField label="Step" type="number" inputMode="numeric" value={String(question.step)} onChange={(value) => replace({ step: Number(value) })} />
-                <div className="col-span-3 grid grid-cols-2 gap-3">
-                  <TextField label="Low label" optional value={question.startLabel ?? ""} onChange={(value) => replace({ startLabel: value || undefined })} />
-                  <TextField label="High label" optional value={question.endLabel ?? ""} onChange={(value) => replace({ endLabel: value || undefined })} />
-                </div>
-              </div>
-            ) : null}
-            {question.kind === "text" ? (
-              <SwitchField label="Long answer" description="A larger box for a few sentences." checked={question.multiline} onChange={(multiline) => replace({ multiline })} />
-            ) : null}
-            <SectionPicker draft={draft} question={question} onChange={change} />
-            <ConditionEditor draft={draft} question={question} onChange={(relevant) => replace({ relevant: relevant || undefined })} />
-            {isAnswerable(question) ? (
-              <Collapsible defaultOpen={Boolean(question.constraint)}>
-                <CollapsibleTrigger render={<Button type="button" variant="ghost" className="-ml-2.5 w-fit" />}>Answer rule<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 grid gap-3">
-                  <TextField label="Constraint" hint="An XLSForm expression; “.” is the answer." autoCapitalize="none" autoCorrect="off" spellCheck={false} value={question.constraint ?? ""} onChange={(value) => replace({ constraint: value || undefined })} />
-                  <TextField label="Message when it fails" value={question.constraintMessage ?? ""} onChange={(value) => replace({ constraintMessage: value || undefined })} />
-                </CollapsibleContent>
-              </Collapsible>
-            ) : null}
-          </aside>
-        ) : null}
+        {wide ? (
+          inspector ? (
+            <aside className="min-w-0 lg:sticky lg:top-[calc(var(--byline-header-height,0px)+4rem)] lg:max-h-[calc(100dvh-var(--byline-header-height,0px)-5rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:pl-6" aria-label="Edit question">{inspector}</aside>
+          ) : null
+        ) : (
+          <Sheet open={Boolean(question) && sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetContent side="right" className="data-[side=right]:w-full data-[side=right]:sm:max-w-lg">
+              <SheetHeader>
+                <SheetTitle>{question ? `Edit ${KIND_LABELS[question.kind].toLowerCase()}` : "Edit question"}</SheetTitle>
+                <SheetDescription className="sr-only">Changes stay in the draft until you save it.</SheetDescription>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">{inspector}</div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** One question's settings, in groups: wording, answers, when it's asked, and the rarer details. */
+function QuestionInspector({ draft, question, index, published, onChange, onReplace, onRename, onMove, onDuplicate, onRemove }: {
+  draft: SurveyDefinition;
+  question: Question;
+  index: number;
+  published: boolean;
+  onChange: (next: SurveyDefinition) => void;
+  onReplace: (patch: Partial<Question> & Record<string, unknown>) => void;
+  onRename: (name: string) => void;
+  onMove: (delta: -1 | 1) => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <p className="flex-1 text-sm text-muted-foreground">{KIND_LABELS[question.kind]} · question {index + 1} of {draft.questions.length}</p>
+        <ButtonGroup>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Move up" disabled={index === 0} onClick={() => onMove(-1)}><ArrowUp /></Button>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Move down" disabled={index === draft.questions.length - 1} onClick={() => onMove(1)}><ArrowDown /></Button>
+        </ButtonGroup>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon-sm" aria-label="More question actions" />}><MoreHorizontal /></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={onDuplicate}><Copy />Duplicate</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 />Delete question</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <FieldGroup>
+        <TextAreaField label={question.kind === "note" ? "Text" : "Question"} value={question.label} rows={3} maxLength={1000} onChange={(label) => onReplace({ label })} />
+        <TextField label="Hint" optional hint="Shown under the question." value={question.hint ?? ""} maxLength={1000} onChange={(hint) => onReplace({ hint: hint || undefined })} />
+        {isAnswerable(question) ? <SwitchField label="Required" description="Optional questions get a Skip button." checked={question.required} onChange={(required) => onReplace({ required })} /> : null}
+      </FieldGroup>
+
+      {question.kind === "select_one" || question.kind === "select_multiple" ? (<><Separator /><ChoicesEditor draft={draft} question={question} onChange={onChange} /></>) : null}
+      {question.kind === "range" ? (
+        <>
+          <Separator />
+          <FieldSet>
+            <FieldLegend variant="label">Scale</FieldLegend>
+            <div className="grid grid-cols-3 gap-3">
+              <TextField label="From" type="number" inputMode="numeric" value={String(question.start)} onChange={(value) => onReplace({ start: Number(value) })} />
+              <TextField label="To" type="number" inputMode="numeric" value={String(question.end)} onChange={(value) => onReplace({ end: Number(value) })} />
+              <TextField label="Step" type="number" inputMode="numeric" value={String(question.step)} onChange={(value) => onReplace({ step: Number(value) })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Low label" optional value={question.startLabel ?? ""} onChange={(value) => onReplace({ startLabel: value || undefined })} />
+              <TextField label="High label" optional value={question.endLabel ?? ""} onChange={(value) => onReplace({ endLabel: value || undefined })} />
+            </div>
+          </FieldSet>
+        </>
+      ) : null}
+      {question.kind === "text" ? (<><Separator /><SwitchField label="Long answer" description="A larger box for a few sentences." checked={question.multiline} onChange={(multiline) => onReplace({ multiline })} /></>) : null}
+
+      <Separator />
+      <FieldGroup>
+        <SectionPicker draft={draft} question={question} onChange={onChange} />
+        <ConditionEditor draft={draft} question={question} onChange={(relevant) => onReplace({ relevant: relevant || undefined })} />
+      </FieldGroup>
+
+      <Separator />
+      <Collapsible defaultOpen={Boolean(isAnswerable(question) && question.constraint)}>
+        <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2.5 w-fit" />}>Advanced<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
+        <CollapsibleContent className="mt-3">
+          <FieldGroup>
+            <TextField label="Name" autoCapitalize="none" autoCorrect="off" spellCheck={false} hint={published ? "Published questions keep their name, so results stay comparable." : "A permanent identifier used by results and conditions."}
+              value={question.name} disabled={published} onChange={(name) => onRename(name.replace(/\s+/g, "_"))} />
+            {isAnswerable(question) ? (
+              <>
+                <TextField label="Answer rule" hint="An XLSForm constraint; “.” is the answer." autoCapitalize="none" autoCorrect="off" spellCheck={false} value={question.constraint ?? ""} onChange={(value) => onReplace({ constraint: value || undefined })} />
+                <TextField label="Message when it fails" value={question.constraintMessage ?? ""} onChange={(value) => onReplace({ constraintMessage: value || undefined })} />
+              </>
+            ) : null}
+          </FieldGroup>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -241,7 +329,7 @@ function SectionPicker({ draft, question, onChange }: { draft: SurveyDefinition;
       <div className="flex gap-2">
         <PollSelect id={id} value={current} emptyLabel="None" options={draft.groups.map((entry) => ({ value: entry.name, label: entry.label || entry.name }))}
           onChange={(value) => setGroups(value ? [...(draft.groups.find((entry) => entry.name === value)?.groups ?? []), value] : [])} />
-        <Button type="button" variant="outline" onClick={addSection}>New</Button>
+        <Button type="button" variant="outline" onClick={addSection}><Plus data-icon="inline-start" />New</Button>
       </div>
       {group ? <Input aria-label="Section heading" value={group.label} onChange={(event) => onChange({ ...draft, groups: draft.groups.map((entry) => (entry.name === group.name ? { ...entry, label: event.target.value } : entry)) })} /> : null}
     </FormField>
@@ -265,7 +353,7 @@ function ConditionEditor({ draft, question, onChange }: { draft: SurveyDefinitio
         <TextField label="Condition" hint="An XLSForm condition. Refer to earlier questions as ${name}." autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="${book_report} = 'yes'" value={question.relevant ?? ""} onChange={onChange} />
       ) : (
         <>
-          {!rows.length ? <FieldDescription>Always.</FieldDescription> : null}
+          {!rows.length ? <FieldDescription>Always shown.</FieldDescription> : null}
           {rows.length > 1 ? (
             <PollSelect label="How conditions combine" className="w-48" value={join} options={[{ value: "and", label: "When all are true" }, { value: "or", label: "When any is true" }]} onChange={(value) => write(rows, value === "or" ? "or" : "and")} />
           ) : null}
@@ -274,7 +362,7 @@ function ConditionEditor({ draft, question, onChange }: { draft: SurveyDefinitio
             const options = target ? choicesFor(draft, target) : [];
             const set = (patch: Partial<Condition>) => write(rows.map((entry, j) => (j === i ? { ...entry, ...patch } : entry)));
             return (
-              <div key={i} className="grid gap-1.5 rounded-lg bg-muted/50 p-2">
+              <div key={i} className="grid gap-1.5 border-l-2 pl-3">
                 <PollSelect label="Earlier question" value={row.question} options={earlier.map((entry) => ({ value: entry.name, label: entry.label.slice(0, 70) }))} onChange={(value) => set({ question: value, value: "" })} />
                 <div className="flex gap-1.5">
                   <PollSelect label="Comparison" className="w-36 shrink-0" value={row.op} options={[{ value: "is", label: "is" }, { value: "is_not", label: "is not" }, ...(target?.kind === "select_multiple" ? [{ value: "includes", label: "includes" }] : []), { value: "answered", label: "was answered" }]} onChange={(value) => set({ op: value as Condition["op"] })} />

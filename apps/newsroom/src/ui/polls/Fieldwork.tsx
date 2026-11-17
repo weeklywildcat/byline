@@ -4,21 +4,22 @@ import { ChoiceCards } from "@byline/newsroom-ui/components/choice-cards";
 import { FormField, TextField } from "@byline/newsroom-ui/components/form-fields";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
-import { Badge } from "@byline/newsroom-ui/ui/badge";
+import { StatusBadge } from "@byline/newsroom-ui/components/status-badge";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@byline/newsroom-ui/ui/dialog";
-import { FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSeparator, FieldSet } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Lock } from "lucide-react";
+import { Lock, Radio } from "lucide-react";
 import { useId, useState } from "react";
 import type { SessionSummary } from "../../polls/server";
 import { useNewsroomRoutes } from "../shell/account";
 import { createSession, endSession, fetchOverview, formatWhen, pollKeys, startKiosk } from "./api";
-import { ListSkeleton, PageHeader, usePollsNavigation } from "./PollStudio";
+import { ListSkeleton, PageHeader, PollsBreadcrumb } from "./PollStudio";
 
 /**
  * Fieldwork setup (docs/wildcat-polls.md#kiosk): choose the poll, where you
@@ -54,14 +55,13 @@ function PinInput({ label, value, onChange, invalid }: { label: string; value: s
   const id = useId();
   return (
     <FormField id={id} label={label}>
-      <Input id={id} type="password" inputMode="numeric" autoComplete="off" maxLength={8} value={value} aria-invalid={invalid || undefined} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))} className="h-12 text-lg tracking-[0.3em]" />
+      <Input id={id} type="password" inputMode="numeric" autoComplete="off" maxLength={8} value={value} aria-invalid={invalid || undefined} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))} />
     </FormField>
   );
 }
 
 export function Fieldwork({ preselect }: { preselect: number | null }) {
   const { api } = useNewsroomRoutes();
-  const go = usePollsNavigation();
   const overview = useQuery({ queryKey: pollKeys.overview(), queryFn: () => fetchOverview(api) });
   const data = overview.data;
   const surveys = data?.surveys.filter((survey) => survey.canInterview) ?? [];
@@ -86,62 +86,75 @@ export function Fieldwork({ preselect }: { preselect: number | null }) {
   const mine = data?.sessions.filter((session) => String(session.interviewerId) === String(data.me.id)) ?? [];
 
   return (
-    <main className="mx-auto flex w-full min-w-0 max-w-[880px] flex-col gap-8 px-4 py-6 lg:px-6" data-polls-fieldwork="">
-      <PageHeader
-        back={<Button type="button" variant="ghost" className="-ml-3 self-start" onClick={() => go({})}><ArrowLeft data-icon="inline-start" />Polls</Button>}
-        title="Start fieldwork"
-        description="Set up on this iPad, then hand it to students. The device keeps counts, never names."
-      />
+    <main className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col gap-6 px-4 py-5 lg:px-6" data-polls-fieldwork="">
+      <div className="flex flex-col gap-4">
+        <PollsBreadcrumb trail={[{ label: "Start fieldwork" }]} />
+        <PageHeader level="detail" title="Start fieldwork" description="Set up on this iPad, then hand it to students. The device keeps counts, never names." />
+      </div>
       {overview.isError ? <InlineAlert title="Polls aren't available" onAction={() => void overview.refetch()}>{(overview.error as Error).message}</InlineAlert> : null}
       {!data ? <ListSkeleton /> : !surveys.length ? (
-        <p className="text-base text-muted-foreground">No open poll has fieldwork for you. An editor publishes a poll and adds you as an interviewer.</p>
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Radio /></EmptyMedia>
+            <EmptyTitle>No poll is ready for fieldwork</EmptyTitle>
+            <EmptyDescription>An editor publishes a poll and adds you as an interviewer.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <form onSubmit={(event) => { event.preventDefault(); if (ready) start.mutate(); }}>
-          <FieldGroup className="gap-9">
+          <FieldGroup>
             <FieldSet>
               <FieldLegend>Poll</FieldLegend>
               <ChoiceCards label="Poll" value={chosen ? String(chosen) : ""} onChange={(value) => setSurveyId(Number(value))}
                 options={surveys.map((survey) => ({ value: String(survey.id), title: survey.title, description: `Version ${survey.versionNumber ?? "—"}` }))} />
             </FieldSet>
 
+            <FieldSeparator />
             <FieldSet>
-              <FieldLegend>Where are you?</FieldLegend>
+              <FieldLegend>Location</FieldLegend>
               {locations.length ? (
-                <ChoiceCards label="Location" className="grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]" value={locationId ? String(locationId) : ""} onChange={(value) => setLocationId(Number(value))}
+                <ChoiceCards label="Location" className="sm:grid-cols-2" value={locationId ? String(locationId) : ""} onChange={(value) => setLocationId(Number(value))}
                   options={locations.map((location) => ({ value: String(location.id), title: location.name }))} />
               ) : (
-                <TextField label="Location" value={locationName} onChange={setLocationName} maxLength={120} placeholder="e.g. Cafeteria" hint="An editor can add a list of locations in Poll Studio." />
+                <TextField label="Where are you?" value={locationName} onChange={setLocationName} maxLength={120} placeholder="e.g. Cafeteria" hint="An editor can keep a list of locations in Poll Studio." />
               )}
             </FieldSet>
 
+            <FieldSeparator />
             <FieldSet>
-              <FieldLegend>When</FieldLegend>
-              <FieldDescription>Optional. Pick a period or describe it.</FieldDescription>
+              <FieldLegend>Period</FieldLegend>
+              <FieldDescription>Optional.</FieldDescription>
               <ToggleGroup variant="outline" aria-label="Collection period" className="flex-wrap" value={PERIODS.includes(period) ? [period] : []} onValueChange={(next: unknown[]) => setPeriod(typeof next[0] === "string" ? next[0] : "")}>
-                {PERIODS.map((entry) => <ToggleGroupItem key={entry} value={entry} className="px-4">{entry}</ToggleGroupItem>)}
+                {PERIODS.map((entry) => <ToggleGroupItem key={entry} value={entry}>{entry}</ToggleGroupItem>)}
               </ToggleGroup>
               <TextField label="Or describe it" value={PERIODS.includes(period) ? "" : period} onChange={setPeriod} maxLength={120} optional />
             </FieldSet>
 
-            <TextField label="How you're choosing students" value={method} onChange={setMethod} maxLength={200} optional placeholder="e.g. Every third student in the lunch line" />
+            <FieldSeparator />
+            <FieldSet>
+              <FieldLegend>Sampling method</FieldLegend>
+              <TextField label="How you're choosing students" value={method} onChange={setMethod} maxLength={200} optional placeholder="e.g. Every third student in the lunch line" />
+            </FieldSet>
 
+            <FieldSeparator />
             <FieldSet>
               <FieldLegend>Interviewer PIN</FieldLegend>
               <FieldDescription>Only you can return to the interviewer controls. Use 4 to 8 digits that aren't your Byline password.</FieldDescription>
-              <div className="grid max-w-md grid-cols-2 gap-3">
+              <div className="grid max-w-sm grid-cols-2 gap-3">
                 <PinInput label="PIN" value={pin} onChange={setPin} invalid={Boolean(pinProblem)} />
                 <PinInput label="Again" value={pinAgain} onChange={setPinAgain} invalid={Boolean(pinProblem)} />
               </div>
               {pinProblem ? <FieldError>{pinProblem}</FieldError> : null}
             </FieldSet>
 
-            <div className="flex flex-col gap-3 border-t pt-6">
+            <FieldSeparator />
+            <Field>
               {start.isError ? <InlineAlert title="Fieldwork didn't start">{(start.error as Error).message}</InlineAlert> : null}
-              <Button type="submit" size="lg" className="h-14" disabled={!ready || start.isPending}>
-                {start.isPending ? <Spinner /> : <Lock data-icon="inline-start" />}Start session and lock this iPad
+              <Button type="submit" size="lg" disabled={!ready || start.isPending}>
+                {start.isPending ? <Spinner data-icon="inline-start" /> : <Lock data-icon="inline-start" />}Start session and lock this iPad
               </Button>
-              <p className="text-sm text-muted-foreground">Starting signs this device out of Byline. Students can only take the poll; you'll sign in again to come back to Poll Studio.</p>
-            </div>
+              <FieldDescription>Starting signs this device out of Byline. Students can only take the poll; you'll sign in again to come back to Poll Studio.</FieldDescription>
+            </Field>
           </FieldGroup>
         </form>
       )}
@@ -167,22 +180,24 @@ export function SessionRows({ sessions, meId, manage, showSurvey, timeZone }: { 
   const end = useMutation({ mutationFn: (id: string) => endSession(api, id), onSuccess: () => { setEndFor(null); void queries.invalidateQueries({ queryKey: pollKeys.all }); } });
   return (
     <>
-      <ItemGroup className="rounded-lg border">
-        {sessions.map((session) => {
+      <ItemGroup className="gap-0 rounded-lg border">
+        {sessions.map((session, index) => {
           const mine = String(session.interviewerId) === String(meId);
           return (
-            <Item key={session.id} className="flex-wrap">
+            <Item key={session.id} className={index ? "rounded-none border-t-border" : "rounded-none"}>
               <ItemContent className="min-w-48">
                 <ItemTitle>{showSurvey && session.survey ? session.survey : session.locationName}</ItemTitle>
                 <ItemDescription>
                   {[showSurvey ? session.locationName : null, session.period || null, session.interviewer, `since ${formatWhen(session.startedAt, timeZone)}`].filter(Boolean).join(" · ")}
                 </ItemDescription>
-                <ItemDescription className="tabular-nums"><span className="font-medium text-foreground">{session.counts.completed}</span> done · {session.counts.declined} declined · {session.counts.abandoned} incomplete</ItemDescription>
+                <ItemDescription className="tabular-nums"><span className="font-medium text-foreground">{session.counts.completed}</span> completed · {session.counts.declined} declined · {session.counts.abandoned} incomplete</ItemDescription>
               </ItemContent>
               <ItemActions>
-                {session.status === "ended" ? <Badge variant="outline">Ended</Badge> : session.status === "paused" ? <Badge variant="outline">Paused</Badge> : session.kioskActive ? <Badge variant="secondary">Kiosk on</Badge> : <Badge variant="outline">Not on a device</Badge>}
-                {session.status !== "ended" && mine ? <Button type="button" variant="outline" onClick={() => { setPin(""); setLockFor(session.id); }}><Lock data-icon="inline-start" />Use this iPad</Button> : null}
-                {session.status !== "ended" && (mine || manage) ? <Button type="button" variant="ghost" onClick={() => setEndFor(session.id)}>End</Button> : null}
+                <StatusBadge tone={session.status === "active" && session.kioskActive ? "done" : session.status === "paused" ? "attention" : "neutral"}>
+                  {session.status === "ended" ? "Ended" : session.status === "paused" ? "Paused" : session.kioskActive ? "On a device" : "Not on a device"}
+                </StatusBadge>
+                {session.status !== "ended" && mine ? <Button type="button" variant="outline" size="sm" onClick={() => { setPin(""); setLockFor(session.id); }}><Lock data-icon="inline-start" />Use this iPad</Button> : null}
+                {session.status !== "ended" && (mine || manage) ? <Button type="button" variant="ghost" size="sm" onClick={() => setEndFor(session.id)}>End</Button> : null}
               </ItemActions>
             </Item>
           );
@@ -199,7 +214,7 @@ export function SessionRows({ sessions, meId, manage, showSurvey, timeZone }: { 
             <PinInput label="PIN" value={pin} onChange={setPin} />
             {kiosk.isError ? <FieldError className="mt-2">{(kiosk.error as Error).message}</FieldError> : null}
           </form>
-          <DialogFooter><Button type="submit" form="resume-kiosk" disabled={!PIN.test(pin) || kiosk.isPending}>{kiosk.isPending ? <Spinner /> : null}Lock this iPad</Button></DialogFooter>
+          <DialogFooter><Button type="submit" form="resume-kiosk" disabled={!PIN.test(pin) || kiosk.isPending}>{kiosk.isPending ? <Spinner data-icon="inline-start" /> : null}Lock this iPad</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

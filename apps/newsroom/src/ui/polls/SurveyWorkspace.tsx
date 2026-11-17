@@ -2,28 +2,34 @@
 
 import { DateTimeField } from "@byline/newsroom-ui/components/date-fields";
 import { FormField, TextAreaField, TextField } from "@byline/newsroom-ui/components/form-fields";
+import { DisabledReason } from "@byline/newsroom-ui/components/disabled-reason";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@byline/newsroom-ui/ui/alert-dialog";
 import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@byline/newsroom-ui/ui/command";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@byline/newsroom-ui/ui/popover";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Switch } from "@byline/newsroom-ui/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Download, FileSpreadsheet, Link2, Radio, Upload, X } from "lucide-react";
+import { Copy, Download, MoreHorizontal, Plus, Radio, Upload, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { instantToLocal, localToInstant } from "../../domain/dates";
 import { hasErrors } from "../../polls/engine/xlsform";
 import { useNewsroomRoutes } from "../shell/account";
 import { deleteSurvey, fetchLinks, fetchPeople, fetchSurvey, formatWhen, pollKeys, publishSurvey, updateSurvey, workbookHref, type SurveyDetail } from "./api";
 import { SessionRows } from "./Fieldwork";
-import { ListSkeleton, PageHeader, StatusBadge, usePollsNavigation } from "./PollStudio";
+import { ListSkeleton, PageHeader, PollsBreadcrumb, PollStatus, usePollsNavigation } from "./PollStudio";
 import { QuestionsEditor } from "./QuestionsEditor";
 import { ResultsView } from "./ResultsView";
 import { SwitchField } from "./fields";
@@ -58,41 +64,71 @@ export function SurveyWorkspace({ id, tab }: { id: number; tab: SurveyTab }) {
   if (detail.isError) {
     return <main className="mx-auto w-full max-w-[1240px] px-4 py-6 lg:px-6"><InlineAlert title="This poll isn't available" onAction={() => void detail.refetch()}>{(detail.error as Error).message}</InlineAlert></main>;
   }
+  if (!data) return <WorkspaceSkeleton />;
+
+  const survey = data.survey;
+  const pending = manage && Boolean(data.draft) && (data.draftChanged || !data.current);
   return (
-    <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-6 px-4 py-6 lg:px-6" data-polls-workspace="">
+    <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-4 px-4 py-5 lg:px-6" data-polls-workspace="">
+      <PollsBreadcrumb trail={[{ label: survey.title }]} />
       <PageHeader
-        back={<Button type="button" variant="ghost" className="-ml-3 self-start" onClick={() => go({})}><ArrowLeft data-icon="inline-start" />Polls</Button>}
-        title={data?.survey.title ?? "Poll"}
-        description={data ? (
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <StatusBadge status={data.survey.status} />
-            <span>{data.current ? `Version ${data.current.number}` : "Not published"}</span>
-            {data.survey.canViewResults ? <span className="tabular-nums">{data.survey.responses} response{data.survey.responses === 1 ? "" : "s"}</span> : null}
-            {manage && data.draftChanged ? <Badge variant="outline">Unpublished changes</Badge> : null}
-          </span>
-        ) : undefined}
-        actions={data ? (
+        level="detail"
+        title={survey.title}
+        status={<PollStatus status={survey.status} />}
+        description={(
           <>
-            {data.survey.canInterview ? <Button type="button" variant="outline" onClick={() => go({ view: "fieldwork", poll: id })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
-            {manage ? <Button type="button" variant="outline" onClick={() => go({ view: "import", poll: id })}><Upload data-icon="inline-start" />Import new version</Button> : null}
-            {manage ? <Button type="button" disabled={!canPublish || publish.isPending} onClick={() => publish.mutate()} title={blocked ? "Fix the errors in Questions first" : !canPublish ? "Nothing to publish" : undefined}>{publish.isPending ? <Spinner /> : null}{data.current ? "Publish changes" : "Publish"}</Button> : null}
+            <span>{data.current ? `Version ${data.current.number}` : "Not published"}</span>
+            {survey.canViewResults ? <> · <span className="tabular-nums">{survey.responses.toLocaleString("en-US")} {survey.responses === 1 ? "response" : "responses"}</span></> : null}
+            {pending && data.current ? <> · <span className="text-warning">unpublished changes</span></> : null}
           </>
-        ) : null}
+        )}
+        actions={(
+          <>
+            {survey.canInterview ? <Button type="button" variant={pending ? "outline" : "default"} onClick={() => go({ view: "fieldwork", poll: id })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
+            {pending ? (
+              <DisabledReason reason={blocked ? "Fix the errors in Questions first." : undefined}>
+                <Button type="button" disabled={!canPublish || publish.isPending} onClick={() => publish.mutate()}>{publish.isPending ? <Spinner data-icon="inline-start" /> : null}{data.current ? "Publish changes" : "Publish"}</Button>
+              </DisabledReason>
+            ) : null}
+            {manage ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="More actions for this poll" />}><MoreHorizontal /></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => go({ view: "import", poll: id })}><Upload />Import a new version</DropdownMenuItem>
+                  {data.draft ? <DropdownMenuItem render={<a href={workbookHref(api, id)} download />}><Download />Download the draft (.xlsx)</DropdownMenuItem> : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </>
+        )}
       />
       {publish.isError ? <InlineAlert title="Not published">{(publish.error as Error).message}</InlineAlert> : null}
 
       <Tabs value={active} onValueChange={(next) => go({ poll: id, tab: next as SurveyTab })}>
-        <TabsList className="max-w-full overflow-x-auto">
-          {visible.map((entry) => <TabsTrigger key={entry.value} value={entry.value} className="min-h-10 px-3">{entry.label}</TabsTrigger>)}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
+          {visible.map((entry) => <TabsTrigger key={entry.value} value={entry.value}>{entry.label}</TabsTrigger>)}
         </TabsList>
       </Tabs>
 
-      {!data ? <ListSkeleton /> : active === "overview" ? <Overview data={data} />
-        : active === "questions" ? <QuestionsEditor key={data.survey.draftRevision} id={id} data={data} />
-        : active === "preview" ? <PreviewTab data={data} />
-        : active === "results" ? <ResultsView id={id} />
-        : active === "fieldwork" ? <FieldworkTab data={data} />
-        : <Settings data={data} />}
+      <div className="pt-2">
+        {active === "overview" ? <Overview data={data} />
+          : active === "questions" ? <QuestionsEditor key={survey.draftRevision} id={id} data={data} />
+          : active === "preview" ? <PreviewTab data={data} />
+          : active === "results" ? <ResultsView id={id} />
+          : active === "fieldwork" ? <FieldworkTab data={data} />
+          : <Settings data={data} />}
+      </div>
+    </main>
+  );
+}
+
+function WorkspaceSkeleton() {
+  return (
+    <main className="mx-auto grid w-full max-w-[1240px] gap-4 px-4 py-5 lg:px-6" aria-busy="true">
+      <Skeleton className="h-4 w-48" />
+      <Skeleton className="h-8 w-80" />
+      <Skeleton className="h-8 w-full max-w-lg" />
+      <ListSkeleton />
     </main>
   );
 }
@@ -100,48 +136,48 @@ export function SurveyWorkspace({ id, tab }: { id: number; tab: SurveyTab }) {
 function Overview({ data }: { data: SurveyDetail }) {
   const { api } = useNewsroomRoutes();
   const definition = data.current?.definition ?? data.draft;
+  const manage = data.survey.canManage;
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <section className="flex min-w-0 flex-col gap-4">
-        {data.survey.description ? <p className="max-w-2xl text-base leading-relaxed">{data.survey.description}</p> : null}
-        {data.draftIssues.length && data.survey.canManage ? (
+        {data.survey.description ? <p className="max-w-2xl text-sm leading-relaxed">{data.survey.description}</p> : null}
+        {data.draftIssues.length && manage ? (
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">{hasErrors(data.draftIssues) ? "The draft can't be published yet" : "Notes on the draft"}</h2>
             <IssueList issues={data.draftIssues} max={8} />
           </div>
         ) : null}
         <h2 className="text-sm font-semibold">{data.current ? `Questions in version ${data.current.number}` : "Draft questions"}</h2>
-        {definition ? <QuestionMap definition={definition} /> : <p className="text-muted-foreground">No questions yet.</p>}
+        {definition?.questions.length ? <QuestionMap definition={definition} /> : <p className="text-sm text-muted-foreground">No questions yet.</p>}
       </section>
-      <aside className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
+      <aside className="flex flex-col gap-6 lg:border-l lg:pl-6">
+        <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold">Versions</h2>
           {data.versions.length ? (
-            <ItemGroup className="rounded-lg border">
+            <ItemGroup className="gap-0">
               {data.versions.map((version) => (
-                <Item key={version.id} size="sm" className="flex-wrap">
+                <Item key={version.id} size="xs" className="px-0">
                   <ItemContent>
                     <ItemTitle>Version {version.number}{version.id === data.current?.id ? <Badge variant="secondary">Current</Badge> : null}</ItemTitle>
                     <ItemDescription>{formatWhen(version.publishedAt, data.timeZone)} · {version.publishedBy || "Someone"} · {version.questionCount} questions</ItemDescription>
                     {version.note ? <ItemDescription>{version.note}</ItemDescription> : null}
                   </ItemContent>
-                  {data.survey.canManage ? (
+                  {manage ? (
                     <ItemActions>
-                      <Button nativeButton={false} variant="ghost" size="icon" aria-label={`Download version ${version.number} as a spreadsheet`} render={<a href={workbookHref(api, data.survey.id, version.id)} download />}><Download /></Button>
+                      <Button nativeButton={false} variant="ghost" size="icon-sm" aria-label={`Download version ${version.number} as a spreadsheet`} render={<a href={workbookHref(api, data.survey.id, version.id)} download />}><Download /></Button>
                     </ItemActions>
                   ) : null}
                 </Item>
               ))}
             </ItemGroup>
           ) : <p className="text-sm text-muted-foreground">Not published yet.</p>}
-          {data.survey.canManage && data.draft ? <Button nativeButton={false} variant="outline" size="sm" className="self-start" render={<a href={workbookHref(api, data.survey.id)} download />}><Download data-icon="inline-start" />Draft as spreadsheet</Button> : null}
-        </div>
+        </section>
         {data.survey.linkedStory || data.survey.linkedCollection ? (
-          <div className="flex flex-col gap-1 text-sm">
+          <section className="flex flex-col gap-1 text-sm">
             <h2 className="font-semibold">Linked</h2>
-            {data.survey.linkedStory ? <p>Story: {data.survey.linkedStory.title}</p> : null}
-            {data.survey.linkedCollection ? <p>Collection: {data.survey.linkedCollection.title}</p> : null}
-          </div>
+            {data.survey.linkedStory ? <p><span className="text-muted-foreground">Story</span> {data.survey.linkedStory.title}</p> : null}
+            {data.survey.linkedCollection ? <p><span className="text-muted-foreground">Collection</span> {data.survey.linkedCollection.title}</p> : null}
+          </section>
         ) : null}
       </aside>
     </div>
@@ -161,7 +197,7 @@ function PreviewTab({ data }: { data: SurveyDetail }) {
           </TabsList>
         </Tabs>
       ) : null}
-      {definition && definition.questions.length ? <PreviewPanel key={which} definition={definition} /> : <p className="text-muted-foreground">Add questions to preview the poll.</p>}
+      {definition && definition.questions.length ? <PreviewPanel key={which} definition={definition} /> : <p className="text-sm text-muted-foreground">Add questions to preview the poll.</p>}
     </section>
   );
 }
@@ -170,11 +206,17 @@ function FieldworkTab({ data }: { data: SurveyDetail }) {
   const go = usePollsNavigation();
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-sm text-muted-foreground">Each session is one interviewer at one place. Counts are approaches recorded on the device: students who agreed, declined, and surveys left incomplete.</p>
-        {data.survey.canInterview ? <Button type="button" onClick={() => go({ view: "fieldwork", poll: data.survey.id })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
-      </div>
-      {data.sessions.length ? <SessionRows sessions={data.sessions} meId={data.me.id} manage={data.survey.canManage} timeZone={data.timeZone} /> : <p className="text-sm text-muted-foreground">No sessions yet.</p>}
+      <p className="max-w-2xl text-sm text-muted-foreground">Each session is one interviewer at one place. Its counts are approaches recorded on the device.</p>
+      {data.sessions.length ? <SessionRows sessions={data.sessions} meId={data.me.id} manage={data.survey.canManage} timeZone={data.timeZone} /> : (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Radio /></EmptyMedia>
+            <EmptyTitle>No sessions yet</EmptyTitle>
+            <EmptyDescription>{data.current ? "Start one on the iPad you'll hand to students." : "Publish the poll to start fieldwork."}</EmptyDescription>
+          </EmptyHeader>
+          {data.survey.canInterview && data.current ? <EmptyContent><Button type="button" onClick={() => go({ view: "fieldwork", poll: data.survey.id })}>Start fieldwork</Button></EmptyContent> : null}
+        </Empty>
+      )}
     </section>
   );
 }
@@ -201,76 +243,77 @@ function Settings({ data }: { data: SurveyDetail }) {
   });
   const remove = useMutation({ mutationFn: () => deleteSurvey(api, survey.id, confirm), onSuccess: async () => { await queries.invalidateQueries({ queryKey: pollKeys.all }); go({}); } });
   const link = survey.publicLinkSettings;
+  const linkId = useId();
   const publicUrl = link?.key ? `${window.location.origin}/polls/s/${link.key}` : "";
   const textChanged = title !== survey.title || description !== survey.description || methodology !== survey.methodology || minimumGroup !== String(survey.minimumGroup);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-10">
+    <div className="flex max-w-2xl flex-col gap-8">
       {save.isError ? <InlineAlert title="Not saved">{(save.error as Error).message}</InlineAlert> : null}
       <Section title="About this poll">
         <FieldGroup>
           <TextField label="Title" value={title} onChange={setTitle} maxLength={200} />
           <TextAreaField label="Description" value={description} onChange={setDescription} maxLength={2000} rows={3} optional />
-          <TextAreaField label="Methodology and limitations" value={methodology} onChange={setMethodology} maxLength={4000} rows={4} hint="Who was asked, where, when, how they were chosen, and what the results can't tell you. Shown beside the results, and needed before any are published." />
+          <TextAreaField label="Methodology and limitations" value={methodology} onChange={setMethodology} maxLength={4000} rows={4} hint="Who was asked, where, when, how they were chosen, and what the results can't tell you. Shown beside the results; needed before any are published." />
           <TextField label="Smallest group reported" type="number" inputMode="numeric" value={minimumGroup} onChange={setMinimumGroup} hint="Breakdowns and rates for fewer respondents than this (3 to 50) are withheld." />
-          <div><Button type="button" disabled={!textChanged || save.isPending} onClick={() => save.mutate({ title, description, methodology, minimumGroup: Number(minimumGroup) })}>Save</Button></div>
+          <div><Button type="button" disabled={!textChanged || save.isPending} onClick={() => save.mutate({ title, description, methodology, minimumGroup: Number(minimumGroup) })}>{save.isPending ? <Spinner data-icon="inline-start" /> : null}Save</Button></div>
         </FieldGroup>
       </Section>
 
       <Section title="Status">
-        <ToggleGroup variant="outline" spacing={0} aria-label="Poll status" disabled={!data.current || save.isPending} value={[survey.status]} onValueChange={(next: unknown[]) => { const value = next[0]; if (value === "open" || value === "closed" || value === "archived") save.mutate({ status: value }); }}>
-          <ToggleGroupItem value="open" className="px-4">Open</ToggleGroupItem>
-          <ToggleGroupItem value="closed" className="px-4">Closed</ToggleGroupItem>
-          <ToggleGroupItem value="archived" className="px-4">Archived</ToggleGroupItem>
-        </ToggleGroup>
-        <p className="text-sm text-muted-foreground">{data.current ? "Closing stops new sessions and responses. Results stay." : "Publish the poll to open it."}</p>
+        <Field>
+          <ToggleGroup variant="outline" spacing={0} aria-label="Poll status" disabled={!data.current || save.isPending} value={[survey.status]} onValueChange={(next: unknown[]) => { const value = next[0]; if (value === "open" || value === "closed" || value === "archived") save.mutate({ status: value }); }}>
+            <ToggleGroupItem value="open">Open</ToggleGroupItem>
+            <ToggleGroupItem value="closed">Closed</ToggleGroupItem>
+            <ToggleGroupItem value="archived">Archived</ToggleGroupItem>
+          </ToggleGroup>
+          <FieldDescription>{data.current ? "Closing stops new sessions and responses. Results stay." : "Publish the poll to open it."}</FieldDescription>
+        </Field>
       </Section>
 
       <Section title="Who can work on it">
-        <SwitchField label="Any staff member can run fieldwork" description="Otherwise only the interviewers below, and editors." checked={survey.openToAllStaff ?? false} onChange={(checked) => save.mutate({ openToAllStaff: checked })} />
-        <PeoplePicker label="Interviewers" description="Staff who may run fieldwork. Editors always can." people={people.data?.people ?? []} chosen={survey.interviewers ?? []} onChange={(ids) => save.mutate({ interviewers: ids })} />
-        <PeoplePicker label="Results" description="Staff who may read results and export responses. Editors always can." people={people.data?.people ?? []} chosen={survey.analysts ?? []} onChange={(ids) => save.mutate({ analysts: ids })} />
+        <FieldGroup>
+          <SwitchField label="Any staff member can run fieldwork" description="Otherwise only the interviewers below, and editors." checked={survey.openToAllStaff ?? false} onChange={(checked) => save.mutate({ openToAllStaff: checked })} />
+          <PeoplePicker label="Interviewers" description="Editors always can." people={people.data?.people ?? []} chosen={survey.interviewers ?? []} onChange={(ids) => save.mutate({ interviewers: ids })} />
+          <PeoplePicker label="Results" description="Staff who may read results and export responses. Editors always can." people={people.data?.people ?? []} chosen={survey.analysts ?? []} onChange={(ids) => save.mutate({ analysts: ids })} />
+        </FieldGroup>
       </Section>
 
       <Section title="How it's collected">
-        <SwitchField label="In person, on a kiosk device" description="Interviewers hand an iPad to students." checked={survey.kioskEnabled} onChange={(checked) => save.mutate({ kioskEnabled: checked })} />
-        <SwitchField label="Public link" description="Anyone with the link can answer, without signing in." checked={link?.enabled ?? false} onChange={(checked) => save.mutate({ publicLink: { enabled: checked } })} />
-        {link?.enabled ? (
-          <FieldSet className="rounded-lg border p-4">
-            <FieldLegend variant="label">Public link</FieldLegend>
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1.5 text-sm">{publicUrl}</code>
-              <Button type="button" variant="outline" size="sm" onClick={() => void navigator.clipboard?.writeText(publicUrl)}><Copy data-icon="inline-start" />Copy</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => save.mutate({ publicLink: { regenerateKey: true } })}>New link</Button>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <WindowField label="Opens" value={link.opensAt} timeZone={data.timeZone} onCommit={(value) => save.mutate({ publicLink: { opensAt: value } })} />
-              <WindowField label="Closes" value={link.closesAt} timeZone={data.timeZone} onCommit={(value) => save.mutate({ publicLink: { closesAt: value } })} />
-            </div>
-            <AccessCodeField hasCode={link.hasAccessCode} value={accessCode} onChange={setAccessCode} onSet={() => save.mutate({ publicLink: { accessCode } })} onRemove={() => save.mutate({ publicLink: { accessCode: "" } })} />
-            <FieldDescription>Public responses are limited to {link.hourlyLimit} starts an hour. Byline records no IP addresses or device identifiers; each start token works once.</FieldDescription>
-          </FieldSet>
-        ) : null}
+        <FieldGroup>
+          <SwitchField label="In person, on a kiosk device" description="Interviewers hand an iPad to students." checked={survey.kioskEnabled} onChange={(checked) => save.mutate({ kioskEnabled: checked })} />
+          <SwitchField label="Public link" description="Anyone with the link can answer, without signing in." checked={link?.enabled ?? false} onChange={(checked) => save.mutate({ publicLink: { enabled: checked } })} />
+          {link?.enabled ? (
+            <FieldSet className="border-l-2 pl-4">
+              <FieldLegend className="sr-only">Public link</FieldLegend>
+              <Field>
+                <FieldLabel htmlFor={`${linkId}-url`}>Link</FieldLabel>
+                <InputGroup>
+                  <InputGroupInput id={`${linkId}-url`} readOnly value={publicUrl} className="font-mono text-xs" onFocus={(event) => event.currentTarget.select()} />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton size="xs" onClick={() => void navigator.clipboard?.writeText(publicUrl)}><Copy data-icon="inline-start" />Copy</InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+                <div><Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => save.mutate({ publicLink: { regenerateKey: true } })}>Replace with a new link</Button></div>
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <WindowField label="Opens" value={link.opensAt} timeZone={data.timeZone} onCommit={(value) => save.mutate({ publicLink: { opensAt: value } })} />
+                <WindowField label="Closes" value={link.closesAt} timeZone={data.timeZone} onCommit={(value) => save.mutate({ publicLink: { closesAt: value } })} />
+              </div>
+              <AccessCodeField hasCode={link.hasAccessCode} value={accessCode} onChange={setAccessCode} onSet={() => save.mutate({ publicLink: { accessCode } })} onRemove={() => save.mutate({ publicLink: { accessCode: "" } })} />
+              <FieldDescription>Limited to {link.hourlyLimit} starts an hour. Byline records no IP addresses or device identifiers, and each start token works once.</FieldDescription>
+            </FieldSet>
+          ) : null}
+        </FieldGroup>
       </Section>
 
-      <Section title="Linked coverage">
-        <p className="text-sm text-muted-foreground">Link the Story or Collection reporting on this poll. Results are never published automatically.</p>
+      <Section title="Linked coverage" description="Results are never published automatically.">
         <LinkPicker kind="stories" label="Story" chosen={survey.linkedStory} onChange={(id) => save.mutate({ linkedStory: id })} />
         <LinkPicker kind="collections" label="Collection" chosen={survey.linkedCollection} onChange={(id) => save.mutate({ linkedCollection: id })} />
       </Section>
 
-      {data.survey.canManage ? (
-        <Section title="Spreadsheet">
-          <div className="flex flex-wrap gap-2">
-            <Button nativeButton={false} variant="outline" render={<a href={workbookHref(api, survey.id)} download />}><FileSpreadsheet data-icon="inline-start" />Download the draft</Button>
-            <Button type="button" variant="outline" onClick={() => go({ view: "import", poll: survey.id })}><Upload data-icon="inline-start" />Import a new version</Button>
-          </div>
-        </Section>
-      ) : null}
-
-      <Section title="Delete">
-        <p className="text-sm text-muted-foreground">Administrators can delete a poll with every version, session and response. To keep results, close or archive it instead.</p>
-        <div><Button type="button" variant="outline" className="text-destructive" onClick={() => setDeleting(true)}>Delete poll…</Button></div>
+      <Section title="Delete poll" description="Administrators can delete a poll with every version, session and response. To keep the results, close or archive it instead.">
+        <div><Button type="button" variant="destructive" onClick={() => setDeleting(true)}>Delete poll…</Button></div>
       </Section>
 
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
@@ -291,12 +334,19 @@ function Settings({ data }: { data: SurveyDetail }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** One settings group: a plain heading, an optional line under it, and a separator before the next. */
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 border-t pt-6 first:border-t-0 first:pt-0">
-      <h2 className="font-(family-name:--poll-serif) text-xl font-medium">{title}</h2>
-      {children}
-    </section>
+    <>
+      <Separator className="first:hidden" />
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-semibold">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        </div>
+        {children}
+      </section>
+    </>
   );
 }
 
@@ -331,13 +381,13 @@ function PeoplePicker({ label, description, people, chosen, onChange }: { label:
       <FieldDescription>{description}</FieldDescription>
       <div className="flex flex-wrap items-center gap-2">
         {chosen.map((person) => (
-          <Badge key={person.id} variant="secondary" className="h-8 gap-1 pr-1 text-sm">
+          <Badge key={person.id} variant="secondary" className="gap-0.5 pr-0.5">
             {person.name}
-            <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${person.name}`} onClick={() => onChange(ids.filter((id) => id !== Number(person.id)))}><X /></Button>
+            <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${person.name}`} onClick={() => onChange(ids.filter((id) => id !== Number(person.id)))}><X /></Button>
           </Badge>
         ))}
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<Button type="button" variant="outline" size="sm" />}>Add…</PopoverTrigger>
+          <PopoverTrigger render={<Button type="button" variant="outline" size="sm" />}><Plus data-icon="inline-start" />Add</PopoverTrigger>
           <PopoverContent className="w-72 p-0" align="start">
             <Command>
               <CommandInput placeholder="Search staff" />
@@ -365,7 +415,7 @@ function LinkPicker({ kind, label, chosen, onChange }: { kind: "stories" | "coll
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="w-24 text-muted-foreground">{label}</span>
-      {chosen ? <span className="inline-flex items-center gap-1 font-medium"><Link2 className="size-4" aria-hidden="true" />{chosen.title}</span> : <span className="text-muted-foreground">None</span>}
+      {chosen ? <span className="min-w-0 truncate font-medium">{chosen.title}</span> : <span className="text-muted-foreground">None</span>}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger render={<Button type="button" variant="outline" size="sm" />}>{chosen ? "Change" : "Choose…"}</PopoverTrigger>
         <PopoverContent className="w-80 p-0" align="start">

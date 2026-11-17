@@ -1,13 +1,20 @@
 "use client";
 
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
+import { Alert, AlertDescription, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
+import { Card } from "@byline/newsroom-ui/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { Item, ItemGroup } from "@byline/newsroom-ui/ui/item";
+import { Separator } from "@byline/newsroom-ui/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
+import { cn } from "@byline/newsroom-ui/lib/utils";
 import { DateButton } from "@byline/newsroom-ui/components/date-fields";
 import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Info } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, Download, Info } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import type { Breakdown, FieldworkRow, QuestionResult } from "../../polls/engine/results";
 import { useNewsroomRoutes } from "../shell/account";
 import { exportHref, fetchResults, formatWhen, pollKeys, type SurveyResultsView } from "./api";
@@ -41,68 +48,96 @@ export function ResultsView({ id }: { id: number }) {
   const results = useQuery({ queryKey: pollKeys.results(id, search), queryFn: () => fetchResults(api, id, search), placeholderData: (previous) => previous });
   const data = results.data;
   const set = (patch: Partial<Filters>) => setFilters((current) => ({ ...current, ...patch }));
+  const [view, setView] = useState("questions");
 
   if (results.isError) return <InlineAlert title="Results aren't available" onAction={() => void results.refetch()}>{(results.error as Error).message}</InlineAlert>;
   if (!data) return <ListSkeleton />;
   const total = data.fieldwork.total;
+  const views = [
+    { value: "questions", label: "Questions", show: true },
+    { value: "breakdowns", label: "Breakdowns", show: data.results.breakdowns.length > 0 },
+    { value: "fieldwork", label: "Fieldwork", show: data.fieldwork.sessions.length > 0 }
+  ].filter((entry) => entry.show);
   return (
-    <div className="flex flex-col gap-8" data-polls-results="">
-      <div className="flex flex-wrap items-end gap-3 border-b pb-4" role="group" aria-label="Filter results">
-        <FilterField label="From" id="results-from"><DateButton id="results-from" value={filters.from} onChange={(from) => set({ from })} className="w-40 justify-start font-normal" /></FilterField>
-        <FilterField label="To" id="results-to"><DateButton id="results-to" value={filters.to} onChange={(to) => set({ to })} className="w-40 justify-start font-normal" /></FilterField>
+    <div className="flex flex-col gap-6" data-polls-results="">
+      <div className="flex flex-wrap items-end gap-3" role="group" aria-label="Filter results">
+        <FilterField label="From" id="results-from"><DateButton id="results-from" value={filters.from} onChange={(from) => set({ from })} className="w-36 justify-start font-normal" /></FilterField>
+        <FilterField label="To" id="results-to"><DateButton id="results-to" value={filters.to} onChange={(to) => set({ to })} className="w-36 justify-start font-normal" /></FilterField>
         <FilterField label="Location" id="results-location">
-          <PollSelect id="results-location" className="w-44" value={filters.location} emptyLabel="All" options={data.options.locations.map((name) => ({ value: name, label: name }))} onChange={(location) => set({ location })} />
+          <PollSelect id="results-location" className="w-40" value={filters.location} emptyLabel="All" options={data.options.locations.map((name) => ({ value: name, label: name }))} onChange={(location) => set({ location })} />
         </FilterField>
         <FilterField label="Session" id="results-session">
-          <PollSelect id="results-session" className="w-64" value={filters.session} emptyLabel="All" options={data.options.sessions.map((session) => ({ value: session.id, label: session.label }))} onChange={(session) => set({ session })} />
+          <PollSelect id="results-session" className="w-56" value={filters.session} emptyLabel="All" options={data.options.sessions.map((session) => ({ value: session.id, label: session.label }))} onChange={(session) => set({ session })} />
         </FilterField>
         {data.versions.length > 1 ? (
           <FilterField label="Version" id="results-version">
-            <PollSelect id="results-version" className="w-52" value={filters.version} emptyLabel={`All (labels from v${data.version.number})`} options={data.versions.map((version) => ({ value: String(version.id), label: `Version ${version.number}` }))} onChange={(version) => set({ version })} />
+            <PollSelect id="results-version" className="w-48" value={filters.version} emptyLabel={`All (labels from v${data.version.number})`} options={data.versions.map((version) => ({ value: String(version.id), label: `Version ${version.number}` }))} onChange={(version) => set({ version })} />
           </FilterField>
         ) : null}
         <FilterField label="Collected" id="results-mode">
-          <PollSelect id="results-mode" className="w-40" value={filters.mode} emptyLabel="Any way" options={[{ value: "kiosk", label: "In person" }, { value: "public", label: "Public link" }]} onChange={(mode) => set({ mode })} />
+          <PollSelect id="results-mode" className="w-36" value={filters.mode} emptyLabel="Any way" options={[{ value: "kiosk", label: "In person" }, { value: "public", label: "Public link" }]} onChange={(mode) => set({ mode })} />
         </FilterField>
         {search ? <Button type="button" variant="ghost" onClick={() => setFilters(EMPTY)}>Clear</Button> : null}
         <span className="flex-1" />
-        <Button nativeButton={false} variant="outline" render={<a href={exportHref(api, id, "summary", search)} download />}><Download data-icon="inline-start" />Summary CSV</Button>
-        <Button nativeButton={false} variant="outline" render={<a href={exportHref(api, id, "responses", search)} download />}><Download data-icon="inline-start" />Responses CSV</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button type="button" variant="outline" />}><Download data-icon="inline-start" />Export<ChevronDown data-icon="inline-end" /></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>CSV, with these filters</DropdownMenuLabel>
+              <DropdownMenuItem render={<a href={exportHref(api, id, "summary", search)} download />}>Summary CSV</DropdownMenuItem>
+              <DropdownMenuItem render={<a href={exportHref(api, id, "responses", search)} download />}>Responses CSV</DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
+      <Separator />
+
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3">
-          <p className="font-(family-name:--poll-serif) text-[2.5rem] leading-none font-medium tabular-nums">{data.results.responses}<span className="ml-2 font-sans text-base font-normal text-muted-foreground">response{data.results.responses === 1 ? "" : "s"}</span></p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm"><span className="text-2xl font-semibold tracking-tight tabular-nums">{data.results.responses.toLocaleString("en-US")}</span> <span>{data.results.responses === 1 ? "response" : "responses"}</span></p>
           <p className="text-sm text-muted-foreground">
             {data.firstResponseAt ? `${formatWhen(data.firstResponseAt)} to ${formatWhen(data.lastResponseAt)}` : "No responses for these filters yet."}
             {data.modes.public ? ` · ${data.modes.kiosk} in person, ${data.modes.public} by public link` : ""}
           </p>
           {total.approached ? (
-            <p className="text-sm">
+            <p className="text-sm text-muted-foreground">
               {total.approached} approached in person · {total.declined} declined · {total.abandoned} incomplete.
               {total.reliable ? ` ${pct(total.declineRate)} declined; ${pct(total.completionRate)} of those who started finished.` : ` Too few approaches (under ${data.survey.minimumGroup}) to give rates.`}
             </p>
           ) : null}
         </div>
-        <aside className="flex flex-col gap-2 rounded-lg bg-muted/60 p-4 text-sm" aria-label="Methodology">
-          <p className="flex items-center gap-2 font-semibold"><Info className="size-4" aria-hidden="true" />Methodology and limitations</p>
-          {data.survey.methodology ? <p className="leading-relaxed whitespace-pre-line">{data.survey.methodology}</p> : <p className="text-muted-foreground">No methodology note yet. Add one in Settings before these results are reported.</p>}
-          <p className="text-muted-foreground">Percentages are of the students who answered each question. Students chose whether to take part, so results describe respondents, not the whole school. Groups smaller than {data.survey.minimumGroup} are withheld.</p>
-        </aside>
+        <Alert aria-label="Methodology" role="note">
+          <Info />
+          <AlertTitle>Methodology and limitations</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            {data.survey.methodology ? <p className="whitespace-pre-line text-foreground">{data.survey.methodology}</p> : <p>No methodology note yet. Add one in Settings before these results are reported.</p>}
+            <p>Percentages are of the students who answered each question. Students chose whether to take part, so results describe respondents, not the whole school. Groups smaller than {data.survey.minimumGroup} are withheld.</p>
+          </AlertDescription>
+        </Alert>
       </section>
 
-      <section className="flex flex-col gap-10" aria-label="Questions">
-        {data.results.questions.map((question) => <QuestionBlock key={question.name} question={question} />)}
-      </section>
-
-      {data.results.breakdowns.length ? (
-        <section className="flex flex-col gap-6">
-          <h2 className="font-(family-name:--poll-serif) text-2xl font-medium">Breakdowns</h2>
+      <Tabs value={views.some((entry) => entry.value === view) ? view : "questions"} onValueChange={(next) => setView(next as string)}>
+        {views.length > 1 ? (
+          <TabsList>
+            {views.map((entry) => <TabsTrigger key={entry.value} value={entry.value}>{entry.label}</TabsTrigger>)}
+          </TabsList>
+        ) : null}
+        <TabsContent value="questions" className="mt-4 flex flex-col gap-8" aria-label="Questions">
+          {data.results.questions.map((question, index) => (
+            <Fragment key={question.name}>
+              {index ? <Separator /> : null}
+              <QuestionBlock question={question} />
+            </Fragment>
+          ))}
+        </TabsContent>
+        <TabsContent value="breakdowns" className="mt-4 flex flex-col gap-6">
           {data.results.breakdowns.map((entry) => <BreakdownTable key={`${entry.by}-${entry.question}`} breakdown={entry} minimum={data.survey.minimumGroup} />)}
-        </section>
-      ) : null}
-
-      {data.fieldwork.sessions.length ? <FieldworkTables data={data} /> : null}
+        </TabsContent>
+        <TabsContent value="fieldwork" className="mt-4">
+          <FieldworkTables data={data} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -123,10 +158,10 @@ function BaseLine({ question }: { question: QuestionResult }) {
 function QuestionBlock({ question }: { question: QuestionResult }) {
   const [allTexts, setAllTexts] = useState(false);
   return (
-    <article className="grid gap-3 border-t pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10" aria-labelledby={`result-${question.name}`}>
-      <header className="flex flex-col gap-1.5">
-        {question.section ? <p className="text-xs font-semibold tracking-[0.1em] text-(--poll-accent) uppercase">{question.section}</p> : null}
-        <h3 id={`result-${question.name}`} className="font-(family-name:--poll-serif) text-xl leading-snug font-medium">{question.label}</h3>
+    <article className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-10" aria-labelledby={`result-${question.name}`}>
+      <header className="flex flex-col gap-1">
+        {question.section ? <p className="text-xs text-muted-foreground">{question.section}</p> : null}
+        <h3 id={`result-${question.name}`} className="text-base leading-snug font-semibold">{question.label}</h3>
         <BaseLine question={question} />
         {question.multiple ? <p className="text-xs text-muted-foreground">More than one answer allowed, so percentages add up to more than 100.</p> : null}
       </header>
@@ -140,9 +175,9 @@ function QuestionBlock({ question }: { question: QuestionResult }) {
           ) : question.texts ? (
             question.texts.length ? (
               <div className="flex flex-col gap-2">
-                <ul className="flex flex-col divide-y rounded-lg border text-sm">
-                  {(allTexts ? question.texts : question.texts.slice(0, 8)).map((entry) => <li key={entry.responseId} className="px-3 py-2.5 leading-relaxed whitespace-pre-line">{entry.text}</li>)}
-                </ul>
+                <ItemGroup className="gap-0 rounded-lg border">
+                  {(allTexts ? question.texts : question.texts.slice(0, 8)).map((entry, index) => <Item key={entry.responseId} size="xs" className={cn("rounded-none leading-relaxed whitespace-pre-line", index && "border-t-border")}>{entry.text}</Item>)}
+                </ItemGroup>
                 {question.texts.length > 8 ? <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setAllTexts(!allTexts)}>{allTexts ? "Show fewer" : `Show all ${question.texts.length}`}</Button> : null}
                 <p className="text-xs text-muted-foreground">Written answers are confidential. Check them for names before quoting anything.</p>
               </div>
@@ -167,7 +202,7 @@ function Bars({ rows, base, narrowLabels }: { rows: Array<{ key: string; label: 
               <div className="flex items-center gap-2">
                 <div className="relative h-3 flex-1 rounded-r-[4px] bg-transparent">
                   <div className="absolute inset-y-0 left-0 w-px bg-border" aria-hidden="true" />
-                  <div className="h-3 rounded-r-[4px] bg-(--poll-accent) transition-[width] duration-300 group-hover:opacity-85 motion-reduce:transition-none" style={{ width: `${Math.max(row.count ? 0.5 : 0, row.percent ?? 0)}%` }} />
+                  <div className="h-3 rounded-r-[4px] bg-primary/80 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${Math.max(row.count ? 0.5 : 0, row.percent ?? 0)}%` }} />
                 </div>
                 <span className="w-14 text-right font-medium tabular-nums">{pct(row.percent)}</span>
               </div>
@@ -184,7 +219,7 @@ function BreakdownTable({ breakdown, minimum }: { breakdown: Breakdown; minimum:
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold">{breakdown.questionLabel} <span className="font-normal text-muted-foreground">by {breakdown.byLabel.replace(/\?$/, "").toLowerCase()}</span></h3>
-      <div className="overflow-x-auto rounded-lg border">
+      <Card className="gap-0 py-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -209,7 +244,7 @@ function BreakdownTable({ breakdown, minimum }: { breakdown: Breakdown; minimum:
             ))}
           </TableBody>
         </Table>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -217,16 +252,15 @@ function BreakdownTable({ breakdown, minimum }: { breakdown: Breakdown; minimum:
 function FieldworkTables({ data }: { data: SurveyResultsView }) {
   const sets: Array<[string, FieldworkRow[]]> = [["By location", data.fieldwork.locations], ["By session", data.fieldwork.sessions], ["By collection method", data.fieldwork.methods]];
   return (
-    <section className="flex flex-col gap-6">
-      <h2 className="font-(family-name:--poll-serif) text-2xl font-medium">Fieldwork</h2>
+    <section className="flex flex-col gap-6" aria-label="Fieldwork">
       {sets.map(([title, rows]) => rows.length ? (
         <div key={title} className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">{title}</h3>
-          <div className="overflow-x-auto rounded-lg border">
+          <Card className="gap-0 py-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead />
+                  <TableHead><span className="sr-only">{title}</span></TableHead>
                   <TableHead className="text-right">Approached</TableHead>
                   <TableHead className="text-right">Declined</TableHead>
                   <TableHead className="text-right">Completed</TableHead>
@@ -249,7 +283,7 @@ function FieldworkTables({ data }: { data: SurveyResultsView }) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </Card>
         </div>
       ) : null)}
     </section>

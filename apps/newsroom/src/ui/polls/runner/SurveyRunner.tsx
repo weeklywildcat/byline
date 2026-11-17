@@ -1,13 +1,17 @@
 "use client";
 
+import { Alert, AlertTitle } from "@byline/newsroom-ui/ui/alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
-import { FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@byline/newsroom-ui/ui/field";
+import { Input } from "@byline/newsroom-ui/ui/input";
+import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
+import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { trackVisualViewport } from "@byline/newsroom-ui/lib/visual-viewport";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, CloudUpload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudUpload } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { answerProblem, choicesFor, pruneAnswers, rangeValues, screensFor, sectionLabel, TEXT_ANSWER_MAX } from "../../../polls/engine/logic";
 import { isAnswerable, type Answers, type AnswerState, type Question, type SurveyDefinition } from "../../../polls/engine/types";
@@ -45,7 +49,8 @@ export type RunnerProps = {
 type Stage = "welcome" | "questions" | "done";
 type Draft = Record<string, string>;
 
-const FOCUS = "outline-none focus-visible:ring-[3px] focus-visible:ring-(--poll-accent)/40";
+/** The respondent's actions: the kit's Button at its large size, made taller for a finger on an iPad. */
+const ACTION = "h-12 px-5 text-base";
 
 export function SurveyRunner(props: RunnerProps) {
   const { definition, mode, embedded = false } = props;
@@ -169,56 +174,61 @@ export function SurveyRunner(props: RunnerProps) {
   const optional = current && isAnswerable(current) ? !current.required : false;
   const isLast = current ? screens.indexOf(current) === screens.length - 1 : true;
 
+  const progress = stage === "welcome" ? 0 : stage === "done" ? 100 : Math.round((index / Math.max(1, screens.length)) * 100);
+  const gutter = "px-[max(1.25rem,var(--byline-safe-left))] sm:px-8";
   return (
     <div
       ref={rootRef}
-      className={cn("byline-polls relative flex flex-col bg-(--poll-paper) text-(--poll-ink)", embedded ? "min-h-full rounded-lg border border-(--poll-rule)" : "min-h-dvh")}
+      className={cn("relative flex flex-col bg-background text-foreground", embedded ? "min-h-full" : "min-h-dvh")}
       data-poll-runner={mode}
     >
-      <header className={cn("sticky top-0 z-10 bg-(--poll-paper)/95 backdrop-blur-sm", embedded ? "rounded-t-lg" : "pt-(--byline-safe-top)")}>
-        <div className="mx-auto flex min-h-14 w-full max-w-6xl items-center gap-4 px-[max(1.25rem,var(--byline-safe-left))] sm:px-8">
-          <p className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium tracking-[0.08em] text-(--poll-muted) uppercase">{definition.settings.title}</p>
+      <header className={cn("sticky top-0 z-10 bg-background", !embedded && "pt-(--byline-safe-top)")}>
+        <div className={cn("mx-auto flex min-h-14 w-full max-w-5xl items-center gap-3", gutter)}>
+          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{definition.settings.title}</p>
           {stage === "questions" && current ? (
-            <p className="shrink-0 text-sm text-(--poll-muted) tabular-nums" aria-live="polite">
-              <span className="sr-only">Question </span>{index + 1}<span aria-hidden="true"> / </span><span className="sr-only"> of about </span>{screens.length}
+            <p className="shrink-0 text-sm text-muted-foreground tabular-nums" aria-live="polite">
+              <span className="sr-only">Question </span>{index + 1}<span aria-hidden="true"> of </span><span className="sr-only"> of about </span>{screens.length}
             </p>
           ) : null}
-          {stage === "questions" && props.onStop ? (
-            <Button type="button" variant="ghost" className="h-11 px-3 text-(--poll-muted)" onClick={props.onStop}>Stop</Button>
-          ) : null}
+          {stage === "questions" && props.onStop ? <Button type="button" variant="ghost" onClick={props.onStop}>Stop</Button> : null}
           {props.headerAction}
         </div>
-        <div className="h-[3px] w-full bg-(--poll-rule)" aria-hidden="true">
-          <div className="h-full bg-(--poll-accent) transition-[width] duration-300 ease-out motion-reduce:transition-none" style={{ width: `${stage === "welcome" ? 0 : stage === "done" ? 100 : Math.round((index / Math.max(1, screens.length)) * 100)}%` }} />
+        <div className={cn("mx-auto w-full max-w-5xl", gutter)}>
+          <Progress value={progress} aria-label="Progress through the poll" />
         </div>
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col">
         {stage === "welcome" ? (
-          <Welcome definition={definition} count={screensFor(definition, {}).filter(isAnswerable).length} onBegin={begin} mode={mode} />
+          <Welcome definition={definition} count={screensFor(definition, {}).filter(isAnswerable).length} onBegin={begin} />
         ) : stage === "done" ? (
           <Done definition={definition} submitting={submitting} outcome={outcome} onRetry={retry} action={props.doneAction} mode={mode} />
         ) : current ? (
           <section
             key={current.name}
             className={cn(
-              cn("mx-auto grid w-full max-w-6xl flex-1 content-start gap-8 px-[max(1.25rem,var(--byline-safe-left))] pt-10 sm:px-10 sm:pt-14", embedded ? "pb-10" : "pb-36"),
-              "[@media(min-width:1000px)_and_(orientation:landscape)]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] [@media(min-width:1000px)_and_(orientation:landscape)]:gap-16 [@media(min-width:1000px)_and_(orientation:landscape)]:pt-20",
+              "mx-auto grid w-full max-w-5xl flex-1 content-start gap-8 pt-8 sm:pt-12",
+              gutter,
+              embedded ? "pb-10" : "pb-32",
+              "[@media(min-width:1000px)_and_(orientation:landscape)]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] [@media(min-width:1000px)_and_(orientation:landscape)]:gap-14 [@media(min-width:1000px)_and_(orientation:landscape)]:pt-16",
               "animate-in fade-in duration-200 motion-reduce:animate-none",
-              direction === "forward" ? "slide-in-from-right-6" : "slide-in-from-left-6"
+              direction === "forward" ? "slide-in-from-right-4" : "slide-in-from-left-4"
             )}
             aria-labelledby={`q-${current.name}`}
           >
-            <div className="flex flex-col gap-4">
-              {sectionLabel(definition, current) ? <p className="text-[0.8125rem] font-semibold tracking-[0.08em] text-(--poll-accent) uppercase">{sectionLabel(definition, current)}</p> : null}
-              <h1 id={`q-${current.name}`} ref={headingRef} tabIndex={-1} className="font-(family-name:--poll-serif) text-[2rem] leading-[1.12] font-medium text-balance outline-none sm:text-[2.5rem]">
+            <div className="flex flex-col gap-3">
+              {sectionLabel(definition, current) ? <p className="text-sm font-medium text-muted-foreground">{sectionLabel(definition, current)}</p> : null}
+              <h1 id={`q-${current.name}`} ref={headingRef} tabIndex={-1} className="text-2xl leading-tight font-semibold tracking-tight text-balance outline-none sm:text-3xl">
                 {current.label}
               </h1>
-              {current.hint ? <p className="max-w-[38rem] text-lg leading-relaxed text-(--poll-muted)">{current.hint}</p> : null}
-              {answerable && optional ? <p className="text-sm text-(--poll-muted)">Optional</p> : null}
-              <p id={`problem-${current.name}`} role="alert" className={cn("flex items-center gap-2 rounded-lg bg-(--poll-accent-soft) px-4 py-3 text-base font-medium text-(--poll-accent)", problem ? "" : "hidden")}>
-                <CircleAlert className="size-5 shrink-0" aria-hidden="true" />{problem}
-              </p>
+              {current.hint ? <p className="max-w-[38rem] text-lg leading-relaxed text-muted-foreground">{current.hint}</p> : null}
+              {answerable && optional ? <p className="text-sm text-muted-foreground">Optional</p> : null}
+              {problem ? (
+                <Alert variant="destructive" id={`problem-${current.name}`} className="text-base">
+                  <CircleAlert />
+                  <AlertTitle>{problem}</AlertTitle>
+                </Alert>
+              ) : null}
             </div>
             <div className="flex flex-col gap-4">
               {isAnswerable(current) ? (
@@ -237,30 +247,19 @@ export function SurveyRunner(props: RunnerProps) {
             </div>
           </section>
         ) : (
-          <p className="p-10 text-lg">This poll has no questions yet.</p>
+          <p className={cn("py-10 text-lg", gutter)}>This poll has no questions yet.</p>
         )}
       </main>
 
       {stage === "questions" && current ? (
-        <footer
-          className={cn("z-10 border-t border-(--poll-rule) bg-(--poll-paper)/95 backdrop-blur-sm", embedded ? "sticky bottom-0 rounded-b-lg" : "fixed inset-x-0 bottom-(--byline-vv-bottom,0px) pb-(--byline-safe-bottom)")}
-        >
-          <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-[max(1.25rem,var(--byline-safe-left))] py-3 sm:px-10">
-            <Button type="button" variant="ghost" className="h-14 gap-2 px-5 text-base" onClick={back}>
-              <ArrowLeft className="size-5" aria-hidden="true" />Back
-            </Button>
+        <footer className={cn("z-10 border-t bg-background", embedded ? "sticky bottom-0" : "fixed inset-x-0 bottom-(--byline-vv-bottom,0px) pb-(--byline-safe-bottom)")}>
+          <div className={cn("mx-auto flex w-full max-w-5xl items-center gap-2 py-3", gutter)}>
+            <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={back}><ArrowLeft data-icon="inline-start" />Back</Button>
             <span className="flex-1" />
-            {answerable && optional ? (
-              <Button type="button" variant="ghost" className="h-14 px-5 text-base text-(--poll-muted)" onClick={() => void skip()}>Skip</Button>
-            ) : null}
-            <Button
-              type="button"
-              className={cn("h-14 min-w-40 gap-2 rounded-full bg-(--poll-ink) px-7 text-base text-(--poll-paper) hover:bg-(--poll-ink)/90", FOCUS)}
-              disabled={answerable && !hasAnswer}
-              onClick={() => void next()}
-            >
+            {answerable && optional ? <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={() => void skip()}>Skip</Button> : null}
+            <Button type="button" size="lg" className={cn(ACTION, "min-w-32")} disabled={answerable && !hasAnswer} onClick={() => void next()}>
               {isLast ? "Submit" : "Next"}
-              {isLast ? <Check className="size-5" aria-hidden="true" /> : <ArrowRight className="size-5" aria-hidden="true" />}
+              {isLast ? <Check data-icon="inline-end" /> : <ArrowRight data-icon="inline-end" />}
             </Button>
           </div>
         </footer>
@@ -271,27 +270,21 @@ export function SurveyRunner(props: RunnerProps) {
 
 /* ------------------------------------------------------------------ screens */
 
-function Welcome({ definition, count, onBegin, mode }: { definition: SurveyDefinition; count: number; onBegin: () => void; mode: RunnerProps["mode"] }) {
+function Welcome({ definition, count, onBegin }: { definition: SurveyDefinition; count: number; onBegin: () => void }) {
   const { settings } = definition;
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-10 animate-in fade-in duration-300 motion-reduce:animate-none">
-      <div className="flex flex-col gap-5">
-        <p className="text-[0.8125rem] font-semibold tracking-[0.12em] text-(--poll-accent) uppercase">{mode === "public" ? "The Weekly Wildcat · Poll" : "The Weekly Wildcat asks"}</p>
-        <h1 className="font-(family-name:--poll-serif) text-[2.75rem] leading-[1.05] font-medium text-balance sm:text-[3.5rem]">{settings.title}</h1>
-        {settings.description ? <p className="max-w-[40rem] text-xl leading-relaxed text-(--poll-ink)/85">{settings.description}</p> : null}
+    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-8 animate-in fade-in duration-300 motion-reduce:animate-none">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">The Weekly Wildcat</p>
+        <h1 className="text-3xl leading-tight font-semibold tracking-tight text-balance sm:text-4xl">{settings.title}</h1>
+        {settings.description ? <p className="text-lg leading-relaxed">{settings.description}</p> : null}
       </div>
-      <p className="max-w-[40rem] text-lg leading-relaxed text-(--poll-muted)">
+      <p className="text-lg leading-relaxed text-muted-foreground">
         {settings.welcome || "Taking part is voluntary and anonymous. We never ask for your name, and you can skip any question or stop at any time."}
+        {" "}About {count} {count === 1 ? "question" : "questions"}.
       </p>
-      <dl className="grid max-w-[40rem] grid-cols-3 gap-6 border-y border-(--poll-rule) py-5 text-sm">
-        <div><dt className="text-(--poll-muted)">Questions</dt><dd className="mt-1 text-lg font-medium tabular-nums">About {count}</dd></div>
-        <div><dt className="text-(--poll-muted)">Your name</dt><dd className="mt-1 text-lg font-medium">Never asked</dd></div>
-        <div><dt className="text-(--poll-muted)">Stopping</dt><dd className="mt-1 text-lg font-medium">Any time</dd></div>
-      </dl>
       <div>
-        <Button type="button" className={cn("h-16 gap-3 rounded-full bg-(--poll-ink) px-10 text-lg text-(--poll-paper) hover:bg-(--poll-ink)/90", FOCUS)} onClick={onBegin}>
-          Start<ArrowRight className="size-5" aria-hidden="true" />
-        </Button>
+        <Button type="button" size="lg" className={cn(ACTION, "min-w-32")} onClick={onBegin}>Start<ArrowRight data-icon="inline-end" /></Button>
       </div>
     </section>
   );
@@ -300,16 +293,22 @@ function Welcome({ definition, count, onBegin, mode }: { definition: SurveyDefin
 function Done({ definition, submitting, outcome, onRetry, action, mode }: { definition: SurveyDefinition; submitting: boolean; outcome: SubmitOutcome | null; onRetry: () => void; action?: ReactNode; mode: RunnerProps["mode"] }) {
   const failed = outcome?.status === "failed";
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-10" aria-live="polite">
-      <h1 className="font-(family-name:--poll-serif) text-[3rem] leading-[1.05] font-medium sm:text-[4rem]">{failed ? "Almost there." : "Thank you."}</h1>
-      <div className="flex min-h-14 items-center gap-3 text-lg" role="status">
-        {submitting || !outcome ? (<><Spinner className="size-5" />Sending your answers…</>)
-          : outcome.status === "saved" ? (<><span className="grid size-8 place-items-center rounded-full bg-(--poll-accent) text-white"><Check className="size-5" aria-hidden="true" /></span>{mode === "preview" ? "Preview finished. Nothing was saved." : "Your answers are saved."}</>)
-          : outcome.status === "queued" ? (<><CloudUpload className="size-6 text-(--poll-accent)" aria-hidden="true" />Your answers are saved on this iPad and will upload automatically.</>)
-          : (<><CircleAlert className="size-6 shrink-0 text-(--poll-accent)" aria-hidden="true" /><span>{outcome.message}</span></>)}
-      </div>
-      {failed && outcome.retry ? <div><Button type="button" className="h-14 rounded-full px-8 text-base" onClick={onRetry}>Try again</Button></div> : null}
-      {!failed ? <p className="max-w-[40rem] text-xl leading-relaxed text-(--poll-ink)/85">{definition.settings.thankYou || (mode === "kiosk" ? "Please hand the iPad back to the reporter." : "You can close this page.")}</p> : null}
+    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-8" aria-live="polite">
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{failed ? "Almost there" : "Thank you"}</h1>
+      {failed ? (
+        <Alert variant="destructive" className="text-base">
+          <CircleAlert />
+          <AlertTitle>{outcome.message}</AlertTitle>
+        </Alert>
+      ) : (
+        <p className="flex min-h-8 items-center gap-2.5 text-lg" role="status">
+          {submitting || !outcome ? (<><Spinner className="size-5" />Sending your answers…</>)
+            : outcome.status === "saved" ? (<><CircleCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />{mode === "preview" ? "Preview finished. Nothing was saved." : "Your answers are saved."}</>)
+            : (<><CloudUpload className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />Your answers are saved on this iPad and will upload automatically.</>)}
+        </p>
+      )}
+      {failed && outcome.retry ? <div><Button type="button" size="lg" className={ACTION} onClick={onRetry}>Try again</Button></div> : null}
+      {!failed ? <p className="text-lg leading-relaxed text-muted-foreground">{definition.settings.thankYou || (mode === "kiosk" ? "Please hand the iPad back to the reporter." : "You can close this page.")}</p> : null}
       {action}
     </section>
   );
@@ -337,10 +336,26 @@ function QuestionInput(props: InputProps) {
   return <NumberAnswer {...props} />;
 }
 
-/** An answer card: the kit's FieldLabel around its control, sized for a finger. */
-const CARD = "flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-xl border-2 bg-white px-5 py-3 text-left text-lg leading-snug font-normal transition-colors duration-150 select-none motion-reduce:transition-none hover:border-(--poll-ink)/40 has-focus-visible:ring-[3px] has-focus-visible:ring-(--poll-accent)/40 has-data-checked:border-(--poll-ink) has-data-checked:bg-(--poll-accent-soft)";
-/** The kit's radio and checkbox, enlarged to match the card. */
-const CONTROL = "size-7 border-2 border-(--poll-ink)/30 after:hidden data-checked:border-(--poll-ink) data-checked:bg-(--poll-ink) [&_[data-slot=radio-group-indicator]]:size-full [&_[data-slot=radio-group-indicator]>span]:size-2.5 [&_[data-slot=checkbox-indicator]_svg]:size-4.5";
+/**
+ * One answer, as the kit composes a choice card (ChoiceCards): a FieldLabel
+ * around a horizontal Field, the control first, sized for a finger. The
+ * selected look is FieldLabel's own, made a touch stronger for a glance at
+ * arm's length.
+ */
+const CHOICE = "*:data-[slot=field]:min-h-14 *:data-[slot=field]:gap-3.5 *:data-[slot=field]:px-4 *:data-[slot=field]:py-3.5 has-data-checked:border-primary";
+
+function ChoiceOption({ htmlFor, control, children }: { htmlFor: string; control: ReactNode; children: ReactNode }) {
+  return (
+    <FieldLabel htmlFor={htmlFor} className={CHOICE}>
+      <Field orientation="horizontal" className="items-center!">
+        {control}
+        <FieldContent>
+          <FieldTitle className="text-base leading-snug font-normal sm:text-lg">{children}</FieldTitle>
+        </FieldContent>
+      </Field>
+    </FieldLabel>
+  );
+}
 
 function ChoiceList({ question, definition, state, onChoose, describedBy }: InputProps) {
   const multiple = question.kind === "select_multiple";
@@ -355,25 +370,19 @@ function ChoiceList({ question, definition, state, onChoose, describedBy }: Inpu
   };
   if (!multiple) {
     return (
-      <RadioGroup value={selected[0] ?? null} onValueChange={(value) => onChoose({ status: "answered", value: String(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy} className="gap-3">
+      <RadioGroup value={selected[0] ?? null} onValueChange={(value) => onChoose({ status: "answered", value: String(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy} className="gap-2.5">
         {choices.map((choice) => (
-          <FieldLabel key={choice.name} htmlFor={`${id}-${choice.name}`} className={CARD}>
-            <RadioGroupItem id={`${id}-${choice.name}`} value={choice.name} className={CONTROL} />
-            <span className="min-w-0 flex-1">{choice.label}</span>
-          </FieldLabel>
+          <ChoiceOption key={choice.name} htmlFor={`${id}-${choice.name}`} control={<RadioGroupItem id={`${id}-${choice.name}`} value={choice.name} className="size-5" />}>{choice.label}</ChoiceOption>
         ))}
       </RadioGroup>
     );
   }
   return (
-    <FieldSet className="gap-3" aria-describedby={describedBy}>
+    <FieldSet className="gap-2.5" aria-describedby={describedBy}>
       <FieldLegend className="sr-only">{question.label} (choose all that apply)</FieldLegend>
-      <FieldDescription className="text-sm font-medium text-(--poll-muted)">Choose all that apply</FieldDescription>
+      <FieldDescription>Choose all that apply</FieldDescription>
       {choices.map((choice) => (
-        <FieldLabel key={choice.name} htmlFor={`${id}-${choice.name}`} className={CARD}>
-          <Checkbox id={`${id}-${choice.name}`} checked={selected.includes(choice.name)} onCheckedChange={(on) => toggle(choice.name, on === true)} className={cn(CONTROL, "rounded-md")} />
-          <span className="min-w-0 flex-1">{choice.label}</span>
-        </FieldLabel>
+        <ChoiceOption key={choice.name} htmlFor={`${id}-${choice.name}`} control={<Checkbox id={`${id}-${choice.name}`} checked={selected.includes(choice.name)} onCheckedChange={(on) => toggle(choice.name, on === true)} className="size-5" />}>{choice.label}</ChoiceOption>
       ))}
     </FieldSet>
   );
@@ -386,19 +395,21 @@ function Scale({ question, state, onChoose, describedBy }: InputProps) {
   const chosen = state?.status === "answered" ? String(state.value) : null;
   const describe = (value: number) => `${value}${value === question.start && question.startLabel ? `, ${question.startLabel}` : ""}${value === question.end && question.endLabel ? `, ${question.endLabel}` : ""}`;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       <RadioGroup value={chosen} onValueChange={(value) => onChoose({ status: "answered", value: Number(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy}
         className={cn("gap-2", values.length <= 7 ? "grid-cols-[repeat(auto-fit,minmax(3.5rem,1fr))]" : "grid-cols-[repeat(auto-fit,minmax(3rem,1fr))]")}>
         {values.map((value) => (
-          <FieldLabel key={value} htmlFor={`${id}-${value}`} className={cn(CARD, "justify-center px-0 text-xl font-medium tabular-nums has-data-checked:bg-(--poll-ink) has-data-checked:text-(--poll-paper)")}>
-            {/* The number is the visible control; the kit radio carries the semantics and keyboard. */}
-            <RadioGroupItem id={`${id}-${value}`} value={String(value)} aria-label={describe(value)} className="sr-only" />
-            {value}
+          <FieldLabel key={value} htmlFor={`${id}-${value}`} className="*:data-[slot=field]:min-h-14 has-data-checked:border-primary has-data-checked:bg-primary has-data-checked:text-primary-foreground">
+            <Field orientation="horizontal" className="justify-center text-lg font-medium tabular-nums">
+              {/* The number is the visible control; the kit radio carries the semantics and keyboard. */}
+              <RadioGroupItem id={`${id}-${value}`} value={String(value)} aria-label={describe(value)} className="sr-only" />
+              {value}
+            </Field>
           </FieldLabel>
         ))}
       </RadioGroup>
       {question.startLabel || question.endLabel ? (
-        <div className="flex justify-between gap-4 text-base text-(--poll-muted)" aria-hidden="true">
+        <div className="flex justify-between gap-4 text-sm text-muted-foreground" aria-hidden="true">
           <span>{question.startLabel}</span><span className="text-right">{question.endLabel}</span>
         </div>
       ) : null}
@@ -418,14 +429,14 @@ function TextAnswer({ question, state, draft, onDraft, onEnter, invalid, describ
     maxLength: TEXT_ANSWER_MAX,
     autoCapitalize: "sentences" as const,
     spellCheck: true,
-    className: cn("w-full rounded-xl border-2 border-(--poll-rule) bg-white px-5 py-4 text-xl leading-relaxed outline-none placeholder:text-(--poll-muted)/70 focus:border-(--poll-ink)", invalid && "border-(--poll-accent)")
+    placeholder: "Type your answer"
   };
   return (
     <div className="flex flex-col gap-2">
       {question.multiline
-        ? <textarea {...common} rows={6} placeholder="Type your answer" onChange={(event) => onDraft(event.target.value)} enterKeyHint="enter" />
-        : <input {...common} type="text" placeholder="Type your answer" autoComplete="off" enterKeyHint="next" onChange={(event) => onDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }} />}
-      {value.length > TEXT_ANSWER_MAX * 0.8 ? <p className="text-right text-sm text-(--poll-muted) tabular-nums">{value.length} / {TEXT_ANSWER_MAX}</p> : null}
+        ? <Textarea {...common} rows={6} className="min-h-40 px-3.5 py-3 text-lg md:text-lg" onChange={(event) => onDraft(event.target.value)} enterKeyHint="enter" />
+        : <Input {...common} type="text" className="h-12 px-3.5 text-lg md:text-lg" autoComplete="off" enterKeyHint="next" onChange={(event) => onDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }} />}
+      {value.length > TEXT_ANSWER_MAX * 0.8 ? <p className="text-right text-sm text-muted-foreground tabular-nums">{value.length} / {TEXT_ANSWER_MAX}</p> : null}
     </div>
   );
 }
@@ -433,7 +444,7 @@ function TextAnswer({ question, state, draft, onDraft, onEnter, invalid, describ
 function NumberAnswer({ question, state, draft, onDraft, onEnter, invalid, describedBy }: InputProps) {
   const value = draft ?? (state?.status === "answered" ? String(state.value) : "");
   return (
-    <input
+    <Input
       id={`answer-${question.name}`}
       type="text"
       inputMode={question.kind === "integer" ? "numeric" : "decimal"}
@@ -444,10 +455,10 @@ function NumberAnswer({ question, state, draft, onDraft, onEnter, invalid, descr
       aria-labelledby={`q-${question.name}`}
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
-      placeholder={question.kind === "integer" ? "Enter a whole number" : "Enter a number"}
+      placeholder={question.kind === "integer" ? "A whole number" : "A number"}
       onChange={(event) => onDraft(event.target.value)}
       onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }}
-      className={cn("w-full max-w-xs rounded-xl border-2 border-(--poll-rule) bg-white px-5 py-4 text-3xl tabular-nums outline-none placeholder:text-lg placeholder:text-(--poll-muted)/70 focus:border-(--poll-ink)", invalid && "border-(--poll-accent)")}
+      className="h-14 max-w-xs px-3.5 text-2xl tabular-nums md:text-2xl"
     />
   );
 }

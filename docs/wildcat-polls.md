@@ -110,7 +110,8 @@ validation serve both modes.
 
 ## Respondent experience
 
-One question per screen, in the publication's Erode serif, with large answers (at least 64px), obvious selection,
+One question per screen, in Byline's own Nova components (no separate palette or typeface; the welcome screen names
+The Weekly Wildcat in a single muted line), with large answers (at least 56px), obvious selection,
 Back, Next and Skip (optional questions only), and progress counted over the questions that apply right now. On a
 landscape iPad the question and answers sit side by side; in portrait they stack. The footer follows the on-screen
 keyboard (`trackVisualViewport`) and every edge clears the safe areas. Reduced motion turns off transitions.
