@@ -123,10 +123,38 @@ export async function verifyPublicationMedia(root, files = null) {
   return count;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\/** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
+");
+}
+
+/**
+ * Two newsroom APIs are deliberately reader-facing: a running Story's live feed
+ * (and its prepared live media) and the donation waitlist form. Remove only
+ * those exact CMS URLs before the broad private-newsroom check; every other
+ * /api/ or /admin reference on that origin must still fail the export.
+ */
+export function redactAllowedPublicNewsroomReferences(text, cms) {
+  const base = typeof cms === "string" ? cms.replace(/\/+$/, "") : "";
+  if (!base) return text;
+  const origin = escapeRegExp(base);
+  const boundary = `(?=$|[\\s"'<>),;])`;
+  return text
+    .replace(new RegExp(`${origin}/api/byline/live/\\d+(?:/media\\?[^\\s"'<>)]*)?${boundary}`, "g"), "[public-newsroom-endpoint]")
+    .replace(new RegExp(`${origin}/api/public/donation-waitlist${boundary}`, "g"), "[public-newsroom-endpoint]");
+}
+
 /** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
 export async function verifyNoPrivateNewsroomReferences(root, env = process.env, files = null) {
   const token = env.BYLINE_BUILD_TOKEN && env.BYLINE_BUILD_TOKEN.length >= 16 ? env.BYLINE_BUILD_TOKEN : null;
   const newsroom = env.BYLINE_NEWSROOM_URL ? env.BYLINE_NEWSROOM_URL.replace(/\/+$/, "") : null;
+  let publicCms = null;
+  try {
+    const publication = JSON.parse(await readFile(path.join(root, "_byline", "publication.json"), "utf8"));
+    publicCms = typeof publication?.urls?.cms === "string" ? publication.urls.cms.replace(/\/+$/, "") : null;
+  } catch {
+    publicCms = null;
+  }
   let buildOrigin = null;
   try {
     buildOrigin = env.BYLINE_NEWSROOM_BUILD_URL ? new URL(env.BYLINE_NEWSROOM_BUILD_URL).origin : null;
@@ -140,7 +168,8 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env,
     const text = await readFile(file, "utf8");
     const relative = path.relative(root, file);
     if (token && text.includes(token)) throw new Error(`Static export leaks the build credential in ${relative}.`);
-    for (const needle of forbidden) if (text.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
+    const privateCheck = publicCms ? redactAllowedPublicNewsroomReferences(text, publicCms) : text;
+    for (const needle of forbidden) if (privateCheck.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
   }
 }
 
