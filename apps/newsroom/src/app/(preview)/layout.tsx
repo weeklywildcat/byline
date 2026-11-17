@@ -2,8 +2,9 @@
  * The page Payload's Live Preview frames: its own root layout, separate from
  * Payload's admin, carrying the real Weekly Wildcat publication stylesheets
  * (the same files the public site's layout imports) but none of its SEO
- * shell. Nothing here is a site header, footer, canonical, Open Graph or
- * structured data.
+ * shell. The Story preview may draw the same reader-facing header chrome,
+ * but this layout never emits a footer, canonical, Open Graph or structured
+ * data.
  */
 import { weeklyWildcatTheme } from "@byline/theme-weekly-wildcat";
 import { themeTokensToCssVariables } from "@byline/ui";

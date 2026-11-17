@@ -20,6 +20,7 @@ export type PreviewPublication = {
   /** The Minimal site navigation Live Preview draws for a story that asks for it, from the same configuration the public header reads. */
   siteNavigation: {
     name: string;
+    location: string;
     /** Absolute: Preview runs on the newsroom's origin, the artwork lives on the public site. */
     homeHref: string;
     logoUrl: string;
@@ -36,6 +37,7 @@ export function previewPublicationFrom(config: BylinePublicationConfig): Preview
   return {
     siteNavigation: {
       name: config.identity.name,
+      location: config.location.display,
       homeHref: `${publicSite}/`,
       logoUrl: absolute(config.branding.masthead.url),
       searchHref: `${publicSite}/search/`,

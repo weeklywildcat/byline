@@ -27,6 +27,7 @@ describe("Live Preview site navigation", () => {
     expect(siteNavigation.homeHref).toBe(`${origin}/`);
     expect(siteNavigation.searchHref).toBe(`${origin}/search/`);
     expect(siteNavigation.logoUrl).toBe(`${origin}${WEEKLY_WILDCAT_PUBLICATION.branding.masthead.url}`);
+    expect(siteNavigation.location).toBe(WEEKLY_WILDCAT_PUBLICATION.location.display);
     for (const link of [...siteNavigation.sections, ...siteNavigation.secondary]) expect(link.url.startsWith(origin)).toBe(true);
   });
 
