@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -15,40 +14,41 @@ import path from "node:path";
  * path is resolved from the newsroom app directory, never from whatever the
  * process's working directory happens to be, so a worker started from the
  * repository root still finds the same files as the web process.
+ *
+ * Keep this resolver purely lexical. This module is imported by Payload's
+ * config, so probing the filesystem here makes Turbopack trace the directories
+ * being probed into every server output.
  */
 const DEFAULT_MEDIA_DIR = "media";
 const DEFAULT_PUBLICATION_DIR = "publication-media";
+const NEWSROOM_PATH = path.join("apps", "newsroom");
 
-function isNewsroomPackage(dir: string) {
-  const file = path.join(dir, "package.json");
-  if (!existsSync(file)) return false;
-  try {
-    return (JSON.parse(readFileSync(file, "utf8")) as { name?: string }).name === "@byline/newsroom";
-  } catch {
-    return false;
-  }
-}
-
-let cachedRoot: string | null = null;
-
-/** The `apps/newsroom` directory: found from the working directory (up, or down from the repository root). */
+/**
+ * The `apps/newsroom` directory.
+ *
+ * npm workspace scripts normally run with this directory as cwd. Commands can
+ * also be started from the repository root (or a child of apps/newsroom), so
+ * recover the same root from the path string without touching the filesystem.
+ */
 export function newsroomAppRoot(cwd = process.cwd()): string {
-  if (cwd === process.cwd() && cachedRoot) return cachedRoot;
-  let found: string | null = null;
-  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
-    if (isNewsroomPackage(dir)) { found = dir; break; }
-    const nested = path.join(dir, "apps", "newsroom");
-    if (isNewsroomPackage(nested)) { found = nested; break; }
-    if (path.dirname(dir) === dir) break;
+  const normalized = path.normalize(cwd);
+  const marker = `${path.sep}${NEWSROOM_PATH}`;
+  const markerIndex = normalized.lastIndexOf(marker);
+
+  if (markerIndex >= 0) {
+    const end = markerIndex + marker.length;
+    if (end === normalized.length || normalized[end] === path.sep) {
+      return normalized.slice(0, end);
+    }
   }
-  const root = found ?? path.resolve(cwd);
-  if (cwd === process.cwd()) cachedRoot = root;
-  return root;
+
+  if (normalized === NEWSROOM_PATH) return normalized;
+  return path.join(normalized, NEWSROOM_PATH);
 }
 
 function resolveDir(value: string | undefined, fallback: string, cwd?: string) {
   const configured = value?.trim() || fallback;
-  return path.isAbsolute(configured) ? path.normalize(configured) : path.resolve(newsroomAppRoot(cwd), configured);
+  return path.isAbsolute(configured) ? path.normalize(configured) : path.join(newsroomAppRoot(cwd), configured);
 }
 
 /** Payload's private upload directory (Media `staticDir`). */
