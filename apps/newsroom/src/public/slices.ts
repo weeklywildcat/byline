@@ -98,6 +98,13 @@ export const storyPlanPublicSlice: PublicSlice = async (row, req) => {
   return { story: storyId, ...settings };
 };
 
+/**
+ * While coverage is running, readers' pages read updates from the newsroom's
+ * public feed (`newsroom/public-live.ts`), so an update is not a build: the
+ * slice is null until coverage ends. Ending coverage changes the Story plan's
+ * slice, and that one revision builds every update into the static page. An
+ * update changed after that is a public change again.
+ */
 export const liveUpdatePublicSlice: PublicSlice = async (row, req) => {
   if (row.state !== "published") return null;
   const storyId = relationId(row.story);
@@ -105,7 +112,8 @@ export const liveUpdatePublicSlice: PublicSlice = async (row, req) => {
   const story = await req.payload.db.findOne({ collection: "stories", where: { id: { equals: storyId } }, req }) as Row | null;
   if (!story || !isPublished(story)) return null;
   const plan = await req.payload.db.findOne({ collection: "story-plans", where: { story: { equals: storyId } }, req }) as Row | null;
-  if (!hasLiveCoverage(normalizeLiveSettings(plan?.liveCoverage))) return null;
+  const settings = normalizeLiveSettings(plan?.liveCoverage);
+  if (!hasLiveCoverage(settings) || settings.state === "live") return null;
   return pick(row, ["story", "headline", "body", "photo", "publishedAt", "pinned", "updatedAt"]);
 };
 

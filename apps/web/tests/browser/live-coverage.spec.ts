@@ -103,20 +103,26 @@ test("a running Payload story reads the newsroom directly and loads an undeploye
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.install();
+  // The page opens already behind the newsroom: the fresh update is in the feed, not in the build.
+  withFresh = true;
   await page.goto(ARTICLE);
   await expect(page.locator("time[data-live-updated]")).toHaveAttribute("data-live-absolute", /Aug/);
 
-  // The newsroom says what the static page already shows: nothing to offer.
-  await page.clock.fastForward(15_000);
+  // The first check is on arrival and applies quietly: no button, the update and its photo are just there.
   await expect.poll(() => sourcePolls).toBe(1);
+  await expect(page.locator("#update-904")).toHaveCount(1);
   await expect(page.locator(".article-live-new")).toHaveAttribute("hidden");
-
-  withFresh = true;
-  await page.clock.fastForward(15_000);
-  await page.getByRole("button", { name: "1 new update", exact: true }).click();
   const image = page.locator("#update-904 .article-live-update-image img");
   await expect(image).toHaveAttribute("src", `${SOURCE}/media?path=${encodeURIComponent(photo)}`);
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBeGreaterThan(0);
+
+  // Later changes wait behind the button, as before.
+  const another = { ...fresh, id: 905, title: "Halftime", image: null };
+  await page.unroute(SOURCE);
+  await page.route(SOURCE, (route) => (sourcePolls++, route.fulfill({ headers: cors, json: { ...coverage, updates: [another, fresh, ...coverage.updates] } })));
+  await page.clock.fastForward(15_000);
+  await expect(page.getByRole("button", { name: "1 new update", exact: true })).toBeVisible();
+  await expect(page.locator("#update-905")).toHaveCount(0);
   expect(served).toEqual([photo]);
   expect(staticPolls).toBe(0);
   expect(errors).toEqual([]);
