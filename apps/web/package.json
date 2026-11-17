@@ -29,7 +29,7 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
-    "astro": "7.3.3",
+    "astro": "7.4.12",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
