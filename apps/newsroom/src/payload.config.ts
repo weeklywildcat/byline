@@ -2,6 +2,7 @@ import { StoryNotes } from "./collections/StoryNotes";
 import { ContentHealth } from "./collections/ContentHealth";
 import { VideoFacts } from "./collections/VideoFacts";
 import { Notifications } from "./collections/Notifications";
+import { DonationWaitlist } from "./collections/DonationWaitlist";
 import { deliverNotificationTask, sendDueDigestTask, withFailureNotice } from "./newsroom/notifications";
 import { refreshVideoFactsTask } from "./newsroom/video-facts";
 import { contentHealthTask } from "./newsroom/health/content-health";
@@ -58,6 +59,7 @@ import { preparePublicationMediaTask } from "./publication-media/task";
 import { DataDatasets, DataProjects, DataRecords } from "./data/collections";
 import { dataEndpoints } from "./data/endpoints";
 import { DATA_PATH } from "./domain/navigation";
+import { donationWaitlistEndpoints } from "./public/donation-waitlist";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -91,6 +93,7 @@ const collections: CollectionConfig[] = [
   ContentHealth,
   VideoFacts,
   Notifications,
+  DonationWaitlist,
   People,
   Media,
   Sections,
@@ -162,7 +165,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...googleEndpoints],
+  endpoints: [...donationWaitlistEndpoints, ...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their
