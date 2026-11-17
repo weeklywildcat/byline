@@ -8,8 +8,7 @@ const headerNavigation = getNavigation("header");
 const secondaryNavigation = getNavigation("footer").filter((item) => item.group === "About");
 // The compact menu keeps the About links short: Diversity & Inclusion stays in the footer only.
 const menuSecondaryNavigation = secondaryNavigation.filter((item) => item.url !== "/diversity-inclusion/");
-// Placeholder destination until the newsroom has a dedicated donation page.
-const DONATE_URL = "/contact/";
+const DONATE_URL = "/donate/";
 const headerNow = new Date();
 const headerDate = new Intl.DateTimeFormat(publication.locale, {
   weekday: "long",
