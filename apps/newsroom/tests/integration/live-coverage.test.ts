@@ -4,6 +4,7 @@ import { normalizeLiveCoverage } from "@byline/core";
 import { createLocalReq, getPayload, type Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { newsroomEndpoints } from "../../src/newsroom/endpoints";
+import { clearPublicLiveCache } from "../../src/newsroom/public-live";
 import { readCurrentRevision, readPublicationState } from "../../src/db/publication-state";
 import { DEPLOY_PUBLIC_SITE_TASK } from "../../src/public/deployment";
 import { PREPARE_PUBLIC_SNAPSHOT_TASK } from "../../src/public/queue";
@@ -44,7 +45,9 @@ const desk = (key: string, storyKey: string) => call("get", "/byline/stories/:id
 const post = (key: string, storyKey: string, data: Record<string, unknown>) => call("post", "/byline/stories/:id/live", key, { data, routeParams: { id: String(story[storyKey]) } });
 const patch = (key: string, storyKey: string, update: number, data: Record<string, unknown>) => call("patch", "/byline/stories/:id/live/:update", key, { data, routeParams: { id: String(story[storyKey]), update: String(update) } });
 const remove = (key: string, storyKey: string, update: number) => call("delete", "/byline/stories/:id/live/:update", key, { routeParams: { id: String(story[storyKey]), update: String(update) } });
-const feed = (storyKey: string) => call("get", "/byline/live/:id", null, { routeParams: { id: String(story[storyKey]) } });
+/** A cold read of the public feed: most tests here write straight to the database, which the feed's short cache cannot see. */
+const feed = (storyKey: string) => { clearPublicLiveCache(); return feedCached(storyKey); };
+const feedCached = (storyKey: string) => call("get", "/byline/live/:id", null, { routeParams: { id: String(story[storyKey]) } });
 
 async function pendingJobs(taskSlug: string) {
   return (await payload.find({
@@ -283,12 +286,21 @@ describe("the public feed", () => {
     expect((await media("off", "/_byline/media/images/aa/x.webp")).status).toBe(404);
   });
 
-  it("shows a newly published update on the next read, despite the projection cache", async () => {
-    const before = (await feed("game")).body.updates.length;
-    await post("editor", "game", { text: "Fresh from the sideline", state: "published" });
-    expect((await feed("game")).body.updates.length).toBe(before + 1);
+  it("shows a live desk write on the very next read, despite the projection cache", async () => {
+    const ids = async () => normalizeLiveCoverage((await feedCached("game")).body)!.updates.map((update) => update.id);
+    await setLive(story.game, { state: "live", endedAt: null });
+    clearPublicLiveCache();
+    const before = await ids();
+    // Cached now: a second read is the same, and the desk's write drops it.
+    expect(await ids()).toEqual(before);
+    const posted = await post("editor", "game", { text: "Fresh from the sideline", state: "published" });
+    expect(await ids()).toContain(posted.body.id);
+    await patch("editor", "game", posted.body.id, { text: "Fresh from the sideline, edited" });
+    expect(JSON.stringify((await feedCached("game")).body)).toContain("edited");
+    await remove("editor", "game", posted.body.id);
+    expect(await ids()).not.toContain(posted.body.id);
     await post("alice", "game", { text: "A draft changes nothing public" });
-    expect((await feed("game")).body.updates.length).toBe(before + 1);
+    expect(await ids()).toEqual(before);
   });
 
   it("keeps ended coverage and its updates", async () => {
@@ -299,16 +311,24 @@ describe("the public feed", () => {
     expect(live!.updates.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("a published update advances the public revision, a draft does not", async () => {
+  it("builds nothing while coverage runs, then once when it ends, and again for a later edit", async () => {
     await setLive(story.game, { state: "live", endedAt: null });
     const before = await readCurrentRevision(payload);
     await post("alice", "game", { text: "Another private draft" });
+    const published = await post("editor", "game", { text: "Final score: 21–14", state: "published" });
+    await patch("editor", "game", published.body.id, { pinned: true });
+    // Readers already have it from the newsroom's feed.
+    expect(normalizeLiveCoverage((await feed("game")).body)!.updates.some((update) => update.id === published.body.id)).toBe(true);
     expect(await readCurrentRevision(payload)).toBe(before);
-    await post("editor", "game", { text: "Final score: 21–14", state: "published" });
-    expect(await readCurrentRevision(payload)).toBeGreaterThan(before);
+
+    await setLive(story.game, { state: "ended", endedAt: new Date().toISOString() });
+    const ended = await readCurrentRevision(payload);
+    expect(ended).toBeGreaterThan(before);
+    await payload.update({ collection: "live-updates", id: published.body.id, data: { headline: "Final" } as never, overrideAccess: true, context: { bylineSystem: true } });
+    expect(await readCurrentRevision(payload)).toBeGreaterThan(ended);
   });
 
-  it("carries a published live update through snapshot promotion to the deploy hook", async () => {
+  it("carries updates published during coverage through snapshot promotion to the deploy hook when it ends", async () => {
     const savedHook = process.env.BYLINE_DEPLOY_HOOK_URL;
     delete process.env.BYLINE_DEPLOY_HOOK_URL;
     // Drain earlier coalesced publication work so the assertions below belong
@@ -316,9 +336,13 @@ describe("the public feed", () => {
     await payload.jobs.run({ queue: "publication", limit: 20 });
 
     await setLive(story.game, { state: "live", endedAt: null });
+    await payload.jobs.run({ queue: "publication", limit: 20 });
     const before = await readCurrentRevision(payload);
     const marker = "SENTINEL-LIVE-DEPLOY touchdown";
     await post("editor", "game", { text: marker, state: "published" });
+    expect(await pendingJobs(PREPARE_PUBLIC_SNAPSHOT_TASK)).toHaveLength(0);
+    // Ending coverage is the one build that carries every update into the static page.
+    await setLive(story.game, { state: "ended", endedAt: new Date().toISOString() });
     const revision = await readCurrentRevision(payload);
     expect(revision).toBeGreaterThan(before);
     expect(await pendingJobs(PREPARE_PUBLIC_SNAPSHOT_TASK)).toHaveLength(1);

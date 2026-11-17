@@ -38,7 +38,7 @@ describe("live update delivery buttons", () => {
     const html = renderToStaticMarkup(<LiveDeliveryButtons canPublishNow disabled={false} onDeliver={() => {}} />);
     expect(html).toContain("Publish now");
     expect(html).toContain("Send to desk");
-    expect(html).toContain("Publish now submits this update for publication. It appears on the public site after the next successful build.");
+    expect(html).toContain("Publish now puts this update in front of readers within about 15 seconds.");
   });
 
   it("gives everyone else only Send to live desk, never a disabled Publish button", () => {

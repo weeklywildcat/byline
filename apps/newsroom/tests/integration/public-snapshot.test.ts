@@ -553,32 +553,48 @@ describe("the projection", () => {
     expect(manifest).toMatchObject({ focalPoint: { x: 30, y: 40 } });
   });
 
-  it("re-queues a live update with a newly uploaded photo after that photo is prepared", async () => {
+  it("builds running coverage once it ends, waiting for a live update's photo to be prepared", async () => {
     const story = await draftStory("Live photo coverage");
     await publish(story);
     const plan = (await payload.find({ collection: "story-plans", where: { story: { equals: story } }, limit: 1, depth: 0, overrideAccess: true })).docs[0];
-    await payload.update({
+    const coverage = (state: "live" | "ended") => payload.update({
       collection: "story-plans",
       id: plan.id,
-      data: { liveCoverage: { mode: "live", state: "live", startedAt: new Date().toISOString(), endedAt: null } },
+      data: { liveCoverage: { mode: "live", state, startedAt: new Date().toISOString(), endedAt: state === "ended" ? new Date().toISOString() : null } },
       overrideAccess: true,
       context: { bylineSystem: true }
     });
+    await coverage("live");
+    await runPublicSnapshotPreparation(payload);
+    await clearJobs();
 
+    // While coverage runs, readers read updates from the newsroom: publishing one (and preparing its photo) is no build.
     const photo = await upload(await image("snapshot-live-update.jpg", 1800, 1200));
     const marker = "SENTINEL-LIVE-PHOTO touchdown";
+    const before = await rev();
     const update = await payload.create({
       collection: "live-updates",
       data: { story, headline: "Touchdown", body: plainTextToLexical(marker), photo, state: "published", publishedAt: new Date().toISOString() } as never,
       overrideAccess: true,
       context: { bylineSystem: true }
     });
+    expect(await rev()).toBe(before);
+    await runMedia();
+    expect(await snapshotJobs()).toHaveLength(0);
+
+    // A second photo is still being prepared when coverage ends: the one build waits for it.
+    const late = await upload(await image("snapshot-live-update-late.jpg", 1800, 1200));
+    await payload.update({ collection: "live-updates", id: update.id, data: { photo: late } as never, overrideAccess: true, context: { bylineSystem: true } });
+    expect(await rev()).toBe(before);
+    await coverage("ended");
     const revision = await rev();
+    expect(revision).toBeGreaterThan(before);
     expect(await snapshotJobs()).toHaveLength(1);
+    const photoId = late;
 
     const waiting = await runPublicSnapshotPreparation(payload);
     expect(waiting).toMatchObject({ outcome: "not-ready", code: "media-not-ready" });
-    expect((waiting as { details: string[] }).details.join(" ")).toContain(`Media ${photo}`);
+    expect((waiting as { details: string[] }).details.join(" ")).toContain(`Media ${photoId}`);
 
     // Simulate the snapshot worker having consumed its waiting job. The media
     // worker must put the current revision back on the publication queue when
@@ -594,7 +610,13 @@ describe("the projection", () => {
     const projected = live?.updates.find((entry) => entry.id === update.id);
     expect(projected?.html).toContain(marker);
     expect(projected?.image?.src).toMatch(/^\/_byline\/media\//);
-    expect(ready.datasets.media.some((entry) => entry.id === photo)).toBe(true);
+    expect(ready.datasets.media.some((entry) => entry.id === photoId)).toBe(true);
+
+    // With that snapshot complete, preparing an unrelated upload is not another build.
+    await clearJobs();
+    await upload(await image("snapshot-unrelated-upload.jpg", 1200, 800));
+    await runMedia();
+    expect(await snapshotJobs()).toHaveLength(0);
 
     // Before that photo's deploy lands, a reader's browser can load it from the newsroom: the same bytes, by the same path.
     const req = await createLocalReq({}, payload);
@@ -602,7 +624,7 @@ describe("the projection", () => {
     const served = await servePublicLiveMedia(req);
     expect(served.status).toBe(200);
     expect(served.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
-    const blob = ready.datasets.media.find((entry) => entry.id === photo)!.manifest;
+    const blob = ready.datasets.media.find((entry) => entry.id === photoId)!.manifest;
     const expected = publicationManifestBlobs(blob).find((entry) => entry.publicPath === projected!.image!.src)!;
     expect(served.headers.get("content-type")).toBe(expected.mimeType);
     expect(createHash("sha256").update(Buffer.from(await served.arrayBuffer())).digest("hex")).toBe(expected.sha256);
