@@ -75,6 +75,9 @@
   background: #1f2328;
   overflow: hidden;
   position: relative;
+  /* A max-height can otherwise shrink an auto-width aspect-ratio box,
+     leaving an empty strip beside the photo on short phone/tablet screens. */
+  width: 100%;
 }
 
 .story-opening .story-opening-media picture {
