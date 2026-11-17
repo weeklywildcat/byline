@@ -151,26 +151,6 @@ export function redactAllowedPublicNewsroomReferences(text, cms) {
 }
 
 /** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
-");
-}
-
-/**
- * Two newsroom APIs are deliberately reader-facing: a running Story's live feed
- * (and its prepared live media) and the donation waitlist form. Remove only
- * those exact CMS URLs before the broad private-newsroom check; every other
- * /api/ or /admin reference on that origin must still fail the export.
- */
-export function redactAllowedPublicNewsroomReferences(text, cms) {
-  const base = typeof cms === "string" ? cms.replace(/\/+$/, "") : "";
-  if (!base) return text;
-  const origin = escapeRegExp(base);
-  const boundary = `(?=$|[\\s"'<>),;])`;
-  return text
-    .replace(new RegExp(`${origin}/api/byline/live/\\d+(?:/media\\?[^\\s"'<>)]*)?${boundary}`, "g"), "[public-newsroom-endpoint]")
-    .replace(new RegExp(`${origin}/api/public/donation-waitlist${boundary}`, "g"), "[public-newsroom-endpoint]");
-}
-
-/** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
 export async function verifyNoPrivateNewsroomReferences(root, env = process.env, files = null) {
   const token = env.BYLINE_BUILD_TOKEN && env.BYLINE_BUILD_TOKEN.length >= 16 ? env.BYLINE_BUILD_TOKEN : null;
   const newsroom = env.BYLINE_NEWSROOM_URL ? env.BYLINE_NEWSROOM_URL.replace(/\/+$/, "") : null;
