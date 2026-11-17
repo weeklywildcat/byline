@@ -51,6 +51,9 @@ async function joinWaitlist(req: PayloadRequest): Promise<Response> {
   if (!origin) return new Response("Forbidden", { status: 403, headers: { "Cache-Control": "no-store" } });
   if (limited(req)) return json(origin, { ok: false, message: "Too many attempts. Try again later." }, 429);
 
+  if (typeof req.text !== "function") {
+    return json(origin, { ok: false, message: "Unable to process this request." }, 500);
+  }
   const raw = await req.text();
   if (raw.length > 4096) return json(origin, { ok: false, message: "That request is too large." }, 413);
   const form = new URLSearchParams(raw);
