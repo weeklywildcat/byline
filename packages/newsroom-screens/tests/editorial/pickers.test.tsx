@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPortalContext } from "@byline/newsroom-ui/lib/portal";
@@ -21,7 +21,7 @@ afterEach(async () => {
   document.body.innerHTML = "";
 });
 
-async function renderPicker(props: Partial<React.ComponentProps<typeof DatePicker>> = {}) {
+async function renderPicker(props: Partial<ComponentProps<typeof DatePicker>> = {}) {
   const onChange = vi.fn();
   root = createRoot(host);
   await act(async () => {
