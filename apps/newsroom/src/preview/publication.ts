@@ -41,7 +41,7 @@ export function previewPublicationFrom(config: BylinePublicationConfig): Preview
       homeHref: `${publicSite}/`,
       logoUrl: absolute(config.branding.masthead.url),
       searchHref: `${publicSite}/search/`,
-      sections: getPublicationNavigation(config, "header").map(link),
+      sections: getPublicationNavigation(config, "header").filter((item) => item.url !== "/the-prowler/").map(link),
       secondary: getPublicationNavigation(config, "footer").filter((item) => item.group === "About").map(link)
     },
     shortName: config.identity.shortName,
