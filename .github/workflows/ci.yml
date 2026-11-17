@@ -26,8 +26,8 @@ jobs:
 
       - name: Simulate a restored Astro cache
         run: |
-          mkdir -p apps/web/node_modules/.astro
-          echo retained > apps/web/node_modules/.astro/cloudflare-cache-sentinel
+          mkdir -p node_modules/.astro
+          echo retained > node_modules/.astro/cloudflare-cache-sentinel
 
       - name: Install public-site dependencies and build
         env:
