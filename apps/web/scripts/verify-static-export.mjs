@@ -123,10 +123,44 @@ export async function verifyPublicationMedia(root, files = null) {
   return count;
 }
 
+/**
+ * Two newsroom APIs are deliberately reader-facing: a running Story's live feed
+ * (and its prepared live media) and the donation waitlist form. Redact only
+ * those exact CMS URLs before the broad private-newsroom check; every other
+ * /api/ or /admin reference on that origin must still fail the export.
+ */
+export function redactAllowedPublicNewsroomReferences(text, cms) {
+  let base;
+  try { base = new URL(cms); } catch { return text; }
+  const basePath = base.pathname.replace(/\/+$/, "");
+  const livePrefix = `${basePath}/api/byline/live/`;
+  const donationPath = `${basePath}/api/public/donation-waitlist`;
+  return text.replace(/https?:\/\/[^\s"'<>),;]+/g, (raw) => {
+    let url;
+    try { url = new URL(raw); } catch { return raw; }
+    if (url.origin !== base.origin) return raw;
+    if (url.pathname === donationPath && !url.search && !url.hash) return "[public-newsroom-endpoint]";
+    if (!url.pathname.startsWith(livePrefix) || url.hash) return raw;
+    const rest = url.pathname.slice(livePrefix.length);
+    const match = /^(\d+)(\/media)?$/.exec(rest);
+    if (!match) return raw;
+    if (!match[2] && !url.search) return "[public-newsroom-endpoint]";
+    if (match[2] && url.searchParams.has("path")) return "[public-newsroom-endpoint]";
+    return raw;
+  });
+}
+
 /** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
 export async function verifyNoPrivateNewsroomReferences(root, env = process.env, files = null) {
   const token = env.BYLINE_BUILD_TOKEN && env.BYLINE_BUILD_TOKEN.length >= 16 ? env.BYLINE_BUILD_TOKEN : null;
   const newsroom = env.BYLINE_NEWSROOM_URL ? env.BYLINE_NEWSROOM_URL.replace(/\/+$/, "") : null;
+  let publicCms = null;
+  try {
+    const publication = JSON.parse(await readFile(path.join(root, "_byline", "publication.json"), "utf8"));
+    publicCms = typeof publication?.urls?.cms === "string" ? publication.urls.cms.replace(/\/+$/, "") : null;
+  } catch {
+    publicCms = null;
+  }
   let buildOrigin = null;
   try {
     buildOrigin = env.BYLINE_NEWSROOM_BUILD_URL ? new URL(env.BYLINE_NEWSROOM_BUILD_URL).origin : null;
@@ -140,7 +174,8 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env,
     const text = await readFile(file, "utf8");
     const relative = path.relative(root, file);
     if (token && text.includes(token)) throw new Error(`Static export leaks the build credential in ${relative}.`);
-    for (const needle of forbidden) if (text.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
+    const privateCheck = publicCms ? redactAllowedPublicNewsroomReferences(text, publicCms) : text;
+    for (const needle of forbidden) if (privateCheck.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
   }
 }
 
