@@ -67,7 +67,8 @@ Routing (`routeCapture`, docs/reporting.md):
 | a photo chosen while writing a live update | Media, attached to that update (one asset) |
 | a photo otherwise | Media for the Story, linked to the person's open assignment when unambiguous (a Drawer asks when there are several) |
 | Record or upload a recording (from an appointment) | a private Reporting File with the Story, appointment and source |
-| Attach | a private Reporting File |
+| Attach (not an image) | a private Reporting File |
+| Attach (an image or HEIC) | asks "Is this a photo for the story?": **Photo for the story** takes the photo path above, **Private file** keeps it a Reporting File (a photographed document) |
 
 Photos record the uploader, Story, assignment, original file hash, the EXIF
 capture time (read in the newsroom zone, else the file time) and, for staff,

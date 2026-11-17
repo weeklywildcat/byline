@@ -18,6 +18,7 @@
  * The logic is pure over an `OutboxStore`; `indexedDbOutbox()` persists it.
  */
 
+import { isHeifFile, PHOTO_MIME_TYPES } from "@byline/core";
 import { deskNote, type PublishBlock } from "../../domain/live-coverage";
 
 export type OutboxKind = "note" | "live" | "photo" | "recording" | "file";
@@ -76,6 +77,11 @@ export class SendError extends Error {
 export type OutboxResult = { id: number; status: "saved" | "posted" | "sent-to-desk"; /** Why a "Publish now" went to the desk instead. */ reason?: PublishBlock };
 
 export type Sender = (item: OutboxItem, context: { photoId: number | null; onProgress: (fraction: number) => void }) => Promise<OutboxResult>;
+
+/** A file chosen with Attach that could be a photograph (so Field asks whether it is one). iPhone pickers often report HEIC with no type. */
+export function isPhotoFile(file: { name?: string | null; type?: string | null }): boolean {
+  return (PHOTO_MIME_TYPES as readonly string[]).includes((file.type ?? "").toLowerCase()) || isHeifFile(file);
+}
 
 /** Connection trouble or a busy server: try again by itself. Anything else needs the reporter. */
 export function isRetryable(status: number): boolean {

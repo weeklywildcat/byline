@@ -28,7 +28,7 @@ import { POSTING_AS_HELP, PostingAsList, PostingAsRow } from "../live/PostingAs"
 import { useLiveDeskControls, type LiveFieldsComponent } from "../live/useLiveDeskControls";
 import { newClientKey, uploadFile } from "../reporting/api";
 import { RecorderPanel, type Recording } from "../reporting/Recorder";
-import { enqueue, indexedDbOutbox, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
+import { enqueue, indexedDbOutbox, isPhotoFile, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
 
 /**
  * Field Mode (docs/field-mode.md): "What am I covering right now?", then one
@@ -386,6 +386,8 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
   const [photo, setPhoto] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [choosing, setChoosing] = useState<File | null>(null);
+  /** An image chosen with Attach: the reporter says whether it is a photo for the story or a private file. */
+  const [attaching, setAttaching] = useState<File | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   // A shared phone: an editor credits the live update to whoever is holding it. Kept until switched back.
   const [author, setAuthor] = useState<{ id: number; name: string; avatarUrl: string | null } | null>(null);
@@ -419,6 +421,12 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, ...(result.durationMs ? { durationMs: result.durationMs } : {}), context }));
   };
   const clear = () => { setText(""); setTitle(""); setKeyUpdate(false); setPhoto(null); };
+  const sendFile = (file: File) => void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name || "attachment", context }));
+  const onAttach = (file: File | undefined) => {
+    if (!file) return;
+    if (isPhotoFile(file)) setAttaching(file);
+    else sendFile(file);
+  };
   const saveNote = async () => {
     if (!text.trim()) return;
     // A headline typed for a live update stays with the words when they're kept as a private note instead.
@@ -459,14 +467,14 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
       </InputGroup>
       {postAs ? <div className="-mt-1"><PostingAsRow tap author={author} me={session.me} onSwitch={() => setSwitching(true)} /></div> : null}
       <input ref={photoInput} type="file" accept={PHOTO_FILE_ACCEPT} capture="environment" hidden aria-label="Take or choose a photo" onChange={(event) => { onPhoto(event.target.files?.[0]); event.target.value = ""; }} />
-      <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name, context })); event.target.value = ""; }} />
+      <input ref={fileInput} type="file" hidden aria-label="Attach a file" onChange={(event) => { onAttach(event.target.files?.[0]); event.target.value = ""; }} />
 
       {live ? (
         <div className="grid gap-4">
           <div role="group" aria-labelledby="field-private-label" className="grid gap-1.5">
             <p id="field-private-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Private</p>
             <Button type="button" variant="outline" className={`${TAP} w-full`} disabled={!text.trim()} onClick={() => void saveNote()}>Save note</Button>
-            <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private.</p>
+            <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private unless you choose Photo for an image.</p>
           </div>
           <div role="group" aria-labelledby="field-live-label" className="grid gap-1.5">
             <p id="field-live-label" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Live update</p>
@@ -482,7 +490,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
       ) : (
         <div className="grid gap-1.5">
           <Button type="button" variant="outline" className={`${TAP} w-full`} disabled={!text.trim()} onClick={() => void saveNote()}>Save note</Button>
-          <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private.</p>
+          <p className="text-xs text-muted-foreground [@media(max-height:480px)]:hidden" data-privacy-line="">Save note keeps it private to the story team. Photos go to Media for this story; recordings and attachments stay private unless you choose Photo for an image.</p>
         </div>
       )}
       {warning ? <p role="alert" className="text-sm font-medium text-destructive">{warning}</p> : null}
@@ -508,6 +516,16 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
           </DrawerContent>
         </Drawer>
       ) : null}
+      <Drawer open={attaching !== null} onOpenChange={(open) => { if (!open) setAttaching(null); }}>
+        <DrawerContent>
+          <DrawerHeader><DrawerTitle>Is this a photo for the story?</DrawerTitle><DrawerDescription>{attaching?.name || "This image"} can go to the story's Media, or stay a private file (like a photographed document).</DrawerDescription></DrawerHeader>
+          <DrawerFooter>
+            <Button type="button" className={TAP} onClick={() => { const file = attaching!; setAttaching(null); onPhoto(file); }}>Photo for the story</Button>
+            <Button type="button" variant="outline" className={TAP} onClick={() => { const file = attaching!; setAttaching(null); sendFile(file); }}>Private file</Button>
+            <Button type="button" variant="ghost" className={TAP} onClick={() => setAttaching(null)}>Cancel</Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       <Drawer open={choosing !== null} onOpenChange={(open) => { if (!open) setChoosing(null); }}>
         <DrawerContent>
