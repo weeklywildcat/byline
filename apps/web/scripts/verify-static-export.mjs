@@ -123,8 +123,34 @@ export async function verifyPublicationMedia(root, files = null) {
   return count;
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\/** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
+/**
+ * Two newsroom APIs are deliberately reader-facing: a running Story's live feed
+ * (and its prepared live media) and the donation waitlist form. Redact only
+ * those exact CMS URLs before the broad private-newsroom check; every other
+ * /api/ or /admin reference on that origin must still fail the export.
+ */
+export function redactAllowedPublicNewsroomReferences(text, cms) {
+  let base;
+  try { base = new URL(cms); } catch { return text; }
+  const basePath = base.pathname.replace(/\/+$/, "");
+  const livePrefix = `${basePath}/api/byline/live/`;
+  const donationPath = `${basePath}/api/public/donation-waitlist`;
+  return text.replace(/https?:\/\/[^\s"'<>),;]+/g, (raw) => {
+    let url;
+    try { url = new URL(raw); } catch { return raw; }
+    if (url.origin !== base.origin) return raw;
+    if (url.pathname === donationPath && !url.search && !url.hash) return "[public-newsroom-endpoint]";
+    if (!url.pathname.startsWith(livePrefix) || url.hash) return raw;
+    const rest = url.pathname.slice(livePrefix.length);
+    const match = /^(\d+)(\/media)?$/.exec(rest);
+    if (!match) return raw;
+    if (!match[2] && !url.search) return "[public-newsroom-endpoint]";
+    if (match[2] && url.searchParams.has("path")) return "[public-newsroom-endpoint]";
+    return raw;
+  });
+}
+
+/** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
 ");
 }
 
