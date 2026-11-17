@@ -7,7 +7,6 @@ import "@byline/ui/hero-reveal.css";
 import "@byline/ui/immersive-article.css";
 import "@byline/ui/story-opening.css";
 import "@byline/ui/story-navigation.css";
-import "../../views/fonts.css";
 import "../../views/globals.css";
 import "@byline/ui/contributor-profile.css";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -240,7 +239,20 @@ const style = Object.entries(getThemeCssVariables(activeTheme.tokens)).map(([key
       })();
     </script>
     {activeTheme.id === "weekly-wildcat" && <script is:inline>
-      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script","xi1qesbixb");
+      (function () {
+        var loaded = false;
+        function loadClarity() {
+          if (loaded) return;
+          loaded = true;
+          (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script","xi1qesbixb");
+        }
+        function afterLoad() {
+          if ("requestIdleCallback" in window) window.requestIdleCallback(loadClarity, { timeout: 2000 });
+          else window.setTimeout(loadClarity, 750);
+        }
+        if (document.readyState === "complete") afterLoad();
+        else window.addEventListener("load", afterLoad, { once: true });
+      })();
     </script>}
     <script is:inline>
       document.addEventListener("change", (event) => {

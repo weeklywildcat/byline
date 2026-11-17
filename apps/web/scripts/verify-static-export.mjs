@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { access, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadOutputInventory } from "./output-inventory.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const output = path.join(projectRoot, "out");
@@ -98,14 +99,15 @@ export function carriesImageMetadata(data, kind) {
   }
   return false;
 }
-export async function verifyPublicationMedia(root) {
+export async function verifyPublicationMedia(root, files = null) {
   for (const entry of await readdir(path.join(root, "_byline")).catch(() => [])) {
     if (entry.startsWith(".media-staging")) throw new Error(`Static export contains publication media staging (${entry}).`);
   }
   const mediaRoot = path.join(root, "_byline", "media");
   if (!(await exists(mediaRoot))) return 0;
   let count = 0;
-  for await (const file of walk(mediaRoot)) {
+  const mediaFiles = files ? files.filter((file) => file.startsWith(`${mediaRoot}${path.sep}`)) : await Array.fromAsync(walk(mediaRoot));
+  for (const file of mediaFiles) {
     const relative = path.relative(root, file).split(path.sep).join("/");
     const match = MEDIA_FILE.exec(relative);
     if (!match) throw new Error(`Unexpected file in publication media: ${relative}`);
@@ -122,7 +124,7 @@ export async function verifyPublicationMedia(root) {
 }
 
 /** The public output never contains the build credential, the build endpoint or a private newsroom file URL. */
-export async function verifyNoPrivateNewsroomReferences(root, env = process.env) {
+export async function verifyNoPrivateNewsroomReferences(root, env = process.env, files = null) {
   const token = env.BYLINE_BUILD_TOKEN && env.BYLINE_BUILD_TOKEN.length >= 16 ? env.BYLINE_BUILD_TOKEN : null;
   const newsroom = env.BYLINE_NEWSROOM_URL ? env.BYLINE_NEWSROOM_URL.replace(/\/+$/, "") : null;
   let buildOrigin = null;
@@ -132,7 +134,8 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env)
     buildOrigin = null;
   }
   const forbidden = ["/api/byline/build/", "/api/media/file/", ...(newsroom ? [`${newsroom}/api/`, `${newsroom}/admin`] : []), ...(buildOrigin ? [`${buildOrigin}/api/`, `${buildOrigin}/admin`] : [])];
-  for await (const file of walk(root)) {
+  const candidates = files ?? await Array.fromAsync(walk(root));
+  for (const file of candidates) {
     if (!/\.(html?|json|xml|txt|js|mjs|css|webmanifest|svg|rss|atom|map)$/i.test(file) && path.basename(file) !== "_headers" && path.basename(file) !== "_redirects") continue;
     const text = await readFile(file, "utf8");
     const relative = path.relative(root, file);
@@ -142,8 +145,10 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env)
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const inventory = await loadOutputInventory(projectRoot, output);
   await verifyExportBoundary(output);
-  const media = await verifyPublicationMedia(output);
-  await verifyNoPrivateNewsroomReferences(output);
+  const media = await verifyPublicationMedia(output, inventory.absoluteFiles);
+  await verifyNoPrivateNewsroomReferences(output, process.env, inventory.absoluteFiles);
   console.log(`Verified static-only Byline export and public configuration boundary${media ? ` (${media} prepared media files)` : ""}.`);
 }

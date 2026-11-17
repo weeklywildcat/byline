@@ -9,6 +9,7 @@ import { tsImport } from "tsx/esm/api";
 
 const totalStartedAt = Date.now();
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const astroCacheDirectory = path.join(projectRoot, "node_modules/.astro");
 const require = createRequire(import.meta.url);
 const astroCommand = path.join(path.dirname(require.resolve("astro/package.json")), "bin", "astro.mjs");
 const astroArguments = process.argv.slice(2);
@@ -47,7 +48,7 @@ async function sourceFingerprint() {
 }
 
 async function invalidateIncrementalBuildWhenSourcesChange() {
-  const cacheDirectory = path.join(projectRoot, "node_modules/.astro");
+  const cacheDirectory = astroCacheDirectory;
   const marker = path.join(cacheDirectory, "byline-source-fingerprint");
   const current = await sourceFingerprint();
   const previous = await readFile(marker, "utf8").catch(() => "");
@@ -179,7 +180,7 @@ if (isBuild && publicationMediaDescriptors.length) {
     token: process.env.BYLINE_BUILD_TOKEN ?? "",
     outDir: path.join(projectRoot, "out"),
     // Verified blobs persist by SHA-256 beside Astro's incremental cache (which Workers Builds restores).
-    cacheDir: process.env.BYLINE_MEDIA_CACHE_DIR?.trim() ? path.resolve(process.env.BYLINE_MEDIA_CACHE_DIR) : path.join(projectRoot, "node_modules/.astro/byline-media"),
+    cacheDir: process.env.BYLINE_MEDIA_CACHE_DIR?.trim() ? path.resolve(process.env.BYLINE_MEDIA_CACHE_DIR) : path.join(astroCacheDirectory, "byline-media"),
     concurrency: Math.min(16, Math.max(1, Number(process.env.BYLINE_MEDIA_CONCURRENCY) || 8))
   });
   publicationMediaMetrics = { descriptors: publicationMediaDescriptors.length, ...result, ms: performance.now() - started };

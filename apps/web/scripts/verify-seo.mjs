@@ -1,26 +1,14 @@
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditFeed, auditNewsSitemap, auditPage, auditSitemap, auditSitemapImages, auditVideoSitemap, decodeEntities, pageVideoObject, parsePage, sitemapImageLocations, sitemapLocations } from "./seo-audit.mts";
+import { loadOutputInventory } from "./output-inventory.mjs";
 
 // Fails the build when generated pages drift from the search/social contract:
 // absolute canonical and social URLs, timezone-aware dates, a sitemap that lists
 // only canonical indexable pages, valid feeds, and well-formed structured data.
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = path.join(projectRoot, "out");
-
-async function filesBelow(root) {
-  const result = [];
-  async function visit(directory) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const absolute = path.join(directory, entry.name);
-      if (entry.isDirectory()) await visit(absolute);
-      else result.push(absolute);
-    }
-  }
-  await visit(root);
-  return result;
-}
 
 function publicPath(file) {
   const relative = path.relative(outputRoot, file).split(path.sep).join("/");
@@ -41,12 +29,18 @@ const siteName = publication.identity?.name ?? "Weekly Wildcat";
 
 const issues = [];
 const pages = new Map();
-const htmlFiles = (await filesBelow(outputRoot)).filter((file) => file.endsWith(".html") && !file.includes(`${path.sep}_astro${path.sep}`));
+const inventory = await loadOutputInventory(projectRoot, outputRoot);
+const htmlFiles = inventory.absoluteFiles.filter((file) => file.endsWith(".html") && !file.includes(`${path.sep}_astro${path.sep}`));
+const htmlCache = new Map();
+async function readHtml(file) {
+  if (!htmlCache.has(file)) htmlCache.set(file, await readFile(file, "utf8"));
+  return htmlCache.get(file);
+}
 
 for (const file of htmlFiles) {
   const route = publicPath(file);
   const kind = kindByRoute.get(route);
-  const html = await readFile(file, "utf8");
+  const html = await readHtml(file);
   const parsed = parsePage(html, route);
   pages.set(route, { canonical: parsed.canonicals[0] ?? "", robots: parsed.robots, kind, video: pageVideoObject(html, route) });
   // Redirects and 404s are verified by verify-build.mjs; they must only stay out of the sitemap.
@@ -100,7 +94,7 @@ if (await exists(sitemapFile)) {
   }
 }
 for (const file of htmlFiles) {
-  const html = await readFile(file, "utf8");
+  const html = await readHtml(file);
   const route = publicPath(file);
   for (const tag of html.match(/<img\b[^>]*\bdata-byline-full-url=[^>]*>/gi) ?? []) {
     const full = tag.match(/data-byline-full-url="([^"]*)"/i)?.[1];

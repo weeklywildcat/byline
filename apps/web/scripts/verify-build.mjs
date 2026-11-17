@@ -1,26 +1,14 @@
-import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isCanonicalRedirectPath, redirectSourceVariants } from "@byline/content/redirect-path";
 import { MAX_STATIC_REDIRECTS, parseRedirectsFile } from "./redirects.mts";
+import { loadOutputInventory } from "./output-inventory.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = path.join(projectRoot, "out");
 const buildRoot = path.join(projectRoot, ".byline-build");
 const reportRoot = path.join(outputRoot, "_byline");
-
-async function filesBelow(root) {
-  const result = [];
-  async function visit(directory) {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const absolute = path.join(directory, entry.name);
-      if (entry.isDirectory()) await visit(absolute);
-      else result.push(absolute);
-    }
-  }
-  await visit(root);
-  return result;
-}
 
 function publicPath(file) {
   const relative = path.relative(outputRoot, file).split(path.sep).join("/");
@@ -55,7 +43,15 @@ async function exists(target) {
   try { await access(target); return true; } catch { return false; }
 }
 
-const files = await filesBelow(outputRoot);
+const inventory = await loadOutputInventory(projectRoot, outputRoot);
+const files = inventory.absoluteFiles;
+const textCache = new Map();
+const inventoryPath = (file) => path.relative(outputRoot, file).split(path.sep).join("/");
+const bytesOf = (file) => inventory.bytesByPath.get(inventoryPath(file)) ?? 0;
+async function readOutputText(file) {
+  if (!textCache.has(file)) textCache.set(file, await readFile(file, "utf8"));
+  return textCache.get(file);
+}
 const routeFiles = files.filter((file) => /\.(?:html|xml|txt)$/.test(file) && !file.includes(`${path.sep}_astro${path.sep}`));
 const actualRoutes = routeFiles.map(publicPath).sort();
 const expectedEntries = JSON.parse(await readFile(path.join(buildRoot, "expected-routes.json"), "utf8"));
@@ -67,7 +63,7 @@ const expectedByPath = new Map(expectedEntries.map((entry) => [entry.path, entry
 const searchIndexFile = path.join(outputRoot, "_byline", "search-index.json");
 let searchIndex;
 try {
-  searchIndex = JSON.parse(await readFile(searchIndexFile, "utf8"));
+  searchIndex = JSON.parse(await readOutputText(searchIndexFile));
 } catch (error) {
   throw new Error(`Search index verification failed: ${error instanceof Error ? error.message : String(error)}`);
 }
@@ -122,7 +118,8 @@ if (removed.length || unexpected.length) {
 // Edge redirects: every one is a 301 rule (with and without the trailing slash)
 // that lands on a generated page, and none has regenerated as an HTML file.
 const edgeRedirects = expectedEntries.filter(isEdgeRedirect);
-const redirectRules = parseRedirectsFile(await readFile(path.join(outputRoot, "_redirects"), "utf8").catch(() => ""));
+const redirectFile = path.join(outputRoot, "_redirects");
+const redirectRules = parseRedirectsFile((await exists(redirectFile)) ? await readOutputText(redirectFile) : "");
 if (redirectRules.size > MAX_STATIC_REDIRECTS) throw new Error(`_redirects has ${redirectRules.size} rules; Cloudflare allows ${MAX_STATIC_REDIRECTS}.`);
 for (const entry of edgeRedirects) {
   const target = entry.redirectTo;
@@ -139,7 +136,7 @@ for (const entry of edgeRedirects) {
 
 const missingAssets = [];
 for (const file of files.filter((candidate) => /\.(?:html|css)$/.test(candidate))) {
-  const source = await readFile(file, "utf8");
+  const source = await readOutputText(file);
   const references = [
     ...source.matchAll(/(?:src|href)=["'](\/[^"'#?]+)(?:[?#][^"']*)?["']/gi),
     ...source.matchAll(/url\(["']?(\/[^)'"?#]+)(?:[?#][^)'" ]*)?["']?\)/gi)
@@ -155,7 +152,7 @@ if (missingAssets.length) throw new Error(`Asset closure failed:\n${missingAsset
 const seo = [];
 for (const file of files.filter((candidate) => candidate.endsWith(".html"))) {
   const route = publicPath(file);
-  const source = await readFile(file, "utf8");
+  const source = await readOutputText(file);
   const title = source.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "";
   const canonical = link(source, "canonical");
   const description = attr(source, "description");
@@ -199,7 +196,7 @@ for (const { publicPath } of descriptors) {
 const snapshotMetrics = JSON.parse(await readFile(path.join(buildRoot, "snapshot-metrics.json"), "utf8"));
 const sizes = { total: 0, html: 0, js: 0, css: 0, media: 0 };
 for (const file of files) {
-  const size = (await stat(file)).size;
+  const size = bytesOf(file);
   sizes.total += size;
   if (file.endsWith(".html")) sizes.html += size;
   else if (file.endsWith(".js")) sizes.js += size;
@@ -218,7 +215,7 @@ const metrics = {
   searchIndex: {
     schemaVersion: searchIndex.schemaVersion,
     items: searchIndex.items.length,
-    bytes: (await stat(searchIndexFile)).size
+    bytes: bytesOf(searchIndexFile)
   },
   outputBytes: sizes
 };

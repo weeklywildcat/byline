@@ -30,6 +30,7 @@ jobs:
           echo retained > apps/web/node_modules/.astro/cloudflare-cache-sentinel
 
       - name: Install public-site dependencies and build
+        working-directory: apps/web
         env:
           BYLINE_PUBLICATION_FILE: tests/fixtures/weekly-wildcat-publication.json
           BYLINE_CONTENT_MODE: weekly-wildcat-fixture

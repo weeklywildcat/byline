@@ -45,9 +45,12 @@ Use the same image for:
 - one-shot migrations; and
 - the one-shot Next production build.
 
-The web process and the build process must share the same `.next` volume when
-the build is performed as a one-shot container. The web and media worker must
-share the private Media and prepared publication-media volumes.
+The web process and the build process share the same persistent `.next`
+volume, but never mutate the same build tree. Production builds write to
+`.next/releases/<release>`; `.next/active-release` names the build a newly
+started web process should serve. The already-running process keeps serving its
+previously resolved release while the next one compiles. The web and media
+worker must also share the private Media and prepared publication-media volumes.
 
 The `publication-worker` also owns public-site deploy-hook delivery. Set
 `BYLINE_DEPLOY_HOOK_URL` to the provider's private production deploy-hook URL
@@ -92,10 +95,14 @@ Run it from a clean `main` checkout on the production host. The command:
    newsroom service;
 4. builds the shared `byline-newsroom` image once through the `newsroom`
    service instead of asking Compose to export the same image for every service;
-5. runs committed Payload migrations;
-6. stops the newsroom before replacing the shared `.next` build;
-7. runs the one-shot production build; and
-8. recreates the web process and workers from the newly built shared image.
+5. builds a versioned Next release while the currently running newsroom stays
+   online, seeding Next's persistent Turbopack compiler cache from the previous
+   release;
+6. runs committed Payload migrations only after the application build has
+   succeeded;
+7. atomically activates the verified release; and
+8. recreates the web process and workers from the newly built shared image,
+   retaining the previous release as the immediate rollback target.
 
 By default the script expects the production Compose project one directory above
 the repository checkout. For example, a checkout at `/opt/byline/src` uses the
@@ -105,9 +112,11 @@ Compose project at `/opt/byline`. Other layouts can set:
 BYLINE_DEPLOY_ROOT=/path/to/compose-project npm run deploy:newsroom
 ```
 
-The script intentionally leaves `newsroom` stopped if `newsroom-build`
-fails. Do not restart it against an incomplete `.next` tree; correct the build
-failure and rerun the deploy command.
+A failed image build, Next build, or migration never changes the active release
+and does not stop the currently running newsroom. The cutover happens only after
+the new build and migrations succeed. If the final Compose recreation fails,
+the script restores the previous release pointer and previous newsroom image tag
+before attempting to bring the services back.
 
 ### Manual / recovery procedure
 
@@ -118,17 +127,25 @@ production Compose project:
 cd /path/to/byline/repository
 git pull --ff-only origin main
 
+release="$(git -C /path/to/byline/repository rev-parse --short=12 HEAD)-$(date +%s)"
+
 cd /path/to/compose-project
 docker compose build newsroom
+docker compose run --rm --no-deps newsroom-build \
+  node scripts/newsroom-release.mjs build "$release"
 docker compose run --rm migrate
-docker compose stop newsroom
-docker compose run --rm newsroom-build
+previous="$(docker compose run --rm --no-deps newsroom-build \
+  node scripts/newsroom-release.mjs current | tail -n 1)"
+docker compose run --rm --no-deps newsroom-build \
+  node scripts/newsroom-release.mjs activate "$release"
 docker compose up -d --no-deps --force-recreate \
   newsroom \
   media-worker \
   publication-worker \
   scheduled-worker \
   maintenance-worker
+docker compose run --rm --no-deps newsroom-build \
+  node scripts/newsroom-release.mjs prune "$previous"
 ```
 
 Build only `newsroom` because all of these services use the same
@@ -137,12 +154,13 @@ BuildKit export and unpack that same image separately for each service, which
 adds substantial deployment time and disk I/O without producing distinct
 artifacts.
 
-`newsroom-build` writes into the same shared `.next` volume used by the web
-process, so stop `newsroom` before running it. This creates a brief
-newsroom-only outage, but it prevents the live server from reading files while
-the build replaces them. Deployments that require zero downtime should build
-into a second versioned `.next` volume and switch the web service to it only
-after a successful build.
+`newsroom-build` uses the shared `.next` volume only as a release store.
+Each deploy gets its own directory, so the active web process never observes a
+partially replaced build. The build helper also carries the previous release's
+`cache/` directory forward, which lets Next 16's
+`turbopackFileSystemCacheForBuild` reuse production compiler work. Passing
+`--no-deps` to this one-shot build avoids starting the migration dependency a
+second time.
 
 Production must keep `BYLINE_DB_PUSH=0` and run committed Payload migrations.
 Do not expose PostgreSQL publicly. The newsroom may be published through a

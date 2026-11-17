@@ -6,7 +6,7 @@
     "dev": "node scripts/astro-with-publication.mjs dev",
     "build": "node scripts/astro-with-publication.mjs build",
     "build:cloudflare": "node ../../scripts/build-cloudflare.mjs",
-    "postbuild": "node scripts/report-build.mjs start && node scripts/materialize-static-compatibility.mjs && node scripts/generate-redirects.mjs && node scripts/generate-headers.mjs && node scripts/generate-byline-manifest.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs && node scripts/verify-seo.mjs && node scripts/report-build.mjs end",
+    "postbuild": "node scripts/report-build.mjs start && node scripts/materialize-static-compatibility.mjs && node scripts/generate-redirects.mjs && node scripts/generate-headers.mjs && node scripts/generate-byline-manifest.mjs && node scripts/output-inventory.mjs && node scripts/verify-static-export.mjs && node scripts/verify-build.mjs && node scripts/verify-seo.mjs && node scripts/report-build.mjs end",
     "test": "vitest run",
     "materialize:publication-media": "node --import tsx scripts/materialize-publication-media.mts",
     "build:data-embed-fixture": "BYLINE_CONTENT_MODE=weekly-wildcat-fixture BYLINE_BUILD_SNAPSHOT_FILE=tests/fixtures/data-embed/snapshot.json BYLINE_BUILD_DATA_DIR=tests/fixtures/data/releases npm run build",
@@ -29,7 +29,7 @@
     "@byline/theme-weekly-wildcat": "0.1.0",
     "@byline/ui": "0.1.0",
     "@iconify/react": "^6.0.2",
-    "astro": "7.3.3",
+    "astro": "7.4.12",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

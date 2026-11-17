@@ -63,6 +63,7 @@ for service in reporting-worker whisper; do
 done
 
 commit="$(git rev-parse --short HEAD)"
+release="$(git rev-parse --short=12 HEAD)-$(date +%s)"
 printf 'Deploying Byline %s using Compose project %s\n' "$commit" "$deploy_root"
 
 if (( ${#retired_services[@]} )); then
@@ -71,20 +72,37 @@ if (( ${#retired_services[@]} )); then
   compose rm -f "${retired_services[@]}" || true
 fi
 
-printf '\n[1/5] Building service images...\n'
+# Keep enough information to put the old image tag back if the final container
+# replacement fails. Building a new image never changes the already-running
+# container, so the current newsroom remains a valid fallback until cutover.
+rollback_container="$(compose ps -q newsroom 2>/dev/null || true)"
+rollback_image_id=""
+rollback_image_ref=""
+if [[ -n "$rollback_container" ]]; then
+  rollback_image_id="$(docker inspect --format '{{.Image}}' "$rollback_container" 2>/dev/null || true)"
+  rollback_image_ref="$(docker inspect --format '{{.Config.Image}}' "$rollback_container" 2>/dev/null || true)"
+fi
+
+printf '\n[1/5] Building service image...\n'
 compose build newsroom
 
-printf '\n[2/5] Running Payload migrations...\n'
-compose run --rm migrate
-
-printf '\n[3/5] Stopping the newsroom before replacing the shared Next build...\n'
-compose stop newsroom
-
-printf '\n[4/5] Building the production newsroom...\n'
-if ! compose run --rm newsroom-build; then
-  printf '\nNewsroom build failed. The newsroom was intentionally left stopped so it cannot start against an incomplete .next tree.\n' >&2
+printf '\n[2/5] Building production newsroom release while the current newsroom stays online...\n'
+if ! compose run --rm --no-deps newsroom-build node scripts/newsroom-release.mjs build "$release"; then
+  printf '\nNewsroom build failed. The current newsroom is still online and the active release was not changed.\n' >&2
   exit 1
 fi
+
+printf '\n[3/5] Running Payload migrations...\n'
+if ! compose run --rm migrate; then
+  printf '\nMigrations failed. The current newsroom is still online and the new release was not activated.\n' >&2
+  exit 1
+fi
+
+printf '\n[4/5] Activating the verified newsroom release...\n'
+previous_release="$(compose run --rm --no-deps newsroom-build node scripts/newsroom-release.mjs current | tail -n 1 | tr -d '\r')"
+[[ "$previous_release" == "legacy" || "$previous_release" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}$ ]] ||
+  fail "could not determine the currently active newsroom release"
+compose run --rm --no-deps newsroom-build node scripts/newsroom-release.mjs activate "$release" >/dev/null
 
 printf '\n[5/5] Recreating newsroom services...\n'
 services_to_recreate=(
@@ -94,7 +112,20 @@ services_to_recreate=(
   scheduled-worker
   maintenance-worker
 )
-compose up -d --no-deps --force-recreate "${services_to_recreate[@]}"
+if ! compose up -d --no-deps --force-recreate "${services_to_recreate[@]}"; then
+  printf '\nCutover failed; restoring the previous newsroom release...\n' >&2
+  compose run --rm --no-deps newsroom-build node scripts/newsroom-release.mjs rollback "$previous_release" >/dev/null || true
+  if [[ -n "$rollback_image_id" && -n "$rollback_image_ref" ]]; then
+    docker tag "$rollback_image_id" "$rollback_image_ref" || true
+  fi
+  compose up -d --no-deps --force-recreate "${services_to_recreate[@]}" || true
+  fail "newsroom service recreation failed; rollback was attempted"
+fi
+
+# Keep the just-replaced release as one quick rollback target and remove older
+# Next build trees. Failure to prune is not a deployment failure.
+compose run --rm --no-deps newsroom-build node scripts/newsroom-release.mjs prune "$previous_release" >/dev/null ||
+  printf 'deploy:newsroom: warning: could not prune old Next releases\n' >&2
 
 printf '\nChecking publication deployment configuration...\n'
 if ! compose exec -T publication-worker sh -lc 'test -n "$BYLINE_DEPLOY_HOOK_URL"'; then
