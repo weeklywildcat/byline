@@ -1,4 +1,5 @@
 import { stableDigest } from "@byline/content";
+import type { ArticleLiveView } from "@byline/content/story";
 import { nativeStory } from "./native-snapshot";
 import { createArticleLiveView, createLiveFeed, formatLiveTime as formatTime } from "@byline/ui/live-feed";
 import { getPublicationConfig } from "@/lib/publication";
@@ -29,14 +30,27 @@ export function liveSourceUrl(postId: number | string, cms = publication.urls.cm
   }
 }
 
+export function attachLiveSource(
+  live: ArticleLiveView | null | undefined,
+  postId: number | string,
+  options: { cms?: string; locale?: string; timeZone?: string } = {}
+): ArticleLiveView | null | undefined {
+  if (!live || live.status !== "live") return live;
+  const url = liveSourceUrl(postId, options.cms ?? publication.urls.cms);
+  if (!url) return live;
+  return {
+    ...live,
+    source: {
+      url,
+      locale: options.locale ?? publication.locale,
+      timeZone: options.timeZone ?? publication.timezone
+    }
+  };
+}
+
 export function buildArticleLiveView(post: ArchivePost) {
   const native = nativeStory(post.id);
-  if (native) {
-    const live = native.live;
-    // Only a Payload story has a newsroom feed, and only running coverage reads it; ended coverage is the build's alone.
-    const url = live?.status === "live" ? liveSourceUrl(post.id) : null;
-    return live && url ? { ...live, source: { url, locale: publication.locale, timeZone: publication.timezone } } : live;
-  }
+  if (native) return attachLiveSource(native.live, post.id);
   const live = getPostLiveCoverage(post);
   return live ? createArticleLiveView(live, {
     postId: post.id, locale: publication.locale, timeZone: publication.timezone,
