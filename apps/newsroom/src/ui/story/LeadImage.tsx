@@ -7,8 +7,7 @@ import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { Crop, ImagePlus, X } from "lucide-react";
 import { relationIdOf, useStoryField } from "./form";
 import type { Id } from "./types";
-
-export const leadImageCaptionShouldReset = (currentId: Id | null, nextId: Id | null) => currentId !== nextId;
+import { leadImageCaptionShouldReset } from "./lead-image";
 
 /**
  * The lead image, chosen through Byline Media (never Payload's upload
