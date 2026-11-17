@@ -6,6 +6,26 @@ describe("publication navigation", () => {
     vi.resetModules();
   });
 
+  it("hides The Prowler from the header while keeping footer navigation intact", async () => {
+    const { WEEKLY_WILDCAT_PUBLICATION } = await import("@/lib/publication");
+    vi.stubEnv(
+      "BYLINE_PUBLICATION_JSON",
+      JSON.stringify({
+        ...WEEKLY_WILDCAT_PUBLICATION,
+        navigation: [
+          ...WEEKLY_WILDCAT_PUBLICATION.navigation,
+          { label: "The Prowler", url: "/the-prowler/", locations: ["header"] }
+        ]
+      })
+    );
+    vi.resetModules();
+
+    const { getNavigation } = await import("@/lib/publication");
+
+    expect(getNavigation("header").map((item) => item.url)).not.toContain("/the-prowler/");
+    expect(getNavigation("footer").map((item) => item.url)).toContain("/the-prowler/");
+  });
+
   it("sends saved /sports/ links to current sports coverage instead of the archive", async () => {
     const { WEEKLY_WILDCAT_PUBLICATION } = await import("@/lib/publication");
     vi.stubEnv(
