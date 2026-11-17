@@ -1,13 +1,8 @@
 import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
-import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   output: "static",
-  // Workers Builds natively persists node_modules/.astro at the repository
-  // root. Keep Astro's incremental route cache and Byline's media cache there
-  // directly instead of mirroring a second workspace-local cache.
-  cacheDir: fileURLToPath(new URL("../../node_modules/.astro/", import.meta.url)),
   experimental: {
     incrementalBuild: true,
     // Astro 7.4 can prerender independent routes on worker threads. Keep this
