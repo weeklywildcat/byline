@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArticleLiveCoverage } from "@byline/ui";
 import { createArticleLiveView } from "@byline/ui/live-feed";
 import { sourceMediaUrl, startLiveUpdates } from "@byline/ui/live-updates";
-import { liveSourceUrl } from "@/lib/live-coverage";
+import { attachLiveSource, liveSourceUrl } from "@/lib/live-coverage";
 
 /**
  * While coverage is live the page reads the newsroom's feed directly
@@ -146,6 +146,22 @@ describe("reading live coverage from the newsroom", () => {
 });
 
 describe("the newsroom feed URL", () => {
+  it("attaches the newsroom source to a running Payload live view", () => {
+    const running = createArticleLiveView(coverage([update(1)]), {
+      postId: 60, locale: "en-US", timeZone: "America/New_York", feedUrl: "/_byline/live/60.json"
+    });
+    expect(attachLiveSource(running, 60, {
+      cms: "https://byline.weeklywildcat.com", locale: "en-US", timeZone: "America/New_York"
+    })?.source).toEqual({
+      url: "https://byline.weeklywildcat.com/api/byline/live/60",
+      locale: "en-US",
+      timeZone: "America/New_York"
+    });
+
+    const ended = { ...running, status: "ended" as const, endedAt: "2026-11-02T21:00:00.000Z" };
+    expect(attachLiveSource(ended, 60, { cms: "https://byline.weeklywildcat.com" })?.source).toBeUndefined();
+  });
+
   it("comes from the Publication's newsroom address", () => {
     expect(liveSourceUrl(9, "https://byline.weeklywildcat.com")).toBe("https://byline.weeklywildcat.com/api/byline/live/9");
     expect(liveSourceUrl(9, "https://example.org/newsroom/")).toBe("https://example.org/newsroom/api/byline/live/9");
