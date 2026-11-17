@@ -59,7 +59,6 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
     { label: "Sports", url: "/category/sports/", locations: ["header"], feature: "sports" },
     { label: "Opinion", url: "/category/opinion/", locations: ["header"] },
     { label: "Features", url: "/category/features/", locations: ["header"] },
-    { label: "The Prowler", url: "/the-prowler/", locations: ["header"] },
     { label: "News", url: "/category/news/", locations: ["footer"], group: "Columns" },
     { label: "Features", url: "/category/features/", locations: ["footer"], group: "Columns" },
     { label: "Opinion", url: "/category/opinion/", locations: ["footer"], group: "Columns" },
