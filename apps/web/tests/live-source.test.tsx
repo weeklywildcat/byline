@@ -49,23 +49,61 @@ describe("reading live coverage from the newsroom", () => {
     expect(ended).not.toContain("data-source");
   });
 
-  it("stays quiet when the newsroom says what the page already shows, then offers a new update", async () => {
-    const photo = { url: "/_byline/media/images/bb/kick--1600--fedcba9876543210.webp", alt: "Kickoff", width: 1600, height: 1067, credit: "Jo Photographer" };
-    const current = coverage([update(2), update(1, { image: photo })]);
-    const root = staticPage(current);
-    const fetch = vi.fn().mockResolvedValueOnce(ok(current)).mockResolvedValue(ok(coverage([update(3), ...current.updates])));
+  it("catches a stale page up on arrival without moving it, then offers later updates behind the button", async () => {
+    const built = coverage([update(1)]);
+    const root = staticPage(built);
+    const current = coverage([update(3), update(2), update(1)]);
+    const fetch = vi.fn().mockResolvedValueOnce(ok(current)).mockResolvedValue(ok(coverage([update(4), ...current.updates])));
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
     const stop = startLiveUpdates(root, { fetch, intervalMs: 1000 });
 
-    await vi.advanceTimersByTimeAsync(1000);
+    // The first check is immediate and applies the newsroom's timeline: no button, no scroll, no focus.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenLastCalledWith(SOURCE, expect.objectContaining({ cache: "no-store", credentials: "omit" }));
+    expect([...root.querySelectorAll<HTMLElement>("[data-update-id]")].map((node) => node.dataset.updateId)).toEqual(["3", "2", "1"]);
     expect(root.querySelector<HTMLElement>(".article-live-new")!.hidden).toBe(true);
+    expect(root.querySelector("#update-3 .article-live-update-name a")?.getAttribute("href")).toBe("/author/ana-reporter/");
+    expect(focus).not.toHaveBeenCalled();
 
+    // After that the reader decides.
     await vi.advanceTimersByTimeAsync(1000);
     expect(root.querySelector("button")!.textContent).toBe("1 new update");
+    expect(root.querySelectorAll("#update-4")).toHaveLength(0);
     root.querySelector<HTMLButtonElement>(".article-live-new button")!.click();
-    expect([...root.querySelectorAll<HTMLElement>("[data-update-id]")].map((node) => node.dataset.updateId)).toEqual(["3", "2", "1"]);
-    expect(root.querySelector("#update-3 .article-live-update-name a")?.getAttribute("href")).toBe("/author/ana-reporter/");
+    expect([...root.querySelectorAll<HTMLElement>("[data-update-id]")].map((node) => node.dataset.updateId)).toEqual(["4", "3", "2", "1"]);
     expect(fetch.mock.calls.every(([url]) => url === SOURCE)).toBe(true);
+    focus.mockRestore();
+    stop();
+  });
+
+  it("stays quiet when the newsroom says what the page already shows", async () => {
+    const current = coverage([update(2), update(1)]);
+    const root = staticPage(current);
+    const fetch = vi.fn(async () => ok(current));
+    const before = [...root.querySelectorAll("[data-update-id]")];
+    const stop = startLiveUpdates(root, { fetch, intervalMs: 1000 });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(root.querySelector<HTMLElement>(".article-live-new")!.hidden).toBe(true);
+    // The same nodes: nothing was re-rendered under the reader.
+    expect([...root.querySelectorAll("[data-update-id]")]).toEqual(before);
+    expect([...root.querySelectorAll("[data-update-id]")].every((node, index) => node === before[index])).toBe(true);
+    stop();
+  });
+
+  it("catches up when a tab opened in the background is first seen", async () => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    const root = staticPage(coverage([update(1)]));
+    const fetch = vi.fn(async () => ok(coverage([update(2), update(1)])));
+    const stop = startLiveUpdates(root, { fetch, intervalMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetch).not.toHaveBeenCalled();
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(root.querySelectorAll("[data-update-id]")).toHaveLength(2);
     stop();
   });
 

@@ -3,7 +3,7 @@ import { relatedSuggestions } from "./related-suggestions";
 import { changeStoryNote, storyNotePreviews, storyNotes } from "./story-notes";
 import { inbox, markNotificationsRead } from "./notifications";
 import { changeLiveCoverage, changeLiveUpdate, deleteLiveUpdate, liveCandidates, liveDesk, postLiveUpdate } from "./live-coverage";
-import { publicLiveEndpoints } from "./public-live";
+import { forgetPublicLive, publicLiveEndpoints } from "./public-live";
 import { postingAsPeople } from "./posting-as";
 import { contentHealth, healthDisposition, startHealthScan } from "./health/content-health";
 import { pageContext } from "./site-pages";
@@ -538,14 +538,26 @@ const collectionEndpoints: Endpoint[] = [
 
 /* ----------------------------------------------------------- endpoints */
 
+/**
+ * A live desk write, then the Story's public projection is dropped so readers' next check sees it: a live update
+ * is not a public revision while coverage runs, so nothing else would tell the public feed's short cache.
+ */
+async function liveWrite<T>(req: PayloadRequest, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } finally {
+    forgetPublicLive(idParam(req));
+  }
+}
+
 export const newsroomEndpoints: Endpoint[] = [
   { path: "/byline/stories/:id/live", method: "get", handler: handle((ctx, req) => liveDesk(ctx, idParam(req))) },
-  { path: "/byline/stories/:id/live", method: "post", handler: handle(async (ctx, req) => postLiveUpdate(ctx, idParam(req), await body(req))) },
-  { path: "/byline/stories/:id/live/coverage", method: "post", handler: handle(async (ctx, req) => changeLiveCoverage(ctx, idParam(req), await body(req))) },
+  { path: "/byline/stories/:id/live", method: "post", handler: handle((ctx, req) => liveWrite(req, async () => postLiveUpdate(ctx, idParam(req), await body(req)))) },
+  { path: "/byline/stories/:id/live/coverage", method: "post", handler: handle((ctx, req) => liveWrite(req, async () => changeLiveCoverage(ctx, idParam(req), await body(req)))) },
   { path: "/byline/stories/:id/live/people", method: "get", handler: handle(async (ctx, req) => ({ people: await postingAsPeople(ctx, idParam(req)) })) },
   { path: "/byline/stories/:id/live/publishers", method: "get", handler: handle(async (ctx, req) => ({ people: await liveCandidates(ctx, idParam(req)) })) },
-  { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle(async (ctx, req) => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req))) },
-  { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update"))) },
+  { path: "/byline/stories/:id/live/:update", method: "patch", handler: handle((ctx, req) => liveWrite(req, async () => changeLiveUpdate(ctx, idParam(req), idParam(req, "update"), await body(req)))) },
+  { path: "/byline/stories/:id/live/:update", method: "delete", handler: handle((ctx, req) => liveWrite(req, () => deleteLiveUpdate(ctx, idParam(req), idParam(req, "update")))) },
   // Public, read-only, published-only: what a reader's browser polls while coverage is live, and the photos it names. No credentials, no cookies.
   ...publicLiveEndpoints,
   { path: "/byline/notifications", method: "get", handler: handle((ctx, req) => inbox(ctx, { unreadOnly: req.searchParams.get("unread") === "1", limit: Number(req.searchParams.get("limit")) || 20 })) },

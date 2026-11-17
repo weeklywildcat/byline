@@ -3,7 +3,6 @@ import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import type { LiveCoverage } from "@byline/core";
 import type { Endpoint, Payload, PayloadRequest } from "payload";
-import { readCurrentRevision } from "../db/publication-state";
 import type { PreparedMediaCatalog } from "../public/snapshot/media";
 import { loadPublicLive } from "./live-coverage";
 
@@ -21,21 +20,24 @@ import { loadPublicLive } from "./live-coverage";
  *   portrait), for a photo whose deploy has not landed yet. Nothing else can
  *   be named: no Media IDs, no originals, no other Story's files.
  *
- * Every reader polls, so a Story's projection is reused while the public
- * revision is unchanged (any public write advances it), for at most
- * `MAX_AGE_MS`, and concurrent requests share one read.
+ * Every reader polls, so a Story's projection is shared for a few seconds and
+ * concurrent requests share one read. A live update does not advance the public
+ * revision while coverage runs (`liveUpdatePublicSlice`), so the revision
+ * cannot key this cache: the live desk's writes drop the Story's entry
+ * (`forgetPublicLive`) once they commit, and a write made any other way is
+ * visible within `MAX_AGE_MS`.
  */
 
 export const PUBLIC_LIVE_FEED_PATH = "/byline/live/:id";
 export const PUBLIC_LIVE_MEDIA_PATH = "/byline/live/:id/media";
 
-const MAX_AGE_MS = 30_000;
+const MAX_AGE_MS = 5_000;
 const MAX_ENTRIES = 64;
 const PUBLIC_HEADERS = { "Access-Control-Allow-Origin": "*", "X-Content-Type-Options": "nosniff" } as const;
 const NO_STORE = { ...PUBLIC_HEADERS, "Cache-Control": "no-store" } as const;
 
 type Loaded = { coverage: LiveCoverage; catalog: PreparedMediaCatalog } | null;
-type Entry = { revision: number; at: number; value: Promise<Loaded> };
+type Entry = { at: number; value: Promise<Loaded> };
 const cache = new Map<number, Entry>();
 
 /** Test hook: forget every cached projection. */
@@ -43,13 +45,17 @@ export function clearPublicLiveCache() {
   cache.clear();
 }
 
+/** Drops a Story's cached projection; called after a live write commits, so the next read sees it. */
+export function forgetPublicLive(storyId: number) {
+  cache.delete(storyId);
+}
+
 export async function cachedPublicLive(payload: Payload, storyId: number, now = Date.now()): Promise<Loaded> {
-  const revision = await readCurrentRevision(payload);
   const entry = cache.get(storyId);
-  if (entry && entry.revision === revision && now - entry.at < MAX_AGE_MS) return entry.value;
+  if (entry && now - entry.at < MAX_AGE_MS) return entry.value;
   const value = loadPublicLive(payload, storyId);
   cache.delete(storyId);
-  cache.set(storyId, { revision, at: now, value });
+  cache.set(storyId, { at: now, value });
   while (cache.size > MAX_ENTRIES) cache.delete(cache.keys().next().value!);
   // A failed read is never reused.
   value.catch(() => { if (cache.get(storyId)?.value === value) cache.delete(storyId); });

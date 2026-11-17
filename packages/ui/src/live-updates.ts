@@ -132,7 +132,8 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
     return template.innerHTML;
   };
 
-  const applyPending = () => {
+  /** `quiet` is for the catch-up on arrival: nothing the reader was looking at moves, and nothing takes focus. */
+  const applyPending = (quiet = false) => {
     if (!latest) return;
     const firstNew = unseenUpdates(latest, known)[0]?.id;
     const template = doc.createElement("template");
@@ -166,6 +167,7 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
       updated.textContent = latest.updatedLabel;
     }
     refreshRelativeTimes(root, now());
+    if (quiet) return;
     const first = list.querySelector<HTMLElement>(firstNew ? `[data-update-id="${firstNew}"]` : "[data-update-id]")
       ?? root.querySelector<HTMLElement>(".article-live-heading");
     if (first) {
@@ -176,6 +178,8 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
     }
   };
 
+  // Set until the first successful read, so a tab opened in the background catches up when it is first seen.
+  let arriving = Boolean(source);
   const poll = async () => {
     if (stopped || inFlight || doc.visibilityState === "hidden") return;
     inFlight = true;
@@ -203,6 +207,10 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
         doc.querySelectorAll(".article-live-badge").forEach((badge) => badge.remove());
         stopPolling();
       }
+      // The page was built when coverage started or last changed, so a reader arriving mid-coverage sees the
+      // newsroom's timeline at once instead of a stale one with a button over it.
+      if (arriving && changed) applyPending(true);
+      arriving = false;
     } catch {
       interval = Math.min(interval * 2, MAX_BACKOFF_MS);
     } finally {
@@ -216,7 +224,7 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
   };
   const onVisibility = () => {
     if (doc.visibilityState === "hidden") view.clearTimeout(timer);
-    else if (now() - lastPoll >= interval) void poll();
+    else if (arriving || now() - lastPoll >= interval) void poll();
     else schedule();
   };
   function stopPolling() {
@@ -224,15 +232,18 @@ export function startLiveUpdates(root: HTMLElement, options: LiveUpdatesOptions 
     view.clearTimeout(timer); view.clearInterval(clock);
     doc.removeEventListener("visibilitychange", onVisibility);
   }
-  button.addEventListener("click", applyPending);
+  const onShow = () => applyPending();
+  button.addEventListener("click", onShow);
   // Image errors do not bubble, so listen while capturing.
   root.addEventListener("error", onImageError, true);
   doc.addEventListener("visibilitychange", onVisibility);
   refreshRelativeTimes(root, now());
   clock = view.setInterval(() => refreshRelativeTimes(root, now()), 60_000);
-  schedule();
+  // Updates are not a build while coverage runs, so a page read from the newsroom starts with a catch-up check.
+  if (source) void poll();
+  else schedule();
   return () => {
     stopPolling(); controller.abort(); started.delete(root);
-    button.removeEventListener("click", applyPending); root.removeEventListener("error", onImageError, true);
+    button.removeEventListener("click", onShow); root.removeEventListener("error", onImageError, true);
   };
 }
