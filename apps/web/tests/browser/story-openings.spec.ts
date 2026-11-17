@@ -322,6 +322,16 @@ test.describe('Feature', () => {
     expect(await noHorizontalOverflow(page)).toBe(true);
   });
 
+  test('short phone viewport keeps a height-capped Feature photo full width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 420 });
+    await open(page, stories.featureWide);
+    const media = await box(page, '.story-opening-feature .story-opening-media');
+    near(media.x, 0);
+    near(media.width, 390);
+    expect(media.height).toBeLessThanOrEqual(420 * 0.86 + 2);
+    expect(await noHorizontalOverflow(page)).toBe(true);
+  });
+
   test('uses the phone crop when the editor made one', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page, stories.featureWide);
@@ -363,11 +373,31 @@ test.describe('Split', () => {
       const layout = await layoutBounds(page);
       const text = await box(page, '.story-opening-split-text');
       const figure = await box(page, '.story-opening-split-figure');
+      const media = await box(page, '.story-opening-split-figure .story-opening-media');
       expect(figure.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
       near(figure.x, 0);
       near(figure.width, layout.width);
+      // Check the image frame, not just its full-width figure: max-height and
+      // aspect-ratio used to shrink the frame and leave a gap on the right.
+      near(media.x, figure.x);
+      near(media.width, figure.width);
       // No narrow columns: the text uses a readable measure.
       expect(text.width).toBeGreaterThan(layout.width * 0.9);
+      expect(await noHorizontalOverflow(page)).toBe(true);
+    });
+  }
+
+  for (const size of [{ width: 390, height: 420 }, { width: 768, height: 540 }, { width: 1000, height: 700 }]) {
+    test(`${size.width}x${size.height}: height-capped split photo still spans the viewport`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await open(page, stories.splitRight);
+      const figure = await box(page, '.story-opening-split-figure');
+      const media = await box(page, '.story-opening-split-figure .story-opening-media');
+      near(figure.x, 0);
+      near(figure.width, size.width);
+      near(media.x, figure.x);
+      near(media.width, figure.width);
+      expect(media.height).toBeLessThanOrEqual(size.height * 0.86 + 2);
       expect(await noHorizontalOverflow(page)).toBe(true);
     });
   }
