@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, link, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -20,9 +20,26 @@ function releaseName(value) {
 
 async function exists(target) {
   try {
-    return (await stat(target)).isDirectory() || (await stat(target)).isFile();
+    const info = await stat(target);
+    return info.isDirectory() || info.isFile();
   } catch {
     return false;
+  }
+}
+
+async function cloneTree(source, target) {
+  await mkdir(target, { recursive: true });
+  for (const entry of await readdir(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) {
+      await cloneTree(from, to);
+    } else if (entry.isFile()) {
+      await link(from, to).catch((error) => {
+        if (error.code === "EXDEV" || error.code === "EPERM" || error.code === "EMLINK") return copyFile(from, to);
+        throw error;
+      });
+    }
   }
 }
 
@@ -39,20 +56,13 @@ function releaseDirectory(name) {
   return path.join(releasesRoot, releaseName(name));
 }
 
-async function copyWarmCache(target) {
+async function copyWarmCache(target, release) {
   const active = await currentRelease();
+  if (active === release) throw new Error("Refusing to rebuild the active newsroom release in place.");
   const source = active ? path.join(releaseDirectory(active), "cache") : path.join(nextRoot, "cache");
   if (!(await exists(source))) return false;
 
-  const staging = path.join(nextRoot, `.cache-seed-${process.pid}`);
-  await rm(staging, { recursive: true, force: true });
-  await cp(source, staging, { recursive: true });
-  try {
-    await mkdir(path.dirname(target), { recursive: true });
-    await cp(staging, target, { recursive: true });
-  } finally {
-    await rm(staging, { recursive: true, force: true });
-  }
+  await cloneTree(source, target);
   return true;
 }
 
@@ -63,7 +73,7 @@ async function buildRelease(name) {
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
 
-  const warm = await copyWarmCache(path.join(directory, "cache"));
+  const warm = await copyWarmCache(path.join(directory, "cache"), release);
   console.log(`[byline] Building newsroom release ${release}${warm ? " with the previous Turbopack cache" : ""}...`);
 
   const child = spawn(
