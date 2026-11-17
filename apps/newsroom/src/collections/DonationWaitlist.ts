@@ -47,8 +47,7 @@ export const DonationWaitlist: CollectionConfig = {
       type: "email",
       required: true,
       unique: true,
-      index: true,
-      maxLength: EMAIL_MAX
+      index: true
     }
   ]
 };
