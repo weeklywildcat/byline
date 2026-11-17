@@ -18,7 +18,7 @@ import "@byline/ui/hero-reveal.css";
 import "@byline/ui/immersive-article.css";
 import "@byline/ui/story-opening.css";
 import "@byline/ui/story-navigation.css";
-import "../../../../web/views/fonts.css";
+import "../../../../web/public/fonts/weekly-wildcat.css";
 import "../../../../web/views/globals.css";
 import "@byline/ui/contributor-profile.css";
 import "@byline/data-presentations/data-project.css";
