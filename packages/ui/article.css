@@ -164,9 +164,28 @@ html[data-byline-theme="weekly-wildcat"] .byline-article-view .story-teaser h2, 
   .byline-article-view .photo-credit { max-width: none; text-align: left; }
   .byline-article-view .article-header h1 { font-size: 2rem; }
   html[data-byline-theme="weekly-wildcat"] .byline-article-view.article-shell-opinion .article-header h1 { font-size: 2.4rem; }
-  .byline-article-view .article-meta-block { column-gap: 10px; }
+
+  /* On phones, contributor photos get their own row instead of consuming the
+     left column and squeezing long/multi-writer bylines. */
+  .byline-article-view .article-meta-block {
+    align-items: start;
+    column-gap: 10px;
+    grid-template-areas:
+      "avatars avatars"
+      "byline share";
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 8px;
+  }
+  .byline-article-view .article-avatars {
+    flex-wrap: wrap;
+    grid-area: avatars;
+    max-width: 100%;
+  }
+  .byline-article-view .article-byline-text { grid-area: byline; }
+  .byline-article-view .article-share-actions { align-self: start; grid-area: share; }
+
   .byline-article-view .article-byline-avatar { height: 36px; width: 36px; }
-  .byline-article-view .article-byline-avatar + .article-byline-avatar { margin-left: -12px; }
+  .byline-article-view .article-byline-avatar + .article-byline-avatar { margin-left: -10px; }
   .byline-article-view .article-share-actions button { height: 34px; width: 34px; }
   .byline-article-view .about-writer-layout { gap: 12px; }
   .byline-article-view .about-writer-avatar { height: 64px; width: 64px; }
