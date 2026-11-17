@@ -4,6 +4,7 @@ import type { PublicStorySnapshot } from "@byline/content";
 import { largestNaturalImage } from "@byline/content";
 import type { ArticleRenderHost } from "@byline/ui/article-body";
 import { decodeHtml } from "./format";
+import { attachLiveSource } from "./live-coverage";
 import { getNativeSnapshot, nativeMedia, nativeStory, nativeStoryIndex } from "./native-snapshot";
 
 function displayTerm(term: PublicTerm): PublicTerm {
@@ -73,7 +74,12 @@ export function nativeArticlePresentation(story: PublicStorySnapshot) {
       complete: entry.status === "past" || entry.status === "archived", stories: entry.stories.map((id) => nativeStory(id)!)
     }))
   });
-  return presentation;
+  const live = attachLiveSource(presentation.live, story.id, {
+    cms: publication.urls.cms,
+    locale: publication.locale,
+    timeZone: publication.timezone
+  });
+  return live === presentation.live ? presentation : { ...presentation, live };
 }
 
 export function nativeArticleCard(story: PublicStorySnapshot, usage: Pick<StoryImageUsage, "shape" | "sizes">) {
