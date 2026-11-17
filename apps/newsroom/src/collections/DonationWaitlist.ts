@@ -1,5 +1,5 @@
 import { APIError, type CollectionConfig } from "payload";
-import { atLeast, editorsOnly, nobody, newsroomUser } from "../access/user";
+import { administratorsOnly, atLeast, nobody, newsroomUser } from "../access/user";
 
 const EMAIL_MAX = 320;
 
@@ -24,14 +24,14 @@ export const DonationWaitlist: CollectionConfig = {
     useAsTitle: "email",
     defaultColumns: ["email", "createdAt"],
     group: "Site",
-    hidden: ({ user }) => !atLeast(newsroomUser(user), "editor"),
+    hidden: ({ user }) => !atLeast(newsroomUser(user), "administrator"),
     description: "People who asked to be notified when Weekly Wildcat donations open."
   },
   access: {
-    read: editorsOnly,
+    read: administratorsOnly,
     create: nobody,
     update: nobody,
-    delete: editorsOnly
+    delete: administratorsOnly
   },
   hooks: {
     beforeValidate: [
