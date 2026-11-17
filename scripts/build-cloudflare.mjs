@@ -2,19 +2,22 @@
 // Cloudflare Workers Builds installs the whole monorepo by default. With
 // SKIP_DEPENDENCY_INSTALL=1, install only the public site and its dependencies.
 //
-// Workers Builds is configured with apps/web as the project Root directory, so
-// its Astro build cache is apps/web/node_modules/.astro. npm ci recreates
-// node_modules, so preserve the restored cache briefly outside that tree during
-// installation and put it straight back afterward. The repository-root cache is
-// accepted once as a compatibility fallback for older Byline build settings.
+// Byline's Workers Builds Root directory is apps/web, so Astro's real cache is
+// apps/web/node_modules/.astro. npm ci recreates node_modules, therefore this
+// wrapper stages the restored cache outside the dependency tree and restores it
+// before Astro runs. A repository-root invocation remains supported for local
+// CI/older Workers settings; only that compatibility path mirrors the cache.
 import { spawnSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises";
+import { copyFile, link, lstat, mkdir, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cache = path.join(root, "apps/web/node_modules/.astro");
-const legacyRootCache = path.join(root, "node_modules/.astro");
+const webRoot = path.join(root, "apps/web");
+const cache = path.join(webRoot, "node_modules/.astro");
+const invocationRoot = path.resolve(process.cwd());
+const invocationCache = path.join(invocationRoot, "node_modules/.astro");
+const shouldMirrorInvocationCache = invocationCache !== cache;
 
 async function inventory(directory) {
   let files = 0;
@@ -42,6 +45,21 @@ const describe = async (directory) => {
 
 const exists = (directory) => lstat(directory).then((info) => info.isDirectory(), () => false);
 
+async function mirror(source, target) {
+  await mkdir(target, { recursive: true });
+  for (const entry of await readdir(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) await mirror(from, to);
+    else if (entry.isFile()) {
+      await link(from, to).catch((error) => {
+        if (error.code === "EXDEV" || error.code === "EPERM" || error.code === "EMLINK") return copyFile(from, to);
+        throw error;
+      });
+    }
+  }
+}
+
 const stagingDirectory = await mkdtemp(path.join(root, ".byline-astro-cache-"));
 const stagedCache = path.join(stagingDirectory, "astro");
 let cacheSaved = false;
@@ -60,7 +78,9 @@ function npm(args) {
 }
 
 try {
-  const restoredFrom = (await exists(cache)) ? cache : (await exists(legacyRootCache)) ? legacyRootCache : null;
+  const restoredFrom = (await exists(cache)) ? cache
+    : shouldMirrorInvocationCache && (await exists(invocationCache)) ? invocationCache
+    : null;
   if (restoredFrom) {
     await rename(restoredFrom, stagedCache);
     cacheSaved = true;
@@ -93,5 +113,10 @@ try {
 npm(["run", "build:frontend"]);
 
 if (await exists(cache)) {
+  if (shouldMirrorInvocationCache) {
+    await rm(invocationCache, { recursive: true, force: true });
+    await mirror(cache, invocationCache);
+    console.log(`[byline] Mirrored Astro cache for ${path.relative(root, invocationRoot) || "repository-root"} invocation compatibility`);
+  }
   console.log(`[byline] Astro cache ready for Workers Builds to save (${await describe(cache)})`);
 }
