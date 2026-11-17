@@ -2,20 +2,19 @@
 // Cloudflare Workers Builds installs the whole monorepo by default. With
 // SKIP_DEPENDENCY_INSTALL=1, install only the public site and its dependencies.
 //
-// Astro is configured to keep its incremental-build cache and Byline's
-// content-addressed publication-media cache in the repository-root
-// node_modules/.astro directory that Workers Builds persists natively. npm ci
-// recreates node_modules, so preserve the restored cache briefly outside that
-// tree during installation and put it straight back afterward.
+// Workers Builds is configured with apps/web as the project Root directory, so
+// its Astro build cache is apps/web/node_modules/.astro. npm ci recreates
+// node_modules, so preserve the restored cache briefly outside that tree during
+// installation and put it straight back afterward. The repository-root cache is
+// accepted once as a compatibility fallback for older Byline build settings.
 import { spawnSync } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cache = path.join(root, "node_modules/.astro");
-// One-build compatibility with the old workspace-local cache layout.
-const legacyCache = path.join(root, "apps/web/node_modules/.astro");
+const cache = path.join(root, "apps/web/node_modules/.astro");
+const legacyRootCache = path.join(root, "node_modules/.astro");
 
 async function inventory(directory) {
   let files = 0;
@@ -61,7 +60,7 @@ function npm(args) {
 }
 
 try {
-  const restoredFrom = (await exists(cache)) ? cache : (await exists(legacyCache)) ? legacyCache : null;
+  const restoredFrom = (await exists(cache)) ? cache : (await exists(legacyRootCache)) ? legacyRootCache : null;
   if (restoredFrom) {
     await rename(restoredFrom, stagedCache);
     cacheSaved = true;
@@ -84,7 +83,7 @@ try {
       await mkdir(path.dirname(cache), { recursive: true });
       await rm(cache, { recursive: true, force: true });
       await rename(stagedCache, cache);
-      console.log("[byline] Restored the Astro cache directly to node_modules/.astro");
+      console.log("[byline] Restored the Astro cache to apps/web/node_modules/.astro");
     }
   }
 } finally {
