@@ -11,7 +11,7 @@
  * docs/article-editor.md. The fonts are the site's files (public/fonts links
  * to apps/web/public/fonts).
  */
-@import "../../../web/views/fonts.css";
+@import "../../../web/public/fonts/weekly-wildcat.css";
 @import "@byline/ui/newsroom-blocks.css";
 @import "@byline/ui/article-body.css";
 @import "@byline/editor/canvas.css";
@@ -41,7 +41,3 @@
 .contributor-profile-preview .author-social-links a { color: var(--accent); text-decoration: underline; }
 .contributor-profile-preview .contributor-preview-note { margin-top: 16px; color: var(--muted); }
 
-/* Reuse the newspaper's self-hosted font assets; Next bundles them locally. */
-@font-face { font-family: "Erode"; font-style: normal; font-weight: 600; font-display: swap; src: url("../../../web/public/fonts/erode-600.woff2") format("woff2"); }
-@font-face { font-family: "Mona Sans"; font-style: normal; font-weight: 200 900; font-display: swap; src: url("../../../web/public/fonts/mona-sans-latin.woff2") format("woff2"); }
-@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("../../../web/public/fonts/newsreader-latin.woff2") format("woff2"); }
