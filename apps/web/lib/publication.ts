@@ -27,5 +27,8 @@ export function getPublicationConfig() {
 }
 
 export function getNavigation(location: "header" | "footer") {
-  return getPublicationNavigation(publication, location);
+  const navigation = getPublicationNavigation(publication, location);
+  // Keep The Prowler published and linked in the footer, but hide it from the
+  // primary header navigation until the section is ready to promote again.
+  return location === "header" ? navigation.filter((item) => item.url !== "/the-prowler/") : navigation;
 }
