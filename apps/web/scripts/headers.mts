@@ -5,6 +5,9 @@
 export type HeaderRule = { path: string; headers: Record<string, string> };
 
 export const STATIC_HEADER_RULES: HeaderRule[] = [
+  // Astro fingerprints generated JS/CSS assets. A changed asset gets a new URL,
+  // so browsers can keep an existing one without revalidation.
+  { path: "/_astro/*", headers: { "Cache-Control": "public, max-age=31536000, immutable" } },
   // Static JSON is a permanent archive. Never retain an older deployment
   // in the browser or a downstream CDN. The runtime Worker sets its own headers.
   { path: "/_byline/live/*", headers: { "Cache-Control": "no-store" } },
