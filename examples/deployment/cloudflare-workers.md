@@ -16,7 +16,7 @@ Configure the Git-connected project in **Workers & Pages → byline → Settings
 | Build secret | `BYLINE_BUILD_TOKEN`, shared with the newsroom |
 | Build cache | Enabled |
 
-The scoped build installs just the Astro workspace and dependencies from the root lockfile. It preserves the restored Astro cache across the install. Configure previews with their own intended snapshot source. Keep fixture and offline snapshot overrides out of production.
+The scoped build installs just the Astro workspace and dependencies from the root lockfile. Astro writes its incremental route cache and Byline publication-media cache directly to the repository-root `node_modules/.astro` directory that Workers Builds persists. The wrapper only moves that cache aside while `npm ci` recreates `node_modules`, then restores it before the build. Configure previews with their own intended snapshot source. Keep fixture and offline snapshot overrides out of production.
 
 Create a production deploy hook and set its HTTPS URL in the publication worker's private environment as `BYLINE_DEPLOY_HOOK_URL`. Once the worker promotes a current snapshot, it requests a build. Confirm `contentSource: "payload"` and the expected `publicationRevision` in the public `/_byline/manifest.json`.
 
