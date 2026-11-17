@@ -34,9 +34,6 @@ export const FIXTURE_REFERENCES: ArticleReferences = {
   },
   events: {
     "701": { id: 701, title: "School board budget vote", eventType: "Meeting", startAt: "2026-01-14T23:00:00.000Z", endAt: "2026-01-15T01:00:00.000Z", allDay: false, location: "Greenwood High library", description: "The board votes on the Nutrition Services request, including the third serving window.", externalUrl: "https://example.org/board/2026-01-14", eventStatus: "scheduled" }
-  },
-  polls: {
-    "601": { id: "lunch-line", question: "How long do you usually wait for lunch?", options: [{ id: "under-5", label: "Under 5 minutes" }, { id: "5-10", label: "5 to 10 minutes" }, { id: "over-10", label: "More than 10 minutes" }], votingOpen: true }
   }
 };
 
@@ -243,7 +240,6 @@ export const FIXTURE_BLOCKS: { [K in ArticleBlockType]: Extract<ArticleBlock, { 
     align: "bottom-left"
   },
   relatedCoverage: { type: "relatedCoverage", id: "blk-related", heading: "Related coverage", stories: [{ id: "s1", story: 501 }, { id: "s2", story: 502 }] },
-  poll: { type: "poll", id: "blk-poll", poll: 601 },
   repositoryInteractive: { type: "repositoryInteractive", id: "blk-interactive", key: FIXTURE_INTERACTIVE_KEY, title: "Build your own lunch schedule", description: "A calculator that shows how a change in period length changes the longest wait." },
   repositoryTracker: { type: "repositoryTracker", id: "blk-tracker", key: FIXTURE_TRACKER_KEY, title: "Where the sidewalk project stands", description: "The Main Street sidewalk project has finished two of its five phases; the crossing at Greenwood High is next." },
   dataProject: { type: "dataProject", id: "blk-data-project", project: 1, title: "Where the sidewalk project stands", description: "Milestones, funding and the work still left to do on the Main Street sidewalk." },
@@ -350,7 +346,6 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
     FIXTURE_BLOCKS.timeline,
     FIXTURE_BLOCKS.relatedCoverage,
     FIXTURE_BLOCKS.event,
-    FIXTURE_BLOCKS.poll,
     FIXTURE_BLOCKS.repositoryInteractive,
     FIXTURE_BLOCKS.repositoryTracker,
     paragraph("Greenwood's football team, meanwhile, eats after practice. The Wildcats closed the regular season with a win."),
@@ -360,7 +355,7 @@ export const FIXTURE_ARTICLE_BODY: ArticleBody = {
 };
 
 /**
- * The first eight blocks and prose only, with no related stories, polls or
+ * The first eight blocks and prose only, with no related stories or
  * repository interactives: the story the snapshot v1 gates (which render
  * through the compatibility bridge and carry no references) seed from.
  */

@@ -27,20 +27,20 @@ import {
 import { FIXTURE_ARTICLE_BODY, FIXTURE_BLOCKS, FIXTURE_INTERACTIVE_KEY, FIXTURE_MEDIA, FIXTURE_REFERENCES, FIXTURE_TRACKER_KEY } from "../src/fixtures";
 
 const lookup: MediaLookup = (id) => FIXTURE_MEDIA[String(id)];
-const refs = { dataProject: (id: number | string) => (String(id) === "1" ? { id } : null), story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: number | string) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
+const refs = { dataProject: (id: number | string) => (String(id) === "1" ? { id } : null), story: (id: number | string) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, event: (id: number | string) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const paragraph = (text: string) => ({ type: "paragraph" as const, children: [{ type: "text" as const, text }] });
 const finalize = (block: ArticleBlock) => finalizeBlock(block, lookup, refs);
 const codes = (block: ArticleBlock) => finalize(block).issues.map((issue) => `${issue.effect}:${issue.code}`);
 
 describe("the final registry", () => {
-  it("has the 29 tools, grouped the way writers look for them", () => {
-    expect(ARTICLE_BLOCK_TYPES).toHaveLength(29);
+  it("has the 28 tools, grouped the way writers look for them", () => {
+    expect(ARTICLE_BLOCK_TYPES).toHaveLength(28);
     const groups = ARTICLE_BLOCK_FAMILIES.map((family) => [family.label, ARTICLE_BLOCK_TYPES.filter((type) => ARTICLE_BLOCKS[type].family === family.id).map((type) => ARTICLE_BLOCKS[type].label)]);
     expect(groups).toEqual([
       ["Media", ["Photo", "Photo Gallery", "Feature Media", "Video", "Audio", "Social Post"]],
       ["Explain", ["Reported Quote", "Pull Quote", "Key Facts", "Context", "Editor's Note", "Margin Note", "Expandable", "Document (PDF)"]],
       ["Data & visual", ["Chart / Map", "Data Table", "Data Project", "Comparison", "Key Numbers", "Final Score", "Annotated Image", "Before / After"]],
-      ["Structure & interact", ["Chapter", "Timeline", "Related Coverage", "Event", "Poll", "Repository Interactive", "Repository Tracker"]]
+      ["Structure & interact", ["Chapter", "Timeline", "Related Coverage", "Event", "Repository Interactive", "Repository Tracker"]]
     ]);
   });
 
@@ -253,7 +253,7 @@ describe("Annotated Image and Before / After", () => {
   });
 });
 
-describe("Related Coverage, Poll and Repository Interactive", () => {
+describe("Related Coverage and Repository Interactive", () => {
   it("links only stories the host resolves as published, once each", () => {
     const result = finalize({ ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "a", story: 501 }, { id: "b", story: 501 }, { id: "c", story: 999 }, { id: "d", story: null }] });
     expect(result.block).toMatchObject({ stories: [{ id: "a", story: 501 }] });
@@ -264,12 +264,6 @@ describe("Related Coverage, Poll and Repository Interactive", () => {
   it("holds at most three stories", () => {
     const stories = [501, 502, 501, 502].map((story, i) => ({ id: `s${i}`, story }));
     expect((finalize({ ...FIXTURE_BLOCKS.relatedCoverage, stories }).block as Extract<ArticleBlock, { type: "relatedCoverage" }>).stories).toHaveLength(2);
-  });
-
-  it("blocks a poll that is missing or not public", () => {
-    expect(codes({ ...FIXTURE_BLOCKS.poll, poll: null })).toEqual(["omitted:poll-missing"]);
-    expect(codes({ ...FIXTURE_BLOCKS.poll, poll: 999 })).toEqual(["omitted:poll-unavailable"]);
-    expect(codes(FIXTURE_BLOCKS.poll)).toEqual([]);
   });
 
   it("blocks an interactive whose key is not registered, or that lacks a text alternative", () => {
@@ -339,7 +333,7 @@ describe("the runtime validator", () => {
   it("accepts the complete fixture, with every block, footnote and reference", () => {
     const result = validateArticleBody(body);
     expect(result.ok ? [] : result.errors).toEqual([]);
-    expect(missingReferences(body)).toEqual({ stories: [], polls: [], events: [] });
+    expect(missingReferences(body)).toEqual({ stories: [], events: [] });
   });
 
   it("rejects an unknown block or node type", () => {
@@ -370,7 +364,7 @@ describe("the runtime validator", () => {
   it("rejects unresolved Media and references, and repeated ids", () => {
     expect(errorsOf(mutate((b) => { delete b.media["201"]; }))).toEqual(expect.arrayContaining([expect.stringContaining("Media 201 is not in the media table")]));
     expect(errorsOf(mutate((b) => { delete b.references.stories["501"]; }))).toEqual(expect.arrayContaining([expect.stringContaining("Story 501")]));
-    expect(errorsOf(mutate((b) => { delete b.references.polls["601"]; }))).toEqual(expect.arrayContaining([expect.stringContaining("Poll 601")]));
+    expect(errorsOf(mutate((b) => { delete b.references.events["701"]; }))).toEqual(expect.arrayContaining([expect.stringContaining("Event 701")]));
     expect(errorsOf(mutate((b) => { b.nodes.find((n: any) => n.type === "pullQuote").id = "blk-photo"; }))).toEqual(expect.arrayContaining([expect.stringContaining("share an id")]));
     expect(errorsOf(mutate((b) => { b.nodes[1].children.push({ type: "footnote", id: "fn-timing", text: "again" }); }))).toEqual(expect.arrayContaining([expect.stringContaining("two footnotes share an id")]));
   });

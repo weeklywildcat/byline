@@ -139,7 +139,7 @@ describe("the custom article hero is gone", () => {
 
 // --- homepage opinion lead treatment ----------------------------------------
 
-const ALL_MODULES = { polls: true, events: true, sports: true };
+const ALL_MODULES = { events: true, sports: true };
 
 function resolve(posts: ArchivePost[], props: unknown) {
   return resolveLeadPackage({

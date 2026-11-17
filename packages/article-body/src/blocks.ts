@@ -39,7 +39,6 @@ export const ARTICLE_BLOCK_TYPES = [
   "timeline",
   "relatedCoverage",
   "event",
-  "poll",
   "repositoryInteractive",
   "repositoryTracker"
 ] as const satisfies readonly ArticleBlockType[];
@@ -58,7 +57,7 @@ export type ArticleBlockIcon =
   | "photo" | "gallery" | "portrait" | "video" | "audio"
   | "quote" | "pullQuote" | "facts" | "context" | "editorsNote" | "marginNote" | "expandable" | "document"
   | "chart" | "table" | "comparison" | "numbers" | "annotated" | "beforeAfter"
-  | "chapter" | "timeline" | "related" | "poll" | "interactive"
+  | "chapter" | "timeline" | "related" | "interactive"
   | "social" | "score" | "event" | "tracker" | "source" | "database";
 
 export type ArticleBlockDefinition = {
@@ -104,7 +103,6 @@ export const ARTICLE_BLOCKS: { readonly [K in ArticleBlockType]: ArticleBlockDef
   timeline: define({ type: "timeline", label: "Timeline", description: "How events unfolded, in order, each with a date and what happened.", family: "structure", aliases: ["timeline", "chronology", "history", "events", "what happened"], icon: "timeline" }),
   relatedCoverage: define({ type: "relatedCoverage", label: "Related Coverage", description: "Up to three of our own stories worth reading next.", family: "structure", aliases: ["related", "read more", "see also", "more stories", "previous coverage", "links"], icon: "related" }),
   event: define({ type: "event", label: "Event", description: "A published school or community event, with its date and place.", family: "structure", aliases: ["event", "date", "calendar", "concert", "meeting", "game day", "when", "schedule"], icon: "event" }),
-  poll: define({ type: "poll", label: "Poll", description: "A reader poll from the Polls list.", family: "structure", aliases: ["survey", "vote", "question", "opinion", "reader poll"], icon: "poll" }),
   repositoryInteractive: define({ type: "repositoryInteractive", label: "Repository Interactive", description: "A custom interactive built by the developers.", family: "structure", aliases: ["interactive", "custom", "app", "widget", "game", "calculator"], icon: "interactive", privileged: true }),
   repositoryTracker: define({ type: "repositoryTracker", label: "Repository Tracker", description: "A progress tracker built and updated by the developers.", family: "structure", aliases: ["tracker", "progress", "project", "status", "database", "interactive", "construction"], icon: "tracker", privileged: true })
 };

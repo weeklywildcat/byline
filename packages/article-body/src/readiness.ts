@@ -471,13 +471,6 @@ export function finalizeBlock(block: ArticleBlock, media: MediaLookup, refs: Ref
       if (stories.length < LIMITS.relatedMin) return omit("related-none", "Choose at least one published story.");
       return { block: { type: "relatedCoverage", id: block.id, heading: cleanLine(block.heading, LIMITS.heading) || DEFAULT_HEADINGS.relatedCoverage, stories: stories.slice(0, LIMITS.relatedMax) }, issues };
     }
-    case "poll": {
-      if (block.poll === null || block.poll === undefined) return omit("poll-missing", "Choose a poll.");
-      const poll = refs.poll?.(block.poll);
-      if (!poll) return omit("poll-unavailable", "This poll is not public yet, or is gone. Choose another.");
-      if (poll.options.length < 2) return omit("poll-options", "A poll needs at least two answers.");
-      return { block: { type: "poll", id: block.id, poll: block.poll }, issues };
-    }
     case "repositoryInteractive": {
       const key = cleanLine(block.key, LIMITS.interactiveKey);
       if (!key) return omit("interactive-key", "Choose an interactive.");

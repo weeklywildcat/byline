@@ -42,6 +42,6 @@ export const weeklyWildcatTheme = defineBylineTheme({
   defaults: {},
   capabilities: {
     supportedBlocks: CORE_BYLINE_BLOCK_IDS,
-    optionalModules: ["sports", "events", "polls", "newsletter"]
+    optionalModules: ["sports", "events", "newsletter"]
   }
 });

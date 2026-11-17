@@ -7,7 +7,7 @@ import { DataProjectEditor } from "./blocks/data-project";
 import { DocumentEditor } from "./blocks/document";
 import { AudioEditor, ChartMapEditor, RepositoryInteractiveEditor, RepositoryTrackerEditor, VideoEditor } from "./blocks/embeds";
 import { ComparisonEditor, EditorsNoteEditor, ExpandableEditor, KeyNumbersEditor, MarginNoteEditor } from "./blocks/explain";
-import { EventEditor, PollEditor, RelatedCoverageEditor } from "./blocks/relations";
+import { EventEditor, RelatedCoverageEditor } from "./blocks/relations";
 import { FinalScoreEditor } from "./blocks/score";
 import { SocialPostEditor } from "./blocks/social";
 import { DataTableEditor } from "./blocks/table";
@@ -46,7 +46,6 @@ export const BLOCK_EDITORS: { readonly [K in ArticleBlockType]: ComponentType<Bl
   annotatedImage: AnnotatedImageEditor,
   beforeAfter: BeforeAfterEditor,
   relatedCoverage: RelatedCoverageEditor,
-  poll: PollEditor,
   repositoryInteractive: RepositoryInteractiveEditor,
   repositoryTracker: RepositoryTrackerEditor,
   dataProject: DataProjectEditor,

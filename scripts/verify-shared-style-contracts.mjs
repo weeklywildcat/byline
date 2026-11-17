@@ -26,8 +26,6 @@ const requiredClasses = [
   "home-story-lead",
   "home-story-briefing",
   "home-story-field",
-  "homepage-poll-card",
-  "homepage-poll-heading",
   "this-week-card",
   "this-week-header",
   "this-week-list",

@@ -1,10 +1,10 @@
 "use client";
 
 import { mediaCredit, type ArticleMediaAsset, type MediaId } from "@byline/article-body";
-import type { BylineEditorHost, DataProjectChoice, PollChoice, StoryChoice } from "@byline/editor/client";
+import type { BylineEditorHost, DataProjectChoice, StoryChoice } from "@byline/editor/client";
 import { articleMediaFromPayload } from "@byline/editor/normalize";
 import { useAuth, useConfig, useDocumentInfo } from "@payloadcms/ui";
-import { publicEventReference, publicPollReference, publicStoryReference } from "../../public/references";
+import { publicEventReference, publicStoryReference } from "../../public/references";
 import { DEFAULT_MEDIA_ROUTE, type MediaLibraryAsset } from "@byline/newsroom-screens/media/media-library-model";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -46,14 +46,6 @@ function storyChoice(doc: unknown, timeZone: string, excludeId: unknown): StoryC
   if (!projected) return null;
   const thumbnail = projected.thumbnail ? articleMediaFromPayload(projected.thumbnail, (media) => (media.sizes as { library?: { url?: string } } | undefined)?.library?.url ?? (typeof media.url === "string" ? media.url : null)) : null;
   return { ...projected.reference, ...(thumbnail ? { thumbnailAsset: thumbnail } : {}) };
-}
-
-function pollChoice(doc: Doc): PollChoice | null {
-  const status = doc.status;
-  if (status !== "draft" && status !== "open" && status !== "closed") return null;
-  // A draft poll is shown (so a writer sees why it will not publish) but never offered by search.
-  const reference = publicPollReference({ ...doc, status: status === "draft" ? "closed" : status });
-  return reference ? { ...reference, status } : null;
 }
 
 export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["registerInserter"]): BylineEditorHost {
@@ -116,14 +108,6 @@ export function useNewsroomEditorHost(registerInserter?: BylineEditorHost["regis
     loadStory: async (id: MediaId) => {
       const doc = await get(`/stories/${String(id)}`, { depth: 1, draft: "false" });
       return doc ? storyChoice(doc, timeZone, currentStoryId) : null;
-    },
-    searchPolls: async (query) => {
-      const found = await get("/polls", { depth: 0, limit: 10, "where[and][0][status][in]": "open,closed", ...(query.trim() ? { "where[and][1][question][like]": query.trim() } : {}) });
-      return ((found?.docs as Doc[]) ?? []).flatMap((doc) => pollChoice(doc) ?? []);
-    },
-    loadPoll: async (id: MediaId) => {
-      const doc = await get(`/polls/${String(id)}`, { depth: 0 });
-      return doc ? pollChoice(doc) : null;
     },
     pickMedia: async ({ kind, multiple, title, confirmLabel }) => (await pick({ kind, multiple, title, confirmLabel })).map(articleMediaFromLibrary),
     loadMedia: async (id) => {

@@ -17,7 +17,7 @@ import {
 } from "@byline/content/story";
 import { formatVideoDuration, parseYouTubeVideoId, youTubeEmbedUrl } from "@byline/core";
 import { publicStoryPath } from "@byline/content";
-import { publicEventReference, publicPollReference, publicStoryReference } from "../public/references";
+import { publicEventReference, publicStoryReference } from "../public/references";
 import { articleMediaFromPayload, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { PreviewPublication } from "./publication";
 
@@ -153,16 +153,15 @@ function primaryVideo(story: Doc, title: string) {
 /**
  * Every record a Lexical body holds populated, by ID: the normalizer's
  * resolvers read only these. A populated relationship inside a block is told
- * by its shape: Media has a MIME type, a Story a headline, a Poll a key.
+ * by its shape: Media has a MIME type, a Story a headline, an Event a start and a title.
  */
-function populatedBodyRecords(body: unknown): { media: Map<string, Doc>; stories: Map<string, Doc>; polls: Map<string, Doc>; events: Map<string, Doc> } {
-  const found = { media: new Map<string, Doc>(), stories: new Map<string, Doc>(), polls: new Map<string, Doc>(), events: new Map<string, Doc>() };
+function populatedBodyRecords(body: unknown): { media: Map<string, Doc>; stories: Map<string, Doc>; events: Map<string, Doc> } {
+  const found = { media: new Map<string, Doc>(), stories: new Map<string, Doc>(), events: new Map<string, Doc>() };
   const take = (value: unknown) => {
     const doc = populated(value as Relation);
     if (!doc) return;
     const key = mediaKey(doc.id as MediaId);
     if (typeof doc.mimeType === "string") found.media.set(key, doc);
-    else if (typeof doc.pollKey === "string") found.polls.set(key, doc);
     else if (typeof doc.startAt === "string" && typeof doc.title === "string") found.events.set(key, doc);
     else if (typeof doc.headline === "string") found.stories.set(key, doc);
   };
@@ -224,7 +223,6 @@ export function payloadPublicStory(doc: Doc, options: PayloadStoryOptions): Payl
           if (projected?.thumbnail) records.media.set(mediaKey(projected.thumbnail.id as MediaId), projected.thumbnail);
           return projected?.reference ?? null;
         },
-        poll: (id) => publicPollReference(records.polls.get(mediaKey(id)), new Date(options.now ?? Date.now())),
         // Live Preview populates relationships from the published Event (draft: false reads); a draft Event never resolves.
         event: (id) => publicEventReference(records.events.get(mediaKey(id))),
         interactive: (key) => interactiveKeys.has(key),

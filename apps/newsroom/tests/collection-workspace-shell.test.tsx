@@ -144,7 +144,7 @@ afterEach(async () => {
 
 describe("Collections in the newsroom", () => {
   it("is the destination after Media, named Collections, never Coverage", () => {
-    expect(NAVIGATION.filter((item) => !item.group).map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data", "people"]);
+    expect(NAVIGATION.filter((item) => !item.group).map((item) => item.key)).toEqual(["home", "stories", "calendar", "media", "collections", "data", "polls", "people"]);
     // Editors' coordination desks follow in their own Publish group.
     expect(NAVIGATION.filter((item) => item.group === "publish").map((item) => item.key)).toEqual(["front-page", "distribution", "content-health"]);
     expect(NAVIGATION.find((item) => item.key === "collections")).toMatchObject({ label: "Collections", path: "/collections", exact: true });
@@ -164,7 +164,7 @@ describe("Collections in the newsroom", () => {
   });
 
   it("is created by editors, after Story and Task, through the one Create controller", () => {
-    expect(CREATE_ACTIONS.map((action) => action.kind)).toEqual(["story", "task", "collection", "media"]);
+    expect(CREATE_ACTIONS.map((action) => action.kind)).toEqual(["story", "task", "collection", "media", "poll"]);
     expect(CREATE_ACTIONS.find((action) => action.kind === "collection")!.minimumRole).toBe("editor");
     const create = src("ui/shell/create.tsx");
     expect(create.match(/<CollectionDialog/g)).toHaveLength(1);

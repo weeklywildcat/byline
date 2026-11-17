@@ -52,14 +52,3 @@ export const scheduleFutureCorrection: CollectionAfterChangeHook = async ({ doc,
   return doc;
 };
 
-/** Poll status can change at either window boundary without a document write. */
-export const schedulePollWindow: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
-  if (publicRevisionSuppressed(req) || doc.status !== "open") return doc;
-  for (const field of ["opensAt", "closesAt"] as const) {
-    const at = Date.parse(doc[field] ?? "");
-    if (at > Date.now() && (previousDoc?.status !== "open" || previousDoc[field] !== doc[field])) {
-      await queuePublicRevisionAt(req.payload, new Date(at), `poll ${doc.id} reaches ${field}`, req);
-    }
-  }
-  return doc;
-};

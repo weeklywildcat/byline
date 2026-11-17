@@ -12,7 +12,6 @@ export type HomepagePublicationInput = {
   contactHref: string;
   social: ReadonlyArray<{ label: string; url: string; service: string }>;
   features: {
-    polls: boolean;
     events: boolean;
     sports: boolean;
     newsletter: boolean;

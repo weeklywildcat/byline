@@ -24,7 +24,6 @@ const imageOnly = { mimeType: { contains: "image/" } } as const;
 const pdfOnly = { mimeType: { equals: "application/pdf" } } as const;
 const audioOnly = { mimeType: { contains: "audio/" } } as const;
 const publishedStories = { _status: { equals: "published" } } as const;
-const publicPolls = { status: { in: ["open", "closed"] } } as const;
 const publishedEvents = { _status: { equals: "published" } } as const;
 /** An optional public web address: empty, or http(s). */
 const optionalWebUrl: Validate = (value) => (value === null || value === undefined || value === "" || safeWebUrl(value) ? true : "Use a web address that starts with https://.");
@@ -82,7 +81,6 @@ const PASCAL: Record<ArticleBlockType, string> = {
   annotatedImage: "AnnotatedImage",
   beforeAfter: "BeforeAfter",
   relatedCoverage: "RelatedCoverage",
-  poll: "Poll",
   repositoryInteractive: "RepositoryInteractive",
   repositoryTracker: "RepositoryTracker",
   dataProject: "DataProject",
@@ -353,7 +351,6 @@ export const BYLINE_BODY_BLOCKS: { readonly [K in ArticleBlockType]: Block } = {
     { name: "heading", type: "text", defaultValue: DEFAULT_HEADINGS.relatedCoverage, maxLength: LIMITS.heading },
     { name: "stories", type: "array", minRows: LIMITS.relatedMin, maxRows: LIMITS.relatedMax, fields: [{ name: "story", type: "relationship", relationTo: "stories", filterOptions: publishedStories }] }
   ]),
-  poll: storyBlock("poll", [{ name: "poll", type: "relationship", relationTo: "polls", required: true, filterOptions: publicPolls }]),
   repositoryInteractive: storyBlock("repositoryInteractive", [
     { name: "key", type: "text", required: true, maxLength: LIMITS.interactiveKey },
     { name: "title", type: "text", required: true, maxLength: LIMITS.interactiveTitle },

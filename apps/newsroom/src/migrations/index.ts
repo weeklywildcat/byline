@@ -27,6 +27,8 @@ import * as migration_20261110_195045_byline_data from './20261110_195045_byline
 import * as migration_20261112_141645_hero_site_navigation from './20261112_141645_hero_site_navigation';
 import * as migration_20261112_212319_reporting_jobs_schema_drift from './20261112_212319_reporting_jobs_schema_drift';
 import * as migration_20261114_010953_welcome_onboarding_request from './20261114_010953_welcome_onboarding_request';
+import * as migration_20261117_182713_retire_article_polls from './20261117_182713_retire_article_polls';
+import * as migration_20261117_184452_wildcat_polls from './20261117_184452_wildcat_polls';
 
 export const migrations = [
   {
@@ -172,6 +174,16 @@ export const migrations = [
   {
     up: migration_20261114_010953_welcome_onboarding_request.up,
     down: migration_20261114_010953_welcome_onboarding_request.down,
-    name: '20261114_010953_welcome_onboarding_request'
+    name: '20261114_010953_welcome_onboarding_request',
+  },
+  {
+    up: migration_20261117_182713_retire_article_polls.up,
+    down: migration_20261117_182713_retire_article_polls.down,
+    name: '20261117_182713_retire_article_polls',
+  },
+  {
+    up: migration_20261117_184452_wildcat_polls.up,
+    down: migration_20261117_184452_wildcat_polls.down,
+    name: '20261117_184452_wildcat_polls'
   },
 ];

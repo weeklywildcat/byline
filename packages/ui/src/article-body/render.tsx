@@ -35,8 +35,7 @@ import {
   type Inline,
   type ListNode,
   type ParagraphNode,
-  type ProseNode,
-  type PublicPollReference
+  type ProseNode
 } from "@byline/article-body";
 import { Fragment, type ReactNode } from "react";
 import {
@@ -234,41 +233,6 @@ export function BodyParagraphs({ body }: { body: readonly ParagraphNode[] }): Re
   return body.map((paragraph, index) => <p key={index}><InlineContent>{paragraph.children}</InlineContent></p>);
 }
 
-
-/** A poll as the page draws it before any script runs: its question and answers, or its results once closed. */
-export function PollBlockView({ blockId, poll }: { blockId: string; poll: PublicPollReference }): ReactNode {
-  const id = `${blockId}-heading`;
-  const total = poll.results?.totalVotes ?? 0;
-  return (
-    <section className="byline-poll-block" id={`poll-${blockId}`} data-byline-poll-id={poll.id} aria-labelledby={id}>
-      <h2 id={id}>Reader poll</h2>
-      <p className="byline-poll-question">{poll.question}</p>
-      {poll.votingOpen ? (
-        <>
-          <ul className="byline-poll-options">
-            {poll.options.map((option) => <li key={option.id} className="byline-poll-option">{option.label}</li>)}
-          </ul>
-          <p className="byline-poll-note">Online voting is unavailable.</p>
-        </>
-      ) : poll.results ? (
-        <ol className="byline-poll-results">
-          {poll.options.map((option) => {
-            const votes = poll.results?.votes[option.id] ?? 0;
-            const percent = total > 0 ? Math.round((votes / total) * 100) : 0;
-            return (
-              <li key={option.id} className="byline-poll-result">
-                <span className="byline-poll-result-label">{option.label}: {percent}%</span>
-                <span className="byline-poll-result-bar" aria-hidden="true"><span style={{ width: `${percent}%` }} /></span>
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <p className="byline-poll-note">Voting is closed.</p>
-      )}
-    </section>
-  );
-}
 
 type BlockRenderer<T extends ArticleBlockType> = (props: { block: ArticleBlockOf<T>; media: MediaTable; context: BlockContext }) => ReactNode;
 
@@ -661,15 +625,6 @@ export const ARTICLE_BLOCK_RENDERERS: { [K in ArticleBlockType]: BlockRenderer<K
             );
           })}
         </RelatedCoverageView>
-      </ArticleBlockFrame>
-    );
-  },
-  poll: ({ block, context }) => {
-    const poll = block.poll === null ? null : context.references.polls?.[mediaKey(block.poll)];
-    if (!poll) return null;
-    return (
-      <ArticleBlockFrame type="poll">
-        <PollBlockView blockId={block.id} poll={poll} />
       </ArticleBlockFrame>
     );
   },

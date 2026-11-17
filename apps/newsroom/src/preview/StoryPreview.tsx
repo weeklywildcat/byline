@@ -124,7 +124,6 @@ function inertSlots(publication: PreviewPublication, interactives: RepositoryInt
       renderDataProject: (block) => <PreviewDataProject block={block} timeZone={publication.timeZone} locale={publication.locale} />
     },
     shareActions: <ArticleShareActionsView copyLabel="Copy link" copyIcon="ph:link" status="" />,
-    poll: null,
     feedback: <ReaderFeedbackView inert type="correction" message="" name="" email="" submitting={false} status={null} />,
     newsletter: (
       <NewsletterSignupView

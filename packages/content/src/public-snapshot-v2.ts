@@ -1,7 +1,7 @@
 import { FIXED_PUBLIC_CONTENT_ROUTES, isCodeOwnedPublicPath } from "./routing";
 import { isCanonicalRedirectPath } from "./redirect-path";
 import { z } from "zod";
-import { mediaCredit, mediaKindOf, safeWebUrl, validateArticleBody, type ArticleBody, type PublicEventReference, type PublicPollReference } from "@byline/article-body";
+import { mediaCredit, mediaKindOf, safeWebUrl, validateArticleBody, type ArticleBody, type PublicEventReference } from "@byline/article-body";
 import { youTubeEmbedUrl, type BylinePublicationConfig, type PrimaryVideo } from "@byline/core";
 import { largestNaturalImage, publicationManifestBlobs, validatePublicationMediaManifest, type PublicationMediaManifest } from "./publication-media";
 import { stableSerialize } from "./digests";
@@ -10,7 +10,6 @@ import { escapeHtml, type PublicStory, type PublicTerm } from "./story";
 
 /** Snapshot v2's wire version. The current producer writes v3 (`public-snapshot-v3.ts`); builds still accept v2. */
 export const PUBLIC_SNAPSHOT_V2_SCHEMA_VERSION = 2 as const;
-export const PUBLIC_POLL_MIN_RESULTS_VOTES = 5;
 
 const text = z.string();
 const name = text.min(1);
@@ -80,10 +79,6 @@ const event = obj({
   location: text, description: text, externalUrl: url.or(z.literal("")), status: z.enum(["scheduled", "canceled"])
 });
 const page = obj({ id, slug, title: name, href, summary: text, bodyHtml: text, indexing: z.enum(["public", "noindex"]), publishedAt: instant, modifiedAt: instant });
-const poll = obj({
-  id: name.max(64), question: name.max(300), options: z.array(obj({ id: name.max(64), label: name.max(200) })).min(2).max(12),
-  votingOpen: z.boolean(), results: obj({ totalVotes: count, votes: z.record(name, count) }).optional()
-});
 const media = obj({ id, filename: name, kind: z.enum(["image", "audio", "document"]), alt: text, creator: text, credit: text, copyright: text, license: text, manifest });
 const redirectPath = text.refine(isCanonicalRedirectPath, "Expected a canonical literal public path");
 const redirect = obj({ id, from: redirectPath, to: redirectPath, status: z.literal(301) });
@@ -106,7 +101,7 @@ const publication = obj({
 const datasets = obj({
   stories: z.array(story), people: z.array(person), sections: z.array(taxonomy), topics: z.array(taxonomy),
   pages: z.array(page), corrections: z.array(correction.extend({ storyId: id })), collections: z.array(collection),
-  events: z.array(event), polls: z.array(poll), media: z.array(media), redirects: z.array(redirect)
+  events: z.array(event), media: z.array(media), redirects: z.array(redirect)
 });
 /**
  * The active Front Page placements (docs/front-page.md): editorial intent only,
@@ -127,7 +122,7 @@ export type PublicCorrectionSnapshot = z.infer<typeof datasets.shape.corrections
 export type PublicCollectionSnapshot = z.infer<typeof collection>;
 export type PublicBuildSnapshotV2 = Omit<z.infer<typeof publicBuildSnapshotV2Schema>, "publication" | "datasets"> & {
   publication: BylinePublicationConfig;
-  datasets: Omit<z.infer<typeof datasets>, "stories" | "polls"> & { stories: PublicStorySnapshot[]; polls: PublicPollReference[] };
+  datasets: Omit<z.infer<typeof datasets>, "stories"> & { stories: PublicStorySnapshot[] };
 };
 
 const requireFact = (condition: unknown, detail: string) => {
@@ -140,7 +135,25 @@ export type SnapshotRegistryOptions = { interactive?: (key: string) => boolean; 
 /** Snapshot v2 and v3 share these sections; v3 only adds `data`. */
 export const snapshotSchemaParts = { publication, datasets, frontPage, instant, count } as const;
 
-export function validatePublicBuildSnapshotV2(value: unknown, options: SnapshotRegistryOptions = {}): PublicBuildSnapshotV2 {
+/**
+ * Article polls were retired (docs/wildcat-polls.md). Snapshots prepared before
+ * that carry an empty `polls` list and a zero count; accept exactly that, so a
+ * build never fails on a snapshot that could not have shown a poll. A snapshot
+ * that still names polls must be prepared again.
+ */
+export function withoutRetiredPolls(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const snapshot = value as { datasets?: Record<string, unknown>; counts?: Record<string, unknown> };
+  if (!snapshot.datasets || typeof snapshot.datasets !== "object" || !("polls" in snapshot.datasets)) return value;
+  const polls = snapshot.datasets.polls;
+  requireFact(Array.isArray(polls) && polls.length === 0 && (snapshot.counts?.polls === undefined || snapshot.counts.polls === 0), "it carries article polls, which Byline no longer publishes; prepare a new snapshot");
+  const { polls: _polls, ...datasets } = snapshot.datasets;
+  const { polls: _count, ...counts } = snapshot.counts ?? {};
+  return { ...snapshot, datasets, counts };
+}
+
+export function validatePublicBuildSnapshotV2(input: unknown, options: SnapshotRegistryOptions = {}): PublicBuildSnapshotV2 {
+  const value = withoutRetiredPolls(input);
   const result = publicBuildSnapshotV2Schema.safeParse(value);
   if (!result.success) throw new Error(`Invalid Byline build snapshot: ${result.error.issues.slice(0, 6).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
   const snapshot = value as PublicBuildSnapshotV2;
@@ -168,7 +181,6 @@ export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "sch
   const mediaById = new Map(data.media.map((row) => [row.id, row]));
   const people = new Map(data.people.map((row) => [row.id, row]));
   const stories = new Map(data.stories.map((row) => [row.id, row]));
-  const polls = new Map(data.polls.map((row) => [row.id, row]));
   const eventsById = new Map(data.events.map((row) => [row.id, row]));
   const sections = new Map(data.sections.map((row) => [`section-${row.id}`, row]));
   const topics = new Map(data.topics.map((row) => [`topic-${row.id}`, row]));
@@ -220,15 +232,6 @@ export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "sch
   }
   for (const row of data.events) {
     requireFact(!row.endAt || Date.parse(row.endAt) >= Date.parse(row.startAt), `Event ${row.id} ends before it starts`);
-  }
-  for (const row of data.polls) {
-    const options = new Set(row.options.map((option) => option.id));
-    requireFact(options.size === row.options.length, `Poll ${row.id} has duplicate options`);
-    if (row.results) {
-      const votes = Object.entries(row.results.votes);
-      requireFact(!row.votingOpen && row.results.totalVotes >= PUBLIC_POLL_MIN_RESULTS_VOTES && votes.length === options.size && votes.every(([key]) => options.has(key))
-        && votes.reduce((sum, [, value]) => sum + value, 0) === row.results.totalVotes, `Poll ${row.id} has inconsistent public results`);
-    }
   }
   const corrections = new Map<number, Array<Omit<PublicCorrectionSnapshot, "storyId">>>();
   for (const { storyId, ...row } of data.corrections) {
@@ -288,9 +291,6 @@ export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "sch
     for (const [key, reference] of Object.entries(row.body.references?.stories ?? {})) {
       const target = stories.get(Number(key));
       requireFact(target && target.id !== row.id && same(reference, snapshotStoryReference(target)), `Story ${row.id} has inconsistent Related Coverage ${key}`);
-    }
-    for (const reference of Object.values(row.body.references?.polls ?? {})) {
-      requireFact(same(reference, polls.get(reference.id)), `Story ${row.id} has an inconsistent Poll ${reference.id}`);
     }
     for (const [key, reference] of Object.entries(row.body.references?.events ?? {})) {
       const target = eventsById.get(Number(key));

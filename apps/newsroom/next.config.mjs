@@ -46,6 +46,21 @@ const nextConfig = {
     return [
       { source: "/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       {
+        // Wildcat Polls' respondent routes: never cached, never framed, never leaking a referrer.
+        source: "/polls/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" }
+        ]
+      },
+      {
+        // Poll Studio shows results: a kiosk's Back button must never bring a cached copy back.
+        source: "/admin/polls",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }]
+      },
+      {
         // Live Preview's page shows unpublished stories: never cached, never indexed,
         // and framed only by this origin (Payload's own preview iframe or pop-out).
         source: "/preview/:path*",

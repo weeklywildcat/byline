@@ -283,21 +283,6 @@ describe("public revision", () => {
     expect(await snapshotJobs()).toHaveLength(0);
   });
 
-  it("advances for public Poll definitions and queues their future windows", async () => {
-    const start = await rev();
-    const opensAt = new Date(Date.now() + 60_000).toISOString();
-    const closesAt = new Date(Date.now() + 120_000).toISOString();
-    const poll = await payload.create({ collection: "polls", data: { pollKey: "snapshot-test-window", question: "Open more windows?", status: "draft",
-      options: [{ optionId: "yes", label: "Yes" }, { optionId: "no", label: "No" }], opensAt, closesAt } });
-    expect(await rev()).toBe(start);
-    await payload.update({ collection: "polls", id: poll.id, data: { status: "open" } });
-    expect(await rev()).toBe(start + 1);
-    const jobs = await payload.find({ collection: "payload-jobs", where: { taskSlug: { equals: "advance-public-revision" } }, depth: 0, pagination: false });
-    expect(jobs.docs.map(({ waitUntil }) => waitUntil)).toEqual(expect.arrayContaining([opensAt, closesAt]));
-    await payload.delete({ collection: "polls", id: poll.id });
-    expect(await rev()).toBe(start + 2);
-  });
-
   it("advances for public Media fields only, never for an upload or preparation", async () => {
     const before = await rev();
     await upload(await image("snapshot-new-upload.jpg", 640, 480));

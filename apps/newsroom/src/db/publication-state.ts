@@ -12,7 +12,7 @@ import { drizzleFor } from "../publication-media/state";
  *
  * Infrastructure, not a Payload collection: no admin screen, REST or GraphQL
  * route can read or write it. It joins Payload's Drizzle schema through
- * `beforeSchemaInit` so committed migrations own it (like `byline_poll_votes`).
+ * `beforeSchemaInit` so committed migrations own it.
  *
  * Every write is ONE SQL statement:
  * - advancing the revision is an atomic upsert-increment inside the caller's

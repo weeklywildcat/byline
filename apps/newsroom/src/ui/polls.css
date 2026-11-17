@@ -1,0 +1,9 @@
+/*
+ * The respondent routes (/polls/kiosk, /polls/s/<key>): Nova and the Polls
+ * tokens, compiled by postcss/byline-ui.cjs like newsroom.css, without the
+ * newsroom's editor, calendar or article styles.
+ */
+@import "@byline/newsroom-ui/styles.css";
+@import "../../../web/public/fonts/weekly-wildcat.css";
+@import "./polls/tokens.css";
+@source "./polls";

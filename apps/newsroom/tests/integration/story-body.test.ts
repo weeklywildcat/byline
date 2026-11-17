@@ -173,26 +173,23 @@ describe("publishing is strict about the body", () => {
     await expect(publish(id)).resolves.toMatchObject({ _status: "published" });
   });
 
-  it("refuses Related Coverage that names an unpublished or deleted story, and a poll that is still a draft", async () => {
+  it("refuses Related Coverage that names an unpublished or deleted story", async () => {
     const draftStory = await story("editor", complete());
     const publicStory = await story("editor", complete());
     await publish(publicStory);
-    const poll = (await payload.create({ collection: "polls", data: { question: "Do you like lunch?", pollKey: `lunch-${Math.random().toString(36).slice(2, 7)}`, options: [{ optionId: "yes", label: "Yes" }, { optionId: "no", label: "No" }], status: "draft" }, overrideAccess: true })).id as number;
     const id = await story("editor", complete());
 
-    await draftBody(id, paragraph("Text."), doc("", { ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "a", story: draftStory }, { id: "b", story: 99999 }] }), doc("", { ...FIXTURE_BLOCKS.poll, poll }));
+    await draftBody(id, paragraph("Text."), doc("", { ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "a", story: draftStory }, { id: "b", story: 99999 }] }));
     const message = await refusal(id);
     expect(message).toMatch(/Related Coverage: A story that is not published, or is gone, is left out\./);
     expect(message).toMatch(/Related Coverage: Choose at least one published story\./);
-    expect(message).toMatch(/Poll: This poll is not public yet, or is gone\./);
 
     // The same story self-linked is not a valid related story either.
     await draftBody(id, doc("", { ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "self", story: id }] }));
     expect(await refusal(id)).toMatch(/Related Coverage: Choose at least one published story\./);
 
-    // Published stories and an open poll publish.
-    await payload.update({ collection: "polls", id: poll, data: { status: "open" }, overrideAccess: true });
-    await draftBody(id, paragraph("Text."), doc("", { ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "a", story: publicStory }] }), doc("", { ...FIXTURE_BLOCKS.poll, poll }));
+    // Published stories publish.
+    await draftBody(id, paragraph("Text."), doc("", { ...FIXTURE_BLOCKS.relatedCoverage, stories: [{ id: "a", story: publicStory }] }));
     await expect(publish(id)).resolves.toMatchObject({ _status: "published" });
   });
 });

@@ -156,7 +156,7 @@ function resolutionContext(
 }
 
 export type LeadPackageResolutionInput = PackageResolutionInput & {
-  features: { polls: boolean; events: boolean; sports: boolean };
+  features: { events: boolean; sports: boolean };
   calendarHeading?: string;
 };
 

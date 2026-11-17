@@ -108,8 +108,6 @@ export function blockFields(block: ArticleBlock): Json {
       return { ...base, before: block.before, after: block.after, beforeLabel: block.beforeLabel, afterLabel: block.afterLabel, fit: block.fit, caption: block.caption, placement: block.placement };
     case "relatedCoverage":
       return { ...base, heading: block.heading, stories: block.stories.map((item) => ({ id: item.id, story: item.story })) };
-    case "poll":
-      return { ...base, poll: block.poll };
     case "repositoryInteractive":
     case "repositoryTracker":
       return { ...base, key: block.key, title: block.title, description: block.description };

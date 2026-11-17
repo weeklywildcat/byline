@@ -8,7 +8,7 @@ import { dataPresentationDescriptor } from "../../data/registry";
 import { escapeHtml, type PublicTerm } from "@byline/content/story";
 import type { BylinePublicationConfig } from "@byline/core";
 import { formatVideoDuration, normalizePrimaryVideo, parseYouTubeVideoId, youTubeEmbedUrl, type PrimaryVideo } from "@byline/core";
-import { collectMediaIds, collectReferenceIds, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
+import { collectMediaIds, normalizePayloadStoryBody, type NormalizeIssue } from "@byline/editor/normalize";
 import type { Payload } from "payload";
 import { relationIds } from "../../access/user";
 import { videoFactsFor } from "../../newsroom/video-facts";
@@ -20,7 +20,6 @@ import { PublicSnapshotError } from "./errors";
 import { PreparedMediaCatalog } from "./media";
 import { hasLiveCoverage } from "../../domain/live-coverage";
 import { collectLiveCoverage, liveUpdatePeople, readLivePlans, readLiveUpdates, type LiveBylinePerson } from "./live";
-import { collectPolls } from "./polls";
 import { activePlacements } from "../../front-page/server";
 
 type Datasets = PublicBuildSnapshotV3["datasets"];
@@ -99,16 +98,14 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   const hiddenSections = new Set(sectionRows.docs.filter((row) => row.hidden).map((row) => row.id));
   const rows = storyRows.filter((row) => !hiddenSections.has(id(row.section) ?? -1));
   const storyIds = rows.map((row) => row.id);
-  const pollIds = [...new Set(rows.flatMap((row) => row.contentFormat === "legacy-html" ? [] : collectReferenceIds(row.body).polls.map(Number)))];
   const liveSettings = await readLivePlans(payload, storyIds);
   const liveUpdates = await readLiveUpdates(payload, rows.filter((row) => hasLiveCoverage(liveSettings.get(row.id))).map(({ id }) => id));
   // A live update's byline is its author's linked Person: credited like an article contributor, so they are projected.
   const liveCredits = await liveUpdatePeople(payload, liveUpdates);
-  const [people, corrections, collections, polls, videoFacts] = await Promise.all([
+  const [people, corrections, collections, videoFacts] = await Promise.all([
     collectPeople(payload, new Set([...rows.flatMap((row) => ids(row.contributors)), ...liveCredits.values()])),
     collectCorrections(payload, storyIds, options.asOf ?? now),
     collectCollections(payload, new Set(storyIds)),
-    collectPolls(payload, pollIds, options.asOf ?? now),
     videoFactsFor(payload, rows.flatMap((row) => { const videoId = row.format === "video" ? parseYouTubeVideoId(row.video?.url) : null; return videoId ? [videoId] : []; }))
   ]);
   await options.afterRead?.();
@@ -165,7 +162,6 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
           const story = facts.get(Number(id));
           return story && story.id !== row.id ? snapshotStoryReference(story) : null;
         },
-        poll: (id) => polls.get(Number(id)),
         event: (id) => eventById.get(Number(id)) ?? null,
         // Absent from the section (never published, draft-only, deleted, invalid) resolves to null: a blocking issue.
         dataProject: (id) => (dataProjectIds.has(Number(id)) ? { id } : null),
@@ -187,7 +183,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
   // Retain historical redirects while a target is offline (unpublish, trash), but
   // don't deploy a rule that would send readers to a missing public document.
   const redirects = collapseRedirects(redirectRows.docs).filter((row) => paths.has(row.to)).map(({ id, from, to }) => ({ id, from, to, status: 301 as const }));
-  const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, polls: [...polls.values()], media: catalog.records(), redirects };
+  const datasets: Datasets = { stories, people, sections, topics, pages, corrections, collections, events, media: catalog.records(), redirects };
   // The active Front Page placements only (never drafts or schedules). A pinned Story that is no longer
   // published is left out, so its slot falls back to automatic instead of failing the public build.
   const active = await activePlacements(payload);

@@ -22,7 +22,6 @@ import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
 import { REPORTING_LIMITS } from "./domain/reporting";
 import { mediaFolders } from "./collections/MediaFolders";
 import { People } from "./collections/People";
-import { Polls } from "./collections/Polls";
 import { CollectionInterviews, CollectionResources, Collections } from "./collections/Collections";
 import { Corrections, LiveUpdates, Pages } from "./collections/Publishing";
 import { Stories } from "./collections/Stories";
@@ -32,7 +31,6 @@ import { Sections, Topics } from "./collections/Taxonomies";
 import { Users } from "./collections/Users";
 import { NewsroomRoles, RoleAssignments, SchoolYears, StaffMemberships } from "./collections/Newsroom";
 import { ReviewComments, ReviewRuns, ReviewWorkflows } from "./collections/Review";
-import { addPollVotesTable } from "./db/poll-votes";
 import { addPresenceSessionsTable } from "./db/presence-sessions";
 import { addPublicationStateTable } from "./db/publication-state";
 import { Events } from "./collections/Events";
@@ -57,7 +55,10 @@ import { COLLECTIONS_VIEW_PATH, REVIEW_WORKFLOWS_PATH } from "./domain/navigatio
 import { preparePublicationMediaTask } from "./publication-media/task";
 import { DataDatasets, DataProjects, DataRecords } from "./data/collections";
 import { dataEndpoints } from "./data/endpoints";
-import { DATA_PATH } from "./domain/navigation";
+import { DATA_PATH, POLLS_PATH } from "./domain/navigation";
+import { PollLocations, PollSurveys, PollVersions } from "./polls/collections";
+import { addPollTables } from "./polls/db";
+import { pollEndpoints } from "./polls/endpoints";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -113,7 +114,6 @@ const collections: CollectionConfig[] = [
   TranscriptSelections,
   FrontPageRevisions,
   DistributionItems,
-  Polls,
   SchoolYears,
   StaffMemberships,
   NewsroomRoles,
@@ -124,6 +124,9 @@ const collections: CollectionConfig[] = [
   DataDatasets,
   DataRecords,
   DataProjects,
+  PollSurveys,
+  PollVersions,
+  PollLocations,
   Users
 ];
 
@@ -158,11 +161,11 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, "migrations"),
     // The WordPress import keeps existing IDs; `dropClientIds` stops anyone else choosing one.
     allowIDOnCreate: true,
-    beforeSchemaInit: [addPollVotesTable, addPublicationStateTable, addPresenceSessionsTable]
+    beforeSchemaInit: [addPublicationStateTable, addPresenceSessionsTable, addPollTables]
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...googleEndpoints],
+  endpoints: [...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...pollEndpoints, ...googleEndpoints],
   admin: {
     user: Users.slug,
     // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their
@@ -216,6 +219,9 @@ export default buildConfig({
         people: { Component: "/components/BylinePeople#BylinePeople", path: "/people", exact: true, meta: { title: "People" } },
         // Byline Data: Datasets (the facts) and Projects (what readers see). Raw Data collections stay administrator fallback.
         data: { Component: "/components/BylineData#BylineData", path: DATA_PATH, exact: true, meta: { title: "Data" } },
+        // Wildcat Polls: Poll Studio and fieldwork setup (docs/wildcat-polls.md). Respondents never see it: the kiosk and
+        // public links are the separate /polls routes, without the admin.
+        polls: { Component: "/components/BylinePolls#BylinePolls", path: POLLS_PATH, exact: true, meta: { title: "Polls" } },
         reviewWorkflows: { Component: "/components/BylineWorkflows#BylineWorkflows", path: REVIEW_WORKFLOWS_PATH, exact: true, meta: { title: "Review workflows" } },
         profile: { Component: "/components/BylineProfile#BylineProfile", path: "/profile", exact: true, meta: { title: "My profile" } },
         contentHealth: { Component: "/components/BylineContentHealth#BylineContentHealth", path: "/content-health", exact: true, meta: { title: "Content Health" } },

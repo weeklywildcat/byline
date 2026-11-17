@@ -96,7 +96,6 @@ export interface Config {
     'transcript-selections': TranscriptSelection;
     'front-page-revisions': FrontPageRevision;
     'distribution-items': DistributionItem;
-    polls: Poll;
     'school-years': SchoolYear;
     'staff-memberships': StaffMembership;
     'newsroom-roles': NewsroomRole;
@@ -107,6 +106,9 @@ export interface Config {
     'data-datasets': DataDataset;
     'data-records': DataRecord;
     'data-projects': DataProject;
+    'poll-surveys': PollSurvey;
+    'poll-versions': PollVersion;
+    'poll-locations': PollLocation;
     users: User;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
@@ -156,7 +158,6 @@ export interface Config {
     'transcript-selections': TranscriptSelectionsSelect<false> | TranscriptSelectionsSelect<true>;
     'front-page-revisions': FrontPageRevisionsSelect<false> | FrontPageRevisionsSelect<true>;
     'distribution-items': DistributionItemsSelect<false> | DistributionItemsSelect<true>;
-    polls: PollsSelect<false> | PollsSelect<true>;
     'school-years': SchoolYearsSelect<false> | SchoolYearsSelect<true>;
     'staff-memberships': StaffMembershipsSelect<false> | StaffMembershipsSelect<true>;
     'newsroom-roles': NewsroomRolesSelect<false> | NewsroomRolesSelect<true>;
@@ -167,6 +168,9 @@ export interface Config {
     'data-datasets': DataDatasetsSelect<false> | DataDatasetsSelect<true>;
     'data-records': DataRecordsSelect<false> | DataRecordsSelect<true>;
     'data-projects': DataProjectsSelect<false> | DataProjectsSelect<true>;
+    'poll-surveys': PollSurveysSelect<false> | PollSurveysSelect<true>;
+    'poll-versions': PollVersionsSelect<false> | PollVersionsSelect<true>;
+    'poll-locations': PollLocationsSelect<false> | PollLocationsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
@@ -1354,33 +1358,6 @@ export interface DistributionItem {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "polls".
- */
-export interface Poll {
-  id: number;
-  question: string;
-  /**
-   * Public and permanent: browsers remember votes by it.
-   */
-  pollKey: string;
-  options: {
-    optionId: string;
-    label: string;
-    id?: string | null;
-  }[];
-  status: 'draft' | 'open' | 'closed';
-  opensAt?: string | null;
-  closesAt?: string | null;
-  /**
-   * Optional story this poll belongs to.
-   */
-  story?: (number | null) | Story;
-  legacyWordPressId?: number | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "school-years".
  */
 export interface SchoolYear {
@@ -1653,6 +1630,104 @@ export interface DataProject {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-surveys".
+ */
+export interface PollSurvey {
+  id: number;
+  title: string;
+  description?: string | null;
+  status: 'draft' | 'open' | 'closed' | 'archived';
+  owner?: (number | null) | User;
+  /**
+   * The published version new respondents answer.
+   */
+  currentVersion?: (number | null) | PollVersion;
+  /**
+   * The working definition. Publishing copies it into a new, immutable version.
+   */
+  draft?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  draftRevision?: number | null;
+  /**
+   * The workbook the draft was last imported from.
+   */
+  draftSource?: string | null;
+  /**
+   * Any staff member may run fieldwork for this poll.
+   */
+  openToAllStaff?: boolean | null;
+  /**
+   * Staff who may run fieldwork for this poll.
+   */
+  interviewers?: (number | User)[] | null;
+  /**
+   * Staff who may read this poll's results.
+   */
+  analysts?: (number | User)[] | null;
+  kioskEnabled?: boolean | null;
+  publicLink?: {
+    enabled?: boolean | null;
+    key?: string | null;
+    opensAt?: string | null;
+    closesAt?: string | null;
+    accessCodeHash?: string | null;
+    hourlyLimit?: number | null;
+  };
+  linkedStory?: (number | null) | Story;
+  linkedCollection?: (number | null) | Collection;
+  methodology?: string | null;
+  minimumGroup: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-versions".
+ */
+export interface PollVersion {
+  id: number;
+  survey: number | PollSurvey;
+  number: number;
+  label?: string | null;
+  definition:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sourceFilename?: string | null;
+  sourceSha256?: string | null;
+  note?: string | null;
+  publishedBy?: (number | null) | User;
+  publishedAt: string;
+  questionCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-locations".
+ */
+export interface PollLocation {
+  id: number;
+  name: string;
+  notes?: string | null;
+  active?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1876,10 +1951,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'production-assignments';
         value: number | ProductionAssignment;
-      } | null)
-    | ({
-        relationTo: 'polls';
-        value: number | Poll;
       } | null)
     | ({
         relationTo: 'data-projects';
@@ -2603,28 +2674,6 @@ export interface DistributionItemsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "polls_select".
- */
-export interface PollsSelect<T extends boolean = true> {
-  question?: T;
-  pollKey?: T;
-  options?:
-    | T
-    | {
-        optionId?: T;
-        label?: T;
-        id?: T;
-      };
-  status?: T;
-  opensAt?: T;
-  closesAt?: T;
-  story?: T;
-  legacyWordPressId?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "school-years_select".
  */
 export interface SchoolYearsSelect<T extends boolean = true> {
@@ -2797,6 +2846,69 @@ export interface DataProjectsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-surveys_select".
+ */
+export interface PollSurveysSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  status?: T;
+  owner?: T;
+  currentVersion?: T;
+  draft?: T;
+  draftRevision?: T;
+  draftSource?: T;
+  openToAllStaff?: T;
+  interviewers?: T;
+  analysts?: T;
+  kioskEnabled?: T;
+  publicLink?:
+    | T
+    | {
+        enabled?: T;
+        key?: T;
+        opensAt?: T;
+        closesAt?: T;
+        accessCodeHash?: T;
+        hourlyLimit?: T;
+      };
+  linkedStory?: T;
+  linkedCollection?: T;
+  methodology?: T;
+  minimumGroup?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-versions_select".
+ */
+export interface PollVersionsSelect<T extends boolean = true> {
+  survey?: T;
+  number?: T;
+  label?: T;
+  definition?: T;
+  sourceFilename?: T;
+  sourceSha256?: T;
+  note?: T;
+  publishedBy?: T;
+  publishedAt?: T;
+  questionCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "poll-locations_select".
+ */
+export interface PollLocationsSelect<T extends boolean = true> {
+  name?: T;
+  notes?: T;
+  active?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3014,7 +3126,7 @@ export interface Publication {
         /**
          * Hidden when this feature is off.
          */
-        feature?: ('sports' | 'events' | 'polls' | 'newsletter' | 'discord') | null;
+        feature?: ('sports' | 'events' | 'newsletter' | 'discord') | null;
         id?: string | null;
       }[]
     | null;
@@ -3029,7 +3141,6 @@ export interface Publication {
   features?: {
     sports?: boolean | null;
     events?: boolean | null;
-    polls?: boolean | null;
     newsletter?: boolean | null;
     discord?: boolean | null;
   };
@@ -3218,7 +3329,6 @@ export interface PublicationSelect<T extends boolean = true> {
     | {
         sports?: T;
         events?: T;
-        polls?: T;
         newsletter?: T;
         discord?: T;
       };
@@ -3895,16 +4005,6 @@ export interface BylineEventBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'event';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "BylinePollBlock".
- */
-export interface BylinePollBlock {
-  poll: number | Poll;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'poll';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

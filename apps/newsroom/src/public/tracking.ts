@@ -11,7 +11,6 @@ import {
   liveUpdatePublicSlice,
   pagePublicSlice,
   personPublicSlice,
-  pollPublicSlice,
   sectionPublicSlice,
   storyPlanPublicSlice,
   storyPublicSlice,
@@ -48,7 +47,6 @@ export const PUBLIC_COLLECTIONS: Record<string, { slice: PublicSlice; options?: 
     }
   },
   corrections: { slice: correctionPublicSlice },
-  polls: { slice: pollPublicSlice },
   "live-updates": { slice: liveUpdatePublicSlice },
   "video-facts": { slice: videoFactsPublicSlice },
   media: { slice: mediaPublicSlice, options: { ignoreCreate: true } },

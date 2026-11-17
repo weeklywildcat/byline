@@ -51,7 +51,7 @@ function post(id: number, categorySlug: string, options: { sticky?: boolean; ima
   } as ArchivePost;
 }
 
-const ALL_MODULES = { polls: true, events: true, sports: true };
+const ALL_MODULES = { events: true, sports: true };
 
 function resolve(posts: ArchivePost[], props: unknown = {}, features = ALL_MODULES) {
   return resolveLeadPackage({
@@ -136,14 +136,13 @@ describe("lead package resolution", () => {
   });
 
   it("cannot switch on a module the publication has disabled", () => {
-    const resolved = resolve(posts, WEEKLY_WILDCAT_LEAD_DEFAULTS, { polls: false, events: false, sports: false });
+    const resolved = resolve(posts, WEEKLY_WILDCAT_LEAD_DEFAULTS, { events: false, sports: false });
 
-    expect(resolved.utility.poll).toBe(false);
     expect(resolved.utility.calendar).toBe(false);
   });
 
   it("keeps the calendar when only sports is enabled", () => {
-    const resolved = resolve(posts, WEEKLY_WILDCAT_LEAD_DEFAULTS, { polls: false, events: false, sports: true });
+    const resolved = resolve(posts, WEEKLY_WILDCAT_LEAD_DEFAULTS, { events: false, sports: true });
 
     expect(resolved.utility.calendar).toBe(true);
   });

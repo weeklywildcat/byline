@@ -107,7 +107,7 @@ describe("stored fields of the new and changed tools", () => {
   it("round-trips the whole fixture, Sources, Context formatting and all", () => {
     const { body, issues } = normalizePayloadArticleBody(lexicalFromArticleBody(FIXTURE_ARTICLE_BODY), {
       media,
-      references: { story: (id) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, interactive: () => true, ...references }
+      references: { story: (id) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, interactive: () => true, ...references }
     });
     expect(issues).toEqual([]);
     expect(body.nodes).toEqual(FIXTURE_ARTICLE_BODY.nodes);

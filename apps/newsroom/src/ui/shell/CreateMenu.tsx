@@ -7,13 +7,13 @@ import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, Dr
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@byline/newsroom-ui/ui/sidebar";
-import { ChevronDown, FileText, Layers, ListTodo, Plus, Upload, type LucideIcon } from "lucide-react";
+import { ChevronDown, FileText, Layers, ListTodo, Plus, Upload, Vote, type LucideIcon } from "lucide-react";
 import type { CreateAction, CreateKind } from "../../domain/navigation";
 import { useBylineCreate } from "./create";
 import { BOTTOM_NAVIGATION_QUERY } from "./shell-config";
 import { tourAnchor } from "../onboarding/tour-targets";
 
-const ICONS: Record<CreateKind, LucideIcon> = { story: FileText, task: ListTodo, collection: Layers, media: Upload };
+const ICONS: Record<CreateKind, LucideIcon> = { story: FileText, task: ListTodo, collection: Layers, media: Upload, poll: Vote };
 
 // The one prominent action in the sidebar: primary colors, quiet otherwise.
 const primary = "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-open:bg-primary/90 data-open:hover:bg-primary/90 data-open:hover:text-primary-foreground focus-visible:ring-ring/50";

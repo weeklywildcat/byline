@@ -15,7 +15,6 @@ export const CORE_BYLINE_BLOCK_IDS = [
   "team-feature",
   "athlete-feature",
   "events-list",
-  "poll",
   "newsletter",
   "section",
   "columns",

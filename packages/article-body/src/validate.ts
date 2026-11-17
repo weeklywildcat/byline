@@ -193,7 +193,6 @@ const BLOCK_SCHEMAS: { readonly [K in ArticleBlockType]: Record<string, Field> }
     }), L.timelineMin, L.timelineMax)
   },
   relatedCoverage: { type: pick(["relatedCoverage"]), id: idField, heading: req(L.heading, true), stories: list(object({ id: idField, story: mediaRef }), L.relatedMin, L.relatedMax) },
-  poll: { type: pick(["poll"]), id: idField, poll: mediaRef },
   repositoryInteractive: { type: pick(["repositoryInteractive"]), id: idField, key: req(L.interactiveKey, true), title: req(L.interactiveTitle, true), description: req(L.interactiveDescription) },
   repositoryTracker: { type: pick(["repositoryTracker"]), id: idField, key: req(L.trackerKey, true), title: req(L.trackerTitle, true), description: req(L.trackerDescription) },
   dataProject: { type: pick(["dataProject"]), id: idField, project: mediaRef, title: req(L.dataProjectTitle, true), description: req(L.dataProjectDescription) },
@@ -258,14 +257,6 @@ const mediaAsset = closed({
 });
 
 const storyReference = closed({ id: mediaRef, headline: req(300, true), href: { check: (value, path, errors) => (typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? undefined : fail(errors, path, "must be a site-relative path")) }, section: str(120, { optional: true, min: 1, line: true }), publishedAt: { check: (value, path, errors) => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? undefined : fail(errors, path, "must be a date and time")) }, thumbnail: optMediaRef });
-const pollReference = closed({
-  id: req(64, true),
-  question: req(300, true),
-  options: list(object({ id: req(64, true), label: req(200, true) }), 2, 12),
-  votingOpen: bool,
-  results: object({ totalVotes: { check: (value, path, errors) => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? undefined : fail(errors, path, "must be a count")) }, votes: { check: (value, path, errors) => (isRecord(value) && Object.values(value).every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0) ? undefined : fail(errors, path, "must map answers to counts")) } }, true)
-});
-
 const eventReference = closed({
   id: mediaRef,
   title: req(200, true),
@@ -290,7 +281,7 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
     version: { check: (version, path, errs) => (version === ARTICLE_BODY_VERSION ? undefined : fail(errs, path, `must be ${ARTICLE_BODY_VERSION}`)) },
     nodes: { check: (nodes, path, errs) => (Array.isArray(nodes) ? nodes.forEach((node, index) => nodeCheck(node, `${path}[${index}]`, errs)) : fail(errs, path, "must be a list")) },
     media: table(mediaAsset),
-    references: object({ stories: { optional: true, check: table(storyReference).check }, polls: { optional: true, check: table(pollReference).check }, events: { optional: true, check: table(eventReference).check } }, true)
+    references: object({ stories: { optional: true, check: table(storyReference).check }, events: { optional: true, check: table(eventReference).check } }, true)
   })(value, "body", errors);
   if (errors.length) return { ok: false, errors };
 
@@ -301,7 +292,6 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
   if (new Set(ids).size !== ids.length) errors.push("body.nodes: two blocks share an id");
   for (const [key, asset] of Object.entries(body.media)) if (mediaKey(asset.id) !== key) errors.push(`body.media.${key}: key does not match the asset's id`);
   for (const [key, story] of Object.entries(body.references?.stories ?? {})) if (mediaKey(story.id) !== key) errors.push(`body.references.stories.${key}: key does not match the story's id`);
-  for (const [key, poll] of Object.entries(body.references?.polls ?? {})) if (poll.options.map((option) => option.id).length !== new Set(poll.options.map((option) => option.id)).size) errors.push(`body.references.polls.${key}: repeated answer id`);
   for (const block of blocks) for (const id of blockMediaIds(block)) if (!(mediaKey(id) in body.media)) errors.push(`${block.type} ${block.id}: Media ${String(id)} is not in the media table`);
   for (const [key, story] of Object.entries(body.references?.stories ?? {})) if (story.thumbnail !== undefined && !(mediaKey(story.thumbnail) in body.media)) errors.push(`body.references.stories.${key}: thumbnail ${String(story.thumbnail)} is not in the media table`);
   for (const [key, event] of Object.entries(body.references?.events ?? {})) if (mediaKey(event.id) !== key) errors.push(`body.references.events.${key}: key does not match the event's id`);
@@ -333,7 +323,6 @@ export function validateArticleBody(value: unknown): ArticleBodyValidation {
   }
   const missing = missingReferences(body);
   for (const id of missing.stories) errors.push(`related coverage: Story ${String(id)} is not in the reference table`);
-  for (const id of missing.polls) errors.push(`poll: Poll ${String(id)} is not in the reference table`);
   for (const id of missing.events) errors.push(`event: Event ${String(id)} is not in the reference table`);
   const sourceIds = sourceRefs(body.nodes).map((ref) => ref.id);
   if (new Set(sourceIds).size !== sourceIds.length) errors.push("body.nodes: two sources share an id");

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ArticleMediaAsset, MediaId, PublicEventReference, PublicPollReference, PublicStoryReference } from "@byline/article-body";
+import type { ArticleMediaAsset, MediaId, PublicEventReference, PublicStoryReference } from "@byline/article-body";
 import { mediaKey } from "@byline/article-body";
 import type { DataProjectChoice } from "../data-project";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -46,9 +46,6 @@ export type BylineEditorHost = {
   suggestStories?: () => Promise<StoryChoice[]>;
   /** One Story's public facts, or null when it is not published or is gone. */
   loadStory?: (id: MediaId) => Promise<StoryChoice | null>;
-  /** The Polls a writer may place in a story (open or closed). */
-  searchPolls?: (query: string) => Promise<PollChoice[]>;
-  loadPoll?: (id: MediaId) => Promise<PollChoice | null>;
   /** The repository's registered interactives, as plain data (never their code). */
   interactives?: ReadonlyArray<{ key: string; name: string; description: string }>;
   /** The repository's registered trackers, as plain data (never their components, styles or client code). */
@@ -93,13 +90,12 @@ export type { DataProjectChoice, DataProjectPublication } from "../data-project"
 
 /** A published Story as the picker and the canvas show it. Facts come from the Story, never from the block. */
 export type StoryChoice = PublicStoryReference & { thumbnailAsset?: ArticleMediaAsset | null };
-export type PollChoice = PublicPollReference & { status: "draft" | "open" | "closed" };
 /** A published Event as the picker and the canvas show it. Facts come from the Event, never from the block. */
 export type EventChoice = PublicEventReference;
 
 type Entry<T = ArticleMediaAsset> = { status: "loading" | "ready" | "missing"; asset: T | null };
 
-/** One small cache per kind of record (Media, Stories, Polls): one request per record, primed by pickers. */
+/** One small cache per kind of record (Media, Stories, Events, Data projects): one request per record, primed by pickers. */
 type RecordStore<T> = {
   get: (id: MediaId) => Entry<T>;
   prime: (items: Array<{ id: MediaId; value: T }>) => void;
@@ -108,7 +104,7 @@ type RecordStore<T> = {
 
 type MediaStore = RecordStore<ArticleMediaAsset> & { primeAssets: (assets: ArticleMediaAsset[]) => void };
 
-type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; polls: RecordStore<PollChoice>; events: RecordStore<EventChoice>; dataProjects: RecordStore<DataProjectChoice>; announce: (message: string) => void };
+type EditorHostContext = BylineEditorHost & { store: MediaStore; stories: RecordStore<StoryChoice>; events: RecordStore<EventChoice>; dataProjects: RecordStore<DataProjectChoice>; announce: (message: string) => void };
 
 const HostContext = createContext<EditorHostContext | null>(null);
 
@@ -154,7 +150,6 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
     return { ...base, primeAssets: (assets) => base.prime(assets.map((asset) => ({ id: asset.id, value: asset }))) };
   }, []);
   const stories = useMemo(() => createRecordStore<StoryChoice>(async (id) => (await hostRef.current.loadStory?.(id)) ?? null), []);
-  const polls = useMemo(() => createRecordStore<PollChoice>(async (id) => (await hostRef.current.loadPoll?.(id)) ?? null), []);
   const events = useMemo(() => createRecordStore<EventChoice>(async (id) => (await hostRef.current.loadEvent?.(id)) ?? null), []);
   const dataProjects = useMemo(() => createRecordStore<DataProjectChoice>(async (id) => (await hostRef.current.loadDataProject?.(id)) ?? null), []);
   // One polite live region for block edits (added, moved, removed): decorators render
@@ -164,7 +159,7 @@ export function BylineEditorHostProvider({ host, children }: { host: BylineEdito
     setMessage("");
     window.requestAnimationFrame(() => setMessage(next));
   }, []);
-  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, polls, events, dataProjects, announce }), [announce, dataProjects, events, host, polls, stories, store]);
+  const value = useMemo<EditorHostContext>(() => ({ ...host, store, stories, events, dataProjects, announce }), [announce, dataProjects, events, host, stories, store]);
   return (
     <HostContext value={value}>
       {children}
@@ -197,13 +192,6 @@ export function useStoryChoice(id: MediaId | null): Entry<StoryChoice> {
   const { stories } = useBylineEditorHost();
   const read = useCallback(() => (id === null ? MISSING_NONE : stories.get(id)), [id, stories]);
   return useSyncExternalStore(stories.subscribe, read, read);
-}
-
-/** One Poll's public definition for display, loaded once. */
-export function usePollChoice(id: MediaId | null): Entry<PollChoice> {
-  const { polls } = useBylineEditorHost();
-  const read = useCallback(() => (id === null ? MISSING_NONE : polls.get(id)), [id, polls]);
-  return useSyncExternalStore(polls.subscribe, read, read);
 }
 
 /** One Event's public facts for display, loaded once. */

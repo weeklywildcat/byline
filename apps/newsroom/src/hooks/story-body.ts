@@ -1,14 +1,14 @@
 import { articleMediaFromPayload, collectMediaIds, collectReferenceIds, normalizePayloadArticleBody, type NormalizeIssue } from "@byline/editor/normalize";
 import { enforcePrivilegedBlocks } from "@byline/editor/permissions";
 import { ensureEditableLexicalRoot } from "@byline/editor/serialize";
-import { blockLabel, isBlockingIssue, mediaKey, type MediaId, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
+import { blockLabel, isBlockingIssue, mediaKey, type MediaId, type PublicEventReference, type PublicStoryReference } from "@byline/article-body";
 import { repositoryInteractiveRegistry } from "@byline/story-presentations/interactives";
 import { repositoryTrackerRegistry } from "@byline/story-presentations/trackers";
 import { ValidationError, type CollectionBeforeChangeHook, type FieldHook, type Payload, type PayloadRequest } from "payload";
 import { atLeast, requestUser } from "../access/user";
 import { embeddableDataProjects } from "../data/embed";
 import { loadPreviewPublication } from "../preview/publication";
-import { publicEventReference, publicPollReference, publicStoryReference } from "../public/references";
+import { publicEventReference, publicStoryReference } from "../public/references";
 
 /** Repair previously stored empty roots on read, including drafts and historical versions. */
 export const repairEmptyStoryBody: FieldHook = ({ value, siblingData }) =>
@@ -53,14 +53,13 @@ type Doc = Record<string, unknown>;
 /** The public-safe records a body names, resolved from Payload for the normalizer. */
 export async function resolveBodyRecords(payload: Payload, body: unknown, options: { storyId?: number | string | null; req?: PayloadRequest }) {
   const mediaIds = collectMediaIds(body).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0);
-  const { stories: storyIds, polls: pollIds, events: eventIds, dataProjects: dataProjectIds } = collectReferenceIds(body);
+  const { stories: storyIds, events: eventIds, dataProjects: dataProjectIds } = collectReferenceIds(body);
   const { timeZone } = await loadPreviewPublication(payload);
   const read = { depth: 1, pagination: false as const, overrideAccess: true as const, req: options.req };
 
-  const [mediaFound, storiesFound, pollsFound, eventsFound, embeddable] = await Promise.all([
+  const [mediaFound, storiesFound, eventsFound, embeddable] = await Promise.all([
     mediaIds.length ? payload.find({ collection: "media", where: { id: { in: mediaIds } }, ...read, depth: 0 }) : { docs: [] },
     storyIds.length ? payload.find({ collection: "stories", where: { and: [{ id: { in: storyIds.map(Number) } }, { _status: { equals: "published" } }] }, draft: false, ...read }) : { docs: [] },
-    pollIds.length ? payload.find({ collection: "polls", where: { id: { in: pollIds.map(Number) } }, ...read, depth: 0 }) : { docs: [] },
     eventIds.length ? payload.find({ collection: "events", where: { and: [{ id: { in: eventIds.map(Number) } }, { _status: { equals: "published" } }] }, draft: false, ...read, depth: 0 }) : { docs: [] },
     // A Data Project is embeddable only when it has a valid published public representation (never a draft's).
     embeddableDataProjects(payload, dataProjectIds.map(Number), options.req)
@@ -74,11 +73,6 @@ export async function resolveBodyRecords(payload: Payload, body: unknown, option
       stories.set(mediaKey(doc.id as MediaId), projected);
       if (projected.thumbnail) media.set(mediaKey(projected.thumbnail.id as MediaId), projected.thumbnail);
     }
-  }
-  const polls = new Map<string, PublicPollReference>();
-  for (const doc of pollsFound.docs) {
-    const projected = publicPollReference(doc);
-    if (projected) polls.set(mediaKey(doc.id as MediaId), projected);
   }
   const events = new Map<string, PublicEventReference>();
   for (const doc of eventsFound.docs) {
@@ -94,7 +88,6 @@ export async function resolveBodyRecords(payload: Payload, body: unknown, option
     },
     references: {
       story: (id: MediaId) => stories.get(mediaKey(id))?.reference ?? null,
-      poll: (id: MediaId) => polls.get(mediaKey(id)) ?? null,
       event: (id: MediaId) => events.get(mediaKey(id)) ?? null,
       dataProject: (id: MediaId) => (embeddable.has(Number(id)) ? { id } : null),
       interactive: (key: string) => key in registry,
