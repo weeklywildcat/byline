@@ -11,7 +11,7 @@ import { publishedHomepageStories } from "./stories";
 /**
  * Server-rendered: the same resolver and components as the static build, over
  * published Stories and the desk's pending (or live) placements. Utility
- * modules (poll, calendar, newsletter form) are shown as quiet placeholders:
+ * modules (calendar, newsletter form) are shown as quiet placeholders:
  * they are not editorial slots.
  */
 export async function FrontPagePreview({ payload, view }: { payload: Payload; view: "pending" | "live" }) {
@@ -23,7 +23,7 @@ export async function FrontPagePreview({ payload, view }: { payload: Payload; vi
   const input: HomepagePublicationInput = {
     shortName: publication.identity.shortName, name: publication.identity.name, organizationName: publication.identity.organizationName,
     contactHref: publication.urls.contact, social: publication.social.map(({ label, url, service }) => ({ label, url, service })),
-    features: { polls: publication.features.polls === true, events: publication.features.events === true, sports: publication.features.sports === true, newsletter: publication.features.newsletter === true },
+    features: { events: publication.features.events === true, sports: publication.features.sports === true, newsletter: publication.features.newsletter === true },
     calendarHeading: publication.appearance?.theme === "weekly-wildcat" ? "At NSHS" : `At ${publication.identity.organizationName}`
   };
   const resolved = resolveHomepageDocument({ document: homeDesign(), stories: stories.map((story) => story.input), publication: input, sportsSchedule: { recentScores: [], upcomingGames: [] }, placements });
@@ -35,7 +35,7 @@ export async function FrontPagePreview({ payload, view }: { payload: Payload; vi
       <HomepagePackages
         packages={resolved.packages}
         theme={weeklyWildcatTheme.id}
-        slots={{ poll: () => placeholder("Poll"), calendar: () => placeholder("This week"), newsletter: () => placeholder("Newsletter sign-up") }}
+        slots={{ calendar: () => placeholder("This week"), newsletter: () => placeholder("Newsletter sign-up") }}
       />
       <FrontPageSlotOverlays slots={resolved.slots.map((slot) => ({ ...slot, label: labels[slot.id] ?? slot.id, href: slot.storyId ? hrefs[slot.storyId] ?? null : null }))} issues={resolved.placementIssues.length} />
     </main>

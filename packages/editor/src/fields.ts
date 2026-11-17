@@ -98,7 +98,6 @@ export type BylineBlockFields = {
   annotatedImage: { media: MediaId | null; altOverride: string; caption: string; placement: ChapterPlacement; markers: Array<{ id: string; x: number; y: number; title: string; body: string }> };
   beforeAfter: { before: MediaId | null; after: MediaId | null; beforeLabel: string; afterLabel: string; fit: BeforeAfterFit; caption: string; placement: ChapterPlacement };
   relatedCoverage: { heading: string; stories: Array<{ id: string; story: MediaId | null }> };
-  poll: { poll: MediaId | null };
   repositoryInteractive: { key: string; title: string; description: string };
   repositoryTracker: { key: string; title: string; description: string };
   dataProject: { project: MediaId | null; title: string; description: string };
@@ -329,7 +328,6 @@ export const BLOCK_FIELD_READERS: { [K in ArticleBlockType]: (raw: unknown) => B
     const stories = rows(fields.stories).map((row, index) => ({ id: rowId(row, index), story: mediaIdOf(row.story) }));
     return { heading: typeof fields.heading === "string" ? fields.heading : DEFAULT_HEADINGS.relatedCoverage, stories: stories.length ? stories : [{ id: "draft-0", story: null }] };
   },
-  poll: (raw) => ({ poll: mediaIdOf(record(raw).poll) }),
   repositoryInteractive: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
   repositoryTracker: (raw) => ({ key: text(record(raw).key), title: text(record(raw).title), description: text(record(raw).description) }),
   dataProject: (raw) => ({ project: mediaIdOf(record(raw).project), title: text(record(raw).title), description: text(record(raw).description) }),
@@ -470,7 +468,6 @@ export const BLOCK_TO_ARTICLE: { [K in ArticleBlockType]: (id: string, fields: B
   }),
   beforeAfter: (id, fields) => ({ type: "beforeAfter", id, before: fields.before, after: fields.after, beforeLabel: fields.beforeLabel, afterLabel: fields.afterLabel, fit: fields.fit, caption: fields.caption, placement: fields.placement }),
   relatedCoverage: (id, fields) => ({ type: "relatedCoverage", id, heading: fields.heading, stories: fields.stories.map((item) => ({ id: item.id, story: item.story })) }),
-  poll: (id, fields) => ({ type: "poll", id, poll: fields.poll }),
   repositoryInteractive: (id, fields) => ({ type: "repositoryInteractive", id, key: fields.key, title: fields.title, description: fields.description }),
   repositoryTracker: (id, fields) => ({ type: "repositoryTracker", id, key: fields.key, title: fields.title, description: fields.description }),
   dataProject: (id, fields) => ({ type: "dataProject", id, project: fields.project, title: fields.title, description: fields.description }),

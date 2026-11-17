@@ -8,7 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
-import { ArticleImage, EventView, formatEventWhen, PollBlockView, RelatedCoverageView } from "@byline/ui/article-body";
+import { ArticleImage, EventView, formatEventWhen, RelatedCoverageView } from "@byline/ui/article-body";
 import { ArrowDown, ArrowUp, Plus, Replace, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { newRowId } from "../../fields";
@@ -16,7 +16,7 @@ import { insertItem, moveItem, removeItem } from "../../items";
 import { BlockShell, SettingsSurface, ToolButton, ToolTextButton } from "../chrome";
 import { InlineText } from "../fields";
 import { useFocusWhenCreated } from "../focus";
-import { useAnnounce, useBylineEditorHost, useEventChoice, usePollChoice, useStoryChoice, type EventChoice, type PollChoice, type StoryChoice } from "../host";
+import { useAnnounce, useBylineEditorHost, useEventChoice, useStoryChoice, type EventChoice, type StoryChoice } from "../host";
 import { BlockIcon } from "../icons";
 import { useReadiness, useTypedFields, type BlockEditorProps } from "./shared";
 
@@ -215,87 +215,6 @@ function useFocusTarget(nodeKey: string) {
   return ref;
 }
 
-/** A searchable list of Polls a writer may place: open or closed, never a draft. */
-function PollPicker({ onChoose, trigger }: { onChoose: (poll: PollChoice) => void; trigger: React.ReactElement }) {
-  const { searchPolls, polls } = useBylineEditorHost();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const { items, loading, failed } = useSearch(searchPolls, query, open);
-  return (
-    <SettingsSurface open={open} onOpenChange={setOpen} title="Choose a poll" description="Open and closed polls from the Polls list." trigger={trigger}>
-      <Command shouldFilter={false} loop className="byline-inserter">
-        <CommandInput value={query} onValueChange={setQuery} placeholder="Search by question" aria-label="Search polls" />
-        <CommandList className="max-h-[min(50dvh,22rem)]">
-          {loading ? <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Spinner />Searching…</div> : null}
-          {failed ? <div className="p-3 text-sm" role="alert">The search did not finish. Try again.</div> : null}
-          {!loading && !failed ? <CommandEmpty>No public poll matches.</CommandEmpty> : null}
-          <CommandGroup>
-            {items.map((poll) => (
-              <CommandItem key={poll.id} value={String(poll.id)} onSelect={() => {
-                polls.prime([{ id: poll.id, value: poll }]);
-                onChoose(poll);
-                setOpen(false);
-                setQuery("");
-              }} className="items-start gap-3 py-2">
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-medium">{poll.question}</span>
-                  <span className="text-xs text-muted-foreground">{poll.status === "open" ? "Open" : "Closed"} · {poll.options.length} answers</span>
-                </span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    </SettingsSurface>
-  );
-}
-
-/**
- * Poll: the real public-safe definition, chosen from Polls. The question and
- * answers are never copied into the article; the block stores only the
- * relationship.
- */
-export function PollEditor({ node, id }: BlockEditorProps) {
-  const [fields, set] = useTypedFields("poll", node);
-  const issues = useReadiness("poll", id, node.fields);
-  const announce = useAnnounce();
-  const entry = usePollChoice(fields.poll);
-  const readOnly = !node.editable;
-  const poll = entry.asset;
-  const choose = (chosen: PollChoice) => {
-    set({ poll: chosen.id });
-    announce("Poll chosen.");
-  };
-  return (
-    <BlockShell
-      type="poll"
-      node={node}
-      issues={issues}
-      actions={fields.poll !== null ? <PollPicker onChoose={choose} trigger={<Button type="button" variant="ghost" size="sm"><Replace />Replace poll</Button>} /> : null}
-    >
-      {fields.poll === null ? (
-        <Empty className="byline-media-empty" data-byline-chrome="" contentEditable={false}>
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><BlockIcon icon="poll" /></EmptyMedia>
-            <EmptyTitle>Choose a poll</EmptyTitle>
-            <EmptyDescription>Pick one from the Polls list. Its question and answers come from there.</EmptyDescription>
-          </EmptyHeader>
-          {readOnly ? null : <PollPicker onChoose={choose} trigger={<Button type="button" size="sm">Choose a poll</Button>} />}
-        </Empty>
-      ) : poll ? (
-        <>
-          <PollBlockView blockId={id} poll={poll} />
-          {poll.status === "draft" ? <Badge variant="outline">Draft poll</Badge> : null}
-        </>
-      ) : (
-        <div className="byline-media-status" data-status={entry.status} role={entry.status === "missing" ? "alert" : undefined}>
-          {entry.status === "loading" ? <Spinner /> : null}
-          <span>{entry.status === "loading" ? "Loading…" : "This poll is gone. Choose another."}</span>
-        </div>
-      )}
-    </BlockShell>
-  );
-}
 
 
 /** A searchable list of published Events. Each row: the title, then when and where. */

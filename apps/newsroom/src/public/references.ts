@@ -1,4 +1,4 @@
-import { safeWebUrl, type PublicEventReference, type PublicPollReference, type PublicStoryReference } from "@byline/article-body";
+import { safeWebUrl, type PublicEventReference, type PublicStoryReference } from "@byline/article-body";
 import { publicStoryPath } from "@byline/content";
 
 /**
@@ -47,31 +47,6 @@ export function publicStoryReference(doc: unknown, options: { timeZone: string; 
     },
     thumbnail
   };
-}
-
-/**
- * A Poll's public definition. A draft poll is not public. Voting is open only
- * while the poll is `open` and inside its window (`opensAt` inclusive,
- * `closesAt` exclusive, a half-open window); counts are never read
- * here, so a snapshot of an open poll carries no tallies.
- */
-export function publicPollReference(doc: unknown, now: Date = new Date()): PublicPollReference | null {
-  if (!isDoc(doc)) return null;
-  const status = doc.status;
-  if (status !== "open" && status !== "closed") return null;
-  const id = text(doc.pollKey);
-  const question = text(doc.question);
-  const options = (Array.isArray(doc.options) ? doc.options : []).flatMap((option) => {
-    if (!isDoc(option)) return [];
-    const optionId = text(option.optionId);
-    const label = text(option.label);
-    return optionId && label ? [{ id: optionId, label }] : [];
-  });
-  if (!id || !question || options.length < 2) return null;
-  const opens = text(doc.opensAt) ? Date.parse(text(doc.opensAt)) : null;
-  const closes = text(doc.closesAt) ? Date.parse(text(doc.closesAt)) : null;
-  const inWindow = (opens === null || now.getTime() >= opens) && (closes === null || now.getTime() < closes);
-  return { id, question, options, votingOpen: status === "open" && inWindow };
 }
 
 /**

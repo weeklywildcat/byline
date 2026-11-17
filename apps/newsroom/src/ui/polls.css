@@ -1,0 +1,12 @@
+/*
+ * The respondent routes (/polls/kiosk, /polls/s/<key>): the Nova kit alone,
+ * compiled by postcss/byline-ui.cjs like newsroom.css, without the newsroom's
+ * editor, calendar or article styles. No palette or typeface of their own.
+ */
+@import "@byline/newsroom-ui/styles.css";
+@source "./polls";
+
+/* A kiosk iPad: no grey flash on every tap. */
+body {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -16,6 +16,7 @@ import { createPayloadHomeFetchers } from "../home/payload-fetchers";
 import { createPayloadMediaFetchers } from "../media/payload-media-fetchers";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { ShellLayer } from "./layer";
+import { PollCreateDialog } from "../polls/PollCreateDialog";
 import { useShellNavigation } from "./navigation";
 
 /** `storyId`: a task starts linked to a story. `folderId`: an upload goes to that folder (null: Unfiled). */
@@ -97,6 +98,9 @@ export function BylineCreateProvider({ children }: { children: ReactNode }) {
                 }}
               />
             ) : null}
+          </ShellLayer>
+          <ShellLayer active={request?.kind === "poll"}>
+            {request?.kind === "poll" ? <PollCreateDialog api={routes.api} admin={routes.admin} onClose={() => setRequest(null)} navigate={navigate} /> : null}
           </ShellLayer>
           <ShellLayer active={request?.kind === "media" || uploading}>
             <MediaUploadDialog

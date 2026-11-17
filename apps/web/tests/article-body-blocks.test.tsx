@@ -11,7 +11,7 @@ describe("every block in the final registry renders from the one ArticleBody", (
   it("renders the whole torture story, and the body it renders is a valid public body", () => {
     expect(validateArticleBody(FIXTURE_ARTICLE_BODY).ok).toBe(true);
     const html = render(...FIXTURE_ARTICLE_BODY.nodes);
-    for (const type of ["photo", "gallery", "portraitText", "video", "audio", "reportedQuote", "pullQuote", "keyFacts", "context", "editorsNote", "marginNote", "expandable", "document", "chartMap", "dataTable", "comparison", "keyNumbers", "annotatedImage", "beforeAfter", "visualChapter", "timeline", "relatedCoverage", "poll", "repositoryInteractive"]) {
+    for (const type of ["photo", "gallery", "portraitText", "video", "audio", "reportedQuote", "pullQuote", "keyFacts", "context", "editorsNote", "marginNote", "expandable", "document", "chartMap", "dataTable", "comparison", "keyNumbers", "annotatedImage", "beforeAfter", "visualChapter", "timeline", "relatedCoverage", "repositoryInteractive"]) {
       expect(html, type).toContain(`data-block-type="${type}"`);
     }
   });
@@ -160,7 +160,7 @@ describe("Annotated Image and Before / After", () => {
   });
 });
 
-describe("Related Coverage, Poll and Repository Interactive", () => {
+describe("Related Coverage and Repository Interactive", () => {
   it("links each story with facts from the reference table, never from the block", () => {
     const html = render(FIXTURE_BLOCKS.relatedCoverage);
     expect(html).toContain('href="/2025/09/12/news/second-lunch-period/"');
@@ -169,25 +169,8 @@ describe("Related Coverage, Poll and Repository Interactive", () => {
     expect(html).toContain("byline-related-thumb");
   });
 
-  it("renders nothing for a story, poll or media the table does not hold", () => {
-    expect(renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.relatedCoverage, FIXTURE_BLOCKS.poll), references: undefined }} />)).toBe('<div class="article-body"></div>');
-  });
-
-  it("renders an open poll statically, with choices and no voting form", () => {
-    const html = render(FIXTURE_BLOCKS.poll);
-    expect(html).toContain('data-byline-poll-id="lunch-line"');
-    expect(html).toContain("How long do you usually wait for lunch?");
-    expect(html).toContain("Online voting is unavailable.");
-    expect(html).not.toContain("<form");
-    expect(html).not.toContain("byline-poll-results");
-  });
-
-  it("renders a closed poll's results only when they were released, and never a count when they were not", () => {
-    const poll = FIXTURE_REFERENCES.polls!["601"]!;
-    const released = renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.poll), references: { polls: { "601": { ...poll, votingOpen: false, results: { totalVotes: 10, votes: { "under-5": 6, "5-10": 3, "over-10": 1 } } } } } }} />);
-    expect(released).toContain("Under 5 minutes: 60%");
-    const withheld = renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.poll), references: { polls: { "601": { ...poll, votingOpen: false } } } }} />);
-    expect(withheld).toContain("Voting is closed.");
+  it("renders nothing for a story or media the table does not hold", () => {
+    expect(renderToStaticMarkup(<StructuredArticleBody body={{ ...body(FIXTURE_BLOCKS.relatedCoverage), references: undefined }} />)).toBe('<div class="article-body"></div>');
   });
 
   it("draws a repository interactive's title and text alternative, and its fallback only from the host registry", () => {

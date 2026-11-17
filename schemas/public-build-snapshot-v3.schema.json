@@ -2056,12 +2056,6 @@
             "additionalProperties": false
           }
         },
-        "polls": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/poll"
-          }
-        },
         "media": {
           "type": "array",
           "items": {
@@ -2159,7 +2153,6 @@
         "corrections",
         "collections",
         "events",
-        "polls",
         "media",
         "redirects"
       ],
@@ -2178,7 +2171,6 @@
           "corrections",
           "collections",
           "events",
-          "polls",
           "media",
           "redirects"
         ]
@@ -2197,7 +2189,6 @@
         "corrections",
         "collections",
         "events",
-        "polls",
         "media",
         "redirects"
       ]
@@ -3154,83 +3145,6 @@
   ],
   "additionalProperties": false,
   "$defs": {
-    "poll": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
-        },
-        "question": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "options": {
-          "minItems": 2,
-          "maxItems": 12,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "label": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "id",
-              "label"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "votingOpen": {
-          "type": "boolean"
-        },
-        "results": {
-          "type": "object",
-          "properties": {
-            "totalVotes": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "votes": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string",
-                "minLength": 1
-              },
-              "additionalProperties": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
-              }
-            }
-          },
-          "required": [
-            "totalVotes",
-            "votes"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "id",
-        "question",
-        "options",
-        "votingOpen"
-      ],
-      "additionalProperties": false
-    },
     "articleBody": {
       "description": "The semantic ArticleBody from @byline/article-body. Its exhaustive registry and runtime validator define the fields of each node variant.",
       "type": "object",
@@ -3276,7 +3190,6 @@
                   "visualChapter",
                   "timeline",
                   "relatedCoverage",
-                  "poll",
                   "repositoryInteractive"
                 ]
               }
@@ -3296,12 +3209,6 @@
               "type": "object",
               "additionalProperties": {
                 "$ref": "#/$defs/storyReference"
-              }
-            },
-            "polls": {
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/$defs/poll"
               }
             }
           },

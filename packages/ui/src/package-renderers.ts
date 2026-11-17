@@ -85,7 +85,7 @@ export function isResolvedHomepagePackageVisible(entry: ResolvedHomepagePackage)
       const resolved = entry.package;
       const mode = resolved.mode ?? "content";
 
-      if (mode === "poll" || mode === "calendar") return resolved.utility.poll || resolved.utility.calendar;
+      if (mode === "calendar") return resolved.utility.calendar;
       if (mode === "single-story") return Boolean(resolved.lead);
 
       // The default lead package always draws its shell, including its empty

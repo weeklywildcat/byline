@@ -5,7 +5,7 @@ import { SidebarProvider } from "@byline/newsroom-ui/ui/sidebar";
 import { createAdminQueryClient } from "@byline/newsroom-screens/story/story-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { primaryNavigationFor } from "../../domain/navigation";
 import { useNewsroomAccount, useNewsroomRoutes } from "./account";
 import { BylineCreateProvider } from "./create";
@@ -50,6 +50,7 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
   const pathname = usePathname() ?? "";
   const search = useSearchParams()?.toString() ?? "";
   const widthRule = routeSidebarWidthRule(shellRouteFor(pathname, routes.admin, search));
+  useSignedOutElsewhere(routes.admin);
   const warmHrefs = useMemo(() => account ? primaryNavigationFor(account.role).map((item) => `${routes.admin}${item.path}` || "/") : [], [account?.role, routes.admin]);
   return (
     <QueryClientProvider client={client}>
@@ -81,4 +82,20 @@ export function BylineShell({ defaultOpen, children }: { defaultOpen: boolean; c
       </SidebarProvider>
     </QueryClientProvider>
   );
+}
+
+/**
+ * When this device's sign-in ends in another tab (a Wildcat Polls kiosk takes
+ * over the iPad), every other Byline tab leaves for the login screen at once
+ * instead of keeping newsroom pages on screen.
+ */
+function useSignedOutElsewhere(admin: string) {
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("byline-account");
+    channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+      if (event.data?.type === "signed-out" && !(window as { bylineHandingOff?: boolean }).bylineHandingOff) window.location.replace(`${admin}/login`);
+    };
+    return () => channel.close();
+  }, [admin]);
 }

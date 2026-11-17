@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { createLocalReq, getPayload, type Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { pollVotes } from "../../src/db/poll-votes";
 import { createGoogleSession } from "../../src/auth/google-session";
 import { advanceIdSequences } from "../../src/import/sequences";
 import type { User } from "../../src/payload-types";
@@ -262,7 +261,7 @@ describe("accounts and anonymous access", () => {
   });
 
   it("serves nothing to anonymous requests, media included", async () => {
-    for (const collection of ["stories", "story-plans", "media", "people", "tasks", "polls"] as const) {
+    for (const collection of ["stories", "story-plans", "media", "people", "tasks"] as const) {
       await expect(payload.find({ collection, overrideAccess: false })).rejects.toThrow();
     }
     await expect(payload.create({
@@ -282,13 +281,11 @@ describe("accounts and anonymous access", () => {
   });
 });
 
-describe("poll votes", () => {
-  it("are a dedicated table with one vote per poll and voter, not a collection", async () => {
-    expect(Object.keys(payload.collections)).not.toContain("byline_poll_votes");
-    const db = (payload.db as unknown as { drizzle: { insert: Function; execute: Function } }).drizzle;
-    await db.insert(pollVotes).values({ pollId: "lunch", optionId: "pizza", voterKey: "k1" });
-    await expect(db.insert(pollVotes).values({ pollId: "lunch", optionId: "tacos", voterKey: "k1" })).rejects.toThrow();
-    const { rows } = await db.execute(sql`SELECT count(*)::int AS n FROM byline_poll_votes`);
-    expect(rows[0].n).toBe(1);
+describe("retired article polls", () => {
+  it("leave no collection or vote table behind", async () => {
+    expect(Object.keys(payload.collections)).not.toContain("polls");
+    const db = (payload.db as unknown as { drizzle: { execute: Function } }).drizzle;
+    const { rows } = await db.execute(sql`SELECT to_regclass('public.byline_poll_votes') AS votes, to_regclass('public.polls') AS polls`);
+    expect(rows[0]).toEqual({ votes: null, polls: null });
   });
 });

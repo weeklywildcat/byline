@@ -10,6 +10,7 @@ import {
 import {
   PUBLIC_SNAPSHOT_V2_SCHEMA_VERSION,
   snapshotSchemaParts,
+  withoutRetiredPolls,
   validatePublicBuildSnapshotV2,
   validateSnapshotFacts,
   type PublicBuildSnapshotV2,
@@ -53,7 +54,8 @@ export type SnapshotValidationOptions = SnapshotRegistryOptions & {
   dataPresentation?: (key: string) => DataPresentationDescriptor | undefined;
 };
 
-export function validatePublicBuildSnapshotV3(value: unknown, options: SnapshotValidationOptions = {}): PublicBuildSnapshotV3 {
+export function validatePublicBuildSnapshotV3(input: unknown, options: SnapshotValidationOptions = {}): PublicBuildSnapshotV3 {
+  const value = withoutRetiredPolls(input);
   const result = publicBuildSnapshotV3Schema.safeParse(value);
   if (!result.success) throw new Error(`Invalid Byline build snapshot: ${result.error.issues.slice(0, 6).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
   const snapshot = value as PublicBuildSnapshotV3;

@@ -47,7 +47,6 @@ function basePresentation(overrides: Partial<ArticlePresentation> = {}): Article
 const slots: ArticleViewSlots = {
   metadata: <script id="newsarticle-json-ld" type="application/ld+json" />,
   shareActions: <div className="article-share-actions" data-slot="share" />,
-  poll: <div data-slot="poll" />,
   feedback: <div data-slot="feedback" />,
   newsletter: <div data-slot="newsletter" />
 };
@@ -220,7 +219,7 @@ describe("an immersive story", () => {
     expect(document.querySelector(".article-tip-callout")).not.toBeNull();
     expect(document.querySelector('.article-meta-block [data-slot="share"]')).not.toBeNull();
     expect(document.querySelectorAll("#newsarticle-json-ld")).toHaveLength(1);
-    for (const slot of ["poll", "feedback", "newsletter"]) expect(document.querySelectorAll(`[data-slot="${slot}"]`)).toHaveLength(1);
+    for (const slot of ["feedback", "newsletter"]) expect(document.querySelectorAll(`[data-slot="${slot}"]`)).toHaveLength(1);
     expect(order(document)).toEqual(order(defaults));
   });
 
@@ -339,7 +338,7 @@ describe("a flagship visual story", () => {
     expect(text(document.querySelector(".article-update-notice"))).toContain("Updated after publication.");
     expect(document.querySelector(".article-tip-callout")).not.toBeNull();
     expect(document.querySelector('.article-meta-block [data-slot="share"]')).not.toBeNull();
-    for (const slot of ["poll", "feedback", "newsletter"]) expect(document.querySelectorAll(`[data-slot="${slot}"]`)).toHaveLength(1);
+    for (const slot of ["feedback", "newsletter"]) expect(document.querySelectorAll(`[data-slot="${slot}"]`)).toHaveLength(1);
     // The narrative sits where the body would: after the header, before the footer.
     const order = [...document.querySelectorAll(".article-header, .story-visual-fixture-narrative, .article-correction-notices, .article-after")].map((element) => element.className.split(" ").at(-1));
     expect(order).toEqual(["article-header", "story-visual-fixture-narrative", "article-correction-notices", "article-after"]);

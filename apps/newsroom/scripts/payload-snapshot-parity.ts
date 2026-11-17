@@ -110,14 +110,6 @@ async function seed() {
   await payload.create({ collection: "live-updates", data: { story: late, headline: "Final score", body: liveBody, photo: laughing,
     pinned: true, state: "published", publishedAt: "2026-11-08T04:30:00.000Z" } });
   await payload.create({ collection: "live-updates", data: { story: late, headline: "SENTINEL-DRAFT-LIVE-UPDATE", body: liveBody, state: "draft" } });
-  const poll = await payload.create({ collection: "polls", data: {
-    pollKey: "parity-lunch", question: "Should the school open another lunch window?", status: "closed",
-    options: [{ optionId: "yes", label: "Yes, open a window" }, { optionId: "no", label: "Keep the current windows" }]
-  } });
-  const db = await drizzleFor(payload);
-  for (let i = 0; i < 6; i++) {
-    await db.execute(sql`insert into byline_poll_votes (poll_id, option_id, voter_key) values (${poll.pollKey}, ${i < 4 ? "yes" : "no"}, ${`SENTINEL-VOTER-${i}`})`);
-  }
   const event = await payload.create({ collection: "events", data: { title: "Homecoming", slug: "homecoming", eventType: "game", startAt: "2027-10-30T23:00:00.000Z", endAt: "2027-10-31T01:30:00.000Z", location: "Wildcat Stadium", eventStatus: "scheduled", _status: "published" } });
   const remap = (id: unknown) => Number(id) % 2 === 1 ? meeting : laughing;
   const nodes = FIXTURE_ARTICLE_BODY.nodes.map((node): ArticleBodyNode => {
@@ -149,8 +141,6 @@ async function seed() {
         return { ...node, media: audio };
       case "relatedCoverage":
         return { ...node, stories: [{ id: "library", story: plain }, { id: "sports", story: late }] };
-      case "poll":
-        return { ...node, poll: poll.id };
       default:
         return node;
     }
@@ -181,6 +171,7 @@ async function seed() {
   }, ...privateWrite });
 
   // Seed private Media fields on a referenced prepared asset without changing its public metadata.
+  const db = await drizzleFor(payload);
   await db.execute(sql`update media set url = '/api/media/file/SENTINEL-PRIVATE-ORIGINAL', thumbnail_u_r_l = '/api/media/file/SENTINEL-LIBRARY-PREVIEW' where id = ${meeting}`);
   await payload.create({ collection: "corrections", data: { story: structured, type: "correction", text: "An earlier version misstated the vote count.", date: "2026-10-15T13:00:00.000Z" } });
   const collection = await payload.create({ collection: "collections", data: { name: "Budget season", brief: "SENTINEL-COLLECTION-BRIEF", stories: [structured, plain], publicPresentation: { enabled: true, format: "series", title: "Budget season", slug: "budget-season", description: "How the district paid for lunch.", overview: "Our reporting on the budget.\n\nIt continues.", artwork: meeting, storyOrder: [plain, structured] } }, context: { bylineSystem: true } });
@@ -352,7 +343,6 @@ const dataHtml = filesA.includes(dataRoute) ? readFileSync(path.join(a.out, data
 if (!dataHtml || !dataHtml.includes("Greenwood High crossing") || !dataHtml.includes("About this data") || !dataHtml.includes("Board approves")) problems.push("missing the rendered Data project page or its related coverage");
 if (!filesA.includes(`_byline/data/${ids.dataRelease}.json`) || filesA.filter((file) => file.startsWith("_byline/data/")).length !== 1) problems.push("the public Data release files are not exactly the snapshot's");
 if (snapshot.data?.projects?.[0]?.bindings?.[0]?.release !== ids.dataRelease) problems.push("the snapshot's Data project does not use the published release");
-if (snapshot.datasets.polls[0]?.results?.totalVotes !== 6) problems.push("closed Poll public aggregate is missing");
 const images = [...structuredHtml.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
 if (!images.length || images.some((src) => !src.startsWith("/_byline/media/") && !src.startsWith("https://weeklywildcat.com/_byline/media/") && !src.startsWith("/brand/") && !src.includes("/_byline/media/"))) problems.push(`story images are not all prepared media: ${images.slice(0, 5).join(", ")}`);
 const media = filesA.filter((file) => file.startsWith("_byline/media/"));

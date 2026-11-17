@@ -278,7 +278,6 @@ export function resolveLeadPackage(
     },
     utility: {
       // A design cannot switch on a module the publication has disabled.
-      poll: config.utility.poll && context.publication.features.polls,
       calendar: config.utility.calendar
         && (context.publication.features.events || context.publication.features.sports),
       calendarLimit: config.utility.calendarLimit,

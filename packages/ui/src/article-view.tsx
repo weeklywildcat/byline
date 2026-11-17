@@ -39,7 +39,6 @@ export type ArticleViewSlots = {
   metadata?: ReactNode;
   shareActions?: ReactNode;
   primaryGame?: ReactNode;
-  poll?: ReactNode;
   feedback?: ReactNode;
   newsletter?: ReactNode;
   /** What a structured body may borrow from its host: date formatting, repository interactives' static fallbacks. */
@@ -463,7 +462,6 @@ export function ArticleStoryFooter({ presentation, slots = {} }: { presentation:
       <ArticleReportingNote presentation={presentation} />
       <ArticleCorrections presentation={presentation} />
       <ArticleSeriesGuide presentation={presentation} />
-      {slots.poll}
       <ArticleTopics presentation={presentation} />
       <ArticleUpdateNotice presentation={presentation} />
       {slots.feedback}

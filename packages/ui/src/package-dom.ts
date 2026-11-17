@@ -7,7 +7,6 @@ const DEFAULT_IDS: Record<string, string> = {
   "home-sports": "field-heading",
   "home-newsletter": "home-newsletter",
   "home-lead-latest": "right-now-heading",
-  "home-lead-poll": "homepage-poll-heading",
   "home-lead-calendar": "this-week-heading",
   "home-newsletter-heading": "article-newsletter-heading",
   "home-sports-schedule": "field-schedule-heading",

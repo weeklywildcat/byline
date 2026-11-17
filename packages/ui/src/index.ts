@@ -13,7 +13,6 @@ export * from "./LeadPackage";
 export * from "./SportsPackage";
 export * from "./sports-view";
 export * from "./ThisWeekCard";
-export * from "./PollCard";
 export * from "./Icon";
 export * from "./article-view";
 export * from "./article-live";
@@ -46,7 +45,6 @@ export type BylineBlockLayout =
   | "team-feature"
   | "sports"
   | "events"
-  | "poll"
   | "newsletter"
   | "structure"
   | "divider";
@@ -72,7 +70,6 @@ export const BYLINE_BLOCK_PRESENTATIONS: Record<CoreBylineBlockId, BylineBlockPr
   "team-feature": { label: "Team feature", defaultHeading: "Team Feature", layout: "team-feature" },
   "athlete-feature": { label: "Athlete feature", defaultHeading: "Athlete Feature", layout: "team-feature" },
   "events-list": { label: "Events list", defaultHeading: "Events", layout: "events" },
-  poll: { label: "Poll", defaultHeading: "Poll", layout: "poll" },
   newsletter: { label: "Newsletter", defaultHeading: "Newsletter", layout: "newsletter" },
   section: { label: "Section", defaultHeading: "Section", layout: "structure" },
   columns: { label: "Columns", defaultHeading: "Columns", layout: "structure" },

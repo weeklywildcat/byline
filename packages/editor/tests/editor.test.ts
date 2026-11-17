@@ -13,7 +13,7 @@ import { BYLINE_BLOCK_COMPONENT, BYLINE_BODY_BLOCKS } from "../src/schema";
 import { blockFields, lexicalFromArticleBody } from "./lexical-fixture";
 
 const media = (id: string | number) => FIXTURE_MEDIA[String(id)] ?? null;
-const references = { dataProject: (id: string | number) => (String(id) === "1" ? { id } : null), story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, poll: (id: string | number) => FIXTURE_REFERENCES.polls?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
+const references = { dataProject: (id: string | number) => (String(id) === "1" ? { id } : null), story: (id: string | number) => FIXTURE_REFERENCES.stories?.[String(id)] ?? null, event: (id: string | number) => FIXTURE_REFERENCES.events?.[String(id)] ?? null, interactive: (key: string) => key === FIXTURE_INTERACTIVE_KEY, tracker: (key: string) => key === FIXTURE_TRACKER_KEY };
 const sourceFiles = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? sourceFiles(path) : [path];
@@ -207,7 +207,6 @@ describe("native slash discovery", () => {
     ["chart", ["Chart / Map"]],
     ["table", ["Data Table"]],
     ["video", ["Video"]],
-    ["poll", ["Poll"]],
     ["interactive", ["Repository Interactive"]]
   ])("/%s finds %j", (query, expected) => {
     expect(find(query)).toEqual(expected);

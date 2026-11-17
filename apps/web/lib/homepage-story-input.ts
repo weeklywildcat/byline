@@ -71,7 +71,6 @@ export function toHomepagePublicationInput(
       service: social.service
     })),
     features: {
-      polls: publication.features.polls === true,
       events: publication.features.events === true,
       sports: publication.features.sports === true,
       newsletter: publication.features.newsletter === true

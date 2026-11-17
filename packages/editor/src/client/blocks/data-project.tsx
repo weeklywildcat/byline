@@ -55,7 +55,7 @@ function ProjectRow({ project, onSelect }: { project: DataProjectChoice; onSelec
 }
 
 /**
- * Choose an existing Data Project. Same composition as the Story, Poll and
+ * Choose an existing Data Project. Same composition as the Story and
  * Event pickers: a Popover with a mouse, a bottom Sheet on touch, a Command
  * list inside. Drafts are listed (a reporter may prepare a story before the
  * project is published) but are never hidden from, or confused with, what

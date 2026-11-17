@@ -7,7 +7,6 @@ import {
   blockEventIds,
   blockMediaIds,
   blockDataProjectIds,
-  blockPollIds,
   blockStoryIds,
   bodyMediaIds,
   cleanText,
@@ -163,11 +162,11 @@ export function collectMediaUsageLabels(state: unknown, id: MediaId): string[] {
     .map((block) => blockLabel(block.type)))];
 }
 
-/** Every Story, Poll, Event and Data Project a body names, for the host to resolve into public-safe references before normalizing. */
-export function collectReferenceIds(state: unknown): { stories: MediaId[]; polls: MediaId[]; events: MediaId[]; dataProjects: MediaId[] } {
+/** Every Story, Event and Data Project a body names, for the host to resolve into public-safe references before normalizing. */
+export function collectReferenceIds(state: unknown): { stories: MediaId[]; events: MediaId[]; dataProjects: MediaId[] } {
   const blocks = storedBlocks(state);
   const unique = (ids: MediaId[]) => [...new Map(ids.map((id) => [mediaKey(id), id])).values()];
-  return { stories: unique(blocks.flatMap(blockStoryIds)), polls: unique(blocks.flatMap(blockPollIds)), events: unique(blocks.flatMap(blockEventIds)), dataProjects: unique(blocks.flatMap(blockDataProjectIds)) };
+  return { stories: unique(blocks.flatMap(blockStoryIds)), events: unique(blocks.flatMap(blockEventIds)), dataProjects: unique(blocks.flatMap(blockDataProjectIds)) };
 }
 
 /** A Payload Media document as the renderer's media record. `src` is the host's choice of URL. */
@@ -201,7 +200,7 @@ export function articleMediaFromPayload(doc: Record<string, unknown>, src: (doc:
  */
 export type NormalizeOptions = {
   media: MediaResolver;
-  /** Public-safe Story, Poll and Event facts, and the registered repository interactives and trackers. Without it, blocks that need them are left out. */
+  /** Public-safe Story and Event facts, and the registered repository interactives and trackers. Without it, blocks that need them are left out. */
   references?: ReferenceLookup;
 };
 
@@ -321,17 +320,12 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
     return { type: "list", ordered: node.listType === "number" || node.tag === "ol", items };
   };
 
-  // Story and Poll facts a finalized block names, resolved once and kept for the body's reference table.
+  // Story and Event facts a finalized block names, resolved once and kept for the body's reference table.
   const lookup: ReferenceLookup = {
     story: (id) => {
       const story = options.references?.story?.(id) ?? null;
       if (story) (references.stories ??= {})[mediaKey(id)] = story;
       return story;
-    },
-    poll: (id) => {
-      const poll = options.references?.poll?.(id) ?? null;
-      if (poll) (references.polls ??= {})[mediaKey(id)] = poll;
-      return poll;
     },
     event: (id) => {
       const event = options.references?.event?.(id) ?? null;
@@ -392,11 +386,9 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
   // Only references the published nodes still name stay in the table (a dropped related story leaves none behind).
   const kept = {
     stories: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockStoryIds(node) : [])).map(mediaKey)),
-    polls: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockPollIds(node) : [])).map(mediaKey)),
     events: new Set(nodes.flatMap((node) => (isArticleBlock(node) ? blockEventIds(node) : [])).map(mediaKey))
   };
   for (const key of Object.keys(references.stories ?? {})) if (!kept.stories.has(key)) delete references.stories![key];
-  for (const key of Object.keys(references.polls ?? {})) if (!kept.polls.has(key)) delete references.polls![key];
   for (const key of Object.keys(references.events ?? {})) if (!kept.events.has(key)) delete references.events![key];
   if (references.events && !Object.keys(references.events).length) delete references.events;
   // A related story's thumbnail is Media too: resolved like any other, or left off.
@@ -408,8 +400,7 @@ export function normalizePayloadArticleBody(state: unknown, options: NormalizeOp
   const used = new Set([...bodyMediaIds(nodes), ...Object.values(references.stories ?? {}).flatMap((story) => (story.thumbnail === undefined ? [] : [story.thumbnail]))].map(mediaKey));
   for (const key of Object.keys(media)) if (!used.has(key)) delete media[key];
   if (references.stories && !Object.keys(references.stories).length) delete references.stories;
-  if (references.polls && !Object.keys(references.polls).length) delete references.polls;
-  const hasReferences = Boolean(Object.keys(references.stories ?? {}).length || Object.keys(references.polls ?? {}).length || Object.keys(references.events ?? {}).length);
+  const hasReferences = Boolean(Object.keys(references.stories ?? {}).length || Object.keys(references.events ?? {}).length);
   const body: ArticleBody = { format: ARTICLE_BODY_FORMAT, version: ARTICLE_BODY_VERSION, nodes, media, ...(hasReferences ? { references } : {}) };
   return { body, issues };
 }

@@ -53,7 +53,7 @@ function asset(name: string, label: string, value: { url: string; alt: string; w
   };
 }
 
-export const FEATURE_SWITCHES = ["sports", "events", "polls", "newsletter", "discord"] as const;
+export const FEATURE_SWITCHES = ["sports", "events", "newsletter", "discord"] as const;
 
 export const Publication: GlobalConfig = {
   slug: PUBLICATION_GLOBAL,

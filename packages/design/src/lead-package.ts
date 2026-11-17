@@ -1,7 +1,7 @@
 // The lead package contract.
 //
 // The Weekly Wildcat lead area is not "a lead story". It is a three-column
-// newsroom package: a utility rail (poll + this-week calendar), the lead story
+// newsroom package: a utility rail (this-week calendar), the lead story
 // itself, and a "The Latest" rail. Modelling that as generic nested Columns
 // blocks would force an editor to rebuild the paper's most important layout by
 // hand, so it is one semantic package with editorial settings.
@@ -16,7 +16,7 @@ export type LeadPackageProps = {
   // Utility-only migrated v1 blocks use the same host-supplied slots without
   // pretending they contain a lead story. Normal homepage packages use the
   // default `content` mode.
-  mode?: "content" | "single-story" | "poll" | "calendar";
+  mode?: "content" | "single-story" | "calendar";
   // A migrated v1 story-lead carried a visible accessible label even though
   // the normal lead package has no section heading of its own.
   heading?: string;
@@ -30,9 +30,8 @@ export type LeadPackageProps = {
     showBylines: boolean;
   };
   utility: {
-    // Both rails are module-dependent: a publication with polls disabled must
-    // not be able to configure a poll into its homepage.
-    poll: boolean;
+    // Module-dependent: a publication with events and sports disabled must
+    // not be able to configure a calendar into its homepage.
     calendar: boolean;
     calendarLimit: number;
   };
@@ -47,7 +46,7 @@ export type LeadPackageProps = {
 export const WEEKLY_WILDCAT_LEAD_DEFAULTS: LeadPackageProps = {
   lead: { source: { type: "sticky" } },
   latest: { heading: "The Latest", source: { type: "compatibility-latest" }, limit: 4, showBylines: true },
-  utility: { poll: true, calendar: true, calendarLimit: 3 },
+  utility: { calendar: true, calendarLimit: 3 },
   presentation: { showDeck: true }
 };
 
@@ -77,7 +76,7 @@ export function parseLeadPackageProps(value: unknown): LeadPackageProps {
   const utility = (props.utility ?? {}) as Record<string, unknown>;
   const presentation = (props.presentation ?? {}) as Record<string, unknown>;
 
-  const mode = props.mode === "poll" || props.mode === "calendar" || props.mode === "content" || props.mode === "single-story"
+  const mode = props.mode === "calendar" || props.mode === "content" || props.mode === "single-story"
     ? props.mode
     : undefined;
   const packageHeading = typeof props.heading === "string" && props.heading.trim()
@@ -97,7 +96,6 @@ export function parseLeadPackageProps(value: unknown): LeadPackageProps {
       showBylines: boolean(latest.showBylines, WEEKLY_WILDCAT_LEAD_DEFAULTS.latest.showBylines)
     },
     utility: {
-      poll: boolean(utility.poll, WEEKLY_WILDCAT_LEAD_DEFAULTS.utility.poll),
       calendar: boolean(utility.calendar, WEEKLY_WILDCAT_LEAD_DEFAULTS.utility.calendar),
       calendarLimit: boundedCount(
         utility.calendarLimit,

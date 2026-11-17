@@ -328,8 +328,6 @@ export type BeforeAfterBlock = {
 
 /** Stories an editor chose to link mid-story. Facts come from `references.stories`; nothing is copied. */
 export type RelatedCoverageBlock = { type: "relatedCoverage"; id: string; heading: string; stories: Array<{ id: string; story: MediaId | null }> };
-/** A Poll record. The question and answers come from `references.polls`. */
-export type PollBlock = { type: "poll"; id: string; poll: MediaId | null };
 /** A registered, repository-owned interactive. Only its key and editorial text are stored. */
 export type RepositoryInteractiveBlock = { type: "repositoryInteractive"; id: string; key: string; title: string; description: string };
 /** A registered, repository-owned tracker. Its content and design live in the repository; the article stores only the key and editorial text. */
@@ -395,7 +393,6 @@ export type ArticleBlock =
   | AnnotatedImageBlock
   | BeforeAfterBlock
   | RelatedCoverageBlock
-  | PollBlock
   | RepositoryInteractiveBlock
   | RepositoryTrackerBlock
   | DataProjectBlock
@@ -447,16 +444,6 @@ export type PublicStoryReference = {
   thumbnail?: MediaId;
 };
 
-/** A Poll's public definition. Counts exist only for a closed poll whose results are releasable. */
-export type PublicPollReference = {
-  /** The public poll key (`pollKey`), the one cookies and votes use. */
-  id: string;
-  question: string;
-  options: Array<{ id: string; label: string }>;
-  votingOpen: boolean;
-  results?: { totalVotes: number; votes: Record<string, number> };
-};
-
 /** A published Event's public facts. Times are instants; the renderer reads them in the publication's timezone. */
 export type PublicEventReference = {
   id: MediaId;
@@ -480,7 +467,6 @@ export type PublicDataProjectReference = { id: MediaId };
 /** Public-safe facts about other records the nodes name, keyed by `String(id)`. Never private data. */
 export type ArticleReferences = {
   stories?: Record<string, PublicStoryReference>;
-  polls?: Record<string, PublicPollReference>;
   events?: Record<string, PublicEventReference>;
 };
 
@@ -490,7 +476,7 @@ export type ArticleBody = {
   nodes: ArticleBodyNode[];
   /** Every asset the nodes reference, keyed by `String(id)`. */
   media: Record<string, ArticleMediaAsset>;
-  /** Related Stories, Polls and Events the nodes name, when there are any. */
+  /** Related Stories and Events the nodes name, when there are any. */
   references?: ArticleReferences;
 };
 

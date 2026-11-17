@@ -20,7 +20,6 @@ export type HomepageRuntimeSlot = ReactNode | ((context: HomepageRuntimeSlotCont
 
 export type HomepageRuntimeSlots = {
   railLimiter?: HomepageRuntimeSlot;
-  poll?: HomepageRuntimeSlot;
   calendar?: HomepageRuntimeSlot;
   newsletter?: HomepageRuntimeSlot;
 };
@@ -56,7 +55,6 @@ export function HomepagePackages({
                 key={entry.package.packageId}
                 package={entry.package}
                 railLimiterSlot={renderSlot(slots.railLimiter, context)}
-                pollSlot={renderSlot(slots.poll, context)}
                 calendarSlot={renderSlot(slots.calendar, context)}
               />
             );

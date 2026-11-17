@@ -79,7 +79,7 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
     { service: "instagram", label: "Instagram", url: "https://www.instagram.com/theweeklywildcat" },
     { service: "tiktok", label: "TikTok", url: "https://www.tiktok.com/@weeklywildcat" }
   ],
-  features: { sports: true, events: true, polls: true, newsletter: true, discord: true },
+  features: { sports: true, events: true, newsletter: true, discord: true },
   licensing: {
     copyrightNotice: "© Weekly Wildcat",
     imageLicenseUrl: "/image-license/",

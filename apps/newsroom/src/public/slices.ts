@@ -80,9 +80,6 @@ export const publicationGlobalSlice: PublicSlice = (row) => {
   return fields;
 };
 
-export const pollPublicSlice: PublicSlice = (row) => row.status === "open" || row.status === "closed"
-  ? pick(row, ["pollKey", "question", "options", "status", "opensAt", "closesAt"]) : null;
-
 /**
  * Live coverage's mode and state live on the unversioned plan, so starting, ending or resuming coverage is a
  * public change of its own (it never rides on, or publishes, article copy). Public only on a published Story

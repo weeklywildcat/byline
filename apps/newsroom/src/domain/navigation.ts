@@ -45,6 +45,9 @@ export const COLLECTIONS_PATH = "/collections";
  */
 export const COLLECTIONS_VIEW_PATH = "/byline-collections";
 
+/** Wildcat Polls' Poll Studio below the admin route: a poll and its section are the query (`?poll=`, `&tab=`). */
+export const POLLS_PATH = "/polls";
+
 /** Byline Data's address below the admin route: a dataset or project is its query (`?dataset=`, `?project=`). */
 export const DATA_PATH = "/data";
 
@@ -56,7 +59,7 @@ export const DATA_PATH = "/data";
  * Stories, Calendar, Media, Collections (reporting projects; public coverage
  * is only an optional presentation of a Collection, never a destination),
  * Data (datasets newsroom staff keep, and the reader-facing projects built on them),
- * then the editor tools (People, Polls, Feedback…), each as its screen is ported
+ * Polls (Wildcat Polls), then the editor tools (People, Feedback…), each as its screen is ported
  * (docs/newsroom-os.md). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
  * and here each is first-class. Visibility is a convenience; every
@@ -69,6 +72,8 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "media", label: "Media", path: MEDIA_PATH, minimumRole: "staff" },
   { key: "collections", label: "Collections", path: COLLECTIONS_PATH, minimumRole: "staff", exact: true },
   { key: "data", label: "Data", path: DATA_PATH, minimumRole: "staff", exact: true },
+  // Staff see the polls granted to them (fieldwork, results); editors manage every poll. The server decides per poll.
+  { key: "polls", label: "Polls", path: POLLS_PATH, minimumRole: "staff", exact: true },
   { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true },
   // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
   { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
@@ -131,7 +136,7 @@ export function activeNavKey(items: readonly Pick<NavItem, "key" | "path" | "exa
 
 /* ---------------------------------------------------------------- Create */
 
-export type CreateKind = "story" | "task" | "collection" | "media";
+export type CreateKind = "story" | "task" | "collection" | "media" | "poll";
 
 export type CreateAction = {
   readonly kind: CreateKind;
@@ -142,14 +147,15 @@ export type CreateAction = {
 /**
  * What the global Create control offers, in menu order. The first allowed
  * entry is the primary action, and the order follows how often each is
- * made. An entry is added only when its Byline flow exists (Poll joins with
- * its screen); the server enforces each create regardless.
+ * made. An entry is added only when its Byline flow exists; the server
+ * enforces each create regardless.
  */
 export const CREATE_ACTIONS: readonly CreateAction[] = [
   { kind: "story", label: "Story", minimumRole: "staff" },
   { kind: "task", label: "Task", minimumRole: "staff" },
   { kind: "collection", label: "Collection", minimumRole: "editor" },
-  { kind: "media", label: "Upload media", minimumRole: "staff" }
+  { kind: "media", label: "Upload media", minimumRole: "staff" },
+  { kind: "poll", label: "Poll", minimumRole: "editor" }
 ];
 
 export function createActionsFor(role: Role): CreateAction[] {
@@ -179,7 +185,6 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-corrections", label: "Corrections", path: "/collections/corrections", minimumRole: "administrator" },
   { key: "raw-redirects", label: "Redirects", path: "/collections/redirects", minimumRole: "administrator" },
   { key: "raw-pages", label: "Pages", path: "/collections/pages", minimumRole: "administrator" },
-  { key: "raw-polls", label: "Polls", path: "/collections/polls", minimumRole: "administrator" },
   { key: "raw-sections", label: "Sections", path: "/collections/sections", minimumRole: "administrator" },
   { key: "raw-topics", label: "Topics", path: "/collections/topics", minimumRole: "administrator" },
   { key: "raw-work", label: "Tasks", path: "/collections/tasks", minimumRole: "administrator" },
@@ -189,6 +194,9 @@ export const ADMINISTRATION: readonly NavItem[] = [
   { key: "raw-data-datasets", label: "Datasets", path: "/collections/data-datasets", minimumRole: "administrator" },
   { key: "raw-data-records", label: "Data rows", path: "/collections/data-records", minimumRole: "administrator" },
   { key: "raw-data-projects", label: "Data projects", path: "/collections/data-projects", minimumRole: "administrator" },
+  { key: "raw-poll-surveys", label: "Polls", path: "/collections/poll-surveys", minimumRole: "administrator" },
+  { key: "raw-poll-versions", label: "Poll versions", path: "/collections/poll-versions", minimumRole: "administrator" },
+  { key: "raw-poll-locations", label: "Polling locations", path: "/collections/poll-locations", minimumRole: "administrator" },
   { key: "raw-jobs", label: "Jobs", path: "/collections/payload-jobs", minimumRole: "administrator" }
 ];
 
