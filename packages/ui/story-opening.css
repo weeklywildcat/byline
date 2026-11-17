@@ -75,6 +75,7 @@
   background: #1f2328;
   overflow: hidden;
   position: relative;
+  width: 100%;
 }
 
 .story-opening .story-opening-media picture {
