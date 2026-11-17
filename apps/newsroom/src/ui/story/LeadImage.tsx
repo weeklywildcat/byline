@@ -6,6 +6,9 @@ import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { Crop, ImagePlus, X } from "lucide-react";
 import { relationIdOf, useStoryField } from "./form";
+import type { Id } from "./types";
+
+export const leadImageCaptionShouldReset = (currentId: Id | null, nextId: Id | null) => currentId !== nextId;
 
 /**
  * The lead image, chosen through Byline Media (never Payload's upload
@@ -22,9 +25,14 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
   const editArtDirection = useOptionalEditorHost()?.editArtDirection;
   const asset = entry.asset;
 
+  const setLeadImage = (nextId: number | null) => {
+    if (leadImageCaptionShouldReset(id, nextId)) caption.setValue("");
+    media.setValue(nextId);
+  };
+
   const choose = async () => {
     const [chosen] = await pick({ kind: "image", multiple: false, title: "Choose the lead image", confirmLabel: "Use this photograph" });
-    if (chosen) media.setValue(chosen.id);
+    if (chosen) setLeadImage(chosen.id);
   };
 
   if (id === null) {
@@ -34,7 +42,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
         title="Lead image"
         description="The photograph at the top of the story. Choose it from Media or upload it; its credit comes from Media."
         readOnly={readOnly}
-        onChosen={(assets) => { if (assets[0]) media.setValue(assets[0].id); }}
+        onChosen={(assets) => { if (assets[0]) setLeadImage(assets[0].id); }}
       />
     );
   }
@@ -52,7 +60,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
           <ButtonGroup>
             <Button type="button" variant="outline" size="sm" onClick={() => void choose()}><ImagePlus />Replace</Button>
             {editArtDirection && asset?.kind === "image" ? <Button type="button" variant="outline" size="sm" onClick={() => void editArtDirection(id)} data-lead-art-direction=""><Crop />Crops & focal point</Button> : null}
-            <Button type="button" variant="outline" size="sm" onClick={() => media.setValue(null)}><X />Remove</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setLeadImage(null)}><X />Remove</Button>
           </ButtonGroup>
         )}
       </div>
