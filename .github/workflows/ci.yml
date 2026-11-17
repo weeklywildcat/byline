@@ -83,6 +83,13 @@ jobs:
       - name: Typecheck and unit-test the newsroom
         run: npm run typecheck:newsroom && npm run test:newsroom
 
+      - name: Build the production newsroom bundle
+        env:
+          DATABASE_URL: postgres://byline:byline@localhost:5432/postgres
+          PAYLOAD_SECRET: ci-production-build-secret-0123456789abcdef
+          BYLINE_DB_PUSH: "0"
+        run: npm run build --workspace @byline/newsroom
+
       - name: Access-control and storage integration tests against PostgreSQL
         env:
           BYLINE_TEST_DATABASE_URL: postgres://byline:byline@localhost:5432/byline_newsroom_test
