@@ -228,9 +228,7 @@ export function describeCondition(definition: SurveyDefinition, source: string |
     .replace(/selected\(\s*\$\{([^}]+)\}\s*,\s*['"‘“]([^'"’”]*)['"’”]\s*\)/g, (_m, q: string, c: string) => `${label(q)} includes ${choice(q, c)}`)
     .replace(/\$\{([^}]+)\}\s*=\s*['"‘“]([^'"’”]*)['"’”]/g, (_m, q: string, c: string) => `${label(q)} is ${choice(q, c)}`)
     .replace(/\$\{([^}]+)\}\s*!=\s*['"‘“]([^'"’”]*)['"’”]/g, (_m, q: string, c: string) => (c === "" ? `${label(q)} is answered` : `${label(q)} is not ${choice(q, c)}`))
-    .replace(/\$\{([^}]+)\}/g, (_m, q: string) => label(q))
-    .replace(/\band\b/g, "and")
-    .replace(/\bor\b/g, "or");
+    .replace(/\$\{([^}]+)\}/g, (_m, q: string) => label(q));
 }
 
 const shorten = (text: string) => (text.length > 48 ? `${text.slice(0, 46).trimEnd()}…` : text);
