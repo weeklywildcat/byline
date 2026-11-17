@@ -133,6 +133,7 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env,
   } catch {
     buildOrigin = null;
   }
+  const allowedPublicApi = [...(newsroom ? [`${newsroom}/api/public/donation-waitlist`, `${newsroom}/api/byline/live/`] : []), ...(buildOrigin ? [`${buildOrigin}/api/public/donation-waitlist`, `${buildOrigin}/api/byline/live/`] : [])];
   const forbidden = ["/api/byline/build/", "/api/media/file/", ...(newsroom ? [`${newsroom}/api/`, `${newsroom}/admin`] : []), ...(buildOrigin ? [`${buildOrigin}/api/`, `${buildOrigin}/admin`] : [])];
   const candidates = files ?? await Array.fromAsync(walk(root));
   for (const file of candidates) {
@@ -140,7 +141,8 @@ export async function verifyNoPrivateNewsroomReferences(root, env = process.env,
     const text = await readFile(file, "utf8");
     const relative = path.relative(root, file);
     if (token && text.includes(token)) throw new Error(`Static export leaks the build credential in ${relative}.`);
-    for (const needle of forbidden) if (text.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
+    const checked = allowedPublicApi.reduce((value, allowed) => value.replaceAll(allowed, ""), text);
+    for (const needle of forbidden) if (checked.includes(needle)) throw new Error(`Static export references the private newsroom (${needle}) in ${relative}.`);
   }
 }
 
