@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leadImageCaptionShouldReset } from "../src/ui/story/LeadImage";
+import { leadImageCaptionShouldReset } from "../src/ui/story/lead-image";
 
 describe("lead image caption reset", () => {
   it("clears the story caption when the lead image changes or is removed", () => {
