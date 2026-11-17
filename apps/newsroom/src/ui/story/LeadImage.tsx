@@ -25,7 +25,7 @@ export function LeadImage({ readOnly }: { readOnly: boolean }) {
   const editArtDirection = useOptionalEditorHost()?.editArtDirection;
   const asset = entry.asset;
 
-  const setLeadImage = (nextId: number | null) => {
+  const setLeadImage = (nextId: Id | null) => {
     if (leadImageCaptionShouldReset(id, nextId)) caption.setValue("");
     media.setValue(nextId);
   };
