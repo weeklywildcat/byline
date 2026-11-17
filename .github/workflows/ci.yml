@@ -37,7 +37,7 @@ jobs:
 
       - name: Verify cache retention, workspace links and static export
         run: |
-          test "$(cat apps/web/node_modules/.astro/cloudflare-cache-sentinel)" = retained
+          test "$(cat node_modules/.astro/cloudflare-cache-sentinel)" = retained
           test -d node_modules/@byline/content
           # The private newsroom (Payload) never enters the public build.
           test ! -d node_modules/payload
