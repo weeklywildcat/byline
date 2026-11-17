@@ -1,9 +1,8 @@
 "use client";
 
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
-import { Button } from "@byline/newsroom-ui/ui/button";
-import { Input } from "@byline/newsroom-ui/ui/input";
-import { Label } from "@byline/newsroom-ui/ui/label";
+import { Button, buttonVariants } from "@byline/newsroom-ui/ui/button";
+import { TextField } from "@byline/newsroom-ui/components/form-fields";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -97,7 +96,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
             {upload.isPending ? <Spinner className="size-6" /> : <FileSpreadsheet className="size-8 text-muted-foreground" aria-hidden="true" />}
             <span className="font-(family-name:--poll-serif) text-2xl font-medium">{upload.isPending ? "Reading the workbook…" : "Choose an .xlsx workbook"}</span>
             <span className="max-w-md text-sm text-muted-foreground">Or drop it here. Byline reads the survey, choices and settings sheets and runs nothing in the file.</span>
-            <span className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-medium text-background"><Upload className="size-4" aria-hidden="true" />Choose file</span>
+            <span className={buttonVariants({ size: "lg" })}><Upload data-icon="inline-start" aria-hidden="true" />Choose file</span>
             <input ref={input} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={(event) => { pick(event.target.files?.[0]); event.target.value = ""; }} data-polls-upload="" />
           </label>
           {upload.isError ? <InlineAlert title="That workbook couldn't be read">{(upload.error as Error).message}</InlineAlert> : null}
@@ -136,10 +135,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
       {preview && step === "Publish" ? (
         <section className="flex max-w-2xl flex-col gap-5">
           {blocked ? <InlineAlert title="This workbook has errors">Fix them in the spreadsheet and upload it again. You can still save it as a draft to fix here.</InlineAlert> : null}
-          <div className="grid gap-1.5">
-            <Label htmlFor="import-note">What changed (optional)</Label>
-            <Input id="import-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="e.g. Reworded the artwork questions" />
-          </div>
+          <TextField label="What changed" optional value={note} onChange={setNote} maxLength={500} placeholder="e.g. Reworded the artwork questions" hint="Kept with the version, for whoever reads the history." />
           <p className="text-sm text-muted-foreground">Publishing creates a new version that can never be changed. Respondents answer the newest version; earlier responses keep the questions they saw.</p>
           {finish.isError ? <InlineAlert title="That didn't finish">{(finish.error as Error).message}</InlineAlert> : null}
           <div className="flex flex-wrap gap-2">

@@ -62,7 +62,7 @@ export function MoreNavigation(account: MoreAccount) {
   return presentation === "drawer" ? (
     <Drawer open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} modal snapPoints={MORE_SNAP_POINTS} snapPoint={snapPoint} onSnapPointChange={setSnapPoint} snapToSequentialPoints>
       <DrawerTrigger render={trigger}>{label}</DrawerTrigger>
-      <DrawerContent className="h-dvh max-h-none shadow-none pt-[max(0px,calc(env(safe-area-inset-top,0px)-var(--drawer-snap-point-offset)))] pb-[calc(max(1rem,env(safe-area-inset-bottom,0px))+var(--drawer-snap-point-offset))] [transform:translateY(calc(var(--drawer-snap-point-offset)+var(--drawer-swipe-movement-y)))]">
+      <DrawerContent backdrop="steady" className="h-dvh max-h-none pt-[max(0px,calc(env(safe-area-inset-top,0px)-var(--drawer-snap-point-offset)))] pb-[calc(max(1rem,env(safe-area-inset-bottom,0px))+var(--drawer-snap-point-offset))] [transform:translateY(calc(var(--drawer-snap-point-offset)+var(--drawer-swipe-movement-y)))]">
         <DrawerHeader className="sticky top-0 z-10 flex-row items-center justify-between bg-popover py-0">
           <DrawerTitle>More</DrawerTitle>
           <DrawerDescription className="sr-only">Newsroom workspaces and account tools</DrawerDescription>

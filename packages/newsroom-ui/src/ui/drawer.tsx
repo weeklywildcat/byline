@@ -23,8 +23,18 @@ function DrawerContent({
   className,
   children,
   keyboardAware = false,
+  backdrop = "fade",
   ...props
-}: DrawerPrimitive.Popup.Props & { keyboardAware?: boolean }) {
+}: DrawerPrimitive.Popup.Props & {
+  keyboardAware?: boolean
+  /**
+   * "fade" dims the page less as the sheet is swiped away. "steady" keeps the
+   * page dimmed while the drawer is open: use it with snap points, where Base UI
+   * reports full swipe progress while the sheet rests at its lower snap point,
+   * which would otherwise leave no backdrop at all.
+   */
+  backdrop?: "fade" | "steady"
+}) {
   const viewport = (
     <DrawerPrimitive.Viewport data-slot="drawer-viewport" className={cn(
       "fixed inset-0 z-50 flex items-end justify-center pr-(--byline-safe-right) pl-(--byline-safe-left)",
@@ -48,7 +58,11 @@ function DrawerContent({
     <DrawerPrimitive.Portal container={useAdminPortal()}>
       <DrawerPrimitive.Backdrop
         data-slot="drawer-overlay"
-        className="fixed inset-0 z-50 min-h-dvh bg-black/20 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 motion-reduce:transition-none"
+        data-backdrop={backdrop}
+        className={cn(
+          "fixed inset-0 z-50 min-h-dvh bg-black/20 transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 motion-reduce:transition-none",
+          backdrop === "fade" && "opacity-[calc(1-var(--drawer-swipe-progress,0))]"
+        )}
       />
       {keyboardAware ? <DrawerPrimitive.VirtualKeyboardProvider>{viewport}</DrawerPrimitive.VirtualKeyboardProvider> : viewport}
     </DrawerPrimitive.Portal>

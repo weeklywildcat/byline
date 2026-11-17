@@ -2,8 +2,8 @@
 
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Input } from "@byline/newsroom-ui/ui/input";
-import { Label } from "@byline/newsroom-ui/ui/label";
+import { DateButton } from "@byline/newsroom-ui/components/date-fields";
+import { Field, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Info } from "lucide-react";
@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import type { Breakdown, FieldworkRow, QuestionResult } from "../../polls/engine/results";
 import { useNewsroomRoutes } from "../shell/account";
 import { exportHref, fetchResults, formatWhen, pollKeys, type SurveyResultsView } from "./api";
+import { PollSelect } from "./fields";
 import { ListSkeleton } from "./PollStudio";
 
 /**
@@ -47,29 +48,21 @@ export function ResultsView({ id }: { id: number }) {
   return (
     <div className="flex flex-col gap-8" data-polls-results="">
       <div className="flex flex-wrap items-end gap-3 border-b pb-4" role="group" aria-label="Filter results">
-        <FilterField label="From"><Input type="date" value={filters.from} onChange={(event) => set({ from: event.target.value })} className="w-40" /></FilterField>
-        <FilterField label="To"><Input type="date" value={filters.to} onChange={(event) => set({ to: event.target.value })} className="w-40" /></FilterField>
-        <FilterField label="Location">
-          <select className="h-10 rounded-md border bg-background px-2 text-sm" value={filters.location} onChange={(event) => set({ location: event.target.value })}>
-            <option value="">All</option>{data.options.locations.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
+        <FilterField label="From" id="results-from"><DateButton id="results-from" value={filters.from} onChange={(from) => set({ from })} className="w-40 justify-start font-normal" /></FilterField>
+        <FilterField label="To" id="results-to"><DateButton id="results-to" value={filters.to} onChange={(to) => set({ to })} className="w-40 justify-start font-normal" /></FilterField>
+        <FilterField label="Location" id="results-location">
+          <PollSelect id="results-location" className="w-44" value={filters.location} emptyLabel="All" options={data.options.locations.map((name) => ({ value: name, label: name }))} onChange={(location) => set({ location })} />
         </FilterField>
-        <FilterField label="Session">
-          <select className="h-10 max-w-64 rounded-md border bg-background px-2 text-sm" value={filters.session} onChange={(event) => set({ session: event.target.value })}>
-            <option value="">All</option>{data.options.sessions.map((session) => <option key={session.id} value={session.id}>{session.label}</option>)}
-          </select>
+        <FilterField label="Session" id="results-session">
+          <PollSelect id="results-session" className="w-64" value={filters.session} emptyLabel="All" options={data.options.sessions.map((session) => ({ value: session.id, label: session.label }))} onChange={(session) => set({ session })} />
         </FilterField>
         {data.versions.length > 1 ? (
-          <FilterField label="Version">
-            <select className="h-10 rounded-md border bg-background px-2 text-sm" value={filters.version} onChange={(event) => set({ version: event.target.value })}>
-              <option value="">All (labels from v{data.version.number})</option>{data.versions.map((version) => <option key={version.id} value={version.id}>Version {version.number}</option>)}
-            </select>
+          <FilterField label="Version" id="results-version">
+            <PollSelect id="results-version" className="w-52" value={filters.version} emptyLabel={`All (labels from v${data.version.number})`} options={data.versions.map((version) => ({ value: String(version.id), label: `Version ${version.number}` }))} onChange={(version) => set({ version })} />
           </FilterField>
         ) : null}
-        <FilterField label="Collected">
-          <select className="h-10 rounded-md border bg-background px-2 text-sm" value={filters.mode} onChange={(event) => set({ mode: event.target.value })}>
-            <option value="">Any way</option><option value="kiosk">In person</option><option value="public">Public link</option>
-          </select>
+        <FilterField label="Collected" id="results-mode">
+          <PollSelect id="results-mode" className="w-40" value={filters.mode} emptyLabel="Any way" options={[{ value: "kiosk", label: "In person" }, { value: "public", label: "Public link" }]} onChange={(mode) => set({ mode })} />
         </FilterField>
         {search ? <Button type="button" variant="ghost" onClick={() => setFilters(EMPTY)}>Clear</Button> : null}
         <span className="flex-1" />
@@ -114,8 +107,8 @@ export function ResultsView({ id }: { id: number }) {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="grid gap-1"><Label className="text-xs text-muted-foreground">{label}</Label>{children}</div>;
+function FilterField({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+  return <Field className="w-auto gap-1"><FieldLabel htmlFor={id} className="text-xs font-normal text-muted-foreground">{label}</FieldLabel>{children}</Field>;
 }
 
 function BaseLine({ question }: { question: QuestionResult }) {

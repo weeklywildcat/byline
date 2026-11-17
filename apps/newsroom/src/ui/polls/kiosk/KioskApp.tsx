@@ -250,7 +250,7 @@ function Ended({ loginHref, message, counts }: { loginHref: string; message: str
         <h1 className="font-(family-name:--poll-serif) text-5xl font-medium">Session ended</h1>
         <p className="text-xl leading-relaxed">{message}</p>
         {counts ? <p className="text-lg text-(--poll-muted) tabular-nums">{counts.completed} completed · {counts.declined} declined · {counts.abandoned} incomplete</p> : null}
-        <div><a href={loginHref} className="inline-flex h-14 items-center rounded-full bg-(--poll-ink) px-8 text-base font-medium text-(--poll-paper)">Sign in to Byline</a></div>
+        <div><Button nativeButton={false} size="lg" className="h-14 px-8 text-base" render={<a href={loginHref} />}>Sign in to Byline</Button></div>
       </div>
     </Shell>
   );
@@ -448,9 +448,9 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
           {KEYS.map((digit) => <PinKey key={digit} label={digit} onPress={() => press(digit)} disabled={checking || waiting > 0} />)}
           <PinKey label="Delete" icon={<Delete className="size-6" />} onPress={() => setPin((value) => value.slice(0, -1))} disabled={checking || !pin} />
           <PinKey label="0" onPress={() => press("0")} disabled={checking || waiting > 0} />
-          <button type="button" className="h-18 rounded-2xl bg-(--poll-ink) text-lg font-medium text-(--poll-paper) outline-none focus-visible:ring-[3px] focus-visible:ring-(--poll-accent)/40 disabled:opacity-40" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
-            {checking ? <Spinner className="mx-auto size-5" /> : "Unlock"}
-          </button>
+          <Button type="button" className="h-18 rounded-2xl text-lg" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
+            {checking ? <Spinner /> : "Unlock"}
+          </Button>
         </div>
         {onCancel ? <Button type="button" variant="ghost" className="h-12 text-base" onClick={onCancel}>Back to the poll</Button> : null}
       </div>
@@ -459,10 +459,10 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
 }
 
 function PinKey({ label, icon, onPress, disabled }: { label: string; icon?: React.ReactNode; onPress: () => void; disabled?: boolean }) {
+  // The kit's outline Button, sized for a thumb: the keypad is the one place the kiosk asks for a precise tap.
   return (
-    <button type="button" aria-label={label} onClick={onPress} disabled={disabled}
-      className="grid h-18 place-items-center rounded-2xl border-2 border-(--poll-rule) bg-white text-2xl font-medium tabular-nums outline-none select-none active:bg-(--poll-rule) focus-visible:ring-[3px] focus-visible:ring-(--poll-accent)/40 disabled:opacity-40">
+    <Button type="button" variant="outline" aria-label={label} onClick={onPress} disabled={disabled} className="h-18 rounded-2xl bg-white text-2xl tabular-nums [&_svg:not([class*='size-'])]:size-6">
       {icon ?? label}
-    </button>
+    </Button>
   );
 }

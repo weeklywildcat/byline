@@ -2,6 +2,9 @@
 
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
+import { FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
+import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { trackVisualViewport } from "@byline/newsroom-ui/lib/visual-viewport";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, CloudUpload } from "lucide-react";
@@ -334,75 +337,72 @@ function QuestionInput(props: InputProps) {
   return <NumberAnswer {...props} />;
 }
 
+/** An answer card: the kit's FieldLabel around its control, sized for a finger. */
+const CARD = "flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-xl border-2 bg-white px-5 py-3 text-left text-lg leading-snug font-normal transition-colors duration-150 select-none motion-reduce:transition-none hover:border-(--poll-ink)/40 has-focus-visible:ring-[3px] has-focus-visible:ring-(--poll-accent)/40 has-data-checked:border-(--poll-ink) has-data-checked:bg-(--poll-accent-soft)";
+/** The kit's radio and checkbox, enlarged to match the card. */
+const CONTROL = "size-7 border-2 border-(--poll-ink)/30 after:hidden data-checked:border-(--poll-ink) data-checked:bg-(--poll-ink) [&_[data-slot=radio-group-indicator]]:size-full [&_[data-slot=radio-group-indicator]>span]:size-2.5 [&_[data-slot=checkbox-indicator]_svg]:size-4.5";
+
 function ChoiceList({ question, definition, state, onChoose, describedBy }: InputProps) {
   const multiple = question.kind === "select_multiple";
   const choices = choicesFor(definition, question);
   const selected = state?.status === "answered" ? (Array.isArray(state.value) ? state.value.map(String) : [String(state.value)]) : [];
-  const name = useId();
-  const toggle = (choice: string) => {
-    if (!multiple) { onChoose({ status: "answered", value: choice }); return; }
-    const next = selected.includes(choice) ? selected.filter((entry) => entry !== choice) : [...selected, choice];
+  const id = useId();
+  const toggle = (choice: string, on: boolean) => {
+    const next = on ? [...selected, choice] : selected.filter((entry) => entry !== choice);
     // Keep the list's order, whatever order they were tapped in.
     const ordered = choices.map((entry) => entry.name).filter((entry) => next.includes(entry));
     onChoose(ordered.length ? { status: "answered", value: ordered } : null);
   };
-  return (
-    <fieldset className="flex flex-col gap-3" aria-describedby={describedBy}>
-      <legend className="sr-only">{question.label}{multiple ? " (choose all that apply)" : ""}</legend>
-      {multiple ? <p className="text-sm font-medium text-(--poll-muted)">Choose all that apply</p> : null}
-      {choices.map((choice) => {
-        const checked = selected.includes(choice.name);
-        return (
-          <label
-            key={choice.name}
-            className={cn(
-              "group flex min-h-16 cursor-pointer items-center gap-4 rounded-xl border-2 px-5 py-3 text-left text-lg leading-snug transition-colors duration-150 select-none motion-reduce:transition-none",
-              "has-focus-visible:ring-[3px] has-focus-visible:ring-(--poll-accent)/40 active:scale-[0.995] motion-reduce:active:scale-100",
-              checked ? "border-(--poll-ink) bg-(--poll-ink) text-(--poll-paper)" : "border-(--poll-rule) bg-white hover:border-(--poll-ink)/40"
-            )}
-            data-selected={checked ? "true" : "false"}
-          >
-            <input type={multiple ? "checkbox" : "radio"} name={name} value={choice.name} checked={checked} onChange={() => toggle(choice.name)} className="sr-only" />
-            <span className={cn("grid size-7 shrink-0 place-items-center border-2", multiple ? "rounded-md" : "rounded-full", checked ? "border-(--poll-paper) bg-(--poll-paper) text-(--poll-ink)" : "border-(--poll-ink)/30")} aria-hidden="true">
-              {checked ? (multiple ? <Check className="size-4" strokeWidth={3} /> : <span className="size-3 rounded-full bg-(--poll-ink)" />) : null}
-            </span>
+  if (!multiple) {
+    return (
+      <RadioGroup value={selected[0] ?? null} onValueChange={(value) => onChoose({ status: "answered", value: String(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy} className="gap-3">
+        {choices.map((choice) => (
+          <FieldLabel key={choice.name} htmlFor={`${id}-${choice.name}`} className={CARD}>
+            <RadioGroupItem id={`${id}-${choice.name}`} value={choice.name} className={CONTROL} />
             <span className="min-w-0 flex-1">{choice.label}</span>
-          </label>
-        );
-      })}
-    </fieldset>
+          </FieldLabel>
+        ))}
+      </RadioGroup>
+    );
+  }
+  return (
+    <FieldSet className="gap-3" aria-describedby={describedBy}>
+      <FieldLegend className="sr-only">{question.label} (choose all that apply)</FieldLegend>
+      <FieldDescription className="text-sm font-medium text-(--poll-muted)">Choose all that apply</FieldDescription>
+      {choices.map((choice) => (
+        <FieldLabel key={choice.name} htmlFor={`${id}-${choice.name}`} className={CARD}>
+          <Checkbox id={`${id}-${choice.name}`} checked={selected.includes(choice.name)} onCheckedChange={(on) => toggle(choice.name, on === true)} className={cn(CONTROL, "rounded-md")} />
+          <span className="min-w-0 flex-1">{choice.label}</span>
+        </FieldLabel>
+      ))}
+    </FieldSet>
   );
 }
 
 function Scale({ question, state, onChoose, describedBy }: InputProps) {
-  const name = useId();
+  const id = useId();
   if (question.kind !== "range") return null;
   const values = rangeValues(question);
-  const chosen = state?.status === "answered" ? Number(state.value) : null;
+  const chosen = state?.status === "answered" ? String(state.value) : null;
+  const describe = (value: number) => `${value}${value === question.start && question.startLabel ? `, ${question.startLabel}` : ""}${value === question.end && question.endLabel ? `, ${question.endLabel}` : ""}`;
   return (
-    <fieldset className="flex flex-col gap-3" aria-describedby={describedBy}>
-      <legend className="sr-only">{question.label}</legend>
-      <div className={cn("grid gap-2", values.length <= 7 ? "grid-cols-[repeat(auto-fit,minmax(3.5rem,1fr))]" : "grid-cols-[repeat(auto-fit,minmax(3rem,1fr))]")}>
-        {values.map((value) => {
-          const checked = chosen === value;
-          return (
-            <label key={value} className={cn(
-              "grid min-h-16 cursor-pointer place-items-center rounded-xl border-2 text-xl font-medium tabular-nums transition-colors duration-150 select-none motion-reduce:transition-none",
-              "has-focus-visible:ring-[3px] has-focus-visible:ring-(--poll-accent)/40",
-              checked ? "border-(--poll-ink) bg-(--poll-ink) text-(--poll-paper)" : "border-(--poll-rule) bg-white hover:border-(--poll-ink)/40"
-            )}>
-              <input type="radio" name={name} value={value} checked={checked} onChange={() => onChoose({ status: "answered", value })} className="sr-only" aria-label={`${value}${value === question.start && question.startLabel ? `, ${question.startLabel}` : ""}${value === question.end && question.endLabel ? `, ${question.endLabel}` : ""}`} />
-              {value}
-            </label>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-3">
+      <RadioGroup value={chosen} onValueChange={(value) => onChoose({ status: "answered", value: Number(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy}
+        className={cn("gap-2", values.length <= 7 ? "grid-cols-[repeat(auto-fit,minmax(3.5rem,1fr))]" : "grid-cols-[repeat(auto-fit,minmax(3rem,1fr))]")}>
+        {values.map((value) => (
+          <FieldLabel key={value} htmlFor={`${id}-${value}`} className={cn(CARD, "justify-center px-0 text-xl font-medium tabular-nums has-data-checked:bg-(--poll-ink) has-data-checked:text-(--poll-paper)")}>
+            {/* The number is the visible control; the kit radio carries the semantics and keyboard. */}
+            <RadioGroupItem id={`${id}-${value}`} value={String(value)} aria-label={describe(value)} className="sr-only" />
+            {value}
+          </FieldLabel>
+        ))}
+      </RadioGroup>
       {question.startLabel || question.endLabel ? (
         <div className="flex justify-between gap-4 text-base text-(--poll-muted)" aria-hidden="true">
           <span>{question.startLabel}</span><span className="text-right">{question.endLabel}</span>
         </div>
       ) : null}
-    </fieldset>
+    </div>
   );
 }
 

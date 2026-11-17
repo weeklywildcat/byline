@@ -333,7 +333,7 @@ function PeoplePicker({ label, description, people, chosen, onChange }: { label:
         {chosen.map((person) => (
           <Badge key={person.id} variant="secondary" className="h-8 gap-1 pr-1 text-sm">
             {person.name}
-            <button type="button" className="touch-hit grid size-6 place-items-center rounded-full hover:bg-background" aria-label={`Remove ${person.name}`} onClick={() => onChange(ids.filter((id) => id !== Number(person.id)))}><X className="size-3.5" /></button>
+            <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${person.name}`} onClick={() => onChange(ids.filter((id) => id !== Number(person.id)))}><X /></Button>
           </Badge>
         ))}
         <Popover open={open} onOpenChange={setOpen}>
