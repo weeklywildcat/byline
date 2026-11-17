@@ -265,7 +265,7 @@ function PreviewStandardHeader({ publication }: { publication: PreviewPublicatio
       <div className="site-utility site-utility--undated" aria-label="Publication details">
         <span>{navigation.location}</span>
         <div className="header-tools" aria-label="Site tools">
-          <a className="header-donate" href={publication.contactHref}>Donate</a>
+          <a className="header-donate" href={`${publication.publicSite}/donate/`}>Donate</a>
           <a className="search-button" href={navigation.searchHref} aria-label="Search" title="Search">
             <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="7" />

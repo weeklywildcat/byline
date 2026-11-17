@@ -1,0 +1,56 @@
+---
+import BaseLayout from "@/src/layouts/BaseLayout.astro";
+import Page, { metadata } from "@/views/donate/page";
+---
+<BaseLayout metadata={metadata}>
+  <Page />
+</BaseLayout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("[data-donation-waitlist]");
+  const status = document.querySelector<HTMLElement>("[data-donation-status]");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!status || !form.reportValidity()) return;
+
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const fields = new FormData(form);
+    const body = new URLSearchParams();
+    fields.forEach((value, key) => {
+      if (typeof value === "string") body.append(key, value);
+    });
+
+    status.textContent = "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Joining…";
+    }
+
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: body.toString()
+      });
+      const result = await response.json().catch(() => ({})) as { ok?: boolean; alreadyJoined?: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "We couldn't add you right now. Try again.");
+      }
+
+      const email = form.querySelector<HTMLInputElement>('input[name="email"]');
+      if (email) email.value = "";
+      status.textContent = result.alreadyJoined
+        ? "You're already on the waitlist."
+        : "You're on the waitlist. We'll email you when donations open.";
+      if (button) button.textContent = "Joined";
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "We couldn't add you right now. Try again.";
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Join the waitlist";
+      }
+    }
+  });
+</script>
