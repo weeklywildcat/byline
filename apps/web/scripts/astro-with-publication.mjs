@@ -9,7 +9,7 @@ import { tsImport } from "tsx/esm/api";
 
 const totalStartedAt = Date.now();
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const astroCacheDirectory = path.resolve(projectRoot, "../../node_modules/.astro");
+const astroCacheDirectory = path.join(projectRoot, "node_modules/.astro");
 const require = createRequire(import.meta.url);
 const astroCommand = path.join(path.dirname(require.resolve("astro/package.json")), "bin", "astro.mjs");
 const astroArguments = process.argv.slice(2);
