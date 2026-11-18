@@ -1,3 +1,4 @@
+import { pollMediaUses } from "../polls/media-usage";
 import { mediaSearchWhere } from "./media-search";
 import { storyMediaUses } from "./story-media-uses";
 import {
@@ -265,14 +266,15 @@ type UsageSearch = { usages: MediaUsage[]; total: number };
 export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<UsageSearch> {
   const { payload } = ctx.req;
   const system = { req: ctx.req, overrideAccess: true as const };
-  const [stories, assignments, artwork, resources, live, people, totals] = await Promise.all([
+  const [stories, assignments, artwork, resources, live, people, polls, totals] = await Promise.all([
     storyMediaUses(ctx, mediaId),
     payload.find({ collection: "production-assignments", where: { media: { in: [mediaId] } }, depth: 0, pagination: false, select: { title: true, type: true, story: true }, ...asUser(ctx) }),
     payload.find({ collection: "collections", where: { "publicPresentation.artwork": { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
     payload.find({ collection: "collection-resources", where: { media: { equals: mediaId } }, depth: 0, pagination: false, select: { label: true, collections: true }, ...asUser(ctx) }),
     payload.find({ collection: "live-updates", where: { photo: { equals: mediaId } }, depth: 0, pagination: false, select: { headline: true, story: true }, ...asUser(ctx) }),
     payload.find({ collection: "people", where: { portrait: { equals: mediaId } }, depth: 0, pagination: false, select: { name: true }, ...asUser(ctx) }),
-    linkedUseTotal(ctx, mediaId, system)
+    pollMediaUses(ctx.req, mediaId, true),
+    linkedUseTotal(ctx, mediaId, system, false)
   ]);
   const storyIds = [...new Set([...assignments.docs.map((row) => num(row.story)), ...live.docs.map((row) => num(row.story))])];
   const readable = await readableStories(ctx, storyIds, { headline: true });
@@ -287,13 +289,18 @@ export async function linkedUses(ctx: ScreenContext, mediaId: number): Promise<U
     ...artwork.docs.map((row) => ({ kind: "collection-artwork" as const, title: row.name, role: "Collection public artwork", storyId: null, collectionId: row.id, recordId: row.id })),
     ...resources.docs.map((row) => ({ kind: "collection-resource" as const, title: row.label, role: "Collection resource", storyId: null, collectionId: relationIds(row.collections).map(Number)[0] ?? null, recordId: row.id })),
     ...live.docs.map((row) => ({ kind: "live-update-photo" as const, title: row.headline?.trim() || headline.get(num(row.story)) || "Live update", role: "Live update photo", storyId: headline.has(num(row.story)) ? num(row.story) : null, recordId: row.id })),
+    ...polls.readable.map((poll) => ({
+      kind: "poll-choice" as const, title: poll.title,
+      role: poll.draft && poll.published ? "Poll choices · Draft and published" : poll.draft ? "Poll choice · Draft" : "Poll choice · Published",
+      storyId: null, recordId: poll.id
+    })),
     ...people.docs.map((row) => ({ kind: "person-portrait" as const, title: row.name, role: "Portrait", storyId: null, recordId: row.id }))
   ];
-  return { usages, total: totals + stories.total };
+  return { usages, total: totals + stories.total + polls.total };
 }
 
 /** Every relationship use, readable or not (for honest counts and for refusing a delete). */
-async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req: ScreenContext["req"]; overrideAccess: true }): Promise<number> {
+async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req: ScreenContext["req"]; overrideAccess: true }, includePolls = true): Promise<number> {
   const { payload } = ctx.req;
   const counts = await Promise.all([
     payload.count({ collection: "production-assignments", where: { media: { in: [mediaId] } }, ...system }),
@@ -302,7 +309,8 @@ async function linkedUseTotal(ctx: ScreenContext, mediaId: number, system: { req
     payload.count({ collection: "live-updates", where: { photo: { equals: mediaId } }, ...system }),
     payload.count({ collection: "people", where: { portrait: { equals: mediaId } }, ...system })
   ]);
-  return counts.reduce((sum, value) => sum + value.totalDocs, 0);
+  const polls = includePolls ? (await pollMediaUses(ctx.req, mediaId, false)).total : 0;
+  return counts.reduce((sum, value) => sum + value.totalDocs, polls);
 }
 
 export async function mediaDetail(ctx: ScreenContext, id: number): Promise<MediaAssetDetail> {

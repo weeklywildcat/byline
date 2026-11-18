@@ -1,10 +1,16 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from "payload";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readCurrentRevision } from "../../src/db/publication-state";
 import type { User } from "../../src/payload-types";
 import { pollEndpoints } from "../../src/polls/endpoints";
+import { emptyDefinition, type SurveyDefinition } from "../../src/polls/engine/types";
+import { publicationStore } from "../../src/publication-media/blob-store";
+import { newsroomUser } from "../../src/access/user";
+import { linkedUses } from "../../src/newsroom/media-library";
 import { KIOSK_COOKIE } from "../../src/polls/kiosk";
 
 /**
@@ -409,7 +415,7 @@ describe("public links", () => {
     const opened = await call("get", "/byline/polls/public/:key", null, { params: { key: linkKey } });
     expect(opened.body.needsCode).toBe(false);
     // Nothing about the newsroom or other respondents is in the public poll.
-    expect(Object.keys(opened.body).sort()).toEqual(["closesAt", "definition", "needsCode", "title"]);
+    expect(Object.keys(opened.body).sort()).toEqual(["closesAt", "definition", "images", "needsCode", "title"]);
     await db().execute(sql`insert into byline_poll_public_starts (token_hash, survey_id, version_id, issued_at) select md5(random()::text) || md5(random()::text), ${ids.survey}, ${ids.version}, now() from generate_series(1, 10)`);
     expect((await call("post", "/byline/polls/public/:key/start", null, { params: { key: linkKey }, data: {} })).status).toBe(429);
     await db().execute(sql`delete from byline_poll_public_starts where used_at is null`);
@@ -461,4 +467,149 @@ describe("deleting a poll", () => {
     const { rows } = await db().execute(sql`select (select count(*)::int from byline_poll_responses) as responses, (select count(*)::int from byline_poll_sessions) as sessions, (select count(*)::int from poll_versions) as versions`);
     expect(rows[0]).toEqual({ responses: 0, sessions: 0, versions: 0 });
   });
+});
+
+describe("frozen Poll choice media", () => {
+  async function imageFile(name: string, background: string) {
+    const data = await sharp({ create: { width: 880, height: 560, channels: 3, background } }).png().toBuffer();
+    return { data, name, mimetype: "image/png", size: data.length };
+  }
+
+  const metadata = { credit: "The Weekly Wildcat", copyright: "The Weekly Wildcat" };
+  const makeImage = async (name: string, background: string, alt: string) => payload.create({
+    collection: "media", data: { ...metadata, alt }, file: await imageFile(name, background), overrideAccess: true
+  });
+
+  const mediaEndpoint = "/byline/polls/media/:versionId/:slot/:key";
+  function paramsFor(src: string) {
+    const [versionId, slot, key] = src.split("/").slice(-3);
+    return { versionId, slot, key };
+  }
+  async function bytesFor(src: string) {
+    const req = await createLocalReq({}, payload);
+    req.user = null;
+    req.routeParams = paramsFor(src);
+    const endpoint = pollEndpoints.find(({ path }) => path === mediaEndpoint)!;
+    const response = (await endpoint.handler(req)) as Response;
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    return Buffer.from(await response.arrayBuffer());
+  }
+  function definitionWith(image: SurveyDefinition["lists"][number]["choices"][number]["image"], second: number): SurveyDefinition {
+    return {
+      ...emptyDefinition("Choose a school graphic"),
+      questions: [{ kind: "select_one", name: "logo", label: "Which logo?", required: true, groups: [], list: "logos", appearance: "columns", imageCards: true }],
+      lists: [{ name: "logos", choices: [{ name: "wildcats", label: "Wildcats", image }, { name: "tigers", label: "Tigers", image: { mediaId: second } }] }]
+    };
+  }
+
+  it("freezes the exact rendition and alt text, and only serves signed version assets", async () => {
+    const red = await makeImage("poll-wildcats.png", "#91201a", "Red Wildcat");
+    const blue = await makeImage("poll-tigers.png", "#3347af", "Blue Tiger");
+    const other = await makeImage("poll-unrelated.png", "#9f832d", "Unrelated graphic");
+    await payload.jobs.run({ queue: "media", limit: 30 });
+    const definition = definitionWith({ mediaId: red.id, sourceName: "private-upload-name.png" }, blue.id);
+    const created = await call("post", "/byline/polls/surveys", "editor", { data: { definition } });
+    expect(created.status).toBe(200);
+    const params = { id: created.body.id };
+    const publish = () => call("post", "/byline/polls/surveys/:id/publish", "editor", { params, data: { draftRevision: 1 } });
+    const first = await publish();
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    const original = first.body.current.images.logos.wildcats;
+    expect(original).toMatchObject({ alt: "Red Wildcat", width: 640 });
+    const firstBytes = await bytesFor(original.src);
+    const v1 = await payload.findByID({ collection: "poll-versions", id: first.body.current.id, overrideAccess: true });
+    const manifest = v1.mediaManifest as Array<{ sha256: string }>;
+    expect(createHash("sha256").update(firstBytes).digest("hex")).toBe(manifest[0].sha256);
+    expect(await publicationStore().verify(manifest[0].sha256)).toBe(true);
+    const raw = await payload.findByID({ collection: "poll-versions", id: v1.id, overrideAccess: false, user: accounts.editor });
+    expect(raw).not.toHaveProperty("mediaManifest");
+
+    const enabled = await call("patch", "/byline/polls/surveys/:id", "editor", { params, data: { publicLink: { enabled: true } } });
+    const key = enabled.body.survey.publicLinkSettings.key;
+    const publicPoll = () => call("get", "/byline/polls/public/:key", null, { params: { key } });
+    const publicV1 = (await publicPoll()).body;
+    expect(publicV1.images.logos.wildcats).toEqual(original);
+    expect(publicV1.definition.lists[0].choices[0]).toEqual({ name: "wildcats", label: "Wildcats" });
+    expect(JSON.stringify(publicV1)).not.toMatch(/mediaId|private-upload-name|publicationAssets|mediaManifest|sha256/);
+    const start = await call("post", "/byline/polls/public/:key/start", null, { params: { key } });
+    expect(start.body.images.logos.wildcats).toEqual(original);
+
+    const { token } = await startKioskFor("editor", params.id);
+    const device = (await kiosk("get", "/byline/polls/kiosk", token)).body;
+    expect(device.images.logos.wildcats).toEqual(original);
+    expect(device.definition.lists[0].choices[0]).toEqual({ name: "wildcats", label: "Wildcats" });
+
+    const access = paramsFor(original.src);
+    const unrelated = await payload.findByID({ collection: "media", id: other.id, overrideAccess: true });
+    const unrelatedBlob = (unrelated.publicationAssets?.manifest as { natural: Array<{ sha256: string }> }).natural[0].sha256;
+    for (const invalid of [{ ...access, slot: "1" }, { ...access, key: unrelatedBlob }, { ...access, versionId: String(v1.id + 1) }]) {
+      expect((await call("get", mediaEndpoint, null, { params: invalid })).status).toBe(404);
+    }
+
+    await payload.update({ collection: "media", id: red.id, data: { alt: "Green Wildcat" }, file: await imageFile("poll-wildcats-v2.png", "#28814d"), overrideAccess: true });
+    await payload.jobs.run({ queue: "media", limit: 30 });
+    expect((await publicPoll()).body.images.logos.wildcats).toEqual(original);
+    expect((await bytesFor(original.src)).equals(firstBytes)).toBe(true);
+    const second = await publish();
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    const replacement = second.body.current.images.logos.wildcats;
+    expect(replacement.alt).toBe("Green Wildcat");
+    expect(replacement.src).not.toBe(original.src);
+    expect((await bytesFor(replacement.src)).equals(firstBytes)).toBe(false);
+    expect((await publicPoll()).body.images.logos.wildcats).toEqual(replacement);
+    expect((await kiosk("get", "/byline/polls/kiosk", token)).body.images.logos.wildcats).toEqual(original);
+    expect((await bytesFor(original.src)).equals(firstBytes)).toBe(true);
+
+    // The start token carries the exact version that was projected at start.
+    await db().execute(sql`update byline_poll_public_starts set issued_at = now() - interval '5 seconds' where survey_id = ${params.id}`);
+    const sent = await call("post", "/byline/polls/public/:key/responses", null, {
+      params: { key }, data: { startToken: start.body.startToken, submissionId: "frozen-media-respondent-1", answers: { logo: yes("wildcats") } }
+    });
+    expect(sent.status).toBe(200);
+    const stored = await db().execute(sql`select version_id, answers from byline_poll_responses where survey_id = ${params.id}`);
+    expect(stored.rows[0]).toMatchObject({ version_id: v1.id, answers: { logo: yes("wildcats") } });
+    const uses = await linkedUses({ req: await createLocalReq({ user: accounts.editor }, payload), user: newsroomUser(accounts.editor)!, now: new Date(), timeZone: "America/New_York", admin: "/admin" }, red.id);
+    expect(uses.usages).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "poll-choice", recordId: params.id })]));
+    await expect(payload.delete({ collection: "media", id: red.id, overrideAccess: true })).rejects.toThrow(/used by a Poll/);
+  }, 60_000);
+
+  it("blocks unresolved, missing, wrong-kind and incomplete images and protects draft-only links", async () => {
+    const valid = await makeImage("poll-complete.png", "#88259d", "Purple shape");
+    const noAlt = await makeImage("poll-alt-needed.png", "#bb5f26", "");
+    const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>"];
+    let pdfBody = "%PDF-1.4\n";
+    const offsets = objects.map((object, i) => {
+      const offset = pdfBody.length;
+      pdfBody += `${i + 1} 0 obj\n${object}\nendobj\n`;
+      return offset;
+    });
+    const xref = pdfBody.length;
+    pdfBody += `xref\n0 4\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    const text = Buffer.from(pdfBody, "latin1");
+    const pdf = await payload.create({ collection: "media", data: metadata, file: { name: "poll-document.pdf", mimetype: "application/pdf", size: text.length, data: text } });
+    await payload.jobs.run({ queue: "media", limit: 30 });
+    for (const [image, message] of [
+      [{ sourceName: "unresolved-logo.jpg" }, /matching image for unresolved-logo.jpg/],
+      [{ mediaId: pdf.id }, /Choose a photo or graphic/],
+      [{ mediaId: noAlt.id }, /alt text/i]
+    ] as const) {
+      const result = await call("post", "/byline/polls/surveys", "editor", { data: { definition: definitionWith(image, valid.id) } });
+      expect(result.status).toBe(200);
+      const params = { id: result.body.id };
+      const detail = await call("get", "/byline/polls/surveys/:id", "editor", { params });
+      expect(JSON.stringify(detail.body.draftMediaIssues)).toMatch(message);
+      expect((await call("post", "/byline/polls/surveys/:id/publish", "editor", { params, data: { draftRevision: 1 } })).status).toBe(422);
+    }
+    await expect(payload.delete({ collection: "media", id: valid.id, overrideAccess: true })).rejects.toThrow(/Poll draft/);
+    const draft = definitionWith({ mediaId: 2_000_000_000 }, valid.id);
+    expect((await call("post", "/byline/polls/surveys", "editor", { data: { definition: draft } })).status).toBe(422);
+    // Simulate a legacy or damaged reference that predated the write guard.
+    const saved = await call("post", "/byline/polls/surveys", "editor", { data: { definition: definitionWith(undefined, valid.id) } });
+    await db().execute(sql`update poll_surveys set draft = ${JSON.stringify(draft)}::jsonb where id = ${saved.body.id}`);
+    const refused = await call("post", "/byline/polls/surveys/:id/publish", "editor", { params: { id: saved.body.id }, data: { draftRevision: 1 } });
+    expect(refused.status).toBe(422);
+    expect(JSON.stringify(refused.body)).toMatch(/missing from Media/);
+  }, 60_000);
 });

@@ -1,4 +1,6 @@
 import { APIError, type Access, type CollectionConfig, type Where } from "payload";
+import { normalizeDefinition } from "./definition";
+import { lockPollMediaReferences } from "./media-usage";
 import { atLeast, editorsOnly, newsroomUser, nobody, requestUser, signedIn } from "../access/user";
 
 /**
@@ -52,6 +54,16 @@ export const PollSurveys: CollectionConfig = {
   admin: { useAsTitle: "title", group: "Polls", hidden: hiddenFromStaff, defaultColumns: ["title", "status", "updatedAt"] },
   lockDocuments: false,
   access: { read: surveyRead, create: editorsOnly, update: editorsOnly, delete: ({ req }) => atLeast(requestUser(req), "administrator") },
+  hooks: {
+    beforeChange: [async ({ data, req }) => {
+      if (data.draft != null) {
+        const definition = normalizeDefinition(data.draft);
+        await lockPollMediaReferences(req, definition);
+        data.draft = definition;
+      }
+      return data;
+    }]
+  },
   fields: [
     { name: "title", type: "text", required: true, maxLength: 200 },
     { name: "description", type: "textarea", maxLength: 2000 },
@@ -103,6 +115,7 @@ export const PollVersions: CollectionConfig = {
     { name: "number", type: "number", required: true, min: 1 },
     { name: "label", type: "text", maxLength: 240 },
     { name: "definition", type: "json", required: true },
+    { name: "mediaManifest", type: "json", admin: { hidden: true }, access: { read: () => false } },
     { name: "sourceFilename", type: "text", maxLength: 300 },
     { name: "sourceSha256", type: "text", maxLength: 64 },
     { name: "note", type: "text", maxLength: 500 },

@@ -56,7 +56,7 @@ export type MediaLibraryAsset = {
   canDelete: boolean;
 };
 
-export type MediaUsageKind = "story-featured" | "story-body" | "production-assignment" | "collection-artwork" | "collection-resource" | "live-update-photo" | "person-portrait";
+export type MediaUsageKind = "story-featured" | "story-body" | "production-assignment" | "collection-artwork" | "collection-resource" | "live-update-photo" | "person-portrait" | "poll-choice";
 
 /** A record that links to the asset through a relationship. */
 export type MediaUsage = {

@@ -1,5 +1,6 @@
 import { choicesFor, rangeValues, sectionLabel } from "./logic";
-import { isAnswerable, KIND_LABELS, type AnswerableQuestion, type QuestionKind, type StoredAnswer, type StoredAnswers, type SurveyDefinition } from "./types";
+import { matricesFor } from "./presentation";
+import { isAnswerable, isSelect, KIND_LABELS, type AnswerableQuestion, type QuestionKind, type StoredAnswer, type StoredAnswers, type SurveyDefinition } from "./types";
 
 /**
  * Results from validated responses (docs/wildcat-polls.md#results).
@@ -23,6 +24,13 @@ export type ResponseRow = {
 
 export type QuestionBase = { total: number; shown: number; answered: number; skipped: number; unanswered: number; notApplicable: number };
 export type ChoiceResult = { name: string; label: string; count: number; percent: number | null };
+export type RankingOption = {
+  name: string; label: string; base: number; averagePosition: number | null;
+  firstPlaceCount: number; firstPlacePercent: number | null; positions: number[];
+};
+export type ConfirmationResult = { confirmed: number; base: number };
+export type MatrixResult = { name: string; label: string; rows: string[]; columns: Array<{ name: string; label: string }> };
+
 export type NumericResult = { mean: number | null; median: number | null; min: number | null; max: number | null; distribution: Array<{ value: number; count: number }> };
 
 export type QuestionResult = {
@@ -36,18 +44,21 @@ export type QuestionResult = {
   /** Multiple choice: percentages are of respondents who answered, and add up to more than 100. */
   multiple?: boolean;
   numeric?: NumericResult;
+  ranking?: RankingOption[];
+  confirmation?: ConfirmationResult;
   /** Written answers, newest first. Never broken down by group. */
   texts?: Array<{ responseId: number; text: string }>;
 };
 
 export type BreakdownCell = { count: number; percent: number | null };
-export type BreakdownGroup = { name: string; label: string; base: number; suppressed: boolean; cells: Record<string, BreakdownCell> };
-export type Breakdown = { by: string; byLabel: string; question: string; questionLabel: string; choices: Array<{ name: string; label: string }>; groups: BreakdownGroup[] };
+export type BreakdownGroup = { name: string; label: string; base: number; suppressed: boolean; cells: Record<string, BreakdownCell>; ranking?: RankingOption[] };
+export type Breakdown = { kind?: "rank" | "acknowledge"; by: string; byLabel: string; question: string; questionLabel: string; choices: Array<{ name: string; label: string }>; groups: BreakdownGroup[] };
 
 export type SurveyResults = {
   responses: number;
   questions: QuestionResult[];
   breakdowns: Breakdown[];
+  matrices: MatrixResult[];
   minimumGroup: number;
 };
 
@@ -61,7 +72,7 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid] : round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-const statusOf = (answers: StoredAnswers, name: string): StoredAnswer => answers[name] ?? { status: "not_applicable" };
+const statusOf = (answers: StoredAnswers, name: string): StoredAnswer => Object.hasOwn(answers, name) ? answers[name] : { status: "not_applicable" };
 
 /** The questions results can be compared by: the poll's configured breakdowns that are single-choice questions. */
 export function compareOptions(definition: SurveyDefinition): Array<{ name: string; label: string }> {
@@ -69,6 +80,29 @@ export function compareOptions(definition: SurveyDefinition): Array<{ name: stri
     const question = definition.questions.find((entry) => entry.name === name);
     return question?.kind === "select_one" ? [{ name, label: question.label }] : [];
   });
+}
+
+function rankOptions(choices: readonly { name: string; label: string }[], values: readonly unknown[]): RankingOption[] {
+  const entries = new Map(choices.map((choice) => [choice.name, { name: choice.name, label: choice.label, positions: [] as number[] }]));
+  let longest = choices.length;
+  for (const value of values) {
+    if (!Array.isArray(value)) continue;
+    longest = Math.max(longest, value.length);
+    value.forEach((name: string, index) => {
+      const option = entries.get(name) ?? { name, label: name, positions: [] };
+      option.positions[index] = (option.positions[index] ?? 0) + 1;
+      entries.set(name, option);
+    });
+  }
+  return [...entries.values()].map((option) => {
+    const positions = Array.from({ length: longest }, (_, i) => option.positions[i] ?? 0);
+    const base = positions.reduce((sum, count) => sum + count, 0);
+    const average = base ? positions.reduce((sum, count, index) => sum + count * (index + 1), 0) / base : null;
+    return {
+      name: option.name, label: option.label, base, positions, average, averagePosition: average === null ? null : round(average),
+      firstPlaceCount: positions[0] ?? 0, firstPlacePercent: pct(positions[0] ?? 0, base)
+    };
+  }).sort((a, b) => (a.average ?? Infinity) - (b.average ?? Infinity)).map(({ average: _average, ...option }) => option);
 }
 
 export function summarize(definition: SurveyDefinition, rows: readonly ResponseRow[], options: { minimumGroup: number; breakdowns?: readonly string[] }): SurveyResults {
@@ -94,6 +128,10 @@ export function summarize(definition: SurveyDefinition, rows: readonly ResponseR
       const extra = [...counts.keys()].filter((name) => !known.some((choice) => choice.name === name)).map((name) => ({ name, label: name }));
       result.choices = [...known, ...extra].map((choice) => ({ name: choice.name, label: choice.label, count: counts.get(choice.name) ?? 0, percent: pct(counts.get(choice.name) ?? 0, base.answered) }));
       result.multiple = question.kind === "select_multiple";
+    } else if (question.kind === "rank") {
+      result.ranking = rankOptions(choicesFor(definition, question), answered.map(({ value }) => value));
+    } else if (question.kind === "acknowledge") {
+      result.confirmation = { confirmed: answered.filter(({ value }) => value === "OK").length, base: base.shown };
     } else if (question.kind === "text") {
       result.texts = answered
         .map(({ row, value }) => ({ responseId: row.id, at: row.submittedAt, text: String(value) }))
@@ -115,9 +153,17 @@ export function summarize(definition: SurveyDefinition, rows: readonly ResponseR
     questions.push(result);
   }
   const breakdowns = (options.breakdowns ?? definition.settings.breakdowns)
-    .flatMap((by) => definition.questions.filter((question) => question.name !== by && (question.kind === "select_one" || question.kind === "select_multiple")).map((question) => breakdown(definition, rows, by, question as AnswerableQuestion, options.minimumGroup)))
+    .flatMap((by) => definition.questions.filter((question) => question.name !== by && (isSelect(question) || question.kind === "rank" || question.kind === "acknowledge")).map((question) => breakdown(definition, rows, by, question as AnswerableQuestion, options.minimumGroup)))
     .filter((entry): entry is Breakdown => entry !== null);
-  return { responses: rows.length, questions, breakdowns, minimumGroup: options.minimumGroup };
+  const byName = new Map(questions.map((question) => [question.name, question]));
+  const matrices = matricesFor(definition).map(({ group, rows: members }) => {
+    const columns = new Map<string, { name: string; label: string }>();
+    for (const member of members) {
+      for (const choice of byName.get(member.name)?.choices ?? []) columns.set(choice.name, { name: choice.name, label: choice.label });
+    }
+    return { name: group.name, label: group.label, rows: members.map(({ name }) => name), columns: [...columns.values()] };
+  });
+  return { responses: rows.length, questions, breakdowns, matrices, minimumGroup: options.minimumGroup };
 }
 
 /** One question by one demographic. A group's base is the respondents in it who answered the question. */
@@ -125,14 +171,32 @@ export function breakdown(definition: SurveyDefinition, rows: readonly ResponseR
   const byQuestion = definition.questions.find((entry) => entry.name === by);
   if (!byQuestion || byQuestion.kind !== "select_one") return null;
   const groups = choicesFor(definition, byQuestion);
-  const choices = choicesFor(definition, question);
+  const rankingQuestion = question.kind === "rank";
+  const confirmation = question.kind === "acknowledge";
+  const choices = confirmation ? [{ name: "OK", label: "Confirmed" }] : [...choicesFor(definition, question)];
   const answeredIn = groups.map((group) => rows.flatMap((row) => {
     const byState = statusOf(row.answers, by);
     if (byState.status !== "answered" || byState.value !== group.name) return [];
     const state = statusOf(row.answers, question.name);
-    return state.status === "answered" ? [state.value] : [];
+    if (state.status === "answered") return [state.value];
+    return confirmation && state.status !== "not_applicable" ? [""] : [];
   }));
-  const withheld = new Set(answeredIn.flatMap((answered, index) => (answered.length < minimumGroup ? [index] : [])));
+  if (isSelect(question)) {
+    const known = new Set(choices.map(({ name }) => name));
+    for (const values of answeredIn) {
+      for (const value of values) {
+        for (const name of Array.isArray(value) ? value : [String(value)]) {
+          if (known.has(name)) continue;
+          known.add(name);
+          choices.push({ name, label: name });
+        }
+      }
+    }
+  }
+  const rankings = rankingQuestion ? answeredIn.map((values) => rankOptions(choices, values)) : undefined;
+  const withheld = new Set(answeredIn.flatMap((answered, index) => (
+    answered.length < minimumGroup || rankings?.[index].some(({ base }) => base > 0 && base < minimumGroup) ? [index] : []
+  )));
   // Secondary suppression: if exactly one group with anyone in it is withheld, the
   // overall result minus the others would give it away, so the next smallest is withheld too.
   const occupiedWithheld = [...withheld].filter((index) => answeredIn[index].length > 0);
@@ -142,13 +206,15 @@ export function breakdown(definition: SurveyDefinition, rows: readonly ResponseR
   }
   return {
     by, byLabel: byQuestion.label, question: question.name, questionLabel: question.label,
+    ...(rankingQuestion ? { kind: "rank" as const } : confirmation ? { kind: "acknowledge" as const } : {}),
     choices: choices.map(({ name, label }) => ({ name, label })),
     groups: groups.map((group, index) => {
       const answered = answeredIn[index];
       const base = answered.length;
       // A withheld group carries nothing: no base, no counts, no percentages.
       if (withheld.has(index)) return { name: group.name, label: group.label, base: 0, suppressed: true, cells: Object.fromEntries(choices.map((choice) => [choice.name, { count: 0, percent: null }])) };
-      const cells: Record<string, BreakdownCell> = {};
+      if (rankings) return { name: group.name, label: group.label, base, suppressed: false, cells: {}, ranking: rankings[index] };
+      const cells: Record<string, BreakdownCell> = Object.create(null);
       for (const choice of choices) {
         const count = answered.filter((value) => (Array.isArray(value) ? value.includes(choice.name) : value === choice.name)).length;
         cells[choice.name] = { count, percent: pct(count, base) };
@@ -247,14 +313,45 @@ export function responsesCsv(definition: SurveyDefinition, rows: readonly Respon
 
 /** The aggregate table: what could be released, never individual answers. Written answers are not included. */
 export function summaryCsv(results: SurveyResults): string {
-  const lines = [csvLine(["question", "label", "type", "choice", "choice_label", "count", "percent", "base_answered", "skipped", "unanswered", "not_applicable"])];
+  const header = ["question", "label", "type", "choice", "choice_label", "count", "percent", "base_answered", "skipped", "unanswered", "not_applicable", "matrix", "average_position", "first_place_count", "first_place_percent", "base", "positions", "compare_by", "group"];
+  const lines = [csvLine(header)];
+  const append = (cells: unknown[]) => lines.push(csvLine(Array.from({ length: header.length }, (_, i) => cells[i])));
+  const matrixLabels = new Map(results.matrices.flatMap((matrix) => matrix.rows.map((name) => [name, matrix.label] as const)));
+  const questions = new Map(results.questions.map((question) => [question.name, question]));
   for (const q of results.questions) {
-    const tail = [q.base.answered, q.base.skipped, q.base.unanswered, q.base.notApplicable];
-    if (q.choices) for (const c of q.choices) lines.push(csvLine([q.name, q.label, q.kindLabel, c.name, c.label, c.count, c.percent ?? "", ...tail]));
+    const head = [q.name, q.label, q.kindLabel];
+    const tail = [q.base.answered, q.base.skipped, q.base.unanswered, q.base.notApplicable, matrixLabels.get(q.name)];
+    if (q.choices) for (const c of q.choices) append([...head, c.name, c.label, c.count, c.percent, ...tail]);
+    else if (q.ranking) for (const option of q.ranking) append([
+      ...head, option.name, option.label, null, null, ...tail,
+      option.averagePosition, option.firstPlaceCount, option.firstPlacePercent, option.base, option.positions.join(" ")
+    ]);
+    else if (q.confirmation) append([...head, "OK", "Confirmed", q.confirmation.confirmed, null, ...tail, null, null, null, q.confirmation.base]);
     else if (q.numeric) {
-      for (const d of q.numeric.distribution) lines.push(csvLine([q.name, q.label, q.kindLabel, d.value, d.value, d.count, pct(d.count, q.base.answered) ?? "", ...tail]));
-      lines.push(csvLine([q.name, q.label, q.kindLabel, "mean", "Mean", q.numeric.mean ?? "", "", ...tail]));
-    } else lines.push(csvLine([q.name, q.label, q.kindLabel, "", "", q.base.answered, "", ...tail]));
+      for (const d of q.numeric.distribution) append([...head, d.value, d.value, d.count, pct(d.count, q.base.answered), ...tail]);
+      append([...head, "mean", "Mean", q.numeric.mean, null, ...tail]);
+    } else append([...head, null, null, q.base.answered, null, ...tail]);
+  }
+  for (const entry of results.breakdowns) {
+    const head = [entry.question, entry.questionLabel, questions.get(entry.question)?.kindLabel];
+    const matrix = matrixLabels.get(entry.question);
+    for (const group of entry.groups) {
+      if (group.suppressed) continue;
+      if (entry.kind === "rank") {
+        for (const option of group.ranking ?? []) append([
+          ...head, option.name, option.label, null, null, group.base, null, null, null, matrix,
+          option.averagePosition, option.firstPlaceCount, option.firstPlacePercent, option.base, option.positions.join(" "), entry.byLabel, group.label
+        ]);
+      } else {
+        for (const choice of entry.choices) {
+          const cell = group.cells[choice.name];
+          append([
+            ...head, choice.name, choice.label, cell?.count, cell?.percent, entry.kind === "acknowledge" ? null : group.base,
+            null, null, null, matrix, null, null, null, group.base, null, entry.byLabel, group.label
+          ]);
+        }
+      }
+    }
   }
   return `${lines.join("\r\n")}\r\n`;
 }

@@ -6,6 +6,8 @@ import {
   pollTemplate, publishSurvey, saveLocation, surveyDetail, surveyResults, surveyWorkbook, updateSurvey, versionDetail
 } from "./server";
 
+import { pollMediaEndpoint } from "./media";
+
 const sessionParam = (value: unknown) => String(value ?? "");
 
 /**
@@ -15,6 +17,7 @@ const sessionParam = (value: unknown) => String(value ?? "");
  * routes are anonymous and act only on an open, enabled public poll.
  */
 export const pollEndpoints: Endpoint[] = [
+  pollMediaEndpoint,
   { path: "/byline/polls", method: "get", handler: handle((ctx) => pollsOverview(ctx)) },
   { path: "/byline/polls/import", method: "post", handler: handle((ctx, req) => importSpreadsheet(ctx, req)) },
   { path: "/byline/polls/files/:file", method: "get", handler: handle(async (ctx, req) => pollTemplate(ctx, String(req.routeParams?.file ?? ""))) },

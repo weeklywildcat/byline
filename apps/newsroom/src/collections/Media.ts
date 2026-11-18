@@ -1,3 +1,4 @@
+import { protectPollMedia } from "../polls/media-usage";
 import { protectStoryMedia } from "../newsroom/story-media-uses";
 import { artDirectionIntentsEqual, normalizeArtDirectionIntent, type ImageDimensions } from "@byline/core";
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook, type CollectionConfig, type PayloadRequest } from "payload";
@@ -194,7 +195,7 @@ export const Media: CollectionConfig = {
     delete: ({ req }) => atLeast(requestUser(req), "editor")
   },
   hooks: {
-    beforeDelete: [protectStoryMedia],
+    beforeDelete: [protectStoryMedia, protectPollMedia],
     beforeOperation: [stripNativeFocalEdits, normalizeApplePhotos],
     beforeChange: [
       ({ data, operation, req }) => {

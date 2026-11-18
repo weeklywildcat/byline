@@ -9,6 +9,9 @@ import { useCallback, useMemo, useState } from "react";
 import { choicesFor, describeCondition, expressionValue, visibleQuestionNames } from "../../polls/engine/logic";
 import { isAnswerable, KIND_LABELS, type Answers, type Question, type SurveyDefinition } from "../../polls/engine/types";
 import type { ImportIssue } from "../../polls/engine/xlsform";
+import { useDraftChoiceImages } from "./ChoiceMedia";
+import { respondentScreens, screenQuestions } from "../../polls/engine/presentation";
+import type { ChoiceImages } from "../../polls/engine/types";
 import { SurveyRunner } from "./runner/SurveyRunner";
 
 /** Problems in the workbook, errors first, each with the sheet and row to fix. */
@@ -103,18 +106,25 @@ function Condition({ text, prefix = "Shown when" }: { text: string; prefix?: str
  * The real respondent screen with a path tracker beside it: answer as a
  * student would and watch which questions apply, and why. Nothing is saved.
  */
-export function PreviewPanel({ definition }: { definition: SurveyDefinition }) {
+export function PreviewPanel({ definition, frozenImages }: { definition: SurveyDefinition; frozenImages?: ChoiceImages }) {
+  const draftImages = useDraftChoiceImages(frozenImages ? undefined : definition);
+  const images = frozenImages ?? draftImages;
   const [run, setRun] = useState(0);
   const [progress, setProgress] = useState<{ answers: Answers; current: string | null }>({ answers: {}, current: null });
   const onProgress = useCallback((state: { answers: Answers; current: string | null }) => setProgress(state), []);
   const visible = useMemo(() => visibleQuestionNames(definition, progress.answers), [definition, progress.answers]);
-  const conditional = definition.questions.filter((question) => question.relevant);
-  const branches = conditional.filter((question) => visible.has(question.name)).length;
+  const screens = useMemo(() => respondentScreens(definition), [definition]);
+  const groups = new Map(definition.groups.map((group) => [group.name, group]));
+  const conditions = (questions: Question[]) => [...new Set(questions.flatMap((question) => [
+    ...question.groups.map((name) => groups.get(name)?.relevant), question.relevant
+  ]).filter(Boolean))];
+  const conditional = screens.filter((screen) => conditions(screenQuestions(screen)).length);
+  const branches = conditional.filter((screen) => screenQuestions(screen).some(({ name }) => visible.has(name))).length;
   const restart = () => { setRun((n) => n + 1); setProgress({ answers: {}, current: null }); };
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]" data-polls-preview="">
       <div className="h-[min(78dvh,52rem)] min-h-[34rem] overflow-y-auto rounded-lg border">
-        <SurveyRunner key={run} definition={definition} mode="preview" embedded onProgress={onProgress} onSubmit={async () => ({ status: "saved" })} />
+        <SurveyRunner key={run} definition={definition} images={images} mode="preview" embedded onProgress={onProgress} onSubmit={async () => ({ status: "saved" })} />
       </div>
       <aside className="flex flex-col gap-3 lg:max-h-[min(78dvh,52rem)] lg:overflow-y-auto" aria-label="Path through the poll">
         <div className="flex items-center justify-between gap-2">
@@ -127,24 +137,31 @@ export function PreviewPanel({ definition }: { definition: SurveyDefinition }) {
             : "Every question is asked of everyone. Nothing is saved."}
         </p>
         <ol className="flex flex-col divide-y rounded-lg border text-sm" data-polls-path="">
-          {definition.questions.map((question: Question) => {
-            const shown = visible.has(question.name);
-            const state = progress.answers[question.name];
-            const value = state?.status === "answered" ? labelFor(definition, question, expressionValue(state)) : state?.status === "skipped" ? "Skipped" : null;
-            const current = progress.current === question.name;
+          {screens.map((screen) => {
+            const questions = screenQuestions(screen);
+            const shown = questions.some((question) => visible.has(question.name));
+            const current = progress.current === screen.name;
+            const title = screen.kind === "matrix" ? screen.matrix.group.label : screen.question.label;
+            const values = questions.flatMap((question) => {
+              const state = progress.answers[question.name];
+              if (!state) return [];
+              const value = state.status === "answered" ? labelFor(definition, question, expressionValue(state)) : "Skipped";
+              return [{ name: question.name, value: screen.kind === "matrix" ? `${question.label} · ${value}` : value }];
+            });
             return (
-              <li key={question.name} className={cn("flex flex-col gap-0.5 px-3 py-2", !shown && "text-muted-foreground/70", current && "bg-muted")} aria-current={current ? "step" : undefined} data-path-state={shown ? (value ? "answered" : "pending") : "not-applicable"}>
+              <li key={screen.name} className={cn("flex flex-col gap-0.5 px-3 py-2", !shown && "text-muted-foreground/70", current && "bg-muted")}
+                aria-current={current ? "step" : undefined} data-path-state={shown ? (values.length ? "answered" : "pending") : "not-applicable"}>
                 <span className="flex items-start gap-2">
-                  <span className={cn("line-clamp-2 flex-1", !shown && "line-through")}>{question.label}</span>
+                  <span className={cn("line-clamp-2 flex-1", !shown && "line-through")}>{title}</span>
                   {!shown ? <Badge variant="outline" className="shrink-0 font-normal">Not asked</Badge> : current ? <Badge variant="secondary" className="shrink-0 font-normal">Now</Badge> : null}
                 </span>
-                {value ? <span className={cn("text-xs", state?.status === "answered" ? "font-medium text-foreground" : "text-muted-foreground")}>{value}</span> : null}
-                {question.relevant ? (
-                  <span className="inline-flex items-start gap-1 text-xs text-muted-foreground">
+                {values.map(({ name, value }) => <span key={name} className="text-xs font-medium wrap-anywhere">{value}</span>)}
+                {conditions(questions).map((condition) => (
+                  <span key={condition} className="inline-flex items-start gap-1 text-xs text-muted-foreground">
                     <GitBranch className="mt-px size-3 shrink-0" aria-hidden="true" />
-                    {shown ? "Asked because " : "Asked only when "}{describeCondition(definition, question.relevant)}
+                    {shown ? "Asked because " : "Asked only when "}{describeCondition(definition, condition)}
                   </span>
-                ) : null}
+                ))}
               </li>
             );
           })}
@@ -155,9 +172,10 @@ export function PreviewPanel({ definition }: { definition: SurveyDefinition }) {
 }
 
 function labelFor(definition: SurveyDefinition, question: Question, value: string | number | boolean): string {
-  if (question.kind === "select_one" || question.kind === "select_multiple") {
+  if (question.kind === "acknowledge") return value === "OK" ? "Confirmed" : "";
+  if (question.kind === "select_one" || question.kind === "select_multiple" || question.kind === "rank") {
     const choices = choicesFor(definition, question);
-    return String(value).split(" ").map((name) => choices.find((choice) => choice.name === name)?.label ?? name).join(", ");
+    return String(value).split(" ").map((name) => choices.find((choice) => choice.name === name)?.label ?? name).join(question.kind === "rank" ? " → " : ", ");
   }
   return String(value);
 }

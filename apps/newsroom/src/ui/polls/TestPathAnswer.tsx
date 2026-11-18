@@ -7,6 +7,7 @@ import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { useId, useState } from "react";
 import { answerProblem, choicesFor, rangeValues, TEXT_ANSWER_MAX } from "../../polls/engine/logic";
 import { type AnswerableQuestion, type Answers, type AnswerState, type SurveyDefinition } from "../../polls/engine/types";
+import { RankAnswer } from "./runner/RankAnswer";
 import { PollSelect } from "./fields";
 
 export function TestPathAnswer({ definition, question, answers, onAnswer }: {
@@ -60,6 +61,14 @@ export function TestPathAnswer({ definition, question, answers, onAnswer }: {
             commit(ordered.length ? { status: "answered", value: ordered } : null);
           }}>Set answer</Button>
         </div>
+      ) : question.kind === "acknowledge" ? (
+        <label className="poll-logic-touch flex items-center gap-2">
+          <Checkbox checked={value === "OK"} onCheckedChange={(checked) => commit(checked ? { status: "answered", value: "OK" } : null)} />
+          I understand
+        </label>
+      ) : question.kind === "rank" ? (
+        <RankAnswer choices={choices} confirmed={Array.isArray(value) ? value : undefined}
+          onConfirm={(order) => commit({ status: "answered", value: order })} onClear={() => commit(null)} />
       ) : question.kind === "range" ? (
         <PollSelect label="Test answer" value={String(value)} options={rangeValues(question).map((step) => ({ value: String(step), label: String(step) }))}
           onChange={(choice) => commit({ status: "answered", value: Number(choice) })} />

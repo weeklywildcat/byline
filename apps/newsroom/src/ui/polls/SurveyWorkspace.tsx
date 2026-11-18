@@ -332,7 +332,7 @@ function PreviewTab({ data }: { data: SurveyDetail }) {
           </TabsList>
         </Tabs>
       ) : null}
-      {definition && definition.questions.length ? <PreviewPanel key={which} definition={definition} /> : <p className="text-sm text-muted-foreground">Add questions to preview the poll.</p>}
+      {definition && definition.questions.length ? <PreviewPanel key={which} definition={definition} frozenImages={which === "current" ? data.current?.images : undefined} /> : <p className="text-sm text-muted-foreground">Add questions to preview the poll.</p>}
     </section>
   );
 }

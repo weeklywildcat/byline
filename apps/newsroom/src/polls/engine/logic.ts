@@ -1,5 +1,6 @@
 import { compileExpression, evaluateCondition, type Value } from "./expression";
 import {
+  hasChoices,
   isAnswerable,
   type AnswerableQuestion,
   type Answers,
@@ -7,6 +8,7 @@ import {
   type AnswerValue,
   type Choice,
   type Question,
+  type StoredAnswer,
   type StoredAnswers,
   type SurveyDefinition
 } from "./types";
@@ -21,11 +23,11 @@ export const TEXT_ANSWER_MAX = 2000;
 const NUMBER_LIMIT = 1_000_000_000;
 
 export function choicesFor(definition: SurveyDefinition, question: Question): Choice[] {
-  if (question.kind !== "select_one" && question.kind !== "select_multiple") return [];
+  if (!hasChoices(question)) return [];
   return definition.lists.find((list) => list.name === question.list)?.choices ?? [];
 }
 
-/** A question's value in an expression: "" unless answered; a multiple choice is its names joined by spaces. */
+/** A question's value in an expression: "" unless answered; multiple choices and rankings are joined by spaces. */
 export function expressionValue(state: AnswerState | undefined): Value {
   if (!state || state.status !== "answered") return "";
   const value = state.value;
@@ -52,7 +54,7 @@ export function visibleQuestionNames(definition: SurveyDefinition, answers: Answ
   const groups = new Map(definition.groups.map((group) => [group.name, group]));
   const visible = new Set<string>();
   const decided = new Set<string>();
-  const value = (name: string): Value => (decided.has(name) && !visible.has(name) ? "" : expressionValue(answers[name]));
+  const value = (name: string): Value => (decided.has(name) && !visible.has(name) ? "" : expressionValue(Object.hasOwn(answers, name) ? answers[name] : undefined));
   const groupCache = new Map<string, boolean>();
   const groupRelevant = (name: string): boolean => {
     const cached = groupCache.get(name);
@@ -140,6 +142,16 @@ export function valueProblem(definition: SurveyDefinition, question: AnswerableQ
       if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !names.has(item)) || new Set(value).size !== value.length) return "Choose at least one of the answers.";
       return null;
     }
+    case "rank": {
+      const names = new Set(choicesFor(definition, question).map((choice) => choice.name));
+      if (!Array.isArray(value) || value.length === 0 || value.length !== names.size
+        || new Set(value).size !== value.length || value.some((item) => !names.has(item))) {
+        return "Put every answer in order, then confirm your ranking.";
+      }
+      return null;
+    }
+    case "acknowledge":
+      return value === "OK" ? null : "Check the confirmation to continue.";
     case "text": {
       if (typeof value !== "string" || !value.trim()) return "Write an answer, or skip this question.";
       if (value.length > TEXT_ANSWER_MAX) return `Keep this under ${TEXT_ANSWER_MAX} characters.`;
@@ -191,7 +203,7 @@ export function checkSubmission(definition: SurveyDefinition, submitted: unknown
   const errors: Array<{ question: string; message: string }> = [];
   if (!submitted || typeof submitted !== "object" || Array.isArray(submitted)) return { ok: false, errors: [{ question: "", message: "The answers are malformed." }] };
   const byName = new Map(definition.questions.map((question) => [question.name, question]));
-  const answers: Answers = {};
+  const answers: Answers = Object.create(null);
   for (const [name, raw] of Object.entries(submitted as Record<string, unknown>)) {
     const question = byName.get(name);
     if (!question || !isAnswerable(question)) { errors.push({ question: name, message: "Not a question in this poll." }); continue; }
@@ -202,27 +214,27 @@ export function checkSubmission(definition: SurveyDefinition, submitted: unknown
   }
   if (errors.length) return { ok: false, errors };
   const visible = visibleQuestionNames(definition, answers);
-  const stored: StoredAnswers = {};
+  const stored = new Map<string, StoredAnswer>();
   let answered = 0;
   for (const question of definition.questions) {
     if (!isAnswerable(question)) continue;
     const state = answers[question.name];
     if (!visible.has(question.name)) {
       if (state) errors.push({ question: question.name, message: "Answered a question that does not apply." });
-      stored[question.name] = { status: "not_applicable" };
+      stored.set(question.name, { status: "not_applicable" });
       continue;
     }
     const problem = answerProblem(definition, question, state, answers);
     if (problem) { errors.push({ question: question.name, message: problem }); continue; }
-    if (!state) stored[question.name] = { status: "unanswered" };
-    else if (state.status === "skipped") stored[question.name] = { status: "skipped" };
+    if (!state) stored.set(question.name, { status: "unanswered" });
+    else if (state.status === "skipped") stored.set(question.name, { status: "skipped" });
     else {
       const value = question.kind === "text" ? String(state.value).trim() : state.value;
-      stored[question.name] = { status: "answered", value };
+      stored.set(question.name, { status: "answered", value });
       answered++;
     }
   }
-  return errors.length ? { ok: false, errors } : { ok: true, stored, answered };
+  return errors.length ? { ok: false, errors } : { ok: true, stored: Object.fromEntries(stored), answered };
 }
 
 /** A readable sentence for a condition, for the review and the editor. */
@@ -239,7 +251,10 @@ export function describeCondition(definition: SurveyDefinition, source: string |
   };
   return source
     .replace(/selected\(\s*\$\{([^}]+)\}\s*,\s*['"‘“]([^'"’”]*)['"’”]\s*\)/g, (_m, q: string, c: string) => `${label(q)} includes ${choice(q, c)}`)
-    .replace(/\$\{([^}]+)\}\s*=\s*['"‘“]([^'"’”]*)['"’”]/g, (_m, q: string, c: string) => `${label(q)} is ${choice(q, c)}`)
+    .replace(/\$\{([^}]+)\}\s*=\s*['"‘“]([^'"’”]*)['"’”]/g, (_m, q: string, c: string) => (
+      c === "OK" && definition.questions.find((question) => question.name === q)?.kind === "acknowledge"
+        ? `${label(q)} is confirmed` : `${label(q)} is ${choice(q, c)}`
+    ))
     .replace(/\$\{([^}]+)\}\s*!=\s*['"‘“]([^'"’”]*)['"’”]/g, (_m, q: string, c: string) => (c === "" ? `${label(q)} is answered` : `${label(q)} is not ${choice(q, c)}`))
     .replace(/\$\{([^}]+)\}/g, (_m, q: string) => label(q));
 }

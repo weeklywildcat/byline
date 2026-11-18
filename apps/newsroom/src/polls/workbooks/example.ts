@@ -121,6 +121,6 @@ export const EXAMPLE_SHEETS: WriteSheet[] = [
 
 export const TEMPLATE_SHEETS: WriteSheet[] = [
   { name: "survey", rows: [SURVEY_HEADER, ["select_one yes_no", "first_question", "Write your first question here", "", "yes"]], widths: [26, 22, 60, 36, 10, 30, 40, 36, 12, 44] },
-  { name: "choices", rows: [["list_name", "name", "label"], ["yes_no", "yes", "Yes"], ["yes_no", "no", "No"]], widths: [18, 18, 44] },
+  { name: "choices", rows: [["list_name", "name", "label", "image"], ["yes_no", "yes", "Yes"], ["yes_no", "no", "No"]], widths: [18, 18, 44, 28] },
   { name: "settings", rows: [["form_title", "form_id", "version", "description", "welcome_message", "thank_you_message", "breakdowns"], ["My poll", "my_poll", "1", "", "", "", ""]], widths: [32, 14, 10, 50, 60, 50, 14] }
 ];

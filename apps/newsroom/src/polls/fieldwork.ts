@@ -14,6 +14,7 @@ import {
   PIN_ATTEMPTS, PIN_LOCK_MS, PIN_PATTERN, PIN_REVOKE_AFTER, publicStartToken, verifyPin, verifySecret
 } from "./kiosk";
 import { formatPairingCode, hashPairingCode, newPairingCode, normalizePairingCode, PAIRING_FAILURES_PER_WINDOW, PAIRING_WINDOW_MS, pairingExpiry, pairingWindow } from "./pairing";
+import { projectRespondent } from "./media";
 import { abandonTicket, endSession, eventCounts, loadSession, loadSurvey, loadVersion, pollDb, versionDefinition, type SurveyDoc } from "./server";
 
 /**
@@ -277,7 +278,7 @@ export async function kioskState(req: PayloadRequest) {
     session: { id: session.id, status: session.status, locationId: session.locationId, locationName: session.locationName, period: session.period, method: session.method, startedAt: session.startedAt.toISOString() },
     survey: { id: survey.id, title: survey.title, open: survey.status === "open" },
     version: { id: version.id, number: version.number },
-    definition: versionDefinition(version),
+    ...projectRespondent(req, version),
     counts,
     mode,
     ticket,
@@ -459,7 +460,9 @@ async function publicSurvey(payload: Payload, key: string): Promise<SurveyDoc> {
 export async function publicPoll(req: PayloadRequest, key: string) {
   const survey = await publicSurvey(req.payload, key);
   const version = await loadVersion(req.payload, Number(relationId(survey.currentVersion)), req);
-  return { title: survey.title, definition: versionDefinition(version), needsCode: Boolean(survey.publicLink?.accessCodeHash), closesAt: survey.publicLink?.closesAt ?? null };
+  const needsCode = Boolean(survey.publicLink?.accessCodeHash);
+  const projection = projectRespondent(req, version);
+  return { title: survey.title, ...projection, ...(needsCode ? { images: {} } : {}), needsCode, closesAt: survey.publicLink?.closesAt ?? null };
 }
 
 /**
@@ -479,8 +482,9 @@ export async function publicStart(req: PayloadRequest, key: string) {
   // Spent and expired tokens are not kept.
   await db.delete(pollPublicStarts).where(lt(pollPublicStarts.issuedAt, new Date(now.getTime() - PUBLIC_TOKEN_HOURS * 3_600_000 * 4)));
   const { token, hash } = publicStartToken();
-  await db.insert(pollPublicStarts).values({ tokenHash: hash, surveyId: survey.id, versionId: Number(relationId(survey.currentVersion)), issuedAt: now });
-  return { startToken: token };
+  const version = await loadVersion(req.payload, Number(relationId(survey.currentVersion)), req);
+  await db.insert(pollPublicStarts).values({ tokenHash: hash, surveyId: survey.id, versionId: version.id, issuedAt: now });
+  return { startToken: token, ...projectRespondent(req, version) };
 }
 
 export async function publicSubmit(req: PayloadRequest, key: string) {

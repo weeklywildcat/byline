@@ -1,6 +1,7 @@
 import { compileExpression, ExpressionError, type ParsedExpression } from "./expression";
 import { groupQuestionIndices } from "./logic";
-import { emptySettings, SURVEY_FORMAT_VERSION, type ChoiceList, type Group, type Question, type QuestionKind, type SurveyDefinition, type SurveySettings } from "./types";
+import { isChoiceImageFilename, isTableGroup, matricesFor, usesImageCards } from "./presentation";
+import { emptySettings, hasChoices, SURVEY_FORMAT_VERSION, type ChoiceList, type Group, type Question, type QuestionKind, type SurveyDefinition, type SurveySettings } from "./types";
 import type { Sheet, Workbook, WriteSheet } from "./xlsx";
 
 /**
@@ -13,7 +14,7 @@ import type { Sheet, Workbook, WriteSheet } from "./xlsx";
 export type ImportIssue = { severity: "error" | "warning"; sheet: string; row?: number; column?: string; message: string };
 export type ImportResult = { definition: SurveyDefinition; issues: ImportIssue[] };
 
-export const DEFINITION_LIMITS = { questions: 300, choicesPerList: 100, lists: 100, label: 1000, hint: 1000, name: 64, groupDepth: 4, rangeSteps: 101 } as const;
+export const DEFINITION_LIMITS = { questions: 300, choicesPerList: 100, lists: 100, label: 1000, hint: 1000, appearance: 1000, name: 64, groupDepth: 4, rangeSteps: 101 } as const;
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 const CHOICE_NAME = /^[^\s'"]+$/;
@@ -34,8 +35,6 @@ const UNSUPPORTED_TYPES: Record<string, string> = {
   video: "Video questions are not supported.",
   file: "File questions are not supported.",
   barcode: "Barcode questions are not supported.",
-  acknowledge: "Acknowledge questions are not supported. Use a note, or a required single-choice question.",
-  rank: "Ranking questions are not supported yet.",
   hidden: "Hidden questions are not supported.",
   "begin repeat": "Repeats are not supported.",
   "end repeat": "Repeats are not supported.",
@@ -144,7 +143,10 @@ export function importWorkbook(workbook: Workbook): ImportResult {
         let list = lists.find((entry) => entry.name === listName);
         if (!list) { list = { name: listName, choices: [] }; lists.push(list); }
         if (list.choices.some((choice) => choice.name === name)) { error(choicesSheet.name, row.row, `List "${listName}" already has a choice named "${name}".`, "name"); continue; }
-        list.choices.push({ name, label });
+        const image = row.get("image") || row.get("media::image");
+        if (image && !isChoiceImageFilename(image)) error(choicesSheet.name, row.row, "Use an image filename, without a path or URL.", "image");
+        if (image && isChoiceImageFilename(image)) warn(choicesSheet.name, row.row, `“${image}” is referenced by this choice. Choose the matching image from Media before publishing.`, "image");
+        list.choices.push({ name, label, ...(isChoiceImageFilename(image) ? { image: { sourceName: image } } : {}) });
       }
       for (const list of lists) if (list.choices.length > DEFINITION_LIMITS.choicesPerList) error(choicesSheet.name, undefined, `List "${list.name}" has more than ${DEFINITION_LIMITS.choicesPerList} choices.`);
     }
@@ -172,13 +174,18 @@ export function importWorkbook(workbook: Workbook): ImportResult {
       const label = row.get("label");
       const hint = row.get("hint");
       const relevant = row.get("relevant");
+      const appearance = row.get("appearance");
+      if (appearance.length > DEFINITION_LIMITS.appearance) error(sheetName, row.row, "This appearance is too long.", "appearance");
       const source = { sheet: sheetName, row: row.row };
       const at = (message: string, column?: string) => error(sheetName, row.row, message, column);
       if (!type) { if (name || label) at("This row has no type.", "type"); continue; }
       if (type === "begin group" || type === "begin_group") {
         if (!name) { at("A group needs a name.", "name"); continue; }
         if (stack.length >= DEFINITION_LIMITS.groupDepth) at(`Groups can be nested at most ${DEFINITION_LIMITS.groupDepth} deep.`);
-        groups.push({ name, label, ...(relevant ? { relevant } : {}), groups: stack.map((entry) => entry.name), source });
+        groups.push({
+          name, label, ...(hint ? { hint } : {}), ...(appearance ? { appearance } : {}),
+          ...(relevant ? { relevant } : {}), groups: stack.map((entry) => entry.name), source
+        });
         stack.push({ name, row: row.row });
         continue;
       }
@@ -197,7 +204,6 @@ export function importWorkbook(workbook: Workbook): ImportResult {
       const requiredText = row.get("required").toLowerCase();
       if (!TRUE.has(requiredText) && !FALSE.has(requiredText)) at(`Write "yes" or leave required empty (found "${row.get("required")}").`, "required");
       const required = TRUE.has(requiredText);
-      const appearance = row.get("appearance");
       const constraint = row.get("constraint");
       const common = {
         name, label, ...(hint ? { hint } : {}), ...(relevant ? { relevant } : {}), groups: stack.map((entry) => entry.name), source
@@ -217,7 +223,18 @@ export function importWorkbook(workbook: Workbook): ImportResult {
         questions.push({ ...answerable, kind: selectMatch[1] as "select_one" | "select_multiple", list: listName });
         continue;
       }
-      if (type === "select_one" || type === "select_multiple") { at(`Name the choice list after ${type}, for example "${type} yes_no".`, "type"); continue; }
+      const rankMatch = /^rank\s+(\S+)$/.exec(rawType.replace(/^rank/i, "rank"));
+      if (rankMatch) {
+        const listName = rankMatch[1];
+        if (!lists.some((list) => list.name === listName)) at(`There is no choice list named "${listName}" on the choices sheet.`, "type");
+        questions.push({ ...answerable, kind: "rank", list: listName });
+        continue;
+      }
+      if (type === "acknowledge" || type === "trigger") {
+        questions.push({ ...answerable, kind: "acknowledge" });
+        continue;
+      }
+      if (type === "select_one" || type === "select_multiple" || type === "rank") { at(`Name the choice list after ${type}, for example "${type} yes_no".`, "type"); continue; }
       if (type === "note") {
         if (required) warn(sheetName, row.row, "A note cannot be required; this was ignored.", "required");
         if (constraint) warn(sheetName, row.row, "A note has no answer to constrain; this was ignored.", "constraint");
@@ -243,6 +260,12 @@ export function importWorkbook(workbook: Workbook): ImportResult {
 
   const definition: SurveyDefinition = { format: SURVEY_FORMAT_VERSION, settings, questions, groups, lists };
   if (!definition.settings.title) definition.settings.title = definition.settings.formId || "Untitled poll";
+  const matrices = new Set(matricesFor(definition).map(({ group }) => group.name));
+  for (const group of groups) {
+    if (isTableGroup(group) && !matrices.has(group.name)) {
+      warn(sheetName, group.source?.row, `“${group.label || group.name}” is an imported table. The Matrix editor requires direct single-choice rows that share one answer list. The imported structure was kept.`, "appearance");
+    }
+  }
   issues.push(...validateDefinition(definition, { checkUnusedLists: true }));
   return { definition, issues: dedupe(issues) };
 }
@@ -288,20 +311,29 @@ export function validateDefinition(definition: SurveyDefinition, options: { chec
     if (names.has(question.name)) error(question, `The name "${question.name}" is used twice.`, "name");
     names.set(question.name, { kind: "question", index });
     if (!question.label.trim()) error(question, `Question "${question.name}" has no label.`, "label");
-    if (question.kind === "select_one" || question.kind === "select_multiple") {
+    if (hasChoices(question)) {
       const list = definition.lists.find((entry) => entry.name === question.list);
       if (!list) error(question, `There is no choice list named "${question.list}".`, "type");
       else if (list.choices.length < 2) error(question, `List "${question.list}" needs at least two choices.`, "type");
     }
   });
+  const listNames = new Set<string>();
   for (const list of definition.lists) {
+    if (!NAME.test(list.name) || list.name.length > DEFINITION_LIMITS.name) {
+      issues.push({ severity: "error", sheet: "choices", message: `“${list.name}” is not a valid list name.` });
+    }
+    if (listNames.has(list.name)) issues.push({ severity: "error", sheet: "choices", message: `List “${list.name}” is defined twice.` });
+    listNames.add(list.name);
     const seen = new Set<string>();
     for (const choice of list.choices) {
+      if (!CHOICE_NAME.test(choice.name) || choice.name.length > DEFINITION_LIMITS.name) {
+        issues.push({ severity: "error", sheet: "choices", message: `List “${list.name}” has an invalid answer identifier “${choice.name}”.` });
+      }
       if (seen.has(choice.name)) issues.push({ severity: "error", sheet: "choices", message: `List "${list.name}" has two choices named "${choice.name}".` });
       seen.add(choice.name);
       if (!choice.label.trim()) issues.push({ severity: "error", sheet: "choices", message: `Choice "${choice.name}" in "${list.name}" has no label.` });
     }
-    if (options.checkUnusedLists && !definition.questions.some((question) => (question.kind === "select_one" || question.kind === "select_multiple") && question.list === list.name)) {
+    if (options.checkUnusedLists && !definition.questions.some((question) => hasChoices(question) && question.list === list.name)) {
       issues.push({ severity: "warning", sheet: "choices", message: `List "${list.name}" is not used by any question.` });
     }
   }
@@ -327,7 +359,7 @@ export function validateDefinition(definition: SurveyDefinition, options: { chec
     for (const { question: ref, choice } of parsed.selectedRefs) {
       const target = questionByName.get(ref)?.question;
       if (!target || choice === null) continue;
-      if (target.kind === "select_one" || target.kind === "select_multiple") {
+      if (hasChoices(target)) {
         const list = definition.lists.find((entry) => entry.name === target.list);
         if (list && !list.choices.some((entry) => entry.name === choice)) error(owner, `${column}: "${choice}" is not a choice of \${${ref}} (list "${target.list}").`, column);
       }
@@ -392,11 +424,11 @@ export const hasErrors = (issues: readonly ImportIssue[]) => issues.some((issue)
 
 /* ------------------------------------------------------------------ export */
 
-const KIND_TYPE: Record<QuestionKind, string> = { select_one: "select_one", select_multiple: "select_multiple", text: "text", integer: "integer", decimal: "decimal", range: "range", note: "note" };
+const KIND_TYPE: Record<QuestionKind, string> = { select_one: "select_one", select_multiple: "select_multiple", rank: "rank", acknowledge: "acknowledge", text: "text", integer: "integer", decimal: "decimal", range: "range", note: "note" };
 
 /** A definition as an XLSForm workbook: the same format the importer reads, so a draft can round-trip. */
 export function definitionToSheets(definition: SurveyDefinition): WriteSheet[] {
-  const survey: string[][] = [["type", "name", "label", "hint", "required", "relevant", "constraint", "constraint_message", "appearance", "parameters"]];
+  const survey: string[][] = [["type", "name", "label", "hint", "required", "relevant", "constraint", "constraint_message", "appearance", "parameters", "required_message"]];
   const open: string[] = [];
   const closeTo = (depth: number) => { while (open.length > depth) { open.pop(); survey.push(["end group"]); } };
   const groupByName = new Map(definition.groups.map((group) => [group.name, group]));
@@ -406,22 +438,26 @@ export function definitionToSheets(definition: SurveyDefinition): WriteSheet[] {
     closeTo(common);
     for (const name of question.groups.slice(common)) {
       const group = groupByName.get(name);
-      survey.push(["begin group", name, group?.label ?? "", "", "", group?.relevant ?? ""]);
+      survey.push(["begin group", name, group?.label ?? "", group?.hint ?? "", "", group?.relevant ?? "", "", "", group?.appearance ?? ""]);
       open.push(name);
     }
-    const type = question.kind === "select_one" || question.kind === "select_multiple" ? `${KIND_TYPE[question.kind]} ${question.list}` : KIND_TYPE[question.kind];
+    const type = hasChoices(question) ? `${KIND_TYPE[question.kind]} ${question.list}` : KIND_TYPE[question.kind];
     const answerable = question.kind !== "note";
     const parameters = question.kind === "range" ? [`start=${question.start}`, `end=${question.end}`, `step=${question.step}`, ...(question.startLabel ? [`start_label='${question.startLabel}'`] : []), ...(question.endLabel ? [`end_label='${question.endLabel}'`] : [])].join(" ") : "";
-    const appearance = question.kind === "text" && question.multiline ? "multiline" : answerable ? question.appearance ?? "" : "";
-    survey.push([type, question.name, question.label, question.hint ?? "", answerable && question.required ? "yes" : "", question.relevant ?? "", answerable ? question.constraint ?? "" : "", answerable ? question.constraintMessage ?? "" : "", appearance, parameters]);
+    const appearance = answerable && usesImageCards(definition, question) ? question.appearance || "columns"
+      : question.kind === "text" && question.multiline ? question.appearance || "multiline"
+      : answerable ? question.appearance ?? "" : "";
+    survey.push([type, question.name, question.label, question.hint ?? "", answerable && question.required ? "yes" : "", question.relevant ?? "", answerable ? question.constraint ?? "" : "", answerable ? question.constraintMessage ?? "" : "", appearance, parameters, answerable ? question.requiredMessage ?? "" : ""]);
   }
   closeTo(0);
-  const choices: string[][] = [["list_name", "name", "label"], ...definition.lists.flatMap((list) => list.choices.map((choice) => [list.name, choice.name, choice.label]))];
+  const choices: string[][] = [["list_name", "name", "label", "image"], ...definition.lists.flatMap((list) =>
+    list.choices.map((choice) => [list.name, choice.name, choice.label, choice.image?.sourceName ?? (choice.image?.mediaId ? `${list.name}-${choice.name}.webp` : "")])
+  )];
   const s = definition.settings;
   const settings: string[][] = [["form_title", "form_id", "version", "description", "welcome_message", "thank_you_message", "breakdowns"], [s.title, s.formId, s.version, s.description, s.welcome, s.thankYou, s.breakdowns.join(" ")]];
   return [
-    { name: "survey", rows: survey, widths: [26, 22, 60, 36, 10, 40, 30, 30, 14, 30] },
-    { name: "choices", rows: choices, widths: [20, 22, 50] },
+    { name: "survey", rows: survey, widths: [26, 22, 60, 36, 10, 40, 30, 30, 14, 30, 35] },
+    { name: "choices", rows: choices, widths: [20, 22, 50, 30] },
     { name: "settings", rows: settings, widths: [36, 22, 12, 50, 50, 50, 24] }
   ];
 }
