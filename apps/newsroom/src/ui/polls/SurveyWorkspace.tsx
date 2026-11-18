@@ -18,7 +18,7 @@ import { BarChart3, ChevronDown, CircleAlert, CircleCheck, Download, Eye, Folder
 import { useState, type ComponentType } from "react";
 import { hasErrors } from "../../polls/engine/xlsform";
 import { useNewsroomRoutes } from "../shell/account";
-import { fetchSurvey, formatWhen, pollKeys, publishSurvey, workbookHref, type SurveyDetail } from "./api";
+import { fetchSurvey, formatWhen, pollKeys, publishSurvey, saveFile, workbookHref, type SurveyDetail } from "./api";
 import { Collect } from "./Collect";
 import { ListSkeleton, PageHeader, PollsBreadcrumb, PollStatus, usePollsNavigation } from "./PollStudio";
 import { BuildEditor } from "./QuestionsEditor";
@@ -103,7 +103,7 @@ export function SurveyWorkspace({ id, tab, startFieldwork = false }: { id: numbe
                 <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="More actions for this poll" />}><MoreHorizontal /></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem onClick={() => go({ view: "import", poll: id })}><Upload />Import a new version</DropdownMenuItem>
-                  {data.draft ? <DropdownMenuItem render={<a href={workbookHref(api, id)} download />}><Download />Download the draft (.xlsx)</DropdownMenuItem> : null}
+                  {data.draft ? <DropdownMenuItem onClick={saveFile(workbookHref(api, id), "poll-draft.xlsx")}><Download />Download the draft (.xlsx)</DropdownMenuItem> : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
@@ -303,7 +303,7 @@ function Overview({ data, onOpen, onPublish }: { data: SurveyDetail; onOpen: (ta
                     </ItemContent>
                     {manage ? (
                       <ItemActions>
-                        <Button nativeButton={false} variant="ghost" size="icon-sm" aria-label={`Download version ${version.number} as a spreadsheet`} render={<a href={workbookHref(api, survey.id, version.id)} download />}><Download /></Button>
+                        <Button type="button" variant="ghost" size="icon-sm" aria-label={`Download version ${version.number} as a spreadsheet`} onClick={saveFile(workbookHref(api, survey.id, version.id), `poll-version-${version.number}.xlsx`)}><Download /></Button>
                       </ItemActions>
                     ) : null}
                   </Item>

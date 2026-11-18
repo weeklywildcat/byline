@@ -26,7 +26,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
 import type { Breakdown, FieldworkRow, MatrixResult, QuestionResult, RankingOption, SurveyResults } from "../../polls/engine/results";
 import { useNewsroomRoutes } from "../shell/account";
-import { createResultsDataset, exportHref, fetchResults, formatWhen, pollKeys, type SurveyResultsView } from "./api";
+import { createResultsDataset, exportHref, fetchResults, formatWhen, pollKeys, saveFile, type SurveyResultsView } from "./api";
 import { PollSelect } from "./fields";
 import { ListSkeleton } from "./PollStudio";
 
@@ -170,8 +170,8 @@ function ResultsToolbar({ data, filters, search, onChange, onClear, id }: { data
         <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuGroup>
             <DropdownMenuLabel className="font-normal text-muted-foreground">{filtered ? `CSV with the ${chips.length} filter${chips.length === 1 ? "" : "s"} shown` : "CSV of all responses"}</DropdownMenuLabel>
-            <DropdownMenuItem render={<a href={exportHref(api, id, "summary", search)} download />}>Summary CSV (aggregates)</DropdownMenuItem>
-            <DropdownMenuItem render={<a href={exportHref(api, id, "responses", search)} download />}>Responses CSV (one row each)</DropdownMenuItem>
+            <DropdownMenuItem onClick={saveFile(exportHref(api, id, "summary", search), "poll-summary.csv")}>Summary CSV (aggregates)</DropdownMenuItem>
+            <DropdownMenuItem onClick={saveFile(exportHref(api, id, "responses", search), "poll-responses.csv")}>Responses CSV (one row each)</DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
