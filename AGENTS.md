@@ -28,6 +28,7 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 
 Use Node.js 24.22.1 or newer. Run `npm ci` for a fresh checkout or after a dependency change.
 
+- Before using ui-sdk in the newsroom, follow the `ui-sdk` skill if it is installed and read `node_modules/@ui-sdk/react/docs/llms.txt`. When building a new component, also search `node_modules/@ui-sdk/react/docs/core.md` by heading and read `rendering.md` in the same directory.
 - Web: `npm run typecheck:frontend` and `npm run test:frontend`. For routing, SEO, build, or snapshot changes, run a fixture build: `BYLINE_CONTENT_MODE=weekly-wildcat-fixture npm run build:frontend`. For browser checks, build with `BYLINE_CONTENT_MODE=weekly-wildcat-browser-fixture` before running `npm run test:frontend:browser`.
 - Newsroom: `npm run typecheck:newsroom` and `npm run test:newsroom`. Access, hook, or schema changes also need `npm run test:newsroom:integration`; schema changes need a committed migration.
 - Shared packages: `npm run typecheck:packages`, `npm run test:packages`, and checks for the consumers affected.
