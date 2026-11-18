@@ -14,6 +14,11 @@ type Raw = Record<string, unknown>;
 const record = (value: unknown): Raw => (value && typeof value === "object" && !Array.isArray(value) ? value as Raw : {});
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.slice(0, max) : "");
 const optional = (value: unknown, max: number) => { const result = text(value, max).trim(); return result ? result : undefined; };
+// Keep the spelling of an existing XLSForm condition when other draft fields change.
+const relevance = (value: unknown) => {
+  const expression = text(value, 1000);
+  return expression.trim() ? { relevant: expression } : {};
+};
 const list = (value: unknown, max: number, what: string): unknown[] => {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new APIError(`The poll's ${what} must be a list.`, 400);
@@ -40,7 +45,7 @@ export function normalizeDefinition(input: unknown): SurveyDefinition {
   });
   const groups: Group[] = list(raw.groups, 100, "groups").map((entry) => {
     const item = record(entry);
-    return { name: text(item.name, DEFINITION_LIMITS.name), label: text(item.label, DEFINITION_LIMITS.label), ...(optional(item.relevant, 1000) ? { relevant: optional(item.relevant, 1000) } : {}), groups: names(item.groups, DEFINITION_LIMITS.groupDepth), ...source(item.source) };
+    return { name: text(item.name, DEFINITION_LIMITS.name), label: text(item.label, DEFINITION_LIMITS.label), ...relevance(item.relevant), groups: names(item.groups, DEFINITION_LIMITS.groupDepth), ...source(item.source) };
   });
   const questions: Question[] = list(raw.questions, DEFINITION_LIMITS.questions, "questions").map((entry) => {
     const item = record(entry);
@@ -50,7 +55,7 @@ export function normalizeDefinition(input: unknown): SurveyDefinition {
       name: text(item.name, DEFINITION_LIMITS.name),
       label: text(item.label, DEFINITION_LIMITS.label),
       ...(optional(item.hint, DEFINITION_LIMITS.hint) ? { hint: optional(item.hint, DEFINITION_LIMITS.hint) } : {}),
-      ...(optional(item.relevant, 1000) ? { relevant: optional(item.relevant, 1000) } : {}),
+      ...relevance(item.relevant),
       groups: names(item.groups, DEFINITION_LIMITS.groupDepth),
       ...source(item.source)
     };

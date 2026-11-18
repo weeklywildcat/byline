@@ -91,6 +91,19 @@ export function screensFor(definition: SurveyDefinition, answers: Answers): Ques
   return definition.questions.filter((question) => visible.has(question.name));
 }
 
+/** The ordered question indices a section controls, including nested members. */
+export function groupQuestionIndices(definition: SurveyDefinition): Map<string, number[]> {
+  const members = new Map<string, number[]>();
+  definition.questions.forEach((question, index) => {
+    for (const name of new Set(question.groups)) {
+      const indices = members.get(name) ?? [];
+      indices.push(index);
+      members.set(name, indices);
+    }
+  });
+  return members;
+}
+
 /** The innermost enclosing group label: the section a question sits in. */
 export function sectionLabel(definition: SurveyDefinition, question: Question): string {
   for (let i = question.groups.length - 1; i >= 0; i--) {

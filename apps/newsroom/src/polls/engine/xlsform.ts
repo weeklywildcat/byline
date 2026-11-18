@@ -1,4 +1,5 @@
 import { compileExpression, ExpressionError, type ParsedExpression } from "./expression";
+import { groupQuestionIndices } from "./logic";
 import { emptySettings, SURVEY_FORMAT_VERSION, type ChoiceList, type Group, type Question, type QuestionKind, type SurveyDefinition, type SurveySettings } from "./types";
 import type { Sheet, Workbook, WriteSheet } from "./xlsx";
 
@@ -262,10 +263,14 @@ function dedupe(issues: ImportIssue[]): ImportIssue[] {
  * references, valid expressions, choices that exist, no circular or forward
  * conditions.
  */
-export function validateDefinition(definition: SurveyDefinition, options: { checkUnusedLists?: boolean } = {}): ImportIssue[] {
+export function validateDefinition(definition: SurveyDefinition, options: { checkUnusedLists?: boolean; onItemIssue?: (item: Question | Group, issue: ImportIssue) => void } = {}): ImportIssue[] {
   const issues: ImportIssue[] = [];
   const where = (item: { source?: { sheet: string; row: number } }) => ({ sheet: item.source?.sheet ?? "survey", row: item.source?.row });
-  const error = (item: { source?: { sheet: string; row: number } }, message: string, column?: string) => issues.push({ severity: "error", ...where(item), column, message });
+  const error = (item: Question | Group, message: string, column?: string) => {
+    const issue: ImportIssue = { severity: "error", ...where(item), column, message };
+    issues.push(issue);
+    options.onItemIssue?.(item, issue);
+  };
 
   if (!definition.questions.some((question) => question.kind !== "note")) issues.push({ severity: "error", sheet: "survey", message: "The survey has no questions to answer." });
   if (definition.questions.length > DEFINITION_LIMITS.questions) issues.push({ severity: "error", sheet: "survey", message: `A poll can have at most ${DEFINITION_LIMITS.questions} questions.` });
@@ -302,7 +307,7 @@ export function validateDefinition(definition: SurveyDefinition, options: { chec
   }
 
   const questionByName = new Map(definition.questions.map((question, index) => [question.name, { question, index }]));
-  const parse = (owner: { name: string; source?: { sheet: string; row: number } }, source: string, column: "relevant" | "constraint", ownIndex: number): ParsedExpression | null => {
+  const parse = (owner: Question | Group, source: string, column: "relevant" | "constraint", ownIndex: number): ParsedExpression | null => {
     let parsed: ParsedExpression;
     try {
       parsed = compileExpression(source);
@@ -331,12 +336,11 @@ export function validateDefinition(definition: SurveyDefinition, options: { chec
   };
 
   // Group relevance applies to every question inside; the first question in a group is where the group starts.
-  const groupStart = new Map<string, number>();
-  definition.questions.forEach((question, index) => question.groups.forEach((group) => { if (!groupStart.has(group)) groupStart.set(group, index); }));
+  const groupMembers = groupQuestionIndices(definition);
   const edges = new Map<string, Set<string>>();
   for (const group of definition.groups) {
     if (!group.relevant) continue;
-    const parsed = parse(group, group.relevant, "relevant", groupStart.get(group.name) ?? definition.questions.length);
+    const parsed = parse(group, group.relevant, "relevant", groupMembers.get(group.name)?.[0] ?? definition.questions.length);
     if (parsed) for (const question of definition.questions) if (question.groups.includes(group.name)) for (const ref of parsed.refs) {
       if (question.groups.length && definition.questions.find((q) => q.name === ref)?.groups.includes(group.name)) error(group, `relevant: \${${ref}} is inside the group "${group.name}" that it controls.`, "relevant");
       edges.set(question.name, new Set([...(edges.get(question.name) ?? []), ref]));
@@ -366,8 +370,8 @@ export function validateDefinition(definition: SurveyDefinition, options: { chec
         const key = [...cycle].sort().join(",");
         if (!reported.has(key)) {
           reported.add(key);
-          const owner = questionByName.get(name)?.question ?? { source: undefined };
-          error(owner, `These conditions depend on each other in a circle: ${cycle.join(" → ")}.`, "relevant");
+          const owner = questionByName.get(name)?.question;
+          if (owner) error(owner, `These conditions depend on each other in a circle: ${cycle.join(" → ")}.`, "relevant");
         }
       } else if (!state.has(next)) visit(next);
     }

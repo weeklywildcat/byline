@@ -34,18 +34,19 @@ export default defineConfig({
   projects: [
     {
       name: "studio-chromium",
-      testMatch: "polls.spec.ts",
+      testMatch: ["polls.spec.ts", "polls-logic.spec.ts"],
+      grepInvert: /@ipad/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL }
     },
     {
       name: "ipad-landscape",
-      testMatch: "polls-devices.spec.ts",
+      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts"],
       grep: /@ipad/,
       use: { ...devices["iPad Pro 11 landscape"] }
     },
     {
       name: "ipad-portrait",
-      testMatch: "polls-devices.spec.ts",
+      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts"],
       grep: /@ipad/,
       use: { ...devices["iPad Pro 11"] }
     },
