@@ -175,20 +175,20 @@ export function KioskApp({ api, pairHref }: { api: string; pairHref: string }) {
     return () => { window.clearInterval(timer); window.removeEventListener("online", online); };
   }, [flush, store]);
 
-  // Keep the screen on while the session runs; a sleeping iPad interrupts students.
+  // Keep the screen on while the session runs; a sleeping device interrupts students.
   useScreenWakeLock(Boolean(state && !ended));
 
   const submit = useCallback(async (answers: Answers, meta: { startedAt: string; durationMs: number }): Promise<SubmitOutcome> => {
     const ticket = state?.ticket?.id;
     const queue = store ?? memoryStore();
-    if (!ticket || !state) return { status: "failed", message: "This survey wasn't started properly. Hand the iPad back to the interviewer.", retry: false };
+    if (!ticket || !state) return { status: "failed", message: "This survey wasn't started properly. Hand the device back to the interviewer.", retry: false };
     const item: PollUpload = { submissionId: newKey(), sessionId: state.session.id, ticket, answers, startedAt: meta.startedAt, durationMs: meta.durationMs, createdAt: Date.now(), attempts: 0, retryAt: 0, error: null };
     await queue.put(item);
     ticketFinished.current = ticket;
     setPending(await queue.all());
     const result = await send(item);
     if (result.status === "saved") { await queue.remove(item.submissionId); setPending(await queue.all()); void load(); return { status: "saved" }; }
-    if (result.status === "rejected") { await queue.remove(item.submissionId); setPending(await queue.all()); setRejected((count) => count + 1); return { status: "failed", message: "These answers couldn't be accepted. Please hand the iPad back to the interviewer.", retry: false }; }
+    if (result.status === "rejected") { await queue.remove(item.submissionId); setPending(await queue.all()); setRejected((count) => count + 1); return { status: "failed", message: "These answers couldn't be accepted. Please hand the device back to the interviewer.", retry: false }; }
     await queue.put({ ...item, attempts: 1, retryAt: Date.now() + 2000, error: result.error });
     setPending(await queue.all());
     return { status: "queued" };
@@ -268,7 +268,7 @@ function Loading({ offline, onRetry }: { offline: boolean; onRetry: () => void }
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><CloudOff /></EmptyMedia>
-            <EmptyTitle>This iPad can't reach Byline</EmptyTitle>
+            <EmptyTitle>This device can't reach Byline</EmptyTitle>
             <EmptyDescription>Check the Wi-Fi, then try again.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent><Button type="button" size="lg" className="h-12 px-5 text-base" onClick={onRetry}>Try again</Button></EmptyContent>
@@ -285,7 +285,7 @@ function Ended({ pairHref, message, counts }: { pairHref: string; message: strin
         <h1 className="text-3xl font-semibold tracking-tight">Session ended</h1>
         <p className="text-lg leading-relaxed">{message}</p>
         {counts ? <p className="text-muted-foreground tabular-nums">{counts.completed} completed · {counts.declined} declined · {counts.abandoned} incomplete</p> : null}
-        <div className="pt-2"><Button nativeButton={false} size="lg" className="h-14 px-6 text-lg" render={<a href={pairHref} />}>Pair this iPad with a new code</Button></div>
+        <div className="pt-2"><Button nativeButton={false} size="lg" className="h-14 px-6 text-lg" render={<a href={pairHref} />}>Set up this device with a new code</Button></div>
         <p className="text-sm text-muted-foreground">Start a session in Poll Studio on your own phone or laptop to get a code.</p>
       </div>
     </Shell>
@@ -347,13 +347,13 @@ function InterviewerPanel({ state, pending, durable, online, rejected, onAct, on
           <Alert variant="destructive" data-polls-offline="">
             <CloudOff />
             <AlertTitle>No connection</AlertTitle>
-            <AlertDescription>{durable ? "You can keep polling: finished surveys are encrypted on this iPad and upload when it reconnects." : "This browser can't keep answers safely offline. Reconnect before the next survey."}</AlertDescription>
+            <AlertDescription>{durable ? "You can keep polling: finished surveys are encrypted on this device and upload when it reconnects." : "This browser can't keep answers safely offline. Reconnect before the next survey."}</AlertDescription>
           </Alert>
         ) : pending > 0 ? (
           <Alert>
             <Cloud />
             <AlertTitle>{pending} {pending === 1 ? "survey is" : "surveys are"} uploading</AlertTitle>
-            <AlertDescription>{durable ? "Encrypted on this iPad until Byline confirms it has them." : "Keep the iPad connected until this reaches 0."}</AlertDescription>
+            <AlertDescription>{durable ? "Encrypted on this device until Byline confirms it has them." : "Keep the device connected until this reaches 0."}</AlertDescription>
           </Alert>
         ) : null}
         {rejected ? <p className="text-sm font-medium text-destructive" role="alert">{rejected} response{rejected === 1 ? " was" : "s were"} refused by the server and not saved.</p> : null}
@@ -406,8 +406,8 @@ function InterviewerPanel({ state, pending, durable, online, rejected, onAct, on
             ) : null}
           </div>
           <details className="text-sm text-muted-foreground">
-            <summary className="cursor-pointer py-2 font-medium">Before you hand the iPad over</summary>
-            <p className="leading-relaxed">Lock it first. For extra safety, turn on Guided Access (Settings → Accessibility → Guided Access, then triple-click the side or home button) to keep it on this page. {durable ? "Finished surveys waiting to upload are encrypted on this iPad and deleted once Byline has them." : "This browser can't store answers securely, so keep the iPad connected until “Waiting to upload” is 0."}</p>
+            <summary className="cursor-pointer py-2 font-medium">Before you hand the device over</summary>
+            <p className="leading-relaxed">Lock it first. On an iPad, you can also turn on Guided Access (Settings → Accessibility → Guided Access, then triple-click the side or home button) to keep it on this page. {durable ? "Finished surveys waiting to upload are encrypted on this device and deleted once Byline has them." : "This browser can't store answers securely, so keep the device connected until “Waiting to upload” is 0."}</p>
           </details>
         </div>
       </div>
@@ -428,7 +428,7 @@ function InterviewerPanel({ state, pending, durable, online, rejected, onAct, on
           <AlertDialogHeader>
             <AlertDialogTitle>End this session?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pending ? `${pending} response${pending === 1 ? " is" : "s are"} still waiting to upload and will be lost if you end now. Connect to Wi-Fi and wait for it to reach 0.` : "This iPad leaves the poll. To poll again, pair it with a new code from Poll Studio."}
+              {pending ? `${pending} response${pending === 1 ? " is" : "s are"} still waiting to upload and will be lost if you end now. Connect to Wi-Fi and wait for it to reach 0.` : "This device leaves the poll. To poll again, pair it with a new code from Poll Studio."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -488,7 +488,7 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const title = reason === "finished" ? "Please hand the iPad back." : reason === "stopped" ? "Hand the iPad back to the interviewer." : state.survey.title;
+  const title = reason === "finished" ? "Please hand the device back." : reason === "stopped" ? "Hand the device back to the interviewer." : state.survey.title;
   return (
     <Shell className="grid place-items-center">
       <div className="flex w-full max-w-sm flex-col items-center gap-6 py-8">
