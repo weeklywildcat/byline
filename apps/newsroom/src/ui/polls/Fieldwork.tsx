@@ -29,10 +29,10 @@ import { QrCode } from "./QrCode";
 
 /**
  * Fieldwork (docs/wildcat-polls.md#collect): choose the poll, where you are and
- * when, and a PIN, then put the session on the iPad you'll hand to students.
+ * when, and a PIN, then put the session on the device you'll hand to students.
  *
  * Pairing is the recommended way: Poll Studio shows a six-digit code that
- * lasts as long as you choose (up to two days), the iPad types it at /poll,
+ * lasts as long as you choose (up to two days), the device types it at /poll,
  * and it never signs in to Byline. "Use this device" turns the signed-in
  * device itself into the kiosk, which signs it out of Byline on the server.
  */
@@ -73,7 +73,7 @@ function PinFields({ pin, again, onPin, onAgain }: { pin: string; again: string;
   return (
     <FieldSet>
       <FieldLegend>Interviewer PIN</FieldLegend>
-      <FieldDescription>Only you can open the interviewer controls on the iPad. 4 to 8 digits, not your Byline password.</FieldDescription>
+      <FieldDescription>Only you can open the interviewer controls on the device. 4 to 8 digits, not your Byline password.</FieldDescription>
       <div className="grid max-w-sm grid-cols-2 gap-3">
         <FormField id={`${id}-pin`} label="PIN">
           <Input id={`${id}-pin`} type="password" inputMode="numeric" autoComplete="off" maxLength={8} value={pin} aria-invalid={problem ? true : undefined} onChange={(event) => onPin(event.target.value.replace(/\D/g, ""))} />
@@ -115,7 +115,7 @@ function ExpiryField({ value, onChange, timeZone }: { value: Expiry; onChange: (
   return (
     <FieldSet>
       <FieldLegend>Code lasts</FieldLegend>
-      <FieldDescription>Set the iPad up now, or later: the code works once, until it expires. Two days at most.</FieldDescription>
+      <FieldDescription>Set the device up now, or later: the code works once, until it expires. Two days at most.</FieldDescription>
       <ToggleGroup variant="outline" aria-label="How long the pairing code lasts" className="flex-wrap" value={[value.preset]} onValueChange={(next: unknown[]) => { if (typeof next[0] === "string") onChange({ ...value, preset: next[0] }); }}>
         {PRESETS.map((entry) => <ToggleGroupItem key={entry.value} value={entry.value}>{entry.label}</ToggleGroupItem>)}
         <ToggleGroupItem value="custom">Until…</ToggleGroupItem>
@@ -134,7 +134,7 @@ export type FieldworkPoll = { id: number; title: string; versionNumber: number |
 type Place = { id: number; name: string };
 
 /** `/admin/polls?view=fieldwork`: choose one of your polls, then set up. */
-export function Fieldwork() {
+export function Fieldwork({ setupDevice = false }: { setupDevice?: boolean } = {}) {
   const { api } = useNewsroomRoutes();
   const overview = useQuery({ queryKey: pollKeys.overview(), queryFn: () => fetchOverview(api) });
   const data = overview.data;
@@ -143,8 +143,14 @@ export function Fieldwork() {
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-[760px] flex-col gap-6 px-4 py-5 lg:px-6" data-polls-fieldwork="">
       <div className="flex flex-col gap-4">
-        <PollsBreadcrumb trail={[{ label: "Start fieldwork" }]} />
-        <PageHeader level="detail" title="Start fieldwork" description="Set up a session here, then pair the iPad you'll hand to students with a six-digit code. It never signs in to Byline, and it keeps counts, never names." />
+        <PollsBreadcrumb trail={[{ label: setupDevice ? "Set up this device" : "Start fieldwork" }]} />
+        <PageHeader
+          level="detail"
+          title={setupDevice ? "Set up this device" : "Start fieldwork"}
+          description={setupDevice
+            ? "Choose the poll and fieldwork details. When you start, Byline signs out on this device and opens the locked polling screen."
+            : "Set up a session here, then pair another device with a six-digit code or use this device. A polling device never keeps a Byline sign-in."}
+        />
       </div>
       {overview.isError ? <InlineAlert title="Polls aren't available" onAction={() => void overview.refetch()}>{(overview.error as Error).message}</InlineAlert> : null}
       {!data ? <ListSkeleton /> : !surveys.length ? (
@@ -156,7 +162,7 @@ export function Fieldwork() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <FieldworkSetup polls={surveys} locations={data.locations.filter((location) => location.active)} periods={data.periods} sessions={data.sessions} timeZone={data.timeZone} />
+        <FieldworkSetup polls={surveys} locations={data.locations.filter((location) => location.active)} periods={data.periods} sessions={data.sessions} timeZone={data.timeZone} setupThisDevice={setupDevice} />
       )}
       {mine.length ? (
         <section className="flex flex-col gap-3" aria-labelledby="my-sessions">
@@ -173,7 +179,7 @@ export function Fieldwork() {
  * method, PIN and how long the code lasts. It ends on the pairing code, or
  * hands this device over.
  */
-export function FieldworkSetup({ polls, preselect, locations, periods, sessions, timeZone, onCancel }: {
+export function FieldworkSetup({ polls, preselect, locations, periods, sessions, timeZone, onCancel, setupThisDevice = false }: {
   polls: FieldworkPoll[];
   preselect?: number;
   locations: Place[];
@@ -182,6 +188,8 @@ export function FieldworkSetup({ polls, preselect, locations, periods, sessions,
   sessions: SessionSummary[];
   timeZone: string;
   onCancel?: () => void;
+  /** Entered from /poll → Sign in to Byline: make the secure local handoff the one setup path. */
+  setupThisDevice?: boolean;
 }) {
   const { api } = useNewsroomRoutes();
   const queries = useQueryClient();
@@ -214,7 +222,12 @@ export function FieldworkSetup({ polls, preselect, locations, periods, sessions,
   }
 
   return (
-    <form onSubmit={(event) => { event.preventDefault(); if (ready && minutes) pair.mutate(); }} data-polls-setup="">
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      if (!ready) return;
+      if (setupThisDevice) here.mutate();
+      else if (minutes) pair.mutate();
+    }} data-polls-setup="" data-polls-device-setup={setupThisDevice ? "true" : undefined}>
       <FieldGroup>
         {polls.length > 1 || !preselect ? (
           <>
@@ -253,28 +266,44 @@ export function FieldworkSetup({ polls, preselect, locations, periods, sessions,
         <FieldSet>
           <FieldLegend>Sampling method</FieldLegend>
           <TextField label="How you'll choose students" value={method} onChange={setMethod} maxLength={200} optional placeholder="e.g. Every third student in the lunch line"
-            hint="Shown large on the iPad's interviewer screen while you choose who to approach, and reported with the results." />
+            hint="Shown large on the device's interviewer screen while you choose who to approach, and reported with the results." />
         </FieldSet>
 
         <FieldSeparator />
         <PinFields pin={pin} again={again} onPin={setPin} onAgain={setAgain} />
 
-        <FieldSeparator />
-        <ExpiryField value={expiry} onChange={setExpiry} timeZone={timeZone} />
+        {!setupThisDevice ? (
+          <>
+            <FieldSeparator />
+            <ExpiryField value={expiry} onChange={setExpiry} timeZone={timeZone} />
+          </>
+        ) : null}
 
         <FieldSeparator />
         <Field>
           {pair.isError || here.isError ? <InlineAlert title="Fieldwork didn't start">{((pair.error ?? here.error) as Error).message}</InlineAlert> : null}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="lg" disabled={!ready || !minutes || pair.isPending || here.isPending}>
-              {pair.isPending ? <Spinner data-icon="inline-start" /> : <MonitorSmartphone data-icon="inline-start" />}Get a pairing code
-            </Button>
-            <Button type="button" size="lg" variant="outline" disabled={!ready || pair.isPending || here.isPending} onClick={() => here.mutate()}>
-              {here.isPending ? <Spinner data-icon="inline-start" /> : <Lock data-icon="inline-start" />}Use this device instead
-            </Button>
+            {setupThisDevice ? (
+              <Button type="submit" size="lg" disabled={!ready || here.isPending}>
+                {here.isPending ? <Spinner data-icon="inline-start" /> : <Lock data-icon="inline-start" />}Start polling on this device
+              </Button>
+            ) : (
+              <>
+                <Button type="submit" size="lg" disabled={!ready || !minutes || pair.isPending || here.isPending}>
+                  {pair.isPending ? <Spinner data-icon="inline-start" /> : <MonitorSmartphone data-icon="inline-start" />}Get a pairing code
+                </Button>
+                <Button type="button" size="lg" variant="outline" disabled={!ready || pair.isPending || here.isPending} onClick={() => here.mutate()}>
+                  {here.isPending ? <Spinner data-icon="inline-start" /> : <Lock data-icon="inline-start" />}Use this device instead
+                </Button>
+              </>
+            )}
             {onCancel ? <Button type="button" size="lg" variant="ghost" onClick={onCancel}>Cancel</Button> : null}
           </div>
-          <FieldDescription>Recommended: pair the iPad with a code, so nobody signs in to Byline on it. “Use this device” signs this device out of Byline and locks it to the poll.</FieldDescription>
+          <FieldDescription>
+            {setupThisDevice
+              ? "Starting signs this device out of Byline before the locked polling screen opens. Your interviewer PIN is the only way back to the controls."
+              : "Pair another device with a code, or use this one. Using this device signs it out of Byline and locks it to the poll."}
+          </FieldDescription>
         </Field>
       </FieldGroup>
     </form>
@@ -297,7 +326,7 @@ function lifetime(ms: number, expiresAt: string, timeZone: string): string {
 }
 
 /**
- * A pairing code, ready for the iPad: where to go, the code, how long it
+ * A pairing code, ready for the device: where to go, the code, how long it
  * lasts, and a QR code for the whole link. It watches for the device to arrive.
  */
 export function PairingPanel({ sessionId, code, minutes, session, timeZone, onCode, onDone }: { sessionId: string; code: PairingCode; minutes?: number; session: SessionSummary | undefined; timeZone?: string; onCode: (code: PairingCode) => void; onDone: () => void }) {
@@ -328,7 +357,7 @@ export function PairingPanel({ sessionId, code, minutes, session, timeZone, onCo
     return (
       <Alert data-polls-paired="">
         <CircleCheck />
-        <AlertTitle>The iPad is paired</AlertTitle>
+        <AlertTitle>The device is paired</AlertTitle>
         <AlertDescription className="flex flex-col gap-3">
           <p>It's locked. Enter your PIN on it to open the interviewer controls, then lock it again before you hand it to a student.</p>
           <div><Button type="button" variant="outline" onClick={onDone}>Done</Button></div>
@@ -340,8 +369,8 @@ export function PairingPanel({ sessionId, code, minutes, session, timeZone, onCo
   return (
     <Card data-polls-pairing="">
       <CardHeader>
-        <CardTitle>Pair the iPad</CardTitle>
-        <CardDescription>On the iPad you'll hand to students, open Safari and go to <span className="font-medium text-foreground">{host}{PAIR_PATH}</span>, then enter this code. Nobody signs in to Byline on it.</CardDescription>
+        <CardTitle>Pair the device</CardTitle>
+        <CardDescription>On the device you'll hand to students, open Safari and go to <span className="font-medium text-foreground">{host}{PAIR_PATH}</span>, then enter this code. Nobody signs in to Byline on it.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -362,12 +391,12 @@ export function PairingPanel({ sessionId, code, minutes, session, timeZone, onCo
         {!expired ? (
           <div className="flex flex-col items-center gap-1.5">
             <QrCode value={link} label="QR code for the pairing link" className="w-36" />
-            <span className="text-xs text-muted-foreground">Or scan with the iPad's camera</span>
+            <span className="text-xs text-muted-foreground">Or scan with the device's camera</span>
           </div>
         ) : null}
       </CardContent>
       <CardFooter className="flex flex-wrap gap-2 border-t">
-        <span className="flex-1 text-xs text-muted-foreground">Waiting for the iPad… The code isn't a password: once used, it stops working, and the iPad still needs your PIN.</span>
+        <span className="flex-1 text-xs text-muted-foreground">Waiting for the device… The code isn't a password: once used, it stops working, and the device still needs your PIN.</span>
         <Button type="button" variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate()}>Cancel code</Button>
       </CardFooter>
     </Card>
@@ -483,7 +512,7 @@ function DeviceDialog({ dialog, sessions, timeZone, onClose }: { dialog: NonNull
               <DialogTitle>{dialog.kind === "pair" ? (pending ? "A new pairing code" : "Pair a device") : "Use this device"}</DialogTitle>
               <DialogDescription>
                 {dialog.kind === "pair"
-                  ? pending ? "The code already waiting stops working. Keep its PIN, or choose a new one." : "Choose the PIN for the paired iPad. It starts locked, so only you can open its interviewer controls."
+                  ? pending ? "The code already waiting stops working. Keep its PIN, or choose a new one." : "Choose the PIN for the paired device. It starts locked, so only you can open its interviewer controls."
                   : "This device becomes the kiosk for this session: it signs out of Byline on the server and shows only the poll."}
               </DialogDescription>
             </DialogHeader>
