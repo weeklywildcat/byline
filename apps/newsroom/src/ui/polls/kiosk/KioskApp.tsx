@@ -407,7 +407,7 @@ function InterviewerPanel({ state, pending, durable, online, rejected, onAct, on
           </div>
           <details className="text-sm text-muted-foreground">
             <summary className="cursor-pointer py-2 font-medium">Before you hand the device over</summary>
-            <p className="leading-relaxed">Lock it first. On an iPad, you can also turn on Guided Access (Settings → Accessibility → Guided Access, then triple-click the side or home button) to keep it on this page. {durable ? "Finished surveys waiting to upload are encrypted on this device and deleted once Byline has them." : "This browser can't store answers securely, so keep the iPad connected until “Waiting to upload” is 0."}</p>
+            <p className="leading-relaxed">Lock it first. On an iPad, you can also turn on Guided Access (Settings → Accessibility → Guided Access, then triple-click the side or home button) to keep it on this page. {durable ? "Finished surveys waiting to upload are encrypted on this device and deleted once Byline has them." : "This browser can't store answers securely, so keep the device connected until “Waiting to upload” is 0."}</p>
           </details>
         </div>
       </div>
