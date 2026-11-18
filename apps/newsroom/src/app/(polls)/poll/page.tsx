@@ -3,15 +3,20 @@ import { getPayload } from "payload";
 import { PairingApp } from "../../../ui/polls/kiosk/PairingApp";
 
 /**
- * `/poll`: where a polling device is paired (docs/wildcat-polls.md#pairing-a-device).
- * Anonymous: the device types the short code an interviewer prepared in Poll
- * Studio and receives a kiosk credential for that one session. No Byline
- * sign-in happens here, and nothing about the newsroom is rendered.
+ * `/poll`: the neutral setup entry for a polling device.
+ *
+ * A device can claim a short pairing code anonymously, or the interviewer can
+ * sign in to Byline and return to Poll Studio's device-setup flow. The login
+ * redirect remains inside the admin route; Poll Studio then hands the account
+ * session off for the same session-scoped kiosk credential before polling.
  */
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Wildcat Polls" };
 
 export default async function PairPage() {
   const payload = await getPayload({ config });
-  return <PairingApp api={payload.config.routes.api} />;
+  const { routes, admin } = payload.config;
+  const returnTo = `${routes.admin}/polls?view=fieldwork&setupDevice=1`;
+  const signInHref = `${routes.admin}${admin.routes.login}?${new URLSearchParams({ redirect: returnTo })}`;
+  return <PairingApp api={routes.api} signInHref={signInHref} />;
 }
