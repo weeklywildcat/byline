@@ -13,12 +13,12 @@ export type Recording = { blob: Blob; filename: string; durationMs: number };
 
 const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
 
-function pickType(): string | undefined {
+export function pickType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   return TYPES.find((type) => MediaRecorder.isTypeSupported(type));
 }
 
-const extension = (mime: string) => (mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm");
+export const extension = (mime: string) => (mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm");
 
 /**
  * Records audio in the browser (the phone's microphone). A recording is held

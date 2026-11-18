@@ -15,7 +15,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, D
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@byline/newsroom-ui/ui/input-group";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Camera, ChevronRight, Mic, MoreVertical, Paperclip, Search, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { deskNote, type PublishBlock } from "../../domain/live-coverage";
 import type { FieldFeed, FieldItem, FieldSession } from "../../field/server";
 import { ApiError, getJson, postJson } from "../story/api";
@@ -27,8 +27,9 @@ import { LiveTimeline } from "../live/LiveTimeline";
 import { POSTING_AS_HELP, PostingAsList, PostingAsRow } from "../live/PostingAs";
 import { useLiveDeskControls, type LiveFieldsComponent } from "../live/useLiveDeskControls";
 import { newClientKey, uploadFile } from "../reporting/api";
-import { RecorderPanel, type Recording } from "../reporting/Recorder";
-import { enqueue, indexedDbOutbox, isPhotoFile, memoryOutbox, newItem, outboxLabel, processOutbox, pruneOutbox, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
+import { clock } from "../reporting/Recorder";
+import { captureBlob, discardCapture, enqueue, indexedDbOutbox, isPhotoFile, memoryOutbox, newItem, outboxItems, outboxLabel, processOutbox, pruneOutbox, recoverRecordings, retry, SendError, type Delivery, type OutboxItem, type OutboxStore, type Sender } from "./outbox";
+import { FieldRecorderProvider, LeaveGuardDialog, RecorderDrawer, RecordingBar, RecordingNotice, recordingIsRunning, useFieldRecorder, useFieldRecording } from "./recording";
 
 /**
  * Field Mode (docs/field-mode.md): "What am I covering right now?", then one
@@ -81,17 +82,27 @@ export function FieldApp({ api, admin, account, signedIn }: { api: string; admin
     window.scrollTo(0, 0);
   }, [admin]);
   const outbox = useOutbox(api, account || "anonymous");
+  // One recorder for all of Field: it keeps recording while the reporter moves between the drawer, Stories and the assignments.
+  const recorder = useFieldRecorder(outbox);
   // A locked phone pauses uploads: stay awake only while a capture is actually being sent, never for the whole live session.
   useScreenWakeLock(outbox.online && outbox.items.some((item) => item.state === "sending"));
   if (!signedIn) return null;
   return (
     // Field has no desktop shell, so it owns its toaster: coverage changes and timeline actions report through it.
     <AdminRoot className="byline-field">
-      <div className="min-h-dvh bg-background pt-(--byline-safe-top) pr-[max(1rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1rem,var(--byline-safe-left))] text-foreground" data-field-shell="">
-        <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
-          {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
+      <FieldRecorderProvider recorder={recorder}>
+        <div className="min-h-dvh bg-background text-foreground" data-field-shell="">
+          <RecordingBar />
+          <div className={`${recorder.active && !recorder.open ? "" : "pt-(--byline-safe-top) "}pr-[max(1rem,var(--byline-safe-right))] pb-[max(1.5rem,var(--byline-safe-bottom))] pl-[max(1rem,var(--byline-safe-left))]`}>
+            <div className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 pt-3 [&>*]:min-w-0">
+              <RecordingNotice />
+              {route.story ? <FieldSessionView api={api} route={route} admin={admin} onBack={() => go({ story: null, appointment: null, from: null })} outbox={outbox} /> : <FieldLanding api={api} admin={admin} onOpen={(next) => go({ ...next, from: null })} outbox={outbox} />}
+            </div>
+          </div>
         </div>
-      </div>
+        <RecorderDrawer />
+        <LeaveGuardDialog />
+      </FieldRecorderProvider>
     </AdminRoot>
   );
 }
@@ -103,11 +114,13 @@ type Outbox = ReturnType<typeof useOutbox>;
 function useOutbox(api: string, account: string) {
   const store = useMemo<OutboxStore>(() => (typeof indexedDB === "undefined" ? memoryOutbox() : indexedDbOutbox(account)), [account]);
   const memory = useRef(new Map<string, OutboxItem>());
+  /** Recordings this page is making now: recovery never takes these. */
+  const live = useRef(new Set<string>());
   const [items, setItems] = useState<OutboxItem[]>([]);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const running = useRef(false);
   const queries = useQueryClient();
-  const refresh = useCallback(async () => setItems([...(await store.all()), ...memory.current.values()].sort((a, b) => b.createdAt - a.createdAt)), [store]);
+  const refresh = useCallback(async () => setItems((await outboxItems(store, memory.current)).sort((a, b) => b.createdAt - a.createdAt)), [store]);
 
   const send = useCallback<Sender>(async (item, { photoId, onProgress }) => {
     try {
@@ -141,6 +154,8 @@ function useOutbox(api: string, account: string) {
     if (running.current) { again.current = true; return; }
     running.current = true;
     try {
+      // A recording whose recorder is gone (Field closed or crashed mid-take) is queued from what it saved.
+      await recoverRecordings(store, (item) => recordingIsRunning(item, live.current));
       const changed = await processOutbox(store, memory.current, send, { online: navigator.onLine, onChange: (item) => setItems((list) => list.map((entry) => (entry.key === item.key ? item : entry))) });
       if (changed.some((item) => item.state === "done")) await queries.invalidateQueries({ queryKey: ["byline", "field"] });
       // A live update just sent shows in the timeline now, not on its next poll.
@@ -179,11 +194,24 @@ function useOutbox(api: string, account: string) {
     void run();
   }, [refresh, run, store]);
   const dismiss = useCallback(async (item: OutboxItem) => {
-    memory.current.delete(item.key);
-    await store.remove(item.key);
+    await discardCapture(store, memory.current, item);
     await refresh();
   }, [refresh, store]);
-  return { items, online, add, again: resend, dismiss };
+  /** Saves a copy of a capture's file to the phone (the reporter's way out when Byline refuses a recording). */
+  const download = useCallback(async (item: OutboxItem) => {
+    const blob = await captureBlob(store, memory.current.get(item.key) ?? item);
+    if (!blob) return false;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = item.filename ?? "capture";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return true;
+  }, [store]);
+  return { items, online, add, again: resend, dismiss, download, store, memory: memory.current, live: live.current, refresh };
 }
 
 /* ----------------------------------------------------------------- landing */
@@ -194,7 +222,8 @@ const dayOf = (iso: string, timeZone: string) => new Intl.DateTimeFormat("en-US"
 function FieldLanding({ api, admin, onOpen, outbox }: { api: string; admin: string; onOpen: (route: Omit<Route, "from">) => void; outbox: Outbox }) {
   const feed = useQuery({ queryKey: ["byline", "field", "feed"], queryFn: () => getJson<FieldFeed>(api, "/byline/field"), refetchInterval: 60_000 });
   const [searching, setSearching] = useState(false);
-  const pending = outbox.items.filter((item) => item.state !== "done").length;
+  const pending = outbox.items.filter((item) => item.state !== "done" && item.state !== "recording").length;
+  const { guardLeave } = useFieldRecording();
   const data = feed.data;
   const empty = data && !data.now.length && !data.today.length && !data.upcoming.length;
   return (
@@ -204,7 +233,7 @@ function FieldLanding({ api, admin, onOpen, outbox }: { api: string; admin: stri
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Field</p>
           <h1 className="text-xl font-semibold">What are you covering?</h1>
         </div>
-        <a href={admin || "/admin"} className="text-sm text-muted-foreground underline underline-offset-4">Newsroom</a>
+        <a href={admin || "/admin"} onClick={guardLeave(admin || "/admin", "Go to the newsroom")} className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-4">Newsroom</a>
       </header>
       {pending ? <p role="status" className="text-sm">{pending} capture{pending === 1 ? "" : "s"} still sending{outbox.online ? "" : " (offline)"}.</p> : null}
       {feed.isError ? <p role="alert" className="text-sm text-destructive">{(feed.error as Error).message}</p> : null}
@@ -269,11 +298,13 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
   const deskControls = useLiveDeskControls({ api, storyId, desk: desk.data, busy, tap: true, Fields: FieldEditFields });
   const [sheet, setSheet] = useState<"setup" | "manage" | null>(null);
   const [ending, setEnding] = useState(false);
+  const { guardLeave } = useFieldRecording();
   // Back returns to where Field was opened from: the Story (a fixed address built here, never a URL taken from the page) or the assignments.
   const storyHref = `${admin || "/admin"}/collections/stories/${storyId}`;
   const back = route.from === "story" ? { href: storyHref, label: "Back to the story" } : null;
-  if (session.isError) return <><BackBar onBack={onBack} href={back?.href} /><p role="alert" className="text-sm text-destructive">{(session.error as Error).message}</p></>;
-  if (!data) return <><BackBar onBack={onBack} href={back?.href} /><p role="status" className="text-sm text-muted-foreground">Loading…</p></>;
+  const leaveBack = back ? guardLeave(back.href, back.label) : undefined;
+  if (session.isError) return <><BackBar onBack={onBack} href={back?.href} onLeave={leaveBack} /><p role="alert" className="text-sm text-destructive">{(session.error as Error).message}</p></>;
+  if (!data) return <><BackBar onBack={onBack} href={back?.href} onLeave={leaveBack} /><p role="status" className="text-sm text-muted-foreground">Loading…</p></>;
   const tz = data.timeZone;
   const coverage = data.story.coverage;
   const context = [data.appointment?.startAt ? timeOf(data.appointment.startAt, tz) : null, data.appointment?.location || null].filter(Boolean).join(" · ");
@@ -282,12 +313,13 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
   const goLive = () => void change({ action: "start" }, "You're live.");
   const ended = coverage.mode === "live" && coverage.state === "ended";
   const notStarted = coverage.mode === "live" && coverage.state === "off";
+  const fullStoryHref = `${storyHref}${coverage.mode === "live" ? "?view=write" : ""}`;
   return (
     <>
       <header className="grid grid-cols-[minmax(0,1fr)] gap-1">
         <div className="flex items-center gap-2">
           {back ? (
-            <Button type="button" nativeButton={false} variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label={back.label} render={<a href={back.href} />}><ArrowLeft /></Button>
+            <Button type="button" nativeButton={false} variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label={back.label} render={<a href={back.href} onClick={leaveBack} />}><ArrowLeft /></Button>
           ) : (
             <Button type="button" variant="ghost" size="icon-lg" className="-ml-2 size-11" aria-label="Back to your assignments" onClick={onBack}><ArrowLeft /></Button>
           )}
@@ -296,7 +328,7 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-lg" className="-mr-2 size-11" aria-label="More for this story" />}><MoreVertical /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-56">
-              <DropdownMenuItem className="min-h-11 text-base" render={<a href={`${storyHref}${coverage.mode === "live" ? "?view=write" : ""}`} />}>Open full story</DropdownMenuItem>
+              <DropdownMenuItem className="min-h-11 text-base" render={<a href={fullStoryHref} onClick={guardLeave(fullStoryHref, "Open full story")} />}>Open full story</DropdownMenuItem>
               {data.canControl ? <DropdownMenuSeparator /> : null}
               {data.canControl && coverage.mode === "standard" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("setup")}>Set up live coverage</DropdownMenuItem> : null}
               {data.canControl && coverage.mode === "live" ? <DropdownMenuItem className="min-h-11 text-base" onClick={() => setSheet("manage")}>Manage direct publishers</DropdownMenuItem> : null}
@@ -373,9 +405,9 @@ function FieldSessionView({ api, admin, route, onBack, outbox }: { api: string; 
   );
 }
 
-function BackBar({ onBack, href }: { onBack: () => void; href?: string }) {
+function BackBar({ onBack, href, onLeave }: { onBack: () => void; href?: string; onLeave?: (event: ReactMouseEvent) => void }) {
   return href
-    ? <Button type="button" nativeButton={false} variant="ghost" className={`${TAP} -ml-3 w-fit`} render={<a href={href} />}><ArrowLeft data-icon="inline-start" />Back to the story</Button>
+    ? <Button type="button" nativeButton={false} variant="ghost" className={`${TAP} -ml-3 w-fit`} render={<a href={href} onClick={onLeave} />}><ArrowLeft data-icon="inline-start" />Back to the story</Button>
     : <Button type="button" variant="ghost" className={`${TAP} -ml-3 w-fit`} onClick={onBack}><ArrowLeft data-icon="inline-start" />Assignments</Button>;
 }
 
@@ -384,7 +416,6 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
   const [title, setTitle] = useState("");
   const [keyUpdate, setKeyUpdate] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [recording, setRecording] = useState(false);
   const [choosing, setChoosing] = useState<File | null>(null);
   /** An image chosen with Attach: the reporter says whether it is a photo for the story or a private file. */
   const [attaching, setAttaching] = useState<File | null>(null);
@@ -415,11 +446,10 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
     if (session.assignments.length > 1) { setChoosing(file); return; }
     void sendPhoto(file, session.assignments[0]?.id ?? null);
   };
-  /** A recording made here or uploaded from the phone: the same private, outboxed file. */
-  const keepRecording = (result: Recording) => {
-    setRecording(false);
-    void queue(newItem({ key: newClientKey(), storyId, kind: "recording", blob: result.blob, filename: result.filename, ...(result.durationMs ? { durationMs: result.durationMs } : {}), context }));
-  };
+  // Recording belongs to Field, not this composer: it keeps going when the drawer closes or the reporter leaves this Story.
+  const recorder = useFieldRecording();
+  const recordingHere = recorder.active?.storyId === storyId;
+  const record = () => recorder.openFor({ storyId, story: session.story.headline, context, ...(session.appointment ? { detail: `Filed with ${session.appointment.title}${session.appointment.source ? ` (${session.appointment.source})` : ""}` } : {}) });
   const clear = () => { setText(""); setTitle(""); setKeyUpdate(false); setPhoto(null); };
   const sendFile = (file: File) => void queue(newItem({ key: newClientKey(), storyId, kind: "file", blob: file, filename: file.name || "attachment", context }));
   const onAttach = (file: File | undefined) => {
@@ -461,7 +491,7 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         ) : null}
         <InputGroupAddon align="block-end" className="flex flex-wrap gap-2 border-t px-2 py-2">
           <Button type="button" variant="ghost" className={TAP} onClick={() => photoInput.current?.click()}><Camera data-icon="inline-start" />Photo</Button>
-          <Button type="button" variant="ghost" className={TAP} onClick={() => setRecording(true)}><Mic data-icon="inline-start" />Record</Button>
+          <Button type="button" variant="ghost" className={`${TAP} ${recordingHere ? "text-destructive" : ""}`} onClick={record} data-field-record={recordingHere ? "recording" : "idle"}>{recordingHere ? <><span aria-hidden="true" className="size-2 rounded-full bg-destructive" />Recording {clock(recorder.elapsed)}</> : <><Mic data-icon="inline-start" />Record</>}</Button>
           <Button type="button" variant="ghost" className={TAP} onClick={() => fileInput.current?.click()}><Paperclip data-icon="inline-start" />Attach</Button>
         </InputGroupAddon>
       </InputGroup>
@@ -494,16 +524,6 @@ function Composer({ api, session, appointmentId, outbox }: { api: string; sessio
         </div>
       )}
       {warning ? <p role="alert" className="text-sm font-medium text-destructive">{warning}</p> : null}
-
-      <Drawer open={recording} onOpenChange={setRecording}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>Record</DrawerTitle>
-            <DrawerDescription>{session.appointment?.source ? `Filed with ${session.appointment.title} (${session.appointment.source}). ` : ""}Record now, or upload a recording from this phone. Saved privately to this story. Keep this screen open while recording.</DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-2"><RecorderPanel large label="Start recording" onRecorded={keepRecording} onUploaded={keepRecording} /></div>
-        </DrawerContent>
-      </Drawer>
 
       {postAs ? (
         <Drawer open={switching} onOpenChange={setSwitching}>
@@ -551,17 +571,38 @@ function Recent({ session, outbox }: { session: FieldSession; outbox: Outbox }) 
   const pending = outbox.items.filter((item) => item.storyId === session.story.id && (item.state !== "done" || !session.recent.some((row) => row.key === serverKey(item))));
   // A Publish now that went to the desk instead keeps its reason once the server's own row replaces the outbox row.
   const reasons = new Map(outbox.items.flatMap((item) => (item.kind === "live" && item.state === "done" && item.result?.reason ? [[serverKey(item), deskNote(item.result.reason)] as const] : [])));
+  /** A file or recording that never reached Byline is deleted only after the reporter confirms it. */
+  const [discarding, setDiscarding] = useState<OutboxItem | null>(null);
   return (
     <section aria-label="Recent" className="grid grid-cols-[minmax(0,1fr)] gap-1">
+      <AlertDialog open={discarding !== null} onOpenChange={(open) => { if (!open) setDiscarding(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this {discarding?.kind === "recording" ? "recording" : "file"} from the phone?</AlertDialogTitle>
+            <AlertDialogDescription>{discarding?.filename ?? "It"} never reached Byline. Deleting it here can’t be undone. Save a copy to this phone first if you might need it.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" className={TAP}>Keep it</AlertDialogCancel>
+            <AlertDialogAction type="button" variant="destructive" className={TAP} onClick={() => { const item = discarding!; setDiscarding(null); void outbox.dismiss(item); }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Recent</h2>
       {!pending.length && !session.recent.length ? <p className="text-sm text-muted-foreground">Nothing captured yet.</p> : null}
       <ul className="divide-y border-y">
         {pending.map((item) => (
           <li key={item.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5" data-outbox={item.state}>
             <span className="w-16 shrink-0 text-xs tabular-nums text-muted-foreground">{timeOf(new Date(item.createdAt).toISOString(), tz)}</span>
-            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]}{item.as && item.kind === "live" ? ` by ${item.as.name}` : ""} · {item.text ?? item.filename}</span>
+            <span className="min-w-0 flex-1 truncate text-sm">{KIND_LABEL[item.kind]}{item.as && item.kind === "live" ? ` by ${item.as.name}` : ""} · {item.text ?? item.filename}{item.durationMs && item.kind === "recording" && item.state !== "recording" ? ` · ${clock(item.durationMs)}` : ""}</span>
             <span role="status" className={`text-sm font-medium ${item.state === "failed" || item.memoryOnly ? "text-destructive" : ""}`}>{outboxLabel(item, outbox.online)}</span>
-            {item.state === "failed" ? <div className="flex w-full gap-2"><Button type="button" className={TAP} onClick={() => void outbox.again(item)}>Retry</Button><Button type="button" variant="ghost" className={TAP} onClick={() => void outbox.dismiss(item)}>Discard</Button></div> : null}
+            {item.recovered && item.state !== "done" ? <p className="w-full text-xs text-muted-foreground" data-outbox-recovered="">Recovered: Field closed while this was recording. Everything saved up to then is here.</p> : null}
+            {item.state === "failed" ? (
+              <div className="flex w-full flex-wrap gap-2">
+                <Button type="button" className={TAP} onClick={() => void outbox.again(item)}>Retry</Button>
+                {item.blob || item.chunked ? <Button type="button" variant="outline" className={TAP} onClick={() => void outbox.download(item)}>Save a copy to this phone</Button> : null}
+                <Button type="button" variant="ghost" className={TAP} onClick={() => (item.blob || item.chunked ? setDiscarding(item) : void outbox.dismiss(item))}>Discard</Button>
+              </div>
+            ) : null}
             {item.error && item.state === "failed" ? <p className="w-full text-xs text-destructive">{item.error}</p> : null}
           </li>
         ))}

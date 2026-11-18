@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enqueue, isPhotoFile, memoryOutbox, newItem, outboxLabel, processOutbox, QuotaError, retry, SendError, type OutboxItem, type OutboxResult, type OutboxStore, type Sender } from "../src/ui/field/outbox";
+import { captureBlob, discardCapture, enqueue, isPhotoFile, memoryOutbox, newItem, outboxItems, outboxLabel, processOutbox, pruneOutbox, QuotaError, recoverRecordings, retry, SendError, type OutboxItem, type OutboxResult, type OutboxStore, type Sender } from "../src/ui/field/outbox";
 
 const blob = () => new Blob(["x"], { type: "image/jpeg" });
 
@@ -127,5 +127,98 @@ describe("attach: which files ask 'is this a photo?'", () => {
     expect(isPhotoFile({ name: "notes.pdf", type: "application/pdf" })).toBe(false);
     expect(isPhotoFile({ name: "interview.m4a", type: "audio/mp4" })).toBe(false);
     expect(isPhotoFile({ name: "IMG_4.dng", type: "image/x-adobe-dng" })).toBe(false);
+  });
+});
+
+describe("Field recordings are never lost", () => {
+  const chunk = (text: string) => new Blob([text], { type: "audio/webm" });
+  const recording = (over: Partial<OutboxItem> = {}): OutboxItem => ({ ...newItem({ key: "rec-live", storyId: 1, kind: "recording", chunked: true, mimeType: "audio/webm", filename: "recording.webm", context: { appointmentId: 4 }, createdAt: 1000 }), state: "recording", updatedAt: 1000, ...over });
+
+  it("never sends a recording that is still recording, and says it is saved as it goes", async () => {
+    const store = memoryOutbox();
+    const item = recording();
+    await store.put(item);
+    await store.appendChunk!({ ...item, durationMs: 3000, updatedAt: 4000 }, 0, chunk("a"));
+    const { calls, send } = recorder(() => ({ id: 1, status: "saved" }));
+    await processOutbox(store, new Map(), send, { online: true });
+    expect(calls).toHaveLength(0);
+    expect(outboxLabel((await store.all())[0], true)).toBe("Recording — saved on this phone as it goes");
+  });
+
+  it("recovers a recording whose recorder is gone, from the chunks it saved, and leaves running ones alone", async () => {
+    const store = memoryOutbox();
+    await store.appendChunk!(recording({ durationMs: 6000, updatedAt: 7000 }), 0, chunk("a"));
+    await store.appendChunk!(recording({ durationMs: 6000, updatedAt: 7000 }), 1, chunk("b"));
+    await store.appendChunk!(recording({ key: "rec-other-tab" }), 0, chunk("c"));
+    const recovered = await recoverRecordings(store, (item) => item.key === "rec-other-tab");
+    expect(recovered.map((item) => item.key)).toEqual(["rec-live"]);
+    expect(store.items.get("rec-live")).toMatchObject({ state: "queued", recovered: true, durationMs: 6000 });
+    expect(store.items.get("rec-other-tab")?.state).toBe("recording");
+    expect(await store.chunks!("rec-live")).toHaveLength(2);
+  });
+
+  it("uploads the chunks joined in order as one file, then and only then removes them from the phone", async () => {
+    const store = memoryOutbox();
+    const item = { ...recording(), state: "queued" as const };
+    await store.appendChunk!(item, 1, chunk("world"));
+    await store.appendChunk!(item, 0, chunk("hello "));
+    const sent: string[] = [];
+    const send: Sender = async (payload) => { sent.push(await payload.blob!.text()); return { id: 12, status: "saved" }; };
+    await processOutbox(store, new Map(), send, { online: true });
+    expect(sent).toEqual(["hello world"]);
+    expect(store.items.get("rec-live")).toMatchObject({ state: "done", result: { id: 12 } });
+    // The stored item never held a copy of the audio.
+    expect(store.items.get("rec-live")?.blob).toBeUndefined();
+    expect(store.chunkMap.has("rec-live")).toBe(false);
+  });
+
+  it("keeps the chunks through failed and offline sends, and the reporter can still get the audio back", async () => {
+    const store = memoryOutbox();
+    const item = { ...recording(), state: "queued" as const };
+    await store.appendChunk!(item, 0, chunk("take"));
+    const { send } = recorder((_item, call) => (call === 1 ? new SendError("offline", 0) : new SendError("That recording is larger than 300 MB.", 413)));
+    await processOutbox(store, new Map(), send, { online: true });
+    await processOutbox(store, new Map(), send, { online: true });
+    expect(store.items.get("rec-live")?.state).toBe("failed");
+    expect(await (await captureBlob(store, store.items.get("rec-live")!))!.text()).toBe("take");
+  });
+
+  it("says so when Field closed before anything was saved, without calling the server", async () => {
+    const store = memoryOutbox();
+    await store.put({ ...recording(), state: "queued", recovered: true });
+    const { calls, send } = recorder(() => ({ id: 1, status: "saved" }));
+    await processOutbox(store, new Map(), send, { online: true });
+    expect(calls).toHaveLength(0);
+    expect(store.items.get("rec-live")).toMatchObject({ state: "failed", error: "Nothing of this recording was saved on the phone before Field closed." });
+  });
+
+  it("deletes a recording's audio only on the reporter's discard", async () => {
+    const store = memoryOutbox();
+    const memory = new Map<string, OutboxItem>();
+    const item = { ...recording(), state: "failed" as const };
+    await store.appendChunk!(item, 0, chunk("a"));
+    await pruneOutbox(store, 10 ** 13);
+    expect(store.chunkMap.has("rec-live")).toBe(true);
+    await discardCapture(store, memory, item);
+    expect(store.items.size).toBe(0);
+    expect(store.chunkMap.size).toBe(0);
+  });
+
+  it("lists a memory-only copy in place of the stored one, never both", async () => {
+    const store = memoryOutbox();
+    const memory = new Map<string, OutboxItem>();
+    await store.put(recording());
+    memory.set("rec-live", { ...recording(), state: "queued", memoryOnly: true, chunked: false, blob: chunk("all") });
+    const items = await outboxItems(store, memory);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ state: "queued", memoryOnly: true });
+  });
+
+  it("falls back to memory, never dropping the capture, when the browser's database fails for any reason", async () => {
+    const broken: OutboxStore = { async all() { return []; }, async put() { throw new DOMException("Connection to Indexed Database server lost.", "UnknownError"); }, async remove() {} };
+    const memory = new Map<string, OutboxItem>();
+    const result = await enqueue(broken, memory, newItem({ key: "rec-x", storyId: 1, kind: "recording", blob: chunk("a"), filename: "a.webm", context: {} }));
+    expect(result.safe).toBe(false);
+    expect(memory.get("rec-x")?.memoryOnly).toBe(true);
   });
 });
