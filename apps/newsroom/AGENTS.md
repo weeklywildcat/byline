@@ -25,7 +25,7 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
 - **IDs:** only the controlled import (`context.bylineImport`) may choose an ID;
   run `advanceIdSequences` after importing. Sequences never move backwards.
 - **Wildcat Polls** ([docs/wildcat-polls.md](../../docs/wildcat-polls.md)) is `/admin/polls` (Poll Studio) plus the
-  respondent routes `/poll` (pairing), `/poll/<key>` (web link; `/polls/s/<key>` still works) and `/polls/kiosk`
+  respondent routes `/poll` (device setup by pairing code or a Byline login that hands off to kiosk), `/poll/<key>` (web link; `/polls/s/<key>` still works) and `/polls/kiosk`
   (their own root layout, never the admin). Definitions are
   Payload collections (`poll-surveys`, immutable `poll-versions`, `poll-locations`); sessions, events and answers
   live in `byline_poll_*` tables (`src/polls/db.ts`), never collections, and never in a public projection or
