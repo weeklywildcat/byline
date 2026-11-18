@@ -1,0 +1,2 @@
+@layer ui-sdk;
+@import "@ui-sdk/core/web.css" layer(components);
