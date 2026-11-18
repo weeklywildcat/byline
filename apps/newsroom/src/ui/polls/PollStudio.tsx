@@ -80,8 +80,9 @@ function PollsRouter() {
   const view = params?.get("view");
   const poll = positive(params?.get("poll"));
   const start = params?.get("start") === "1";
+  const setupDevice = params?.get("setupDevice") === "1";
   if (view === "fieldwork" && poll) return <SurveyWorkspace key={`poll-${poll}`} id={poll} tab="collect" startFieldwork />;
-  if (view === "fieldwork") return <Fieldwork key="fieldwork" />;
+  if (view === "fieldwork") return <Fieldwork key={setupDevice ? "device-setup" : "fieldwork"} setupDevice={setupDevice} />;
   if (view === "import") return <ImportFlow key={`import-${poll ?? ""}`} pollId={poll} />;
   if (view === "locations") return <Locations />;
   if (poll) return <SurveyWorkspace key={`poll-${poll}`} id={poll} tab={surveyTab(params?.get("tab"))} startFieldwork={start} />;
