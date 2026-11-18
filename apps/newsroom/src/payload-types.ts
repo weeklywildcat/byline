@@ -1721,6 +1721,15 @@ export interface PollVersion {
     | number
     | boolean
     | null;
+  mediaManifest?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   sourceFilename?: string | null;
   sourceSha256?: string | null;
   note?: string | null;
@@ -2915,6 +2924,7 @@ export interface PollVersionsSelect<T extends boolean = true> {
   number?: T;
   label?: T;
   definition?: T;
+  mediaManifest?: T;
   sourceFilename?: T;
   sourceSha256?: T;
   note?: T;

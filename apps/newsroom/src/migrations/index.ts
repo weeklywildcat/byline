@@ -31,6 +31,7 @@ import * as migration_20261117_161800_donation_waitlist from './20261117_161800_
 import * as migration_20261117_182713_retire_article_polls from './20261117_182713_retire_article_polls';
 import * as migration_20261117_184452_wildcat_polls from './20261117_184452_wildcat_polls';
 import * as migration_20261118_023730_poll_device_pairing from './20261118_023730_poll_device_pairing';
+import * as migration_20261118_133739_poll_version_media_manifest from './20261118_133739_poll_version_media_manifest';
 import * as migration_20261118_135007_google_analytics from './20261118_135007_google_analytics';
 
 export const migrations = [
@@ -198,6 +199,11 @@ export const migrations = [
     up: migration_20261118_023730_poll_device_pairing.up,
     down: migration_20261118_023730_poll_device_pairing.down,
     name: '20261118_023730_poll_device_pairing',
+  },
+  {
+    up: migration_20261118_133739_poll_version_media_manifest.up,
+    down: migration_20261118_133739_poll_version_media_manifest.down,
+    name: '20261118_133739_poll_version_media_manifest',
   },
   {
     up: migration_20261118_135007_google_analytics.up,

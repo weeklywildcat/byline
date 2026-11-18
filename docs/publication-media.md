@@ -372,10 +372,11 @@ build endpoint contract. It is not a runtime or public-delivery dependency.
 
 ## Garbage collection (later)
 
-Nothing deletes prepared objects today: a deployed or retained snapshot may
-reference an older generation. Snapshot retention is now defined (Phase 7: the current artifact, the four newest, a one-day reader grace, at most twenty), but blob deletion stays a separate, later operation. When it is built,
-a collector can delete objects referenced by no current manifest and no
-retained snapshot, after a grace period. Staging files older than an hour can
+Nothing deletes prepared objects today. A deployed or retained snapshot, or an
+immutable Wildcat Poll Version, may reference an older generation. Snapshot retention is now defined (Phase 7: the current artifact, the four newest, a one-day reader grace, at most twenty), but blob deletion stays a separate, later operation. When it is built,
+a collector can delete an object after a grace period once it is absent from
+current manifests, retained snapshots and every retained Poll Version media
+manifest. See [Choice images](wildcat-polls.md#choice-images). Staging files older than an hour can
 be cleared safely (`clearAbandonedStaging`).
 
 ## Deployment

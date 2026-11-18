@@ -14978,6 +14978,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "media_manifest": {
+          "name": "media_manifest",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source_filename": {
           "name": "source_filename",
           "type": "varchar",

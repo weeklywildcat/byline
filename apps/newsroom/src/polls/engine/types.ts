@@ -15,13 +15,21 @@ export const SURVEY_FORMAT_VERSION = 1 as const;
 export type QuestionKind =
   | "select_one"
   | "select_multiple"
+  | "rank"
+  | "acknowledge"
   | "text"
   | "integer"
   | "decimal"
   | "range"
   | "note";
 
-export type Choice = { name: string; label: string };
+/** A newsroom Media reference, or an unresolved XLSForm filename. */
+export type ChoiceImage = { mediaId: number; sourceName?: string } | { sourceName: string; mediaId?: never };
+export type Choice = { name: string; label: string; image?: ChoiceImage };
+
+/** The only image fields the respondent renderer needs. */
+export type RespondentImage = { src: string; alt: string; width: number; height: number };
+export type ChoiceImages = Record<string, Record<string, RespondentImage>>;
 
 export type ChoiceList = { name: string; choices: Choice[] };
 
@@ -45,22 +53,32 @@ type Answerable = QuestionBase & {
   requiredMessage?: string;
   constraint?: string;
   constraintMessage?: string;
-  /** Marks a demographic question: results may break down by it, and small groups are suppressed. */
+  /** XLSForm presentation; it does not affect the stored value. */
   appearance?: string;
 };
 
-export type SelectQuestion = Answerable & { kind: "select_one" | "select_multiple"; list: string };
+export type SelectQuestion<K extends "select_one" | "select_multiple" = "select_one" | "select_multiple"> = Answerable & {
+  kind: K;
+  list: string;
+  /** Byline display override. Imported choices with images can infer this when absent. */
+  imageCards?: boolean;
+};
+export type RankQuestion = Answerable & { kind: "rank"; list: string };
+export type ConfirmationQuestion = Answerable & { kind: "acknowledge" };
+export type ChoiceQuestion = SelectQuestion | RankQuestion;
 export type TextQuestion = Answerable & { kind: "text"; multiline: boolean };
 export type NumberQuestion = Answerable & { kind: "integer" | "decimal" };
 export type RangeQuestion = Answerable & { kind: "range"; start: number; end: number; step: number; startLabel?: string; endLabel?: string };
 
-export type Question = NoteQuestion | SelectQuestion | TextQuestion | NumberQuestion | RangeQuestion;
+export type Question = NoteQuestion | ChoiceQuestion | ConfirmationQuestion | TextQuestion | NumberQuestion | RangeQuestion;
 export type AnswerableQuestion = Exclude<Question, NoteQuestion>;
 
 export type Group = {
   name: string;
   label: string;
   relevant?: string;
+  hint?: string;
+  appearance?: string;
   /** Enclosing groups, outermost first. */
   groups: string[];
   source?: { sheet: string; row: number };
@@ -103,6 +121,12 @@ export type StoredAnswers = Record<string, StoredAnswer>;
 
 export const isAnswerable = (question: Question): question is AnswerableQuestion => question.kind !== "note";
 
+export const isSelect = (question: Question): question is SelectQuestion =>
+  question.kind === "select_one" || question.kind === "select_multiple";
+
+export const hasChoices = (question: Question): question is ChoiceQuestion =>
+  isSelect(question) || question.kind === "rank";
+
 export function emptySettings(title = "Untitled poll"): SurveySettings {
   return { title, formId: "", version: "", description: "", welcome: "", thankYou: "", breakdowns: [] };
 }
@@ -114,6 +138,8 @@ export function emptyDefinition(title?: string): SurveyDefinition {
 export const KIND_LABELS: Record<QuestionKind, string> = {
   select_one: "Single choice",
   select_multiple: "Multiple choice",
+  rank: "Ranking",
+  acknowledge: "Confirmation",
   text: "Written answer",
   integer: "Whole number",
   decimal: "Number",

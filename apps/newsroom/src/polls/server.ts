@@ -16,6 +16,8 @@ import { readWorkbook, WorkbookError, writeWorkbook } from "./engine/xlsx";
 import { hashPin, newPublicKey, normalizeAccessCode } from "./kiosk";
 import { EXAMPLE_SHEETS, EXAMPLE_WORKBOOK_FILE, SPREADSHEET_GUIDE_FILE, TEMPLATE_SHEETS, TEMPLATE_WORKBOOK_FILE } from "./workbooks/example";
 import { SPREADSHEET_GUIDE } from "./workbooks/guide";
+import { projectRespondent, readPollMedia, resolvePollMedia, versionImages } from "./media";
+import { lockPollMediaReferences } from "./media-usage";
 import { collectionPeriods } from "./periods";
 import { createDataset, createRows, deleteDataset } from "../data/server";
 
@@ -49,7 +51,7 @@ export type SurveyDoc = {
   createdAt: string;
 };
 
-export type VersionDoc = { id: number; survey: unknown; number: number; label?: string | null; definition: unknown; sourceFilename?: string | null; note?: string | null; publishedBy?: unknown; publishedAt: string; questionCount?: number | null };
+export type VersionDoc = { id: number; survey: unknown; number: number; label?: string | null; definition: unknown; mediaManifest?: unknown; sourceFilename?: string | null; note?: string | null; publishedBy?: unknown; publishedAt: string; questionCount?: number | null };
 
 export type Drizzle = PostgresAdapter["drizzle"];
 
@@ -256,7 +258,10 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
   const linked = await linkedRecords(ctx, survey);
   const sessions = await sessionSummaries(payload, canManagePolls(ctx.user) ? eq(pollSessions.surveyId, id) : and(eq(pollSessions.surveyId, id), eq(pollSessions.interviewerId, Number(ctx.user.id))), 100);
   const byMode = canViewResults(ctx.user, survey) ? await responseCountsByMode(payload, id) : null;
-  const changed = Boolean(draft && current && !sameDefinition(draft, current.definition));
+  const media = draft ? await resolvePollMedia(ctx.req, draft, false) : null;
+  const changed = Boolean(draft && current && (
+    !sameDefinition(draft, current.definition) || (media && !media.issues.length && !sameMedia(media.manifest, current.mediaManifest))
+  ));
   const { docs: locationDocs } = await payload.find({ collection: POLL_LOCATIONS, where: { active: { equals: true } }, ...system, pagination: false, sort: "name" });
   return {
     me: { id: ctx.user.id },
@@ -281,9 +286,12 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
       linkedCollection: linked.collection
     },
     draft,
-    draftIssues: draft ? validateDefinition(draft) : [],
+    draftIssues: draft ? [...validateDefinition(draft), ...(media?.issues ?? [])] : [],
+    draftMediaIssues: media?.issues ?? [],
     draftChanged: changed,
-    current: current ? { id: current.id, number: current.number, definition: versionDefinition(current) } : null,
+    current: current ? { id: current.id, number: current.number,
+      ...(manage ? { definition: versionDefinition(current), images: versionImages(ctx.req, current.id, current.mediaManifest) } : projectRespondent(ctx.req, current))
+    } : null,
     versions: versions.map((version) => ({ id: version.id, number: version.number, label: version.label ?? "", sourceFilename: version.sourceFilename ?? "", note: version.note ?? "", publishedAt: version.publishedAt, publishedBy: names.get(String(relationId(version.publishedBy))) ?? "", questionCount: version.questionCount ?? 0 })),
     sessions
   };
@@ -293,6 +301,11 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
 export function sameDefinition(a: unknown, b: unknown): boolean {
   const canonical = (definition: unknown) => JSON.stringify(normalizeDefinition(definition), (key, value) => (key === "source" ? undefined : value));
   return canonical(a) === canonical(b);
+}
+
+function sameMedia(a: unknown, b: unknown) {
+  const facts = (value: unknown) => readPollMedia(value).map(({ list, choice, sha256, alt }) => [list, choice, sha256, alt]);
+  return JSON.stringify(facts(a)) === JSON.stringify(facts(b));
 }
 
 async function responseCountsByMode(payload: Payload, surveyId: number): Promise<{ kiosk: number; public: number }> {
@@ -408,14 +421,17 @@ export async function publishSurvey(ctx: ScreenContext, id: number, input: { dra
     const draft = draftOf(survey);
     const issues = validateDefinition(draft);
     if (hasErrors(issues)) throw new APIError("Fix the errors in the questions before publishing.", 422, { issues });
-    const { docs: latest } = await payload.find({ collection: POLL_VERSIONS, where: { survey: { equals: id } }, sort: "-number", limit: 1, ...system, req: ctx.req, select: { number: true, definition: true } });
+    await lockPollMediaReferences(ctx.req, draft, true);
+    const media = await resolvePollMedia(ctx.req, draft, true);
+    if (media.issues.length) throw new APIError("Fix the choice images before publishing.", 422, { issues: media.issues });
+    const { docs: latest } = await payload.find({ collection: POLL_VERSIONS, where: { survey: { equals: id } }, sort: "-number", limit: 1, ...system, req: ctx.req, select: { number: true, definition: true, mediaManifest: true } });
     const previous = latest[0] as unknown as VersionDoc | undefined;
-    if (previous && sameDefinition(previous.definition, draft)) throw new APIError("Nothing has changed since the last published version.", 409);
+    if (previous && sameDefinition(previous.definition, draft) && sameMedia(previous.mediaManifest, media.manifest)) throw new APIError("Nothing has changed since the last published version.", 409);
     const number = (previous?.number ?? 0) + 1;
     const version = await payload.create({
       collection: POLL_VERSIONS, req: ctx.req, ...system,
       data: {
-        survey: id, number, label: `${draft.settings.title} · v${number}`.slice(0, 240), definition: draft as never,
+        survey: id, number, label: `${draft.settings.title} · v${number}`.slice(0, 240), definition: draft as never, mediaManifest: media.manifest as never,
         sourceFilename: survey.draftSource ?? null, note: typeof input.note === "string" ? input.note.slice(0, 500) : null,
         publishedBy: ctx.user.id as number, publishedAt: ctx.now.toISOString(), questionCount: draft.questions.filter(isAnswerable).length
       }
@@ -458,7 +474,7 @@ export async function versionDetail(ctx: ScreenContext, surveyId: number, versio
   if (!canSeeSurvey(ctx.user, survey)) throw new APIError("This poll does not exist.", 404);
   const version = await loadVersion(ctx.req.payload, versionId, ctx.req);
   if (!sameId(relationId(version.survey), surveyId)) throw new APIError("This poll version does not exist.", 404);
-  return { id: version.id, number: version.number, definition: versionDefinition(version) };
+  return { id: version.id, number: version.number, ...projectRespondent(ctx.req, version) };
 }
 
 /* ------------------------------------------------------------------ files */
@@ -718,7 +734,11 @@ export async function exportResponses(ctx: ScreenContext, id: number, params: UR
   const rows = await responsesFor(ctx.req.payload, id, filters);
   const definition = versionDefinition(version);
   const stamp = ctx.now.toISOString().slice(0, 10);
-  if (kind === "summary") return download(summaryCsv(summarize(definition, rows, { minimumGroup: survey.minimumGroup ?? 5 })), "text/csv; charset=utf-8", `${slugify(survey.title)}-summary-${stamp}.csv`);
+  if (kind === "summary") {
+    const compare = compareOptions(definition).find(({ name }) => name === filters.compare);
+    const results = summarize(definition, rows, { minimumGroup: survey.minimumGroup ?? 5, breakdowns: compare ? [compare.name] : [] });
+    return download(summaryCsv(results), "text/csv; charset=utf-8", `${slugify(survey.title)}-summary-${stamp}.csv`);
+  }
   ctx.req.payload.logger.info({ msg: "Poll responses exported", surveyId: id, userId: ctx.user.id, rows: rows.length });
   return download(responsesCsv(definition, rows, new Map(versions.map((entry) => [entry.id, entry.number]))), "text/csv; charset=utf-8", `${slugify(survey.title)}-responses-${stamp}.csv`);
 }

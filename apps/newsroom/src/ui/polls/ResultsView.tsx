@@ -24,7 +24,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Database, Download, Info, ListFilter, X } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
-import type { Breakdown, FieldworkRow, QuestionResult } from "../../polls/engine/results";
+import type { Breakdown, FieldworkRow, MatrixResult, QuestionResult, RankingOption, SurveyResults } from "../../polls/engine/results";
 import { useNewsroomRoutes } from "../shell/account";
 import { createResultsDataset, exportHref, fetchResults, formatWhen, pollKeys, type SurveyResultsView } from "./api";
 import { PollSelect } from "./fields";
@@ -83,12 +83,7 @@ export function ResultsView({ id }: { id: number }) {
           </TabsList>
         ) : null}
         <TabsContent value="questions" className="mt-4 flex flex-col gap-8" aria-label="Questions">
-          {data.results.questions.map((question, index) => (
-            <Fragment key={question.name}>
-              {index ? <Separator /> : null}
-              <QuestionBlock question={question} breakdown={data.results.breakdowns.find((entry) => entry.question === question.name) ?? null} minimum={data.survey.minimumGroup} />
-            </Fragment>
-          ))}
+          <QuestionResults results={data.results} minimum={data.survey.minimumGroup} />
         </TabsContent>
         <TabsContent value="fieldwork" className="mt-4">
           <FieldworkView data={data} />
@@ -331,6 +326,21 @@ function Methodology({ data }: { data: SurveyResultsView }) {
 
 /* ------------------------------------------------------------------ questions */
 
+function QuestionResults({ results, minimum }: { results: SurveyResults; minimum: number }) {
+  const questions = new Map(results.questions.map((question) => [question.name, question]));
+  const breakdowns = new Map(results.breakdowns.map((entry) => [entry.question, entry]));
+  const matrixRows = new Map(results.matrices.flatMap((matrix) => matrix.rows.map((row) => [row, matrix] as const)));
+  return results.questions.map((question, index) => {
+    const matrix = matrixRows.get(question.name);
+    if (matrix && question.name !== matrix.rows[0]) return null;
+    return <Fragment key={question.name}>
+      {index > 0 ? <Separator /> : null}
+      {matrix ? <MatrixResultBlock matrix={matrix} rows={matrix.rows.map((name) => questions.get(name)!)} breakdowns={breakdowns} minimum={minimum} />
+        : <QuestionBlock question={question} breakdown={breakdowns.get(question.name) ?? null} minimum={minimum} />}
+    </Fragment>;
+  });
+}
+
 /** The base, always in words beside the numbers: `176 answered · 5 skipped · 3 not asked`. */
 function BaseLine({ question }: { question: QuestionResult }) {
   const { base } = question;
@@ -359,7 +369,9 @@ function QuestionBlock({ question, breakdown, minimum }: { question: QuestionRes
         ) : null}
       </header>
       <div className="min-w-0">
-        {breakdown ? <BreakdownView breakdown={breakdown} minimum={minimum} display={display} multiple={Boolean(question.multiple)} />
+        {question.ranking ? <RankingResult options={question.ranking} breakdown={breakdown} minimum={minimum} />
+          : question.confirmation ? <ConfirmationResult question={question} breakdown={breakdown} minimum={minimum} />
+          : breakdown ? <BreakdownView breakdown={breakdown} minimum={minimum} display={display} multiple={Boolean(question.multiple)} />
           : question.choices ? <ChoiceResult question={question} display={display} />
           : question.numeric ? <NumericResult question={question} display={display} />
           : question.texts ? <TextAnswers question={question} />
@@ -367,6 +379,162 @@ function QuestionBlock({ question, breakdown, minimum }: { question: QuestionRes
       </div>
     </article>
   );
+}
+
+function RankingResult({ options, breakdown, minimum }: { options: RankingOption[]; breakdown: Breakdown | null; minimum: number }) {
+  if (breakdown) return (
+    <div className="grid gap-4" data-polls-breakdown={breakdown.by}>
+      <p className="text-sm text-muted-foreground">By {breakdown.byLabel}. A first-place share uses the respondents who ranked that option.</p>
+      {breakdown.groups.map((group) => <section key={group.name} className="grid gap-2 rounded-lg border p-3">
+        <h4 className="font-semibold">{group.label}</h4>
+        {group.suppressed ? <p className="text-sm text-muted-foreground">Withheld (small group, minimum {minimum})</p>
+          : <RankingList options={group.ranking ?? []} />}
+      </section>)}
+    </div>
+  );
+  return <RankingList options={options} />;
+}
+
+function RankingList({ options }: { options: RankingOption[] }) {
+  if (!options.some((option) => option.base)) return <p className="text-sm text-muted-foreground">No rankings yet.</p>;
+  const positions = Math.max(...options.map((option) => option.positions.length));
+  return (
+    <div className="grid min-w-0 gap-3" data-polls-ranking-result="">
+      <h4 className="text-sm font-semibold">Current ranking by average position</h4>
+      <ol className="m-0 grid list-none divide-y rounded-lg border p-0">
+        {options.map((option, i) => <li key={option.name} className="flex gap-3 p-3">
+          <span className="w-6 shrink-0 text-sm tabular-nums text-muted-foreground">{option.base ? i + 1 : "—"}</span>
+          <div className="min-w-0">
+            <p className="font-medium wrap-anywhere">{option.label}</p>
+            <p className="text-sm tabular-nums text-muted-foreground">{option.averagePosition === null ? "No rankings"
+              : `Average position ${option.averagePosition.toFixed(1)} · First place ${pct(option.firstPlacePercent)} (${n(option.firstPlaceCount)} of ${n(option.base)})`}</p>
+          </div>
+        </li>)}
+      </ol>
+      <details className="min-w-0 text-sm">
+        <summary className="min-h-11 cursor-pointer py-3 font-medium">Position distribution</summary>
+        <Table>
+          <TableHeader><TableRow><TableHead>Answer</TableHead><TableHead className="text-right">Base</TableHead>
+            {Array.from({ length: positions }, (_, i) => <TableHead key={i} className="text-right">Position {i + 1}</TableHead>)}
+          </TableRow></TableHeader>
+          <TableBody>
+            {options.map((option) => <TableRow key={option.name}>
+              <TableCell className="whitespace-normal">{option.label}</TableCell><TableCell className="text-right">{n(option.base)}</TableCell>
+              {Array.from({ length: positions }, (_, i) => <TableCell key={i} className="text-right tabular-nums">{n(option.positions[i] ?? 0)}</TableCell>)}
+            </TableRow>)}
+          </TableBody>
+        </Table>
+      </details>
+    </div>
+  );
+}
+
+function ConfirmationResult({ question, breakdown, minimum }: { question: QuestionResult; breakdown: Breakdown | null; minimum: number }) {
+  const counts = question.confirmation!;
+  const figures: Array<[string, number]> = [
+    ["Confirmed", counts.confirmed], ["Skipped", question.base.skipped], ["Unanswered", question.base.unanswered],
+    ["Not applicable", question.base.notApplicable], ["Base (shown)", counts.base]
+  ];
+  return <div className="grid gap-3" data-polls-confirmation-result="">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border p-3 sm:grid-cols-3">
+      {figures.map(([label, count]) => <div key={label}><dt className="text-sm text-muted-foreground">{label}</dt><dd className="text-lg font-medium tabular-nums">{n(count)}</dd></div>)}
+    </dl>
+    {breakdown ? <Table>
+      <TableHeader><TableRow><TableHead>Group</TableHead><TableHead className="text-right">Confirmed</TableHead><TableHead className="text-right">Base (shown)</TableHead></TableRow></TableHeader>
+      <TableBody>{breakdown.groups.map((group) => <TableRow key={group.name}>
+        <TableCell className="whitespace-normal">{group.label}</TableCell>
+        {group.suppressed ? <TableCell colSpan={2} className="text-right text-muted-foreground">Withheld (small group, minimum {minimum})</TableCell>
+          : <><TableCell className="text-right">{n(group.cells.OK?.count ?? 0)}</TableCell><TableCell className="text-right">{n(group.base)}</TableCell></>}
+      </TableRow>)}</TableBody>
+    </Table> : null}
+  </div>;
+}
+
+type MatrixRowResult = {
+  name: string; label: string; base: number | null; cells: Record<string, { count: number; percent: number | null }>;
+  reason?: "withheld" | "unavailable";
+};
+
+function MatrixResultBlock({ matrix, rows, breakdowns, minimum }: {
+  matrix: MatrixResult; rows: QuestionResult[]; breakdowns: ReadonlyMap<string, Breakdown>; minimum: number;
+}) {
+  const [display, setDisplay] = useState<"chart" | "table">("chart");
+  const entry = rows.flatMap((row) => breakdowns.get(row.name) ?? [])[0];
+  const all = rows.map((row): MatrixRowResult => ({
+    name: row.name, label: row.label, base: row.base.answered,
+    cells: Object.fromEntries((row.choices ?? []).map((choice) => [choice.name, choice]))
+  }));
+  const comparisons = entry?.groups.map((group) => ({
+    key: group.name, label: group.label,
+    rows: rows.map((row): MatrixRowResult => {
+      const result = breakdowns.get(row.name)?.groups.find((candidate) => candidate.name === group.name);
+      if (!result || result.suppressed) return { name: row.name, label: row.label, base: null, cells: {}, reason: result ? "withheld" : "unavailable" };
+      return { name: row.name, label: row.label, base: result.base, cells: result.cells };
+    })
+  })) ?? [];
+  return (
+    <article className="grid min-w-0 gap-4" aria-labelledby={`result-${matrix.name}`} data-polls-matrix-result={matrix.name}>
+      <header>
+        <p className="text-xs text-muted-foreground">Matrix</p>
+        <h3 id={`result-${matrix.name}`} className="text-base font-semibold wrap-anywhere">{matrix.label}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Each row uses the respondents who answered that row.</p>
+        <ToggleGroup variant="outline" size="sm" className="mt-2" aria-label="Show matrix as" value={[display]}
+          onValueChange={(next: unknown[]) => { if (next[0] === "chart" || next[0] === "table") setDisplay(next[0]); }}>
+          <ToggleGroupItem value="chart">Chart</ToggleGroupItem><ToggleGroupItem value="table">Table</ToggleGroupItem>
+        </ToggleGroup>
+      </header>
+      <MatrixDistribution columns={matrix.columns} rows={all} display={display} title="All respondents" />
+      <ul className="m-0 grid list-none gap-1 p-0">
+        {rows.map((row) => <li key={row.name} className="flex flex-wrap items-baseline gap-x-2 text-xs">
+          <span className="font-medium">{row.label}</span><BaseLine question={row} />
+        </li>)}
+      </ul>
+      {entry ? <div className="grid gap-4 border-t pt-4" data-polls-breakdown={entry.by}>
+        <h4 className="text-sm font-semibold">Compare by {entry.byLabel}</h4>
+        {comparisons.map((group) => <section key={group.key} className="grid min-w-0 gap-2 rounded-lg border p-3">
+          <h5 className="font-medium">{group.label}</h5>
+          <MatrixDistribution columns={matrix.columns} rows={group.rows} display={display} title={group.label} />
+          {group.rows.some((row) => row.reason === "withheld") ? <p className="text-xs text-muted-foreground">Withheld rows have a small group (minimum {minimum}) or would reveal one.</p> : null}
+        </section>)}
+      </div> : null}
+    </article>
+  );
+}
+
+function MatrixDistribution({ columns, rows, display, title }: { columns: MatrixResult["columns"]; rows: MatrixRowResult[]; display: "chart" | "table"; title: string }) {
+  if (display === "table") return <Table aria-label={`Matrix distribution · ${title}`}>
+    <TableHeader><TableRow><TableHead>Row</TableHead><TableHead className="text-right">Base</TableHead>
+      {columns.map((column) => <TableHead key={column.name} className="text-right whitespace-normal">{column.label}</TableHead>)}
+    </TableRow></TableHeader>
+    <TableBody>{rows.map((row) => <TableRow key={row.name}>
+      <TableHead scope="row" className="whitespace-normal">{row.label}</TableHead>
+      {row.reason ? <TableCell colSpan={columns.length + 1} className="text-muted-foreground">{row.reason === "withheld" ? "Withheld" : "No comparison"}</TableCell> : <>
+        <TableCell className="text-right tabular-nums">{n(row.base ?? 0)}</TableCell>
+        {columns.map((column) => <TableCell key={column.name} className="text-right whitespace-nowrap tabular-nums">
+          {pct(row.cells[column.name]?.percent ?? null)}{row.base ? ` (${n(row.cells[column.name]?.count ?? 0)})` : ""}
+        </TableCell>)}
+      </>}
+    </TableRow>)}</TableBody>
+  </Table>;
+  const config = Object.fromEntries(columns.map((column, i) => [`c${i}`, { label: column.label, color: GROUP_COLORS[i % GROUP_COLORS.length] }])) satisfies ChartConfig;
+  const plotted = rows.filter((row) => row.base);
+  if (!plotted.length) return <p className="text-sm text-muted-foreground">{rows.some((row) => row.reason === "withheld") ? "No distributions can be shown for this group." : "No answers yet."}</p>;
+  const data = plotted.map((row) => ({
+    label: `${row.label} (${n(row.base!)})`,
+    ...Object.fromEntries(columns.map(({ name }, i) => [`c${i}`, ((row.cells[name]?.count ?? 0) / row.base!) * 100]))
+  }));
+  return <>
+    <ChartContainer config={config} className="aspect-auto w-full min-w-0" style={{ height: `${Math.max(145, plotted.length * 42 + 76)}px` }}>
+      <BarChart accessibilityLayer data={data} layout="vertical" stackOffset="expand" margin={{ left: 0, right: 4 }}>
+        <XAxis type="number" domain={[0, 1]} hide />
+        <YAxis type="category" dataKey="label" width={130} interval={0} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value, key) => <span className="tabular-nums">{config[String(key)]?.label} · {pct(Math.round(Number(value) * 10) / 10)}</span>} />} />
+        <ChartLegend content={<ChartLegendContent className="flex-wrap" />} />
+        {columns.map((column, i) => <Bar key={column.name} dataKey={`c${i}`} stackId="matrix" fill={`var(--color-c${i})`} maxBarSize={28} isAnimationActive={false} />)}
+      </BarChart>
+    </ChartContainer>
+    {rows.filter((row) => row.reason).map((row) => <p key={row.name} className="text-xs text-muted-foreground">{row.label} · {row.reason === "withheld" ? "Withheld" : "No comparison"}</p>)}
+  </>;
 }
 
 const shareConfig = { percent: { label: "Share", color: "var(--chart-4)" } } satisfies ChartConfig;

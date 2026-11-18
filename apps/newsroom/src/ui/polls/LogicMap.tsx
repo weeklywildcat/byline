@@ -15,7 +15,7 @@ import {
 import { CircleAlert, GitBranch, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { newCondition, writeConditions, type Condition } from "../../polls/engine/condition-builder";
+import { isConditionSource, newCondition, writeConditions, type Condition } from "../../polls/engine/condition-builder";
 import { choicesFor, describeCondition, sectionLabel } from "../../polls/engine/logic";
 import {
   changeRelevance, choiceHandle, connectionProblem, END, ownerId, projectLogic, projectTestPath, questionId, SHOWN_WHEN, START,
@@ -172,8 +172,9 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
   const defaultPositions = useMemo(() => arrangeLogicMap(map), [map]);
   const path = useMemo(() => testAnswers ? projectTestPath(definition, map, testAnswers) : null, [definition, map, testAnswers]);
 
-  const selected = selectedSection ?? (selectedQuestion ? questionId(selectedQuestion) : "");
+  const selected = selectedSection ?? (selectedQuestion ? map.matrixByRow.get(questionId(selectedQuestion)) ?? questionId(selectedQuestion) : "");
   const selectedTarget = map.targets.get(selected);
+  const pickedMatrix = map.matrices.get(selected);
   const pickedQuestion = selectedTarget?.kind === "question" ? map.questions.get(selectedTarget.name)?.question : undefined;
   const ruleTarget = request?.kind === "rule" ? map.targets.get(request.target) : undefined;
   const pickedSource = request?.kind === "destination" ? map.questions.get(request.source) : undefined;
@@ -190,11 +191,12 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
     const card = (id: string, target: LogicTarget): MapNode => {
       const { item } = target;
       const question = target.kind === "question" ? map.questions.get(target.name)?.question : undefined;
-      const choices = question ? choicesFor(definition, question) : [];
+      const matrix = map.matrices.get(id);
+      const choices = question && isConditionSource(question) ? choicesFor(definition, question) : [];
       const title = item.label || (question ? "Untitled question" : "Untitled section");
       const conditional = Boolean(item.relevant || item.groups.some((name) => map.targets.get(ownerId({ kind: "section", name }))?.item.relevant));
       const invalid = issues.has(item);
-      const subtitle = question ? `Q${target.start + 1} · ${KIND_LABELS[question.kind]}` : `Section · ${sectionRange(target)}`;
+      const subtitle = question ? `Q${target.start + 1} · ${KIND_LABELS[question.kind]}` : matrix ? `Matrix · ${matrix.rows.length} rows` : `Section · ${sectionRange(target)}`;
       return {
         id, type: "pollCard", position: defaultPositions[id], width: QUESTION_WIDTH, deletable: false,
         ariaLabel: `${question ? `Question ${target.start + 1}` : "Section"}, ${title}${conditional ? ", conditional" : ""}${invalid ? ", has errors" : ""}`,
@@ -202,13 +204,13 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
           title, subtitle, section: question ? sectionLabel(definition, question) : item.groups.length
             ? map.targets.get(ownerId({ kind: "section", name: item.groups.at(-1)! }))?.item.label : undefined,
           conditional, invalid, sectionCard: !question,
-          orderIn: Boolean(question), orderOut: Boolean(question), source: question && isAnswerable(question),
+          orderIn: Boolean(question || matrix), orderOut: Boolean(question || matrix), source: question && isConditionSource(question),
           required: question && isAnswerable(question) && question.required,
           choices: choices.slice(0, MAX_MAP_CHOICES), additionalChoices: Math.max(0, choices.length - MAX_MAP_CHOICES)
         }
       };
     };
-    return [terminal(START, "Start"), ...[...map.targets].map(([id, target]) => card(id, target)), terminal(END, "Thank you")];
+    return [terminal(START, "Start"), ...[...map.targets].filter(([id]) => !map.matrixByRow.has(id)).map(([id, target]) => card(id, target)), terminal(END, "Thank you")];
   }, [definition, issues, map, defaultPositions]);
 
   const pathVariants = useMemo(() => baseNodes.map((node) => {
@@ -246,9 +248,10 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
       ends[lane] = end;
       lanes.set(dependency.id, lane % 12);
     }
+    const cardById = new Map(baseNodes.map((node) => [node.id, node]));
     const dependencies = map.dependencies.map((dependency): MapEdge => {
       const { source, target, sourceHandle } = dependency;
-      const node = baseNodes[(orderPositions.get(source) ?? 0)];
+      const node = cardById.get(source);
       const lane = lanes.get(dependency.id);
       const hasChoice = sourceHandle && node?.data.choices?.some((choice) => choiceHandle(choice.name) === sourceHandle);
       return {
@@ -319,7 +322,7 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
   const openEdge = (edge: MapEdge) => {
     if (!edge.data?.dependency) return;
     selectTarget(edge.target);
-    openEditor({ kind: "rule", target: edge.target, edge: edge.data.dependency });
+    openEditor({ kind: "rule", target: edge.data.dependency.owner ?? edge.target, edge: edge.data.dependency });
   };
 
   const applyRule = (target: LogicTarget, relevant: string | undefined, removed = relevant === undefined) => {
@@ -338,7 +341,7 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
     } else toast.success(previous ? "Logic updated" : "Logic added");
   };
   const removeDependency = (dependency: Dependency) => {
-    const target = map.targets.get(dependency.target);
+    const target = map.targets.get(dependency.owner ?? dependency.target);
     if (!target || target.builder.kind !== "simple" || dependency.row === undefined) return;
     const rowIndex = dependency.row;
     const relevant = writeConditions(definition, target.builder.join, target.builder.rows.filter((_row, index) => index !== rowIndex)) || undefined;
@@ -363,18 +366,19 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
     setTestAnswers({});
     setTestReset((value) => value + 1);
   };
-  const testQuestion = path && pickedQuestion && isAnswerable(pickedQuestion) && path.visible.has(pickedQuestion.name) ? pickedQuestion : undefined;
-  const answer = (state: AnswerState | null) => {
-    if (!testQuestion || !path) return;
-    const next = state ? { ...path.answers, [testQuestion.name]: state } : { ...path.answers };
-    if (!state) delete next[testQuestion.name];
+  const testQuestions = (pickedQuestion ? [pickedQuestion] : map.matrices.get(selected)?.rows ?? [])
+    .filter(isAnswerable).filter((question) => path?.visible.has(question.name));
+  const answer = (name: string, state: AnswerState | null) => {
+    if (!path) return;
+    const next = state ? { ...path.answers, [name]: state } : { ...path.answers };
+    if (!state) delete next[name];
     setTestAnswers(projectTestPath(definition, map, next).answers);
   };
 
   const labelFor = (target: LogicTarget) => target.kind === "question"
     ? `Q${target.start + 1} · ${target.item.label || "Untitled question"}`
-    : `Section · ${target.item.label || "Untitled section"}`;
-  const targetOptions = [...map.targets].map(([id, target]) => ({ value: id, label: labelFor(target) }));
+    : `${map.matrices.has(ownerId(target)) ? "Matrix" : "Section"} · ${target.item.label || "Untitled section"}`;
+  const targetOptions = [...map.targets].filter(([id]) => !map.matrixByRow.has(id)).map(([id, target]) => ({ value: id, label: labelFor(target) }));
   const inheritedRules = selectedTarget?.item.groups.flatMap((name) => {
     const section = map.targets.get(ownerId({ kind: "section", name }));
     return section?.item.relevant ? [section] : [];
@@ -395,7 +399,12 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
       {path ? (
         <div className="grid gap-2 border-t pt-2">
           <p className="text-sm font-medium">{path.nodes.has(selected) ? "On the respondent’s path" : "Hidden on this path"}</p>
-          {testQuestion ? <TestPathAnswer key={`${testQuestion.name}:${testReset}`} definition={definition} question={testQuestion} answers={path.answers} onAnswer={answer} /> : null}
+          {testQuestions.map((question) => (
+            <div key={`${question.name}:${testReset}`} className="grid gap-1">
+              {!pickedQuestion ? <p className="text-sm font-medium">{question.label}</p> : null}
+              <TestPathAnswer definition={definition} question={question} answers={path.answers} onAnswer={(state) => answer(question.name, state)} />
+            </div>
+          ))}
         </div>
       ) : null}
     </div>
@@ -474,7 +483,8 @@ export function LogicMap({ definition, issues, selectedQuestion, onSelectQuestio
           }}>Add logic</Button>
         <Button type="button" variant="outline" className="poll-logic-touch" disabled={!selectedTarget || Boolean(path)}
           onClick={() => openEditor({ kind: "rule", target: selected })}>Edit display logic</Button>
-        {pickedQuestion ? <Button type="button" variant="ghost" className="poll-logic-touch" onClick={() => onEditQuestion(pickedQuestion.name)}>Edit question</Button> : null}
+        {pickedQuestion || pickedMatrix ? <Button type="button" variant="ghost" className="poll-logic-touch"
+          onClick={() => onEditQuestion(pickedMatrix?.group.name ?? pickedQuestion!.name)}>{pickedMatrix ? "Edit matrix" : "Edit question"}</Button> : null}
       </div>
       <div className={cn("grid min-w-0 gap-3", desktop && "grid-cols-[minmax(0,1fr)_minmax(250px,300px)]")}>
         <div className="relative h-[clamp(290px,56dvh,620px)] min-w-0 overflow-hidden rounded-lg border bg-muted/30" aria-label="Poll logic map" role="region">

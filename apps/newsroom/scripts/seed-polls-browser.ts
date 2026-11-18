@@ -5,6 +5,7 @@
  * two polling locations. The passwords are test values for this fixture only.
  */
 import pg from "pg";
+import sharp from "sharp";
 import { getPayload } from "payload";
 
 export const POLLS_BROWSER_ACCOUNTS = {
@@ -33,6 +34,15 @@ try {
     await payload.create({ collection: "users", data: { ...account, enabled: true }, overrideAccess: true });
   }
   for (const name of ["Cafeteria", "Library entrance"]) await payload.create({ collection: "poll-locations", data: { name, active: true }, overrideAccess: true });
+  for (const [name, background, alt] of [
+    ["poll-wildcat.png", "#7c1639", "Maroon school graphic"],
+    ["poll-tiger.png", "#ca7527", "Gold school graphic"]
+  ]) {
+    const data = await sharp({ create: { width: 800, height: 560, channels: 3, background } }).png().toBuffer();
+    await payload.create({ collection: "media", data: { alt, credit: "Polls browser fixture", copyright: "The Weekly Wildcat" },
+      file: { data, name, mimetype: "image/png", size: data.length }, overrideAccess: true });
+  }
+  await payload.jobs.run({ queue: "media", limit: 10 });
 } finally {
   await payload.destroy();
 }

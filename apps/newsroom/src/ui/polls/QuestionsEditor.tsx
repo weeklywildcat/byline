@@ -12,7 +12,7 @@ import { ButtonGroup } from "@byline/newsroom-ui/ui/button-group";
 import { Checkbox } from "@byline/newsroom-ui/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@byline/newsroom-ui/ui/collapsible";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@byline/newsroom-ui/ui/drawer";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
@@ -24,10 +24,13 @@ import { ArrowDown, ArrowUp, ChevronDown, CircleAlert, CloudCheck, Copy, GitBran
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import type { Viewport } from "@xyflow/react";
+import { toast } from "sonner";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { choicesFor, describeCondition } from "../../polls/engine/logic";
-import { isAnswerable, KIND_LABELS, type Choice, type Question, type QuestionKind, type SurveyDefinition } from "../../polls/engine/types";
+import { hasChoices, isAnswerable, isSelect, KIND_LABELS, type Choice, type ChoiceImage, type ChoiceQuestion, type Group, type Question, type QuestionKind, type SurveyDefinition } from "../../polls/engine/types";
 import { readCondition } from "../../polls/engine/condition-builder";
+import { changeMatrixSection, createMatrix, definitionNames, deleteBuildItem, duplicateBuildItem, previewItem, restoreBuildItem, uniqueName } from "../../polls/engine/build-items";
+import { CHOICE_DISPLAYS, DISPLAY_APPEARANCES, choiceDisplay, isTableGroup, likertChoices, respondentScreens, screenQuestions, type ChoiceDisplay, type Matrix, type RespondentScreen } from "../../polls/engine/presentation";
 import { diagnoseDefinition } from "../../polls/engine/logic-map";
 import { useNewsroomRoutes } from "../shell/account";
 import { ApiError } from "../story/api";
@@ -35,6 +38,8 @@ import { fetchSurvey, pollKeys, updateSurvey, type SurveyDetail } from "./api";
 import { PollSelect, SwitchField } from "./fields";
 import { useLogicPositions } from "./useLogicPositions";
 import { RuleEditor } from "./RuleEditor";
+import { ChoiceMedia, useDraftChoiceImages } from "./ChoiceMedia";
+import { SurveyRunner } from "./runner/SurveyRunner";
 import { IssueList } from "./Review";
 
 /**
@@ -52,18 +57,18 @@ const LogicMap = dynamic(() => import("./LogicMap").then((module) => module.Logi
   loading: () => <p role="status" className="flex items-center gap-2 py-4 text-sm text-muted-foreground"><Spinner />Loading map…</p>
 });
 
-const NEW_KINDS: QuestionKind[] = ["select_one", "select_multiple", "range", "text", "integer", "note"];
+type AddKind = QuestionKind | "image_choice" | "matrix";
+const QUESTION_MENU: Array<{ label: string; kinds: AddKind[] }> = [
+  { label: "Choice", kinds: ["select_one", "select_multiple", "image_choice", "rank", "matrix"] },
+  { label: "Input", kinds: ["text", "integer", "decimal", "range"] },
+  { label: "Structure", kinds: ["acknowledge", "note"] }
+];
+const addLabel = (kind: AddKind) => kind === "image_choice" ? "Image choice" : kind === "matrix" ? "Matrix" : KIND_LABELS[kind];
+type ChangeDraft = (update: SurveyDefinition | ((current: SurveyDefinition) => SurveyDefinition)) => void;
 const AUTOSAVE_MS = 1200;
 /** Measure the rows before a drag starts, so the keyboard sensor always has their resting places. */
 const MEASURING = { droppable: { strategy: MeasuringStrategy.BeforeDragging } };
 const slug = (text: string) => text.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "answer";
-
-function uniqueName(base: string, taken: Set<string>): string {
-  const start = /^[a-z_]/.test(base) ? base : `q_${base}`;
-  let name = start;
-  for (let n = 2; taken.has(name); n++) name = `${start}_${n}`;
-  return name;
-}
 
 /** Identifiers Build made up itself, which may still follow the wording. */
 const AUTO_QUESTION = /^(question|note)(_\d+)?$/;
@@ -89,11 +94,11 @@ function settleNames(draft: SurveyDefinition, name: string, published: ReadonlyS
   let next = draft;
   let finalName = name;
   if (AUTO_QUESTION.test(name) && !referenced(draft, name) && question.label.trim() && !/^New question$|^Information for respondents$/.test(question.label)) {
-    const taken = new Set([...draft.questions.map((entry) => entry.name), ...draft.groups.map((entry) => entry.name)].filter((entry) => entry !== name));
+    const taken = new Set([...definitionNames(draft), ...published].filter((entry) => entry !== name));
     finalName = uniqueName(slug(question.label), taken);
     next = { ...next, questions: next.questions.map((entry, i) => (i === index ? { ...entry, name: finalName } : entry)) };
   }
-  if ((question.kind === "select_one" || question.kind === "select_multiple") && !referenced(draft, name) && !draft.questions.some((entry) => entry.name !== name && "list" in entry && entry.list === question.list)) {
+  if (hasChoices(question) && !referenced(draft, name) && !draft.questions.some((entry) => entry.name !== name && "list" in entry && entry.list === question.list)) {
     const list = next.lists.find((entry) => entry.name === question.list);
     if (list) {
       const used = new Set<string>();
@@ -209,17 +214,23 @@ function SaveStatus({ state }: { state: SaveState }) {
 
 export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
   const { draft, change, state, retry, reload, overwrite } = useAutosave(id, data.draft!, data.survey.draftRevision ?? 0);
-  const [selected, setSelected] = useState<string | null>(draft.questions[0]?.name ?? null);
+  const items = useMemo(() => respondentScreens(draft), [draft]);
+  const [selected, setSelected] = useState<string | null>(items[0]?.name ?? null);
   const wide = useMediaQuery("(min-width: 1024px)", true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const logic = useSearchParams()?.get("build") === "logic";
   const { positions, update: setPositions } = useLogicPositions(id, logic, draft);
   const viewport = useRef<Viewport | undefined>(undefined);
   const setViewport = useCallback((next: Viewport | undefined) => { viewport.current = next; }, []);
-  const { issues, byItem } = useMemo(() => diagnoseDefinition(draft), [draft]);
-  const published = useMemo(() => new Set(data.versions.length && data.current ? data.current.definition.questions.map((question) => question.name) : []), [data.versions.length, data.current]);
-  const index = draft.questions.findIndex((question) => question.name === selected);
-  const question = index >= 0 ? draft.questions[index] : null;
+  const { issues: definitionIssues, byItem } = useMemo(() => diagnoseDefinition(draft), [draft]);
+  const issues = [...definitionIssues, ...data.draftMediaIssues];
+  const published = useMemo(() => data.current ? definitionNames(data.current.definition) : new Set<string>(), [data.current]);
+  const selectedItem = items.find((item) => item.name === selected) ?? items.find(
+    (item) => item.kind === "matrix" && item.matrix.rows.some((row) => row.name === selected)
+  );
+  const position = items.findIndex((item) => item === selectedItem);
+  const question = selectedItem?.kind === "question" ? selectedItem.question : null;
+  const index = question ? draft.questions.indexOf(question) : -1;
 
   /** Gives the question being left identifiers from its wording, where Build may. */
   const settle = useCallback((name: string | null) => {
@@ -243,59 +254,70 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
     replace({ name });
     setSelected(name);
   };
-  const add = (kind: QuestionKind) => {
-    const base = selected ? settleNames(draft, selected, published).draft : draft;
-    const taken = new Set([...base.questions.map((entry) => entry.name), ...base.groups.map((entry) => entry.name)]);
-    const name = uniqueName(kind === "note" ? "note" : "question", taken);
-    const after = base.questions.findIndex((entry) => entry.name === selected);
-    const groups = after >= 0 ? base.questions[after].groups : [];
+  const add = (preset: AddKind) => {
+    const settled = selected ? settleNames(draft, selected, published) : { draft, name: null };
+    const base = settled.draft;
+    const after = selectedItem ? draft.questions.indexOf(screenQuestions(selectedItem).at(-1)!) : -1;
+    const groups = selectedItem?.kind === "matrix" ? selectedItem.matrix.group.groups : after >= 0 ? base.questions[after].groups : [];
+    const at = after >= 0 ? after + 1 : base.questions.length;
+    if (preset === "matrix") {
+      const result = createMatrix(base, at, groups.length < 4 ? groups : groups.slice(0, 3), published);
+      change(result.draft);
+      setSelected(result.name);
+      setDrawerOpen(true);
+      return;
+    }
+    const kind = preset === "image_choice" ? "select_one" : preset;
+    const name = uniqueName(kind === "note" ? "note" : "question", new Set([...definitionNames(base), ...published]));
     let lists = base.lists;
     let created: Question;
-    if (kind === "select_one" || kind === "select_multiple") {
-      const listName = uniqueName(`${name}_choices`, new Set(lists.map((list) => list.name)));
-      lists = [...lists, { name: listName, choices: [{ name: "answer_1", label: "Answer 1" }, { name: "answer_2", label: "Answer 2" }] }];
-      created = { kind, name, label: "New question", groups, required: false, list: listName };
+    if (kind === "select_one" || kind === "select_multiple" || kind === "rank") {
+      const list = uniqueName(`${name}_choices`, new Set(lists.map((entry) => entry.name)));
+      lists = [...lists, { name: list, choices: [{ name: "answer_1", label: "Answer 1" }, { name: "answer_2", label: "Answer 2" }] }];
+      created = { kind, name, label: "New question", groups, required: false, list };
+      if (isSelect(created) && preset === "image_choice") created = { ...created, appearance: "columns", imageCards: true };
     } else if (kind === "range") created = { kind, name, label: "New question", groups, required: false, start: 1, end: 5, step: 1 };
     else if (kind === "text") created = { kind, name, label: "New question", groups, required: false, multiline: true };
     else if (kind === "note") created = { kind, name, label: "Information for respondents", groups };
-    else created = { kind: kind as "integer" | "decimal", name, label: "New question", groups, required: false };
-    const at = after >= 0 ? after + 1 : base.questions.length;
+    else created = { kind, name, label: "New question", groups, required: false };
     change({ ...base, lists, questions: [...base.questions.slice(0, at), created, ...base.questions.slice(at)] });
     setSelected(name);
     setDrawerOpen(true);
   };
   const moveTo = (from: number, to: number) => {
-    if (from < 0 || to < 0 || to >= draft.questions.length || from === to) return;
-    change({ ...draft, questions: arrayMove(draft.questions, from, to) });
+    if (from < 0 || to < 0 || to >= items.length || from === to) return;
+    change({ ...draft, questions: arrayMove(items, from, to).flatMap(screenQuestions) });
   };
   const removeAt = (at: number) => {
-    const questions = draft.questions.filter((_entry, i) => i !== at);
-    change({ ...draft, questions });
-    setSelected(questions[Math.min(at, questions.length - 1)]?.name ?? null);
+    const item = items[at];
+    if (!item) return;
+    change(deleteBuildItem(draft, item));
+    setSelected((items[at + 1] ?? items[at - 1])?.name ?? null);
     setDrawerOpen(false);
+    toast.success(item.kind === "matrix" ? "Matrix deleted" : "Question deleted", {
+      action: { label: "Undo", onClick: () => change((current) => restoreBuildItem(current, draft, item)) }
+    });
   };
   const duplicateAt = (at: number) => {
-    const source = draft.questions[at];
-    const taken = new Set([...draft.questions.map((entry) => entry.name), ...draft.groups.map((entry) => entry.name)]);
-    const copy = { ...structuredClone(source), name: uniqueName(`${source.name}_copy`, taken) };
-    change({ ...draft, questions: [...draft.questions.slice(0, at + 1), copy, ...draft.questions.slice(at + 1)] });
-    setSelected(copy.name);
+    const result = duplicateBuildItem(draft, items[at], published);
+    change(result.draft);
+    setSelected(result.name);
+    setDrawerOpen(true);
   };
 
-  const inspector = question ? (
+  const actions = {
+    onMove: (delta: -1 | 1) => moveTo(position, position + delta),
+    onDuplicate: () => duplicateAt(position),
+    onRemove: () => removeAt(position)
+  };
+  const inspector = selectedItem?.kind === "matrix" ? (
+    <MatrixInspector key={selectedItem.name} draft={draft} matrix={selectedItem.matrix}
+      position={position} count={items.length} published={published} onChange={change} {...actions} />
+  ) : question && selectedItem ? (
     <QuestionInspector
-      key={`${index}-${question.kind}`}
-      draft={draft}
-      question={question}
-      index={index}
-      published={published.has(question.name)}
-      publishedNames={published}
-      onChange={change}
-      onReplace={replace}
-      onRename={rename}
-      onMove={(delta) => { moveTo(index, index + delta); }}
-      onDuplicate={() => duplicateAt(index)}
-      onRemove={() => removeAt(index)}
+      key={`${index}-${question.kind}`} draft={draft} question={question} index={index} position={position} count={items.length}
+      published={published.has(question.name)} publishedNames={published}
+      onChange={change} onReplace={replace} onRename={rename} {...actions}
     />
   ) : null;
 
@@ -328,7 +350,11 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="Add a different kind of question" />}><ChevronDown /></DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              {NEW_KINDS.map((kind) => <DropdownMenuItem key={kind} onClick={() => add(kind)}>{KIND_LABELS[kind]}</DropdownMenuItem>)}
+              {QUESTION_MENU.map(({ label, kinds }, i) => <DropdownMenuGroup key={label}>
+                {i > 0 ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuLabel>{label}</DropdownMenuLabel>
+                {kinds.map((kind) => <DropdownMenuItem key={kind} onClick={() => add(kind)}>{addLabel(kind)}</DropdownMenuItem>)}
+              </DropdownMenuGroup>)}
             </DropdownMenuContent>
           </DropdownMenu>
         </ButtonGroup> : null}
@@ -364,7 +390,7 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
       ) : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
         <div className="flex min-w-0 flex-col gap-8">
           {draft.questions.length ? (
-            <SortableQuestions draft={draft} selected={wide ? selected : null} onSelect={(name) => select(name)} onMove={moveTo} onDuplicate={duplicateAt} onRemove={removeAt} />
+            <SortableQuestions draft={draft} items={items} selected={wide ? selected : null} onSelect={(name) => select(name)} onMove={moveTo} onDuplicate={duplicateAt} onRemove={removeAt} />
           ) : (
             <Empty className="border border-dashed">
               <EmptyHeader>
@@ -383,10 +409,10 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
             <aside className="min-w-0 lg:sticky lg:top-[calc(var(--byline-header-height,0px)+4rem)] lg:max-h-[calc(100dvh-var(--byline-header-height,0px)-5rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:pl-6" aria-label="Edit question">{inspector}</aside>
           ) : null
         ) : (
-          <Drawer open={Boolean(question) && drawerOpen} onOpenChange={(open) => { if (!open) setSelected(settle(selected)); setDrawerOpen(open); }}>
+          <Drawer open={Boolean(selectedItem) && drawerOpen} onOpenChange={(open) => { if (!open) setSelected(settle(selected)); setDrawerOpen(open); }}>
             <DrawerContent keyboardAware className="max-h-[92dvh]">
               <DrawerHeader>
-                <DrawerTitle>{question ? `Edit ${KIND_LABELS[question.kind].toLowerCase()}` : "Edit question"}</DrawerTitle>
+                <DrawerTitle>{selectedItem?.kind === "matrix" ? "Edit matrix" : question ? `Edit ${KIND_LABELS[question.kind].toLowerCase()}` : "Edit question"}</DrawerTitle>
                 <DrawerDescription className="sr-only">Changes save as you go.</DrawerDescription>
               </DrawerHeader>
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1.5rem,var(--byline-safe-bottom))]">{inspector}</div>
@@ -399,8 +425,9 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
 }
 
 /** The questions in order, draggable (pointer or keyboard) by their handles. */
-function SortableQuestions({ draft, selected, onSelect, onMove, onDuplicate, onRemove }: {
+function SortableQuestions({ draft, items, selected, onSelect, onMove, onDuplicate, onRemove }: {
   draft: SurveyDefinition;
+  items: RespondentScreen[];
   selected: string | null;
   onSelect: (name: string) => void;
   onMove: (from: number, to: number) => void;
@@ -408,10 +435,13 @@ function SortableQuestions({ draft, selected, onSelect, onMove, onDuplicate, onR
   onRemove: (at: number) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  const labelOf = (name: string | number) => draft.questions.find((question) => question.name === String(name))?.label ?? "question";
-  const position = (name: string | number) => draft.questions.findIndex((question) => question.name === String(name)) + 1;
+  const labelOf = (name: string | number) => {
+    const item = items.find((entry) => entry.name === String(name));
+    return item?.kind === "matrix" ? item.matrix.group.label : item?.question.label ?? "question";
+  };
+  const position = (name: string | number) => items.findIndex((item) => item.name === String(name)) + 1;
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up “${labelOf(active.id)}”, question ${position(active.id)} of ${draft.questions.length}.`,
+    onDragStart: ({ active }) => `Picked up “${labelOf(active.id)}”, question ${position(active.id)} of ${items.length}.`,
     onDragOver: ({ active, over }) => (over ? `“${labelOf(active.id)}” is over position ${position(over.id)}.` : `“${labelOf(active.id)}” is no longer over a position.`),
     onDragEnd: ({ active, over }) => (over ? `“${labelOf(active.id)}” moved to position ${position(over.id)}.` : `“${labelOf(active.id)}” dropped.`),
     onDragCancel: ({ active }) => `Moving “${labelOf(active.id)}” cancelled.`
@@ -425,24 +455,27 @@ function SortableQuestions({ draft, selected, onSelect, onMove, onDuplicate, onR
   let lastSection = "";
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} measuring={MEASURING} onDragEnd={end} accessibility={{ announcements, screenReaderInstructions: { draggable: "To move a question, press Space or Enter on its handle, use the arrow keys, then press Space or Enter again. Escape cancels." } }}>
-      <SortableContext items={draft.questions.map((question) => question.name)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={items.map((item) => item.name)} strategy={verticalListSortingStrategy}>
         <ol className="flex flex-col" data-polls-question-map="">
-          {draft.questions.map((question, at) => {
-            const section = question.groups.at(-1) ?? "";
+          {items.map((item, at) => {
+            const question = item.kind === "question" ? item.question : null;
+            const content = item.kind === "matrix" ? item.matrix.group : item.question;
+            const section = content.groups.at(-1) ?? "";
             const header = section !== lastSection && section ? groups.get(section) : null;
             lastSection = section;
-            if (isAnswerable(question)) number++;
+            const answerable = item.kind === "matrix" || (question && isAnswerable(question));
+            if (answerable) number++;
+            const type = item.kind === "matrix" ? `Matrix · ${item.matrix.rows.length} rows` : KIND_LABELS[item.question.kind];
+            const required = question && isAnswerable(question) ? question.required : item.kind === "matrix" ? item.matrix.rows.every((row) => row.required) : false;
             return (
-              <SortableQuestion
-                key={question.name}
-                question={question}
-                number={isAnswerable(question) ? number : null}
-                header={header ? header.label || header.name : null}
-                condition={question.relevant ? describeCondition(draft, question.relevant) : null}
-                current={selected === question.name}
+              <SortableQuestion key={item.name} name={item.name} label={content.label} type={type} required={required}
+                number={answerable ? number : null}
+                header={header ? `${isTableGroup(header) ? "Imported table · " : ""}${header.label || header.name}` : null}
+                condition={content.relevant ? describeCondition(draft, content.relevant) : null}
+                current={selected === item.name}
                 first={at === 0}
-                last={at === draft.questions.length - 1}
-                onSelect={() => onSelect(question.name)}
+                last={at === items.length - 1}
+                onSelect={() => onSelect(item.name)}
                 onMove={(delta) => onMove(at, at + delta)}
                 onDuplicate={() => onDuplicate(at)}
                 onRemove={() => onRemove(at)}
@@ -455,28 +488,28 @@ function SortableQuestions({ draft, selected, onSelect, onMove, onDuplicate, onR
   );
 }
 
-function SortableQuestion({ question, number, header, condition, current, first, last, onSelect, onMove, onDuplicate, onRemove }: {
-  question: Question; number: number | null; header: string | null; condition: string | null; current: boolean; first: boolean; last: boolean;
+function SortableQuestion({ name, label, type, required, number, header, condition, current, first, last, onSelect, onMove, onDuplicate, onRemove }: {
+  name: string; label: string; type: string; required: boolean; number: number | null; header: string | null; condition: string | null; current: boolean; first: boolean; last: boolean;
   onSelect: () => void; onMove: (delta: -1 | 1) => void; onDuplicate: () => void; onRemove: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: question.name });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: name });
   return (
     <li ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className={cn("flex flex-col", isDragging && "relative z-10")}>
       {header ? <h3 className="mt-5 mb-1 px-3 text-sm font-medium text-muted-foreground first:mt-0">{header}</h3> : null}
-      <div className={cn("group flex items-start gap-1 rounded-lg border border-transparent py-1 pr-1 pl-0.5", current ? "bg-muted" : "hover:bg-muted/50", isDragging && "border-border bg-background shadow-md")} data-polls-question={question.name}>
-        <Button ref={setActivatorNodeRef} type="button" variant="ghost" size="icon-sm" className="mt-1 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing" aria-label={`Move “${question.label || "question"}”`} {...attributes} {...listeners}>
+      <div className={cn("group flex items-start gap-1 rounded-lg border border-transparent py-1 pr-1 pl-0.5", current ? "bg-muted" : "hover:bg-muted/50", isDragging && "border-border bg-background shadow-md")} data-polls-question={name}>
+        <Button ref={setActivatorNodeRef} type="button" variant="ghost" size="icon-sm" className="mt-1 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing" aria-label={`Move “${label || "question"}”`} {...attributes} {...listeners}>
           <GripVertical />
         </Button>
         <button type="button" onClick={onSelect} aria-current={current ? "true" : undefined} className="flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-1.5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
           <span className="w-6 shrink-0 pt-px text-right text-sm text-muted-foreground tabular-nums">{number ?? <Info className="ml-auto size-4" aria-label="Information" />}</span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-sm leading-snug font-medium">{question.label || <em className="font-normal text-muted-foreground">No wording yet</em>}</span>
-            <span className="text-xs text-muted-foreground">{KIND_LABELS[question.kind]}{isAnswerable(question) ? ` · ${question.required ? "Required" : "Optional"}` : ""}</span>
+            <span className="text-sm leading-snug font-medium">{label || <em className="font-normal text-muted-foreground">No wording yet</em>}</span>
+            <span className="text-xs text-muted-foreground">{type}{number ? ` · ${required ? "Required" : "Optional"}` : ""}</span>
             {condition ? <span className="inline-flex items-start gap-1.5 text-xs text-muted-foreground"><GitBranch className="mt-px size-3.5 shrink-0" aria-hidden="true" />Shown when {condition}</span> : null}
           </span>
         </button>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" className="mt-1 shrink-0 text-muted-foreground" aria-label={`Actions for “${question.label || "question"}”`} />}><MoreHorizontal /></DropdownMenuTrigger>
+          <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" className="mt-1 shrink-0 text-muted-foreground" aria-label={`Actions for “${label || "question"}”`} />}><MoreHorizontal /></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem disabled={first} onClick={() => onMove(-1)}><ArrowUp />Move up</DropdownMenuItem>
             <DropdownMenuItem disabled={last} onClick={() => onMove(1)}><ArrowDown />Move down</DropdownMenuItem>
@@ -523,13 +556,15 @@ function PollScreens({ draft, onChange }: { draft: SurveyDefinition; onChange: (
 }
 
 /** One question's settings, in groups: wording, answers, when it's asked, and the rarer details. */
-function QuestionInspector({ draft, question, index, published, publishedNames, onChange, onReplace, onRename, onMove, onDuplicate, onRemove }: {
+function QuestionInspector({ draft, question, index, position, count, published, publishedNames, onChange, onReplace, onRename, onMove, onDuplicate, onRemove }: {
   draft: SurveyDefinition;
   question: Question;
   index: number;
+  position: number;
+  count: number;
   published: boolean;
   publishedNames: ReadonlySet<string>;
-  onChange: (next: SurveyDefinition) => void;
+  onChange: ChangeDraft;
   onReplace: (patch: Partial<Question> & Record<string, unknown>) => void;
   onRename: (name: string) => void;
   onMove: (delta: -1 | 1) => void;
@@ -539,10 +574,10 @@ function QuestionInspector({ draft, question, index, published, publishedNames, 
   return (
     <div className="flex flex-col gap-5" data-polls-inspector="">
       <div className="flex items-center gap-2">
-        <p className="flex-1 text-sm text-muted-foreground">{KIND_LABELS[question.kind]} · {index + 1} of {draft.questions.length}</p>
+        <p className="flex-1 text-sm text-muted-foreground">{KIND_LABELS[question.kind]} · {position + 1} of {count}</p>
         <ButtonGroup>
-          <Button type="button" variant="outline" size="icon-sm" aria-label="Move up" disabled={index === 0} onClick={() => onMove(-1)}><ArrowUp /></Button>
-          <Button type="button" variant="outline" size="icon-sm" aria-label="Move down" disabled={index === draft.questions.length - 1} onClick={() => onMove(1)}><ArrowDown /></Button>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Move up" disabled={position === 0} onClick={() => onMove(-1)}><ArrowUp /></Button>
+          <Button type="button" variant="outline" size="icon-sm" aria-label="Move down" disabled={position === count - 1} onClick={() => onMove(1)}><ArrowDown /></Button>
         </ButtonGroup>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon-sm" aria-label="More question actions" />}><MoreHorizontal /></DropdownMenuTrigger>
@@ -560,7 +595,13 @@ function QuestionInspector({ draft, question, index, published, publishedNames, 
         {isAnswerable(question) ? <SwitchField label="Required" description="Optional questions get a Skip button." checked={question.required} onChange={(required) => onReplace({ required })} /> : null}
       </FieldGroup>
 
-      {question.kind === "select_one" || question.kind === "select_multiple" ? (<><Separator /><ChoicesEditor draft={draft} question={question} locked={publishedNames.has(question.name)} onChange={onChange} /></>) : null}
+      {question.kind === "acknowledge" ? <FieldDescription>Ask respondents to acknowledge a statement before continuing.</FieldDescription> : null}
+      {question.kind === "rank" ? <FieldDescription>Respondents put every option in order from highest to lowest.</FieldDescription> : null}
+      {isSelect(question) ? <DisplayPicker draft={draft} question={question} locked={published} onChange={onChange} /> : null}
+      {hasChoices(question) ? (<><Separator /><ChoicesEditor draft={draft} question={question}
+        locked={draft.questions.some((entry) => publishedNames.has(entry.name) && hasChoices(entry) && entry.list === question.list)}
+        withImages={isSelect(question) && choiceDisplay(draft, question) === "images"} onChange={onChange} /></>) : null}
+      <QuestionPreview draft={draft} item={{ kind: "question", name: question.name, question }} />
       {question.kind === "range" ? (
         <>
           <Separator />
@@ -598,6 +639,10 @@ function QuestionInspector({ draft, question, index, published, publishedNames, 
               value={question.name} disabled={published} onChange={(name) => onRename(name.replace(/\s+/g, "_"))} />
             {isAnswerable(question) ? (
               <>
+                {isSelect(question) && choiceDisplay(draft, question) === "advanced" ? (
+                  <TextField label="Imported appearance" hint="This display is preserved when you download the spreadsheet." value={question.appearance ?? ""}
+                    onChange={(appearance) => onReplace({ appearance: appearance || undefined })} />
+                ) : null}
                 <TextField label="Answer rule" hint="An XLSForm constraint; “.” is the answer." autoCapitalize="none" autoCorrect="off" spellCheck={false} value={question.constraint ?? ""} onChange={(value) => onReplace({ constraint: value || undefined })} />
                 <TextField label="Message when it fails" value={question.constraintMessage ?? ""} onChange={(value) => onReplace({ constraintMessage: value || undefined })} />
               </>
@@ -610,10 +655,19 @@ function QuestionInspector({ draft, question, index, published, publishedNames, 
 }
 
 /** The answers, reorderable (pointer or keyboard). Their identifiers are under Advanced. */
-function ChoicesEditor({ draft, question, locked, onChange }: { draft: SurveyDefinition; question: Extract<Question, { kind: "select_one" | "select_multiple" }>; locked: boolean; onChange: (next: SurveyDefinition) => void }) {
+function ChoicesEditor({ draft, question, locked, withImages = false, columns = false, onChange }: {
+  draft: SurveyDefinition; question: ChoiceQuestion; locked: boolean; withImages?: boolean; columns?: boolean; onChange: ChangeDraft;
+}) {
   const choices = choicesFor(draft, question);
-  const sharedWith = draft.questions.filter((entry) => entry.name !== question.name && (entry.kind === "select_one" || entry.kind === "select_multiple") && entry.list === question.list).length;
-  const setChoices = (next: Choice[]) => onChange({ ...draft, lists: draft.lists.map((list) => (list.name === question.list ? { ...list, choices: next } : list)) });
+  const sharedWith = draft.questions.filter((entry) => entry.name !== question.name && hasChoices(entry) && entry.list === question.list
+    && (!columns || entry.groups.at(-1) !== question.groups.at(-1))).length;
+  const itemLabel = columns ? "Column" : "Answer";
+  const setChoices = (next: Choice[]) => onChange((current) => ({ ...current, lists: current.lists.map((list) => (list.name === question.list ? { ...list, choices: next } : list)) }));
+  const setImage = (choice: string, image?: ChoiceImage) => onChange((current) => ({
+    ...current, lists: current.lists.map((list) => list.name === question.list ? {
+      ...list, choices: list.choices.map((entry) => entry.name === choice ? { ...entry, image } : entry)
+    } : list)
+  }));
   const taken = new Set(choices.map((choice) => choice.name));
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const end = ({ active, over }: DragEndEvent) => {
@@ -624,7 +678,7 @@ function ChoicesEditor({ draft, question, locked, onChange }: { draft: SurveyDef
   const at = (id: string | number) => choices.findIndex((choice) => choice.name === String(id)) + 1;
   return (
     <FieldSet>
-      <FieldLegend variant="label">Answers</FieldLegend>
+      <FieldLegend variant="label">{columns ? "Columns" : "Answers"}</FieldLegend>
       {sharedWith ? <FieldDescription>This list is also used by {sharedWith} other question{sharedWith === 1 ? "" : "s"}.</FieldDescription> : null}
       <DndContext sensors={sensors} collisionDetection={closestCorners} measuring={MEASURING} onDragEnd={end} accessibility={{ announcements: {
         onDragStart: ({ active }) => `Picked up “${labelOf(active.id)}”, answer ${at(active.id)} of ${choices.length}.`,
@@ -635,16 +689,17 @@ function ChoicesEditor({ draft, question, locked, onChange }: { draft: SurveyDef
         <SortableContext items={choices.map((choice) => choice.name)} strategy={verticalListSortingStrategy}>
           <ol className="flex flex-col gap-1.5">
             {choices.map((choice, i) => (
-              <SortableChoice key={choice.name} choice={choice} index={i}
+              <SortableChoice key={choice.name} choice={choice} index={i} itemLabel={itemLabel}
+                media={withImages ? <ChoiceMedia image={choice.image} label={choice.label || `answer ${i + 1}`} onChange={(image) => setImage(choice.name, image)} /> : null}
                 onLabel={(label) => setChoices(choices.map((entry, j) => (j === i ? { ...entry, label } : entry)))}
                 onRemove={() => setChoices(choices.filter((_entry, j) => j !== i))} />
             ))}
           </ol>
         </SortableContext>
       </DndContext>
-      <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setChoices([...choices, { name: uniqueName(`answer_${choices.length + 1}`, taken), label: `Answer ${choices.length + 1}` }])}><Plus data-icon="inline-start" />Add answer</Button>
+      <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setChoices([...choices, { name: uniqueName(`answer_${choices.length + 1}`, taken), label: `${itemLabel} ${choices.length + 1}` }])}><Plus data-icon="inline-start" />Add {itemLabel.toLowerCase()}</Button>
       <Collapsible>
-        <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2.5 w-fit text-muted-foreground" />}>Answer identifiers<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
+        <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2.5 w-fit text-muted-foreground" />}>{itemLabel} identifiers<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
         <CollapsibleContent className="mt-2 flex flex-col gap-1.5">
           <FieldDescription>{locked ? "This question is published: its answers keep their identifiers. New answers get their own." : "Stored with each response and used in conditions. Made from the wording."}</FieldDescription>
           {choices.map((choice, i) => (
@@ -659,13 +714,19 @@ function ChoicesEditor({ draft, question, locked, onChange }: { draft: SurveyDef
   );
 }
 
-function SortableChoice({ choice, index, onLabel, onRemove }: { choice: Choice; index: number; onLabel: (label: string) => void; onRemove: () => void }) {
+function SortableChoice({ choice, index, itemLabel, media, onLabel, onRemove }: {
+  choice: Choice; index: number; itemLabel: string; media?: React.ReactNode; onLabel: (label: string) => void; onRemove: () => void;
+}) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: choice.name });
+  const fields = <>
+    <Button ref={setActivatorNodeRef} type="button" variant="ghost" size="icon-sm" className="shrink-0 cursor-grab touch-none text-muted-foreground" aria-label={`Move answer “${choice.label || index + 1}”`} {...attributes} {...listeners}><GripVertical /></Button>
+    <Input aria-label={`${itemLabel} ${index + 1}`} value={choice.label} onChange={(event) => onLabel(event.target.value)} />
+    <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label={`Remove ${choice.label || `answer ${index + 1}`}`} onClick={onRemove}><X /></Button>
+  </>;
   return (
-    <li ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className={cn("flex items-center gap-1", isDragging && "relative z-10 rounded-md bg-background shadow-md")}>
-      <Button ref={setActivatorNodeRef} type="button" variant="ghost" size="icon-sm" className="shrink-0 cursor-grab touch-none text-muted-foreground" aria-label={`Move answer “${choice.label || index + 1}”`} {...attributes} {...listeners}><GripVertical /></Button>
-      <Input aria-label={`Answer ${index + 1}`} value={choice.label} onChange={(event) => onLabel(event.target.value)} />
-      <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label={`Remove ${choice.label || `answer ${index + 1}`}`} onClick={onRemove}><X /></Button>
+    <li ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn(media ? "grid min-w-0" : "flex items-center gap-1", isDragging && "relative z-10 rounded-md bg-background shadow-md")}>
+      {media ? <><div className="flex min-w-0 items-center gap-1">{fields}</div>{media}</> : fields}
     </li>
   );
 }
@@ -683,11 +744,159 @@ function SectionPicker({ draft, question, onChange }: { draft: SurveyDefinition;
   return (
     <FormField id={id} label="Section">
       <div className="flex gap-2">
-        <PollSelect id={id} value={current} emptyLabel="None" options={draft.groups.map((entry) => ({ value: entry.name, label: entry.label || entry.name }))}
+        <PollSelect id={id} value={current} emptyLabel="None" options={draft.groups.filter((entry) => !isTableGroup(entry) || entry.name === current).map((entry) => ({ value: entry.name, label: entry.label || entry.name }))}
           onChange={(value) => setGroups(value ? [...(draft.groups.find((entry) => entry.name === value)?.groups ?? []), value] : [])} />
         <Button type="button" variant="outline" onClick={addSection}><Plus data-icon="inline-start" />New</Button>
       </div>
+      {group && isTableGroup(group) ? <FieldDescription>This imported table is kept as written. The Matrix editor needs direct single-choice rows with a shared answer list.</FieldDescription> : null}
       {group ? <Input aria-label="Section heading" value={group.label} onChange={(event) => onChange({ ...draft, groups: draft.groups.map((entry) => (entry.name === group.name ? { ...entry, label: event.target.value } : entry)) })} /> : null}
     </FormField>
   );
+}
+
+function DisplayPicker({ draft, question, locked, onChange }: {
+  draft: SurveyDefinition; question: Parameters<typeof choiceDisplay>[1]; locked: boolean; onChange: ChangeDraft;
+}) {
+  const display = choiceDisplay(draft, question);
+  const options: Array<{ value: string; label: string }> = Object.entries(CHOICE_DISPLAYS)
+    .filter(([value]) => value !== "likert" || question.kind === "select_one")
+    .map(([value, label]) => ({ value, label }));
+  if (display === "advanced") options.push({ value: "advanced", label: "Imported display" });
+  const choose = (value: ChoiceDisplay | "advanced") => {
+    if (value === "advanced" || value === display) return;
+    const otherQuestions = draft.questions.some((other) => other.name !== question.name && hasChoices(other) && other.list === question.list);
+    const choices = choicesFor(draft, question);
+    const seed = value === "likert" && !locked && !otherQuestions && choices.every((choice) => /^Answer \d+$/.test(choice.label) && !choice.image);
+    const appearance = value === "list" && choices.some((choice) => choice.image) ? "list" : DISPLAY_APPEARANCES[value];
+    onChange({
+      ...draft, questions: draft.questions.map((entry) => entry === question ? { ...question, appearance: appearance || undefined, imageCards: value === "images" } : entry),
+      lists: seed ? draft.lists.map((list) => list.name === question.list ? { ...list, choices: likertChoices() } : list) : draft.lists
+    });
+  };
+  const id = useId();
+  return <FieldGroup>
+    <FormField id={id} label="Display">
+      <PollSelect id={id} value={display} options={options} onChange={(value) => choose(value as ChoiceDisplay | "advanced")} />
+      {display === "advanced" ? <FieldDescription>Byline shows this as a list. The spreadsheet appearance is under Advanced.</FieldDescription> : null}
+    </FormField>
+    {display === "images" ? <SwitchField label="Allow multiple answers" description={locked ? "Published questions keep the same answer type across versions." : undefined}
+      checked={question.kind === "select_multiple"} disabled={locked} onChange={(multiple) => {
+        const kind = multiple ? "select_multiple" : "select_one";
+        onChange((current) => ({
+          ...current, questions: current.questions.map((entry) => entry.name === question.name ? { ...question, kind } : entry),
+          settings: multiple ? { ...current.settings, breakdowns: current.settings.breakdowns.filter((name) => name !== question.name) } : current.settings
+        }));
+      }} /> : null}
+  </FieldGroup>;
+}
+
+function QuestionPreview({ draft, item }: { draft: SurveyDefinition; item: RespondentScreen }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="min-h-11 w-fit" />}>Preview question<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        {open ? <QuestionPreviewBody draft={draft} item={item} /> : null}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function QuestionPreviewBody({ draft, item }: { draft: SurveyDefinition; item: RespondentScreen }) {
+  const definition = useMemo(() => previewItem(draft, item), [draft, item]);
+  const images = useDraftChoiceImages(definition);
+  return <div className="max-h-[32rem] min-h-48 overflow-auto rounded-lg border" data-polls-question-preview="">
+    <SurveyRunner key={JSON.stringify([definition.groups, definition.questions, definition.lists])} definition={definition} images={images} mode="preview" embedded skipWelcome
+      onSubmit={async () => ({ status: "saved" })} />
+  </div>;
+}
+
+function MatrixInspector({ draft, matrix, position, count, published, onChange, onMove, onDuplicate, onRemove }: {
+  draft: SurveyDefinition; matrix: Matrix; position: number; count: number; published: ReadonlySet<string>;
+  onChange: ChangeDraft; onMove: (delta: -1 | 1) => void; onDuplicate: () => void; onRemove: () => void;
+}) {
+  const { group, rows, list } = matrix;
+  const start = draft.questions.indexOf(rows[0]);
+  const replace = (patch: Partial<Group>) => onChange((current) => ({
+    ...current, groups: current.groups.map((entry) => entry.name === group.name ? { ...entry, ...patch } : entry)
+  }));
+  const setRows = (next: Matrix["rows"]) => onChange((current) => ({
+    ...current, questions: [...current.questions.slice(0, start), ...next, ...current.questions.slice(start + rows.length)],
+    settings: { ...current.settings, breakdowns: current.settings.breakdowns.filter((name) => !rows.some((row) => row.name === name) || next.some((row) => row.name === name)) }
+  }));
+  const addRow = () => {
+    const name = uniqueName(`${group.name}_row_${rows.length + 1}`, new Set([...definitionNames(draft), ...published]));
+    setRows([...rows, { kind: "select_one", list, name, label: `Statement ${rows.length + 1}`, groups: [...group.groups, group.name], required: rows.every((row) => row.required) }]);
+  };
+  const sectionId = useId();
+  const allRequired = rows.every((row) => row.required);
+  const mixed = !allRequired && rows.some((row) => row.required);
+  const section = group.groups.at(-1);
+  const sections = draft.groups.filter((entry) => !isTableGroup(entry) && !entry.groups.includes(group.name) && entry.groups.length < 3);
+  return <div className="flex min-w-0 flex-col gap-5" data-polls-inspector="" data-polls-matrix-editor="">
+    <div className="flex items-center gap-2">
+      <p className="flex-1 text-sm text-muted-foreground">Matrix · {position + 1} of {count}</p>
+      <ButtonGroup>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Move matrix up" disabled={position === 0} onClick={() => onMove(-1)}><ArrowUp /></Button>
+        <Button type="button" variant="outline" size="icon-sm" aria-label="Move matrix down" disabled={position === count - 1} onClick={() => onMove(1)}><ArrowDown /></Button>
+      </ButtonGroup>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon-sm" aria-label="More matrix actions" />}><MoreHorizontal /></DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={onDuplicate}><Copy />Duplicate matrix</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={onRemove}><Trash2 />Delete matrix</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+    <FieldGroup>
+      <TextAreaField label="Question" value={group.label} rows={3} maxLength={1000} onChange={(label) => replace({ label })} />
+      <TextField label="Hint" optional value={group.hint ?? ""} maxLength={1000} onChange={(hint) => replace({ hint: hint || undefined })} />
+      <SwitchField label="Require every row" description={mixed ? "Some imported rows are required. Changing this applies to every row." : undefined}
+        checked={allRequired} onChange={(required) => setRows(rows.map((row) => ({ ...row, required })))} />
+    </FieldGroup>
+    <FieldSet>
+      <FieldLegend variant="label">Rows</FieldLegend>
+      <ol className="m-0 grid list-none gap-2 p-0">
+        {rows.map((row, i) => <li key={row.name} className="flex min-w-0 items-center gap-1">
+          <Input aria-label={`Row ${i + 1}`} className="min-w-0" value={row.label} onChange={(event) => {
+            const label = event.target.value;
+            setRows(rows.map((entry) => entry === row ? { ...entry, label } : entry));
+          }} />
+          <Button type="button" variant="ghost" size="icon-sm" className="shrink-0 any-pointer-coarse:size-11" aria-label={`Move row ${i + 1} up`} disabled={i === 0} onClick={() => setRows(arrayMove(rows, i, i - 1))}><ArrowUp /></Button>
+          <Button type="button" variant="ghost" size="icon-sm" className="shrink-0 any-pointer-coarse:size-11" aria-label={`Move row ${i + 1} down`} disabled={i === rows.length - 1} onClick={() => setRows(arrayMove(rows, i, i + 1))}><ArrowDown /></Button>
+          <Button type="button" variant="ghost" size="icon-sm" className="shrink-0 any-pointer-coarse:size-11" aria-label={`Remove row ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((entry) => entry !== row))}><X /></Button>
+        </li>)}
+      </ol>
+      <Button type="button" variant="outline" size="sm" className="min-h-11 self-start" onClick={addRow}><Plus />Add row</Button>
+    </FieldSet>
+    <ChoicesEditor draft={draft} question={rows[0]} columns locked={draft.questions.some((question) => hasChoices(question) && question.list === list && published.has(question.name))} onChange={onChange} />
+    <QuestionPreview draft={draft} item={{ kind: "matrix", name: group.name, matrix }} />
+    <Separator />
+    <FormField id={sectionId} label="Section">
+      <PollSelect id={sectionId} value={section ?? ""} emptyLabel="None" options={sections.map(({ name, label }) => ({ value: name, label: label || name }))}
+        onChange={(value) => {
+          const selected = sections.find((entry) => entry.name === value);
+          if (value !== (section ?? "")) onChange(changeMatrixSection(draft, group, selected ? [...selected.groups, selected.name] : []));
+        }} />
+    </FormField>
+    <RuleEditor key={group.relevant ?? ""} definition={draft} target={{
+      kind: "section", name: group.name, item: group, start, members: rows.map((_row, i) => start + i), builder: readCondition(draft, group.relevant)
+    }} onApply={(relevant) => replace({ relevant })} />
+    <Collapsible>
+      <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="-ml-2.5 w-fit" />}>Advanced<ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
+      <CollapsibleContent className="mt-3 space-y-3">
+        <Identifier label="Matrix identifier" value={group.name} />
+        <Identifier label="Shared answer list" value={list} />
+        {rows.map((row) => <div key={row.name} className="grid gap-2">
+          <Identifier label={row.label || "Row identifier"} value={row.name} />
+          {row.relevant ? <p className="text-sm text-muted-foreground">{describeCondition(draft, row.relevant)}</p> : null}
+        </div>)}
+      </CollapsibleContent>
+    </Collapsible>
+  </div>;
+}
+
+function Identifier({ label, value }: { label: string; value: string }) {
+  const id = useId();
+  return <FormField id={id} label={label}><Input id={id} className="font-mono text-xs" value={value} readOnly /></FormField>;
 }

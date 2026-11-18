@@ -18,8 +18,8 @@ are ignored.
 
 ### survey
 
-One row per question, in the order respondents see them. Respondents see one
-question per screen.
+One row per question, in the order respondents see them. A Matrix groups
+several rows on one screen.
 
 | column | required | meaning |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ question per screen.
 | relevant | no | a condition (below): the question is shown only when it is true |
 | constraint | no | a condition the answer must meet; `.` is the answer itself |
 | constraint_message | no | what to say when the constraint fails |
-| appearance | no | `multiline` for a long written answer; `likert` for an agree/disagree scale (display only) |
+| appearance | no | How a question or group is displayed. See Displays below. |
 | parameters | no | for `range` only: `start=1 end=5 step=1`, optionally `start_label='Not at all' end_label='Very'` |
 
 A `label::English (en)` column is accepted in place of `label` (the first
@@ -44,6 +44,8 @@ language column is used; Wildcat Polls has one language per poll).
 | --- | --- | --- |
 | `select_one LIST` | choose one answer from choice list LIST | the chosen choice name |
 | `select_multiple LIST` | choose one or more answers | the chosen names separated by spaces; test with `selected()` |
+| `rank LIST` | put every choice in order and confirm the order | the chosen names in ranking order, separated by spaces |
+| `acknowledge` | confirm a statement | `OK` when confirmed. Byline also imports `trigger`. |
 | `text` | write an answer (up to 2,000 characters) | the text |
 | `integer` | enter a whole number | the number |
 | `decimal` | enter a number | the number |
@@ -53,7 +55,7 @@ language column is used; Wildcat Polls has one language per poll).
 
 Not supported (Byline refuses the workbook and says which row):
 `calculate`, `date`, `time`, `datetime`, location, media and file
-questions, `acknowledge`, `rank`, `hidden`, repeats, `or_other`,
+questions, `hidden`, repeats, `or_other`,
 choice filters and choices from a file. Metadata rows such as `start`, `end`
 and `deviceid` are skipped with a warning: Byline records times itself and
 never identifies devices or respondents.
@@ -65,9 +67,58 @@ never identifies devices or respondents.
 | list_name | the list a choice belongs to (the LIST in `select_one LIST`) |
 | name | a permanent identifier for the answer: no spaces or quotes, unique in its list |
 | label | what respondents read |
+| image | optional image filename, such as `wildcat.png`. Keep a text label too. |
 
 Every list used by a question needs at least two choices. Choices appear in
 sheet order.
+
+### Displays
+
+| Byline display | XLSForm appearance | Use |
+| --- | --- | --- |
+| List | empty | Radio buttons or checkboxes |
+| Cards | `compact` | Larger selectable cards |
+| Dropdown | `minimal` | A single- or multiple-choice menu |
+| Horizontal | `horizontal` | Answers wrap onto the next line as needed. Byline also reads `horizontal-compact`. |
+| Likert | `likert` | One answer on an ordered scale |
+| Image cards | `columns` with `choices.image` | Text and images on ordinary choice answers |
+| Matrix | `table-list` on `begin group` | Single-choice rows from one list, shown together |
+| Long written answer | `multiline` | A larger text box |
+
+Byline preserves other appearance text in the workbook. A table with mixed
+lists, nested sections or incompatible rows retains its original structure in
+Build under the imported section.
+
+#### Rank, Confirmation and Matrix
+
+| type | name | label | required | appearance | relevant |
+| --- | --- | --- | --- | --- | --- |
+| rank topics | rank_topics | Rank the topics for our next edition | yes | | |
+| acknowledge | read_rules | I have read the activity rules | yes | | |
+| begin group | school_experience | How much do you agree? | | table-list | ${read_rules} = 'OK' |
+| select_one agreement | support | I know where to find support | yes | | |
+| select_one agreement | clubs | I can find a club I want to join | yes | | |
+| end group | | | | | |
+
+Add the `topics` choices and the shared `agreement` choices to the
+choices sheet. Each Matrix row is exported as its own answer column.
+
+#### Image Choice
+
+Use `select_one logos` or `select_multiple logos` with appearance
+`columns`, and add image filenames on the choices sheet:
+
+| list_name | name | label | image |
+| --- | --- | --- | --- |
+| logos | wildcat | Wildcats | wildcat.png |
+| logos | tiger | Tigers | tiger.png |
+
+The workbook references separate files. Save an import as a draft and match
+each filename to an image in Byline's Media picker. The image needs alt
+text and prepared publication files before you can publish. XLSForm exports
+include filenames. Media files are managed separately. Image Choice asks
+respondents to choose a pictured answer. A respondent photo upload is a
+different XLSForm question type and remains unsupported.
 
 ### settings
 

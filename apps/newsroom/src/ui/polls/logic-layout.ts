@@ -1,6 +1,6 @@
 import { graphlib, layout } from "@dagrejs/dagre";
 import type { Point, Positions } from "./logic-positions";
-import { END, ownerId, START, type LogicProjection } from "../../polls/engine/logic-map";
+import { END, ownerId, questionId, START, type LogicProjection } from "../../polls/engine/logic-map";
 
 export const QUESTION_WIDTH = 228;
 export const TERMINAL_WIDTH = 104;
@@ -21,11 +21,13 @@ export function arrangeLogicMap(map: LogicProjection): Positions {
     positions[id] = { x: node.x - node.width / 2, y: 0 };
   }
   const lanes = new Map<number, number>();
-  const sections = [...map.targets.values()].filter((target) => target.kind === "section")
+  const sections = [...map.targets.values()].filter((target) => target.kind === "section" && !map.matrices.has(ownerId(target)))
     .sort((a, b) => a.start - b.start || a.item.groups.length - b.item.groups.length);
   for (const section of sections) {
     const lane = Math.max(section.item.groups.length, lanes.get(section.start) ?? 0);
-    const anchor = positions[map.order[section.start + 1]];
+    const first = [...map.questions.values()].find(({ index }) => index === section.start);
+    const firstId = first ? questionId(first.question.name) : END;
+    const anchor = positions[map.matrixByRow.get(firstId) ?? firstId];
     positions[ownerId(section)] = { x: anchor.x, y: -(lane + 1) * (SECTION_HEIGHT + 34) };
     lanes.set(section.start, lane + 1);
   }

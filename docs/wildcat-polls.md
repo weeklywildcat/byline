@@ -10,7 +10,7 @@ public site on its own.
 - **Pairing**, `/poll`: an iPad types a six-digit code from Poll Studio and becomes that session's kiosk, without
   anyone signing in to Byline on it.
 - **Interviewer mode**, `/polls/kiosk`: the device a reporter hands to students, locked to one polling session.
-- **Respondent mode**: one question per screen, on the kiosk or at a web link (`/poll/<key>`; the first address,
+- **Respondent mode**: one question or Matrix per screen, on the kiosk or at a web link (`/poll/<key>`; the first address,
   `/polls/s/<key>`, still works and renders the same app).
 
 The respondent routes have their own root layout (`src/app/(polls)`), not Payload's admin, so no newsroom
@@ -28,7 +28,7 @@ Definitions and fieldwork metadata are Payload documents. Answers are not.
 | Where | What |
 | --- | --- |
 | `poll-surveys` (collection) | Title, status (draft, open, closed, archived), owner, the working **draft** definition and its revision, per-poll grants (`interviewers`, `analysts`, `openToAllStaff`), collection modes (kiosk, public link with key, window, optional access code, hourly limit), linked Story and Collection, methodology note, smallest reported group. |
-| `poll-versions` (collection) | An immutable published definition: number, definition JSON, source workbook name, note, who published it and when. Created only by Publish; updates are refused even with `overrideAccess`. |
+| `poll-versions` (collection) | An immutable published definition: number, definition JSON, frozen choice-image manifest, source workbook name, note, who published it and when. Created only by Publish; updates are refused even with `overrideAccess`. |
 | `poll-locations` (collection) | Places fieldwork happens. Editors keep the list; turning one off keeps it on old sessions. |
 | `byline_poll_sessions` | One interviewer at one place: survey, version, location, period, sampling method, status, the kiosk state (hashed credential, scrypt PIN hash, mode, active ticket, PIN failures) and a pending pairing (the code's HMAC, its expiry, the PIN the paired device will use, and whether claiming may replace a running device). |
 | `byline_poll_session_events` | `started`, `declined`, `completed`, `abandoned`. Nothing about the person. `event_key` is the client's idempotency key; one ending per ticket. |
@@ -159,7 +159,7 @@ validation serve both modes.
 
 ## Respondent experience
 
-One question per screen, in Byline's own Nova components (no separate palette or typeface; the welcome screen names
+One question or Matrix per screen, in Byline's own Nova components (no separate palette or typeface; the welcome screen names
 The Weekly Wildcat in a single muted line), with large answers (at least 56px), obvious selection, Back, Continue,
 Submit on the last question and Skip (optional questions only). The kiosk's primary buttons are larger still. Progress
 says *Question 4 of 9* only when nothing in the poll is conditional (`hasStableLength`); with branching it says
@@ -168,9 +168,37 @@ when the connection drops. On a
 landscape iPad the question and answers sit side by side; in portrait they stack. The footer follows the on-screen
 keyboard (`trackVisualViewport`) and every edge clears the safe areas. Reduced motion turns off transitions.
 
+Ranking asks respondents to put all answers in order. They can drag, move an
+answer up or down, or reorder by keyboard. **Use this order** records the
+ranking, including when the starting order is right. A Confirmation asks
+respondents to check **I understand**. A Matrix displays its visible rows
+together, in a grid in wide landscape layouts and as individually labelled
+radio groups on narrow screens. Progress counts a Matrix once. Each row has
+its own answer, requirement, relevance and result.
+
 When an earlier answer changes, questions that no longer apply disappear at once and their answers are discarded
 (`pruneAnswers`). The server recomputes visibility from the submitted answers and refuses any answer to a hidden or
 unknown question, any value of the wrong shape and any broken rule (`checkSubmission`).
+
+### Choice images
+
+Use **Image choice** or choose **Image cards** under Display. Add a text label
+and choose a photo or graphic for each answer in the Media picker. The Media
+details action opens the file's alt text, rights, credit and preparation status.
+Build and Overview identify the choices that need attention.
+
+On Publish, the newsroom selects a bounded natural WebP or JPEG from the
+existing publication-media store and records its hash, dimensions and alt text
+in the immutable version. Changing a Media file or its alt text can be published
+as a new version. Versions in use continue to show the image they published.
+Drafts and retained versions appear in Media's linked uses and protect their
+referenced files from deletion.
+
+The kiosk and public respondents receive version-specific, signed image URLs.
+Each URL serves one rendition in that version's manifest. An access-code poll
+issues these URLs after the respondent starts with the code. The kiosk warms
+the browser cache for its active version, with at most 60 images. The answer is
+still the choice identifier. See [Publication media](publication-media.md).
 
 ## Results
 
@@ -182,7 +210,13 @@ The page opens with responses, in person, by web link, completion and decline ra
 then responses over time (per day in the newsroom timezone) and the methodology note. Charts are the shadcn Chart
 component in `@byline/newsroom-ui` on Recharts, each with `accessibilityLayer`, and every chart can be read as a
 table. Choice questions are horizontal bars; scales and small numeric questions show their distribution beside
-average, median and range; written answers stay a readable list.
+average, median and range; written answers stay a readable list. Ranking sorts
+by average position and shows first-place share, count and base for each option.
+Open **Position distribution** for the count at each position. Confirmation
+shows confirmed, skipped, unanswered, not applicable and its shown base.
+Matrices show a 100% distribution and base for each row with a table view.
+Compare by applies the suppression rules to Matrix rows and Ranking or
+Confirmation groups.
 
 **Compare by** offers the poll's configured breakdowns (single-choice questions such as grade, chosen in Build).
 Groups smaller than the poll's minimum (5 by default) are withheld on the server, and so is a second group whenever
@@ -205,7 +239,9 @@ say so:
 **Create dataset** (editors) puts the current results, with the current filters and comparison, into a **private
 working dataset** through Data's own `createDataset` and `createRows` (`createResultsDataset`, built by
 `aggregateHandoff` in `src/polls/engine/handoff.ts`). Each row is a question, an answer, an optional group, a count, a
-percentage and its base. Written answers never enter it, nor any response or respondent; questions answered by fewer
+percentage and its base. Ranking includes average position and first-place
+counts and shares. A Matrix contributes one row per statement and answer
+option. Confirmation contributes its confirmed count and base. Written answers never enter it, nor any response or respondent; questions answered by fewer
 than the minimum group are left out (the description says how many) and withheld groups stay withheld. Nothing is
 public until an editor reviews the dataset in Data and publishes it through Data's release step.
 
@@ -233,13 +269,24 @@ when Build named them and nothing published or referenced uses them) and kept un
 keeps its identifier. On narrow screens the question editor opens in a Drawer. **Download as spreadsheet** writes the
 draft or any version in the same format, so a poll can round-trip.
 
+Choice questions offer **List**, **Cards**, **Dropdown**, **Horizontal**,
+**Likert** (single choice) and **Image cards**. Ranking and Confirmation are in
+the Add question menu. A Matrix stays together when you move, duplicate or delete
+it in Build. Edit its row labels and shared columns, and choose whether to require
+every visible row. Imported tables with incompatible rows keep their workbook
+structure and are shown as imported sections. **Preview question** uses the
+same controls students see.
+
 ### Logic Map
 
 **Build → Logic** shows the same draft as **Questions**. The order connectors run from Start through each question
 to Thank you. A labeled logic connector means an earlier answer can make the destination appear through its
 existing XLSForm `relevant` expression. Display logic has no skip-to, goto or branch routing. Section cards show
 which questions they contain. A condition on a section applies to all its questions, including questions in
-nested sections.
+nested sections. A Matrix has one card. A connector from a Matrix row names
+the row and its answer. Confirmation conditions read **is confirmed**.
+Ranking can receive display logic, and supported imported expressions
+referencing its ordered answer stay under Advanced.
 
 Drag from a question's answer handle to a later question or section, or select a source and choose **Add logic**
 to pick a destination by touch or keyboard. **Edit display logic** opens the selected question or section, and
@@ -282,15 +329,22 @@ committed files drift. **Add the example poll** installs the example by importin
 
 - `tests/polls-engine.test.ts`: expressions, branching, pruning, server validation, importer errors, results, CSV and
   the committed workbooks.
+- `tests/polls-question-types.test.ts` covers the new answer types, Matrix
+  structure and relevance, Workbook round trips, Ranking statistics, CSV and Data handoff.
 - `tests/polls-logic-map.test.ts` covers builder round-tripping, advanced expressions, nested section gates,
   respondent path agreement and layout at the 300-question limit.
 - `tests/polls-ux.test.ts`: pairing codes, links, periods, progress, the timeline, Compare by, secondary suppression
   and the Data handoff.
 - `tests/integration/polls.test.ts`: access, versions, the kiosk, pairing (hashed at rest, expiry, one use,
   replacement, throttling, locked start, no newsroom access), web-link windows and limits, linked polls and the
-  dataset handoff, against PostgreSQL.
+  dataset handoff, against PostgreSQL. Image tests publish two versions of the
+  same Media asset and verify frozen bytes and alt text, signed routes and deletion protection.
 - `npm run test:polls:browser --workspace @byline/newsroom` runs against the throwaway database from
   `scripts/seed-polls-browser.ts`. Chromium covers the Poll Studio workflow, keyboard sorting and Logic Map
-  editing by pointer and keyboard. WebKit uses iPad landscape and portrait profiles for pairing, the kiosk and
-  Logic Map touch controls. A WebKit phone profile checks both web link addresses. Install WebKit once with
-  `npx playwright install webkit`.
+  editing by pointer and keyboard. It builds a poll with the new displays and tests
+  Ranking, Matrix and Confirmation from Preview to Results. WebKit uses iPad
+  landscape and portrait profiles for pairing, touch controls, offline images
+  and queued submissions. A WebKit phone profile checks both web link addresses
+  and narrow Matrix and Image Card layouts. Install WebKit once with
+  `npx playwright install webkit`. Set `BYLINE_POLLS_BROWSER_DATABASE_URL` to use
+  a different disposable PostgreSQL instance.

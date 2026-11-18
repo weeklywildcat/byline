@@ -34,25 +34,25 @@ export default defineConfig({
   projects: [
     {
       name: "studio-chromium",
-      testMatch: ["polls.spec.ts", "polls-logic.spec.ts"],
-      grepInvert: /@ipad/,
+      testMatch: ["polls.spec.ts", "polls-logic.spec.ts", "polls-formats.spec.ts"],
+      grepInvert: /@ipad|@phone/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL }
     },
     {
       name: "ipad-landscape",
-      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts"],
+      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts", "polls-formats.spec.ts"],
       grep: /@ipad/,
       use: { ...devices["iPad Pro 11 landscape"] }
     },
     {
       name: "ipad-portrait",
-      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts"],
+      testMatch: ["polls-devices.spec.ts", "polls-logic.spec.ts", "polls-formats.spec.ts"],
       grep: /@ipad/,
       use: { ...devices["iPad Pro 11"] }
     },
     {
       name: "phone-public",
-      testMatch: "polls-devices.spec.ts",
+      testMatch: ["polls-devices.spec.ts", "polls-formats.spec.ts"],
       grep: /@phone/,
       use: { ...devices["iPhone 15"] }
     }
@@ -65,7 +65,7 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       PAYLOAD_SECRET: "polls-browser-fixture-secret-0123456789",
-      DATABASE_URL: "postgres://localhost:5432/byline_newsroom_test_polls_browser",
+      DATABASE_URL: process.env.BYLINE_POLLS_BROWSER_DATABASE_URL ?? "postgres://localhost:5432/byline_newsroom_test_polls_browser",
       BYLINE_DB_PUSH: "0",
       BYLINE_NEWSROOM_URL: "http://localhost:3093",
       NEXT_TELEMETRY_DISABLED: "1",
