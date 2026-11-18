@@ -26,8 +26,19 @@ async function signIn(page: Page, next: string) {
   await page.waitForURL((url) => url.pathname.startsWith("/admin") && !url.pathname.endsWith("/login"));
   // Skip the welcome tour. Preferences need a token header; the browser keeps the session the form created.
   const login = await page.request.post("/api/users/login", { data: EDITOR });
-  await markWelcomeSeen(page.request, { Authorization: `JWT ${(await login.json()).token}` });
+  const headers = { Authorization: `JWT ${(await login.json()).token}` };
+  await markWelcomeSeen(page.request, headers);
   await page.reload();
+  return headers;
+}
+
+async function seedPublishedExample(page: Page, headers: Record<string, string>) {
+  const response = await page.request.post("/api/byline/polls/surveys", { headers, data: { example: true } });
+  expect(response.ok()).toBe(true);
+  const { id } = await response.json();
+  const published = await page.request.post(`/api/byline/polls/surveys/${id}/publish`, { headers, data: { draftRevision: 1 } });
+  expect(published.ok()).toBe(true);
+  return id as number;
 }
 
 const runner = (page: Page) => page.locator("[data-poll-runner]");
@@ -44,7 +55,7 @@ test("build, publish, pair an iPad with a code, collect a response and read the 
   await signIn(page, "/admin/polls");
   await expect(page.getByRole("heading", { level: 1, name: "Polls", exact: true })).toBeVisible();
   // New poll is the primary action; Import is secondary.
-  await expect(page.locator("[data-polls-home]").getByRole("button", { name: "New poll" })).toBeVisible();
+  await expect(page.locator("[data-polls-home]").getByRole("button", { name: "New poll", exact: true }).first()).toBeVisible();
 
   // Import → review (validation and every question) → preview → publish.
   await page.getByRole("button", { name: "Import", exact: true }).first().click();
@@ -154,9 +165,8 @@ test("build, publish, pair an iPad with a code, collect a response and read the 
 });
 
 test("sorts questions in Build from the keyboard and saves as it goes", async ({ page }) => {
-  await signIn(page, "/admin/polls");
-  await page.locator("[data-polls-row]").filter({ hasText: TITLE }).first().click();
-  await page.getByRole("tab", { name: "Build" }).click();
+  const headers = await signIn(page, "/admin/polls");
+  await page.goto(`/admin/polls?poll=${await seedPublishedExample(page, headers)}&tab=build`);
   const questions = page.locator("[data-polls-question-map] [data-polls-question]");
   const first = await questions.nth(0).getAttribute("data-polls-question");
   const second = await questions.nth(1).getAttribute("data-polls-question");
@@ -183,8 +193,8 @@ test("sorts questions in Build from the keyboard and saves as it goes", async ({
 
 test("uses a section drawer, not a scrolling tab strip, on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signIn(page, "/admin/polls");
-  await page.locator("[data-polls-row]").filter({ hasText: TITLE }).first().click();
+  const headers = await signIn(page, "/admin/polls");
+  await page.goto(`/admin/polls?poll=${await seedPublishedExample(page, headers)}`);
   await expect(page.getByRole("tab", { name: "Results" })).toHaveCount(0);
   await page.locator("[data-polls-section-button]").click();
   await page.getByRole("navigation", { name: "Poll sections" }).getByRole("button", { name: "Results" }).click();

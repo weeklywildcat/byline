@@ -250,6 +250,8 @@ test("@laptop reflects question, answer and section edits when switching from Qu
   const announcement = page.locator("[data-polls-inspector] [id^=DndLiveRegion]");
   await page.keyboard.press("Space");
   await expect(announcement).toContainText("“Maybe” is over position 3");
+  // Let the keyboard sensor attach after lift before sending the next key.
+  await page.waitForTimeout(150);
   await page.keyboard.press("ArrowUp");
   await expect(announcement).toContainText("over position 2");
   await page.keyboard.press("Space");

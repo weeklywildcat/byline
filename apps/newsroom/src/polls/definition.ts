@@ -1,5 +1,6 @@
 import { APIError } from "payload";
-import { SURVEY_FORMAT_VERSION, type ChoiceList, type Group, type Question, type QuestionKind, type SurveyDefinition } from "./engine/types";
+import { SURVEY_FORMAT_VERSION, type ChoiceImage, type ChoiceList, type Group, type Question, type QuestionKind, type SurveyDefinition } from "./engine/types";
+import { isChoiceImageFilename } from "./engine/presentation";
 import { DEFINITION_LIMITS } from "./engine/xlsform";
 
 /**
@@ -8,7 +9,7 @@ import { DEFINITION_LIMITS } from "./engine/xlsform";
  * semantic checks (names, references, conditions) are `validateDefinition`.
  */
 
-const KINDS: readonly QuestionKind[] = ["select_one", "select_multiple", "text", "integer", "decimal", "range", "note"];
+const KINDS: readonly QuestionKind[] = ["select_one", "select_multiple", "rank", "acknowledge", "text", "integer", "decimal", "range", "note"];
 type Raw = Record<string, unknown>;
 
 const record = (value: unknown): Raw => (value && typeof value === "object" && !Array.isArray(value) ? value as Raw : {});
@@ -32,6 +33,23 @@ const source = (value: unknown) => {
   return typeof raw.sheet === "string" && Number.isInteger(raw.row) ? { source: { sheet: raw.sheet.slice(0, 40), row: raw.row as number } } : {};
 };
 
+function choiceImage(value: unknown): { image?: ChoiceImage } {
+  if (value === undefined) return {};
+  const raw = record(value);
+  if (Object.keys(raw).some((key) => key !== "mediaId" && key !== "sourceName")) {
+    throw new APIError("A choice image must reference a Media asset or an imported filename.", 400);
+  }
+  const sourceName = raw.sourceName;
+  if (sourceName !== undefined && !isChoiceImageFilename(sourceName)) {
+    throw new APIError("An imported choice image must be a filename.", 400);
+  }
+  if (typeof raw.mediaId === "number" && Number.isSafeInteger(raw.mediaId) && raw.mediaId > 0 && raw.mediaId <= 2_147_483_647) {
+    return { image: { mediaId: raw.mediaId, ...(sourceName ? { sourceName } : {}) } };
+  }
+  if (raw.mediaId === undefined && sourceName) return { image: { sourceName } };
+  throw new APIError("A choice image must reference a Media asset or an imported filename.", 400);
+}
+
 export function normalizeDefinition(input: unknown): SurveyDefinition {
   const raw = record(input);
   if (raw.format !== undefined && raw.format !== SURVEY_FORMAT_VERSION) throw new APIError("This poll definition is from an unsupported format.", 400);
@@ -40,12 +58,21 @@ export function normalizeDefinition(input: unknown): SurveyDefinition {
     const item = record(entry);
     return {
       name: text(item.name, DEFINITION_LIMITS.name),
-      choices: list(item.choices, DEFINITION_LIMITS.choicesPerList, "choices").map((choice) => ({ name: text(record(choice).name, DEFINITION_LIMITS.name), label: text(record(choice).label, DEFINITION_LIMITS.label) }))
+      choices: list(item.choices, DEFINITION_LIMITS.choicesPerList, "choices").map((entry) => {
+        const choice = record(entry);
+        return { name: text(choice.name, DEFINITION_LIMITS.name), label: text(choice.label, DEFINITION_LIMITS.label), ...choiceImage(choice.image) };
+      })
     };
   });
   const groups: Group[] = list(raw.groups, 100, "groups").map((entry) => {
     const item = record(entry);
-    return { name: text(item.name, DEFINITION_LIMITS.name), label: text(item.label, DEFINITION_LIMITS.label), ...relevance(item.relevant), groups: names(item.groups, DEFINITION_LIMITS.groupDepth), ...source(item.source) };
+    const hint = optional(item.hint, DEFINITION_LIMITS.hint);
+    const appearance = optional(item.appearance, DEFINITION_LIMITS.appearance);
+    return {
+      name: text(item.name, DEFINITION_LIMITS.name), label: text(item.label, DEFINITION_LIMITS.label),
+      ...(hint ? { hint } : {}), ...(appearance ? { appearance } : {}),
+      ...relevance(item.relevant), groups: names(item.groups, DEFINITION_LIMITS.groupDepth), ...source(item.source)
+    };
   });
   const questions: Question[] = list(raw.questions, DEFINITION_LIMITS.questions, "questions").map((entry) => {
     const item = record(entry);
@@ -66,9 +93,15 @@ export function normalizeDefinition(input: unknown): SurveyDefinition {
       ...(optional(item.requiredMessage, 300) ? { requiredMessage: optional(item.requiredMessage, 300) } : {}),
       ...(optional(item.constraint, 1000) ? { constraint: optional(item.constraint, 1000) } : {}),
       ...(optional(item.constraintMessage, 300) ? { constraintMessage: optional(item.constraintMessage, 300) } : {}),
-      ...(optional(item.appearance, 60) ? { appearance: optional(item.appearance, 60) } : {})
+      ...(optional(item.appearance, DEFINITION_LIMITS.appearance) ? { appearance: optional(item.appearance, DEFINITION_LIMITS.appearance) } : {})
     };
-    if (kind === "select_one" || kind === "select_multiple") return { ...answerable, kind, list: text(item.list, DEFINITION_LIMITS.name) };
+    if (kind === "select_one" || kind === "select_multiple") {
+      return {
+        ...answerable, kind, list: text(item.list, DEFINITION_LIMITS.name),
+        ...(typeof item.imageCards === "boolean" ? { imageCards: item.imageCards } : {})
+      };
+    }
+    if (kind === "rank") return { ...answerable, kind, list: text(item.list, DEFINITION_LIMITS.name) };
     if (kind === "text") return { ...answerable, kind, multiline: item.multiline === true };
     if (kind === "range") {
       return {

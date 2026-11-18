@@ -7,14 +7,19 @@ import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSe
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Progress } from "@byline/newsroom-ui/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@byline/newsroom-ui/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@byline/newsroom-ui/ui/select";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { Textarea } from "@byline/newsroom-ui/ui/textarea";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { trackVisualViewport } from "@byline/newsroom-ui/lib/visual-viewport";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CloudUpload } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { answerProblem, choicesFor, pruneAnswers, rangeValues, screensFor, sectionLabel, TEXT_ANSWER_MAX } from "../../../polls/engine/logic";
-import { isAnswerable, type Answers, type AnswerState, type Question, type SurveyDefinition } from "../../../polls/engine/types";
+import { answerProblem, choicesFor, pruneAnswers, rangeValues, sectionLabel, TEXT_ANSWER_MAX } from "../../../polls/engine/logic";
+import { choiceDisplay, respondentScreens, screenQuestions, type RespondentScreen } from "../../../polls/engine/presentation";
+import { isAnswerable, isSelect, type ChoiceImages, type SelectQuestion, type Answers, type AnswerState, type Question, type SurveyDefinition } from "../../../polls/engine/types";
+
+import { MatrixAnswer } from "./MatrixAnswer";
+import { RankAnswer } from "./RankAnswer";
 
 /**
  * The respondent experience (docs/wildcat-polls.md#respondent-mode): one
@@ -28,6 +33,7 @@ export type SubmitOutcome = { status: "saved" } | { status: "queued" } | { statu
 
 export type RunnerProps = {
   definition: SurveyDefinition;
+  images?: ChoiceImages;
   mode: "kiosk" | "public" | "preview";
   onSubmit: (answers: Answers, meta: { startedAt: string; durationMs: number }) => Promise<SubmitOutcome>;
   /** Kiosk: the respondent asked to stop. */
@@ -48,6 +54,8 @@ export type RunnerProps = {
 
 type Stage = "welcome" | "questions" | "done";
 type Draft = Record<string, string>;
+
+const GUTTER = "pl-[max(1.25rem,var(--byline-safe-left))] pr-[max(1.25rem,var(--byline-safe-right))] sm:pl-[max(2rem,var(--byline-safe-left))] sm:pr-[max(2rem,var(--byline-safe-right))]";
 
 /** The respondent's actions: the kit's Button at its large size, made taller for a finger on an iPad. */
 const ACTION = "h-12 px-5 text-base";
@@ -83,16 +91,22 @@ export function SurveyRunner(props: RunnerProps) {
   const [drafts, setDrafts] = useState<Draft>({});
   const [currentName, setCurrentName] = useState<string | null>(null);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<{ message: string; name: string } | null>(null);
   const [outcome, setOutcome] = useState<SubmitOutcome | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const startedAt = useRef<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const screens = useMemo(() => screensFor(definition, answers), [answers, definition]);
+  const screens = useMemo(() => respondentScreens(definition, answers), [answers, definition]);
+  const potentialCount = useMemo(() => respondentScreens(definition).filter((screen) => screenQuestions(screen).some(isAnswerable)).length, [definition]);
   const current = screens.find((question) => question.name === currentName) ?? screens[0] ?? null;
   const index = current ? screens.indexOf(current) : 0;
+  const question = current?.kind === "question" ? current.question : null;
+  const matrix = current?.kind === "matrix" ? current.matrix : null;
+  const members = matrix?.rows ?? (question ? [question] : []);
+  const title = matrix?.group ?? question;
+  const section = matrix ? definition.groups.find(({ name }) => name === matrix.group.groups.at(-1))?.label : question ? sectionLabel(definition, question) : "";
 
   useEffect(() => props.onProgress?.({ answers, current: stage === "questions" ? current?.name ?? null : null, stage }), [answers, current, stage, props.onProgress]);
   useEffect(() => { if (!embedded && rootRef.current) return trackVisualViewport(rootRef.current); }, [embedded]);
@@ -131,7 +145,7 @@ export function SurveyRunner(props: RunnerProps) {
     return undefined;
   };
 
-  const go = (target: Question | null, dir: "forward" | "back") => {
+  const go = (target: RespondentScreen | null, dir: "forward" | "back") => {
     setDirection(dir);
     setProblem(null);
     setCurrentName(target?.name ?? null);
@@ -140,7 +154,7 @@ export function SurveyRunner(props: RunnerProps) {
 
   const advance = async (override?: Answers) => {
     const now = override ?? answers;
-    const nextScreens = screensFor(definition, now);
+    const nextScreens = respondentScreens(definition, now);
     const position = current ? nextScreens.findIndex((question) => question.name === current.name) : -1;
     const next = nextScreens[position + 1] ?? null;
     if (next) { go(next, "forward"); return; }
@@ -150,13 +164,18 @@ export function SurveyRunner(props: RunnerProps) {
   const next = async () => {
     if (!current) { await submit(answers); return; }
     let nextAnswers = answers;
-    const typed = draftState(current);
-    if (typed !== undefined) {
+    const typed = question ? draftState(question) : undefined;
+    if (question && typed !== undefined) {
       nextAnswers = { ...answers };
-      if (typed) nextAnswers[current.name] = typed; else delete nextAnswers[current.name];
+      if (typed) nextAnswers[question.name] = typed; else delete nextAnswers[question.name];
     }
-    const issue = answerProblem(definition, current, nextAnswers[current.name], nextAnswers);
-    if (issue) { setProblem(issue); return; }
+    for (const member of members) {
+      const issue = answerProblem(definition, member, nextAnswers[member.name], nextAnswers);
+      if (!issue) continue;
+      setProblem({ message: matrix ? `${member.label} — ${issue}` : issue, name: member.name });
+      if (matrix) requestAnimationFrame(() => document.getElementById(`answers-${member.name}`)?.querySelector<HTMLElement>('[role="radio"]')?.focus());
+      return;
+    }
     if (typed !== undefined) {
       nextAnswers = pruneAnswers(definition, nextAnswers);
       setAnswers(nextAnswers);
@@ -166,7 +185,8 @@ export function SurveyRunner(props: RunnerProps) {
 
   const skip = async () => {
     if (!current) return;
-    const nextAnswers = pruneAnswers(definition, { ...answers, [current.name]: { status: "skipped" } });
+    const skipped = Object.fromEntries(members.filter(isAnswerable).map(({ name }) => [name, { status: "skipped" as const }]));
+    const nextAnswers = pruneAnswers(definition, { ...answers, ...skipped });
     setDrafts((previous) => { const copy = { ...previous }; delete copy[current.name]; return copy; });
     setAnswers(nextAnswers);
     await advance(nextAnswers);
@@ -193,24 +213,24 @@ export function SurveyRunner(props: RunnerProps) {
 
   const retry = () => void submit(answers);
 
-  const answerable = current ? isAnswerable(current) : false;
-  const hasAnswer = current ? (draftState(current) !== undefined ? Boolean(draftState(current)) : answers[current.name]?.status === "answered") : false;
-  const optional = current && isAnswerable(current) ? !current.required : false;
+  const answerable = members.some(isAnswerable);
+  const typedAnswer = question ? draftState(question) : undefined;
+  const hasAnswer = matrix || (question && (typedAnswer !== undefined ? Boolean(typedAnswer) : answers[question.name]?.status === "answered"));
+  const optional = answerable && !members.some((member) => isAnswerable(member) && member.required);
   const isLast = current ? screens.indexOf(current) === screens.length - 1 : true;
 
   const stable = useMemo(() => hasStableLength(definition), [definition]);
   const online = useOnline();
   const progress = stage === "welcome" ? 0 : stage === "done" ? 100 : Math.round((index / Math.max(1, screens.length)) * 100);
   const primary = mode === "kiosk" ? KIOSK_PRIMARY : ACTION;
-  const gutter = "px-[max(1.25rem,var(--byline-safe-left))] sm:px-8";
   return (
     <div
       ref={rootRef}
-      className={cn("relative flex flex-col bg-background text-foreground", embedded ? "min-h-full" : "min-h-dvh")}
+      className={cn("relative flex min-w-0 flex-col overflow-x-clip bg-background text-foreground", embedded ? "min-h-full" : "min-h-dvh")}
       data-poll-runner={mode}
     >
       <header className={cn("sticky top-0 z-10 bg-background", !embedded && "pt-(--byline-safe-top)")}>
-        <div className={cn("mx-auto flex min-h-14 w-full max-w-5xl items-center gap-3", gutter)}>
+        <div className={cn("mx-auto flex min-h-14 w-full max-w-5xl items-center gap-3", GUTTER)}>
           <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{definition.settings.title}</p>
           {mode === "public" && !online ? <span className="shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground" role="status">Offline</span> : null}
           {stage === "questions" && current ? (
@@ -222,7 +242,7 @@ export function SurveyRunner(props: RunnerProps) {
           {props.headerAction}
         </div>
         {stable ? (
-          <div className={cn("mx-auto w-full max-w-5xl", gutter)}>
+          <div className={cn("mx-auto w-full max-w-5xl", GUTTER)}>
             <Progress value={progress} aria-label="Progress through the poll" />
           </div>
         ) : <div className="border-b" aria-hidden="true" />}
@@ -230,45 +250,47 @@ export function SurveyRunner(props: RunnerProps) {
 
       <main className="flex min-h-0 flex-1 flex-col">
         {stage === "welcome" ? (
-          <Welcome definition={definition} count={stable ? screensFor(definition, {}).filter(isAnswerable).length : definition.questions.filter(isAnswerable).length} upTo={!stable} primary={primary} onBegin={begin} />
+          <Welcome definition={definition} count={potentialCount} upTo={!stable} primary={primary} onBegin={begin} />
         ) : stage === "done" ? (
           <Done definition={definition} submitting={submitting} outcome={outcome} onRetry={retry} action={props.doneAction} mode={mode} />
-        ) : current ? (
+        ) : current && title ? (
           <section
             key={current.name}
             className={cn(
-              "mx-auto grid w-full max-w-5xl flex-1 content-start gap-8 pt-8 sm:pt-12",
-              gutter,
+              "mx-auto grid w-full min-w-0 max-w-5xl flex-1 grid-cols-[minmax(0,1fr)] content-start gap-8 pt-8 sm:pt-12",
+              GUTTER,
               embedded ? "pb-10" : "pb-32",
-              "[@media(min-width:1000px)_and_(orientation:landscape)]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] [@media(min-width:1000px)_and_(orientation:landscape)]:gap-14 [@media(min-width:1000px)_and_(orientation:landscape)]:pt-16",
+              !matrix && "[@media(min-width:1000px)_and_(orientation:landscape)]:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] [@media(min-width:1000px)_and_(orientation:landscape)]:gap-14 [@media(min-width:1000px)_and_(orientation:landscape)]:pt-16",
               "animate-in fade-in duration-200 motion-reduce:animate-none",
               direction === "forward" ? "slide-in-from-right-4" : "slide-in-from-left-4"
             )}
             aria-labelledby={`q-${current.name}`}
           >
             <div className="flex flex-col gap-3">
-              {sectionLabel(definition, current) ? <p className="text-sm font-medium text-muted-foreground">{sectionLabel(definition, current)}</p> : null}
+              {section ? <p className="text-sm font-medium text-muted-foreground">{section}</p> : null}
               <h1 id={`q-${current.name}`} ref={headingRef} tabIndex={-1} className="text-2xl leading-tight font-semibold tracking-tight text-balance outline-none sm:text-3xl">
-                {current.label}
+                {title.label}
               </h1>
-              {current.hint ? <p className="max-w-[38rem] text-lg leading-relaxed text-muted-foreground">{current.hint}</p> : null}
+              {title.hint ? <p className="max-w-[38rem] text-lg leading-relaxed text-muted-foreground">{title.hint}</p> : null}
               {answerable && optional ? <p className="text-sm text-muted-foreground">Optional</p> : null}
               {problem ? (
-                <Alert variant="destructive" id={`problem-${current.name}`} className="text-base">
+                <Alert role="alert" variant="destructive" id={`problem-${current.name}`} className="text-base">
                   <CircleAlert />
-                  <AlertTitle>{problem}</AlertTitle>
+                  <AlertTitle>{problem.message}</AlertTitle>
                 </Alert>
               ) : null}
             </div>
             <div className="flex flex-col gap-4">
-              {isAnswerable(current) ? (
+              {matrix ? <MatrixAnswer matrix={matrix} definition={definition} answers={answers} problemRow={problem?.name} onAnswer={commit} /> : null}
+              {question && isAnswerable(question) ? (
                 <QuestionInput
-                  question={current}
+                  question={question}
                   definition={definition}
-                  state={answers[current.name]}
-                  draft={drafts[current.name]}
-                  onDraft={(value) => { setProblem(null); setDrafts((previous) => ({ ...previous, [current.name]: value })); }}
-                  onChoose={(state) => commit(current.name, state)}
+                  images={props.images}
+                  state={answers[question.name]}
+                  draft={drafts[question.name]}
+                  onDraft={(value) => { setProblem(null); setDrafts((previous) => ({ ...previous, [question.name]: value })); }}
+                  onChoose={(state) => commit(question.name, state)}
                   onEnter={() => void next()}
                   invalid={Boolean(problem)}
                   describedBy={problem ? `problem-${current.name}` : undefined}
@@ -277,17 +299,17 @@ export function SurveyRunner(props: RunnerProps) {
             </div>
           </section>
         ) : (
-          <p className={cn("py-10 text-lg", gutter)}>This poll has no questions yet.</p>
+          <p className={cn("py-10 text-lg", GUTTER)}>This poll has no questions yet.</p>
         )}
       </main>
 
       {stage === "questions" && current ? (
         <footer className={cn("z-10 border-t bg-background", embedded ? "sticky bottom-0" : "fixed inset-x-0 bottom-(--byline-vv-bottom,0px) pb-(--byline-safe-bottom)")}>
-          <div className={cn("mx-auto flex w-full max-w-5xl items-center gap-2 py-3", gutter)}>
-            <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={back}><ArrowLeft data-icon="inline-start" />Back</Button>
+          <div className={cn("mx-auto flex w-full max-w-5xl items-center gap-2 py-3", GUTTER)}>
+            <Button type="button" variant="ghost" size="lg" className={cn(ACTION, "px-3 sm:px-5")} onClick={back}><ArrowLeft data-icon="inline-start" />Back</Button>
             <span className="flex-1" />
-            {answerable && optional ? <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={() => void skip()}>Skip</Button> : null}
-            <Button type="button" size="lg" className={cn(primary, "min-w-36")} disabled={answerable && !hasAnswer} onClick={() => void next()}>
+            {answerable && optional ? <Button type="button" variant="ghost" size="lg" className={cn(ACTION, "px-3 sm:px-5")} onClick={() => void skip()}>Skip</Button> : null}
+            <Button type="button" size="lg" className={cn(primary, "min-w-0 px-4 sm:min-w-36")} disabled={answerable && !hasAnswer} onClick={() => void next()}>
               {isLast ? "Submit" : "Continue"}
               {isLast ? <Check data-icon="inline-end" /> : <ArrowRight data-icon="inline-end" />}
             </Button>
@@ -303,7 +325,7 @@ export function SurveyRunner(props: RunnerProps) {
 function Welcome({ definition, count, upTo, primary, onBegin }: { definition: SurveyDefinition; count: number; upTo: boolean; primary: string; onBegin: () => void }) {
   const { settings } = definition;
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-8 animate-in fade-in duration-300 motion-reduce:animate-none">
+    <section className={cn("mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 py-12 animate-in fade-in duration-300 motion-reduce:animate-none", GUTTER)}>
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">The Weekly Wildcat</p>
         <h1 className="text-3xl leading-tight font-semibold tracking-tight text-balance sm:text-4xl">{settings.title}</h1>
@@ -323,7 +345,7 @@ function Welcome({ definition, count, upTo, primary, onBegin }: { definition: Su
 function Done({ definition, submitting, outcome, onRetry, action, mode }: { definition: SurveyDefinition; submitting: boolean; outcome: SubmitOutcome | null; onRetry: () => void; action?: ReactNode; mode: RunnerProps["mode"] }) {
   const failed = outcome?.status === "failed";
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-8" aria-live="polite">
+    <section className={cn("mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 py-12", GUTTER)} aria-live="polite">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{failed ? "Almost there" : "Thank you"}</h1>
       {failed ? (
         <Alert variant="destructive" className="text-base">
@@ -349,6 +371,7 @@ function Done({ definition, submitting, outcome, onRetry, action, mode }: { defi
 type InputProps = {
   question: Exclude<Question, { kind: "note" }>;
   definition: SurveyDefinition;
+  images?: ChoiceImages;
   state: AnswerState | undefined;
   draft: string | undefined;
   onDraft: (value: string) => void;
@@ -360,7 +383,11 @@ type InputProps = {
 
 function QuestionInput(props: InputProps) {
   const { question } = props;
-  if (question.kind === "select_one" || question.kind === "select_multiple") return <ChoiceList {...props} />;
+  if (isSelect(question)) return <ChoiceList {...props} question={question} />;
+  if (question.kind === "rank") return <RankAnswer choices={choicesFor(props.definition, question)}
+    confirmed={props.state?.status === "answered" && Array.isArray(props.state.value) ? props.state.value : undefined}
+    onConfirm={(value) => props.onChoose({ status: "answered", value })} onClear={() => props.onChoose(null)} />;
+  if (question.kind === "acknowledge") return <Confirmation {...props} />;
   if (question.kind === "range") return <Scale {...props} />;
   if (question.kind === "text") return <TextAnswer {...props} />;
   return <NumberAnswer {...props} />;
@@ -374,20 +401,27 @@ function QuestionInput(props: InputProps) {
  */
 const CHOICE = "*:data-[slot=field]:min-h-14 *:data-[slot=field]:gap-3.5 *:data-[slot=field]:px-4 *:data-[slot=field]:py-3.5 has-data-checked:border-primary";
 
-function ChoiceOption({ htmlFor, control, children }: { htmlFor: string; control: ReactNode; children: ReactNode }) {
+function ChoiceOption({ htmlFor, control, children, className }: { htmlFor: string; control: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <FieldLabel htmlFor={htmlFor} className={CHOICE}>
+    <FieldLabel htmlFor={htmlFor} className={cn(CHOICE, "min-w-0 has-focus-visible:ring-2 has-focus-visible:ring-ring", className)}>
       <Field orientation="horizontal" className="items-center!">
         {control}
-        <FieldContent>
-          <FieldTitle className="text-base leading-snug font-normal sm:text-lg">{children}</FieldTitle>
+        <FieldContent className="min-w-0">
+          <FieldTitle className="min-w-0 wrap-anywhere text-base leading-snug font-normal sm:text-lg">{children}</FieldTitle>
         </FieldContent>
       </Field>
     </FieldLabel>
   );
 }
 
-function ChoiceList({ question, definition, state, onChoose, describedBy }: InputProps) {
+function Confirmation({ question, state, onChoose, describedBy }: InputProps) {
+  const id = useId();
+  return <ChoiceOption htmlFor={id} control={<Checkbox id={id} checked={state?.status === "answered" && state.value === "OK"}
+    aria-describedby={describedBy ?? `q-${question.name}`} className="size-5"
+    onCheckedChange={(checked) => onChoose(checked ? { status: "answered", value: "OK" } : null)} />}>I understand</ChoiceOption>;
+}
+
+function ChoiceList({ question, definition, images, state, onChoose, describedBy }: InputProps & { question: SelectQuestion }) {
   const multiple = question.kind === "select_multiple";
   const choices = choicesFor(definition, question);
   const selected = state?.status === "answered" ? (Array.isArray(state.value) ? state.value.map(String) : [String(state.value)]) : [];
@@ -398,22 +432,63 @@ function ChoiceList({ question, definition, state, onChoose, describedBy }: Inpu
     const ordered = choices.map((entry) => entry.name).filter((entry) => next.includes(entry));
     onChoose(ordered.length ? { status: "answered", value: ordered } : null);
   };
-  if (!multiple) {
-    return (
-      <RadioGroup value={selected[0] ?? null} onValueChange={(value) => onChoose({ status: "answered", value: String(value) })} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy} className="gap-2.5">
-        {choices.map((choice) => (
-          <ChoiceOption key={choice.name} htmlFor={`${id}-${choice.name}`} control={<RadioGroupItem id={`${id}-${choice.name}`} value={choice.name} className="size-5" />}>{choice.label}</ChoiceOption>
-        ))}
-      </RadioGroup>
-    );
+  const display = choiceDisplay(definition, question);
+  const pick = (value: string | null) => onChoose(value ? { status: "answered", value } : null);
+  if (display === "dropdown") {
+    const items = choices.map(({ name, label }) => ({ value: name, label }));
+    const trigger = <SelectTrigger aria-labelledby={`q-${question.name}`} aria-describedby={describedBy}
+      className="min-h-14 w-full justify-between rounded-lg px-4 text-base">
+      <SelectValue placeholder={multiple ? "Choose all that apply" : "Choose an answer"}>
+        {multiple && selected.length > 0 ? `${selected.length} selected` : undefined}
+      </SelectValue>
+    </SelectTrigger>;
+    const menu = <SelectContent alignItemWithTrigger={false} className="motion-reduce:animate-none">
+      {items.map(({ value, label }) => <SelectItem key={value} value={value} className="min-h-11 whitespace-normal **:whitespace-normal">{label}</SelectItem>)}
+    </SelectContent>;
+    return multiple ? <div className="grid gap-2">
+      <Select multiple items={items} value={selected} onValueChange={(values) => {
+        const ordered = items.filter(({ value }) => values.includes(value)).map(({ value }) => value);
+        onChoose(ordered.length ? { status: "answered", value: ordered } : null);
+      }}>{trigger}{menu}</Select>
+      {selected.length ? <p className="text-sm wrap-anywhere text-muted-foreground">{items.filter(({ value }) => selected.includes(value)).map(({ label }) => label).join(", ")}</p> : null}
+    </div> : <Select items={items} value={selected[0] ?? null} onValueChange={pick}>{trigger}{menu}</Select>;
   }
+
+  const layout = cn("grid min-w-0 gap-2.5", {
+    "grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]": display === "cards" || display === "images",
+    "flex flex-wrap": display === "horizontal",
+    "grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))]": display === "likert"
+  });
+  const card = display === "images" || display === "cards" || display === "likert";
+  const options = choices.map((choice) => {
+    const controlId = `${id}-${choice.name}`;
+    const image = display === "images" && Object.hasOwn(images ?? {}, question.list) && Object.hasOwn(images![question.list], choice.name)
+      ? images![question.list][choice.name] : undefined;
+    const control = multiple
+      ? <Checkbox id={controlId} checked={selected.includes(choice.name)} onCheckedChange={(on) => toggle(choice.name, on === true)} className="size-5 shrink-0" />
+      : <RadioGroupItem id={controlId} value={choice.name} className="size-5 shrink-0" />;
+    if (card) return (
+      <FieldLabel key={choice.name} htmlFor={controlId}
+        className="flex min-w-0 cursor-pointer flex-col gap-0 overflow-hidden rounded-lg border bg-card has-data-checked:border-primary has-data-checked:bg-primary/10 has-focus-visible:ring-2 has-focus-visible:ring-ring">
+        {display === "images" ? <span className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-muted">
+          {image ? <img src={image.src} alt={image.alt} width={image.width} height={image.height} className="size-full object-contain" /> : null}
+        </span> : null}
+        <span className={cn("flex min-h-14 w-full min-w-0 items-center gap-2.5 px-3 py-2", display === "likert" && "flex-col justify-start text-center")}>
+          {control}<span className="min-w-0 wrap-anywhere text-base leading-snug">{choice.label}</span>
+        </span>
+      </FieldLabel>
+    );
+    return <ChoiceOption key={choice.name} htmlFor={controlId} control={control} className={display === "horizontal" ? "w-fit max-w-full" : undefined}>{choice.label}</ChoiceOption>;
+  });
+  if (!multiple) return (
+    <RadioGroup value={selected[0] ?? null} onValueChange={pick} aria-labelledby={`q-${question.name}`} aria-describedby={describedBy}
+      className={layout} data-choice-display={display}>{options}</RadioGroup>
+  );
   return (
-    <FieldSet className="gap-2.5" aria-describedby={describedBy}>
+    <FieldSet className="min-w-0 gap-2.5" aria-describedby={describedBy} data-choice-display={display}>
       <FieldLegend className="sr-only">{question.label} (choose all that apply)</FieldLegend>
       <FieldDescription>Choose all that apply</FieldDescription>
-      {choices.map((choice) => (
-        <ChoiceOption key={choice.name} htmlFor={`${id}-${choice.name}`} control={<Checkbox id={`${id}-${choice.name}`} checked={selected.includes(choice.name)} onCheckedChange={(on) => toggle(choice.name, on === true)} className="size-5" />}>{choice.label}</ChoiceOption>
-      ))}
+      <div className={layout}>{options}</div>
     </FieldSet>
   );
 }

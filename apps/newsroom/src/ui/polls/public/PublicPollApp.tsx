@@ -6,7 +6,7 @@ import { Field, FieldError, FieldLabel } from "@byline/newsroom-ui/ui/field";
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { useEffect, useRef, useState } from "react";
-import type { Answers, SurveyDefinition } from "../../../polls/engine/types";
+import type { Answers, ChoiceImages, SurveyDefinition } from "../../../polls/engine/types";
 import { newKey } from "../outbox";
 import { SurveyRunner, type SubmitOutcome } from "../runner/SurveyRunner";
 
@@ -17,7 +17,8 @@ import { SurveyRunner, type SubmitOutcome } from "../runner/SurveyRunner";
  * failed send says so and offers to try again.
  */
 
-type Poll = { title: string; definition: SurveyDefinition; needsCode: boolean; closesAt: string | null };
+type Respondent = { definition: SurveyDefinition; images: ChoiceImages };
+type Poll = { title: string; needsCode: boolean; closesAt: string | null };
 
 async function call<T>(api: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
@@ -41,10 +42,11 @@ const remember = (key: string) => { try { window.localStorage.setItem(doneKey(ke
 export function PublicPollApp({ api, pollKey }: { api: string; pollKey: string }) {
   const [poll, setPoll] = useState<Poll | null>(null);
   const [error, setError] = useState<string | null>(pollKey ? null : "This poll isn't available.");
-  const [token, setToken] = useState<string | null>(null);
+  const [run, setRun] = useState<(Respondent & { startToken: string }) | null>(null);
   const [code, setCode] = useState("");
   const [starting, setStarting] = useState(false);
   const [already, setAlready] = useState(false);
+  const startRequested = useRef(false);
   const submission = useRef(newKey());
   const honeypot = useRef<HTMLInputElement>(null);
 
@@ -55,21 +57,25 @@ export function PublicPollApp({ api, pollKey }: { api: string; pollKey: string }
   }, [api, pollKey]);
 
   const start = async () => {
+    // Keep the first successful token and its version together, including during duplicate initial reads.
+    if (startRequested.current) return;
+    startRequested.current = true;
     setStarting(true);
     setError(null);
     try {
-      setToken((await call<{ startToken: string }>(api, `${pollKey}/start`, { code })).startToken);
+      setRun(await call<Respondent & { startToken: string }>(api, `${pollKey}/start`, { code }));
     } catch (failure) {
+      startRequested.current = false;
       setError((failure as Error).message);
     } finally {
       setStarting(false);
     }
   };
-  useEffect(() => { if (poll && !poll.needsCode && !token && !already) void start(); }, [poll, already]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (poll && !poll.needsCode && !run && !already) void start(); }, [poll, already]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (answers: Answers): Promise<SubmitOutcome> => {
     try {
-      await call(api, `${pollKey}/responses`, { startToken: token, submissionId: submission.current, answers, website: honeypot.current?.value ?? "" });
+      await call(api, `${pollKey}/responses`, { startToken: run?.startToken, submissionId: submission.current, answers, website: honeypot.current?.value ?? "" });
       remember(pollKey);
       return { status: "saved" };
     } catch (failure) {
@@ -82,8 +88,8 @@ export function PublicPollApp({ api, pollKey }: { api: string; pollKey: string }
     <AdminRoot toaster={false}>
       {/* A field people never see; automated form fillers do. */}
       <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-px w-px opacity-0" />
-      {poll && token ? (
-        <SurveyRunner definition={poll.definition} mode="public" onSubmit={(answers) => submit(answers)} />
+      {poll && run ? (
+        <SurveyRunner definition={run.definition} images={run.images} mode="public" onSubmit={(answers) => submit(answers)} />
       ) : (
         <div className="grid min-h-dvh place-items-center bg-background px-[max(1.25rem,var(--byline-safe-left))] text-foreground">
           <div className="flex w-full max-w-md flex-col gap-5 py-12">

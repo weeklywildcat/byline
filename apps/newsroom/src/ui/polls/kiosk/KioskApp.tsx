@@ -13,7 +13,7 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
 import { Cloud, CloudOff, Delete, Lock, MapPin, Pause, Play, ShieldCheck, Square, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Answers, SurveyDefinition } from "../../../polls/engine/types";
+import type { Answers, ChoiceImages, SurveyDefinition } from "../../../polls/engine/types";
 import { clearStoredUploads, encryptedStore, flushUploads, memoryStore, newKey, type PollUpload, type SendResult, type UploadStore } from "../outbox";
 import { SurveyRunner, type SubmitOutcome } from "../runner/SurveyRunner";
 
@@ -24,12 +24,15 @@ import { SurveyRunner, type SubmitOutcome } from "../runner/SurveyRunner";
  * always lands where the server says. Interviewer controls need the PIN.
  */
 
+const SAVED = { status: "saved" } as const;
+
 type Counts = { started: number; declined: number; completed: number; abandoned: number };
 type KioskState = {
   session: { id: string; status: "active" | "paused" | "ended"; locationId: number | null; locationName: string; period: string; method: string; startedAt: string };
   survey: { id: number; title: string; open: boolean };
   version: { id: number; number: number };
   definition: SurveyDefinition;
+  images: ChoiceImages;
   counts: Counts;
   mode: "locked" | "interviewer" | "respondent";
   ticket: { id: string; submitted: boolean } | null;
@@ -66,13 +69,30 @@ async function call<T>(api: string, path: string, body?: unknown, timeoutMs = 15
 
 export function KioskApp({ api, pairHref }: { api: string; pairHref: string }) {
   const [state, setState] = useState<KioskState | null>(null);
+  // Keep decoded images for the active version and warm the browser's immutable
+  // HTTP cache before the interviewer hands the device to a respondent.
+  const urls = JSON.stringify([...new Set(Object.values(state?.images ?? {}).flatMap((list) => Object.values(list).map(({ src }) => src)))]);
+  useEffect(() => {
+    const pending: string[] = JSON.parse(urls);
+    if (!pending.length) return;
+    const images: HTMLImageElement[] = [];
+    let active = true;
+    async function preload() {
+      while (active && pending.length) {
+        const image = new Image();
+        image.src = pending.shift()!;
+        await image.decode().then(() => images.push(image), () => undefined);
+      }
+    }
+    void Promise.all(Array.from({ length: Math.min(6, pending.length) }, preload));
+    return () => { active = false; images.length = 0; };
+  }, [urls]);
   const [ended, setEnded] = useState<{ message: string; counts?: Counts } | null>(null);
   const [offline, setOffline] = useState(false);
   const [store, setStore] = useState<UploadStore | null>(null);
   const [pending, setPending] = useState<PollUpload[]>([]);
   const [rejected, setRejected] = useState(0);
   const [handBack, setHandBack] = useState<null | "finished" | "stopped">(null);
-  const [outcome, setOutcome] = useState<SubmitOutcome | null>(null);
   const ticketFinished = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -179,7 +199,6 @@ export function KioskApp({ api, pairHref }: { api: string; pairHref: string }) {
     const outcomeFor = ticket && (ticketFinished.current === ticket || state?.ticket?.submitted) ? "pending" : "abandon";
     const next = await call<KioskState>(api, "/unlock", { pin, ticketOutcome: outcomeFor });
     setHandBack(null);
-    setOutcome(null);
     ticketFinished.current = null;
     setState(next);
   };
@@ -209,9 +228,10 @@ export function KioskApp({ api, pairHref }: { api: string; pairHref: string }) {
           <SurveyRunner
             key={state.ticket?.id ?? "none"}
             definition={state.definition}
+            images={state.images}
             mode="kiosk"
             onSubmit={submit}
-            outcomeOverride={outcome}
+            outcomeOverride={state.ticket?.submitted ? SAVED : null}
             onStop={() => setHandBack("stopped")}
             headerAction={<Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Interviewer" onClick={() => setHandBack("stopped")}><Lock /></Button>}
             doneAction={<div className="pt-2"><Button type="button" variant="outline" size="lg" className="h-12 px-5 text-base" onClick={() => setHandBack("finished")}><Lock data-icon="inline-start" />Return to interviewer</Button></div>}

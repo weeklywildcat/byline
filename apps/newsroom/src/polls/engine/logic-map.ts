@@ -1,7 +1,8 @@
-import { OPERATOR_LABELS, readCondition, writeConditions, type Condition, type ConditionBuilder } from "./condition-builder";
+import { isConditionSource, OPERATOR_LABELS, readCondition, writeConditions, type Condition, type ConditionBuilder } from "./condition-builder";
 import { compileExpression, evaluateCondition } from "./expression";
 import { choicesFor, expressionValue, groupQuestionIndices, pruneAnswers, visibleQuestionNames } from "./logic";
-import { isAnswerable, type Answers, type Group, type Question, type SurveyDefinition } from "./types";
+import { matricesFor } from "./presentation";
+import { type Answers, type Group, type Question, type SurveyDefinition } from "./types";
 import { validateDefinition, type ImportIssue } from "./xlsform";
 
 export type LogicOwner = { kind: "question" | "section"; name: string };
@@ -23,6 +24,8 @@ export type Dependency = {
   id: string;
   source: string;
   target: string;
+  /** Semantic target when the visible edge lands on a Matrix. */
+  owner?: string;
   sourceHandle?: string;
   label: string;
   description: string;
@@ -43,7 +46,7 @@ export function diagnoseDefinition(definition: SurveyDefinition) {
 }
 
 export function connectionProblem(source: Question | undefined, sourceIndex: number, target: LogicTarget | undefined): string | null {
-  if (!source || !isAnswerable(source)) return "Choose an earlier question that a respondent can answer.";
+  if (!source || !isConditionSource(source)) return "Choose an earlier question that a respondent can answer.";
   if (!target) return "Choose a question or section to show conditionally.";
   if (target.kind === "question" && source.name === target.name) return "A question cannot depend on its own answer.";
   if (target.kind === "section" && source.groups.includes(target.name)) return "A section cannot depend on an answer from inside that section.";
@@ -86,6 +89,7 @@ export function relevanceProblem(definition: SurveyDefinition, target: LogicOwne
 
 function rowLabel(row: Condition, choices: ReturnType<typeof choicesFor>, answered: boolean): string {
   if (row.op === "answered") return "Was answered";
+  if (row.op === "confirmed") return "Is confirmed";
   const value = choices.find((entry) => entry.name === row.value)?.label ?? (row.value || "blank");
   if (row.op === "is" && answered) return value;
   const operator = { gt: ">", gte: "≥", lt: "<", lte: "≤" }[row.op as "gt" | "gte" | "lt" | "lte"] ?? OPERATOR_LABELS[row.op];
@@ -107,6 +111,12 @@ export function projectLogic(definition: SurveyDefinition) {
     const target = { kind: "section" as const, name: item.name, item, start: members[0] ?? definition.questions.length, members, builder: readCondition(definition, item.relevant) };
     targets.set(ownerId(target), target);
   }
+  const matrixByRow = new Map<string, string>();
+  const matrices = new Map(matricesFor(definition).map((matrix) => {
+    const id = ownerId({ kind: "section", name: matrix.group.name });
+    for (const row of matrix.rows) matrixByRow.set(questionId(row.name), id);
+    return [id, matrix] as const;
+  }));
   const dependencies: Dependency[] = [];
   for (const target of targets.values()) {
     const { builder } = target;
@@ -120,11 +130,17 @@ export function projectLogic(definition: SurveyDefinition) {
         try { expression = writeConditions(definition, "and", [condition]); }
         catch { /* Preserve the original expression if this draft cannot be rebuilt. */ }
       }
-      const label = condition ? rowLabel(condition, choices, Boolean(usesChoice && source.kind === "select_one")) : builder.kind === "invalid" ? "Invalid condition" : "Advanced condition";
+      const sourceId = questionId(ref);
+      const targetId = ownerId(target);
+      const visibleSource = matrixByRow.get(sourceId) ?? sourceId;
+      const visibleTarget = matrixByRow.get(targetId) ?? targetId;
+      const comparison = condition ? rowLabel(condition, choices, Boolean(usesChoice && source.kind === "select_one")) : builder.kind === "invalid" ? "Invalid condition" : "Advanced condition";
+      const label = matrixByRow.has(sourceId) ? `${source.label} → ${comparison}` : comparison;
       dependencies.push({
         id: JSON.stringify([ownerId(target), ref, row ?? "advanced", condition?.op, condition?.value]),
-        source: questionId(ref), target: ownerId(target),
-        sourceHandle: usesChoice ? choiceHandle(condition.value) : undefined,
+        source: visibleSource, target: visibleTarget,
+        ...(visibleTarget !== targetId ? { owner: targetId } : {}),
+        sourceHandle: usesChoice && visibleSource === sourceId ? choiceHandle(condition.value) : undefined,
         label, description: `Logic from ${source.label} to ${target.item.label || "Untitled section"} · ${label}`,
         expression, row
       });
@@ -132,7 +148,8 @@ export function projectLogic(definition: SurveyDefinition) {
     if (builder.kind === "simple") builder.rows.forEach((row, index) => add(row.question, row, index));
     else builder.refs.forEach((ref) => add(ref));
   }
-  return { targets, questions, dependencies, order: [START, ...definition.questions.map(({ name }) => questionId(name)), END] };
+  const order = [...new Set(definition.questions.map(({ name }) => matrixByRow.get(questionId(name)) ?? questionId(name)))];
+  return { targets, questions, dependencies, matrices, matrixByRow, order: [START, ...order, END] };
 }
 
 export type LogicProjection = ReturnType<typeof projectLogic>;
@@ -147,7 +164,7 @@ export function projectTestPath(definition: SurveyDefinition, map: LogicProjecti
   }
   const active = new Set<string>();
   for (const dependency of map.dependencies) {
-    if (!nodes.has(dependency.target)) continue;
+    if (!nodes.has(dependency.owner ?? dependency.target)) continue;
     try {
       if (evaluateCondition(compileExpression(dependency.expression), {
         value: (name) => expressionValue(Object.hasOwn(pruned, name) ? pruned[name] : undefined)

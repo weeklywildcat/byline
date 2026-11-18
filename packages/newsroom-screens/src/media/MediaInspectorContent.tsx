@@ -371,7 +371,7 @@ function InspectorBody({ asset, fetchers, navigator, timezone, guardRef, onClose
                   ))}
                 </ItemGroup>
               ) : asset.hiddenUsageCount ? null : (
-                <p className="text-sm text-muted-foreground">Not linked from any story, assignment, Collection or profile.</p>
+                <p className="text-sm text-muted-foreground">No linked uses.</p>
               )}
               {asset.hiddenUsageCount ? <p className="text-xs text-muted-foreground">{asset.hiddenUsageCount} more {asset.hiddenUsageCount === 1 ? "record you can't open links" : "records you can't open link"} to this file.</p> : null}
               <p className="text-xs text-muted-foreground">Includes Byline article blocks. Imported HTML and older Story versions are not listed.</p>

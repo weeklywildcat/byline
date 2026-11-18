@@ -3,7 +3,7 @@ import { choicesFor } from "./logic";
 import { isAnswerable, type AnswerableQuestion, type SurveyDefinition } from "./types";
 
 const comparisons = { is: "=", is_not: "!=", gt: ">", gte: ">=", lt: "<", lte: "<=" } as const;
-export type ConditionOperator = keyof typeof comparisons | "includes" | "excludes" | "answered";
+export type ConditionOperator = keyof typeof comparisons | "includes" | "excludes" | "answered" | "confirmed";
 export type Condition = { question: string; op: ConditionOperator; value: string };
 export type ConditionJoin = "and" | "or";
 export type ConditionBuilder =
@@ -14,20 +14,26 @@ export type ConditionBuilder =
 
 export const OPERATOR_LABELS: Record<ConditionOperator, string> = {
   is: "is", is_not: "is not", includes: "includes", excludes: "does not include",
-  answered: "was answered", gt: "is greater than", gte: "is at least", lt: "is less than", lte: "is at most"
+  confirmed: "is confirmed", answered: "was answered", gt: "is greater than", gte: "is at least", lt: "is less than", lte: "is at most"
 };
 
 export function isNumeric(question: AnswerableQuestion) {
   return question.kind === "integer" || question.kind === "decimal" || question.kind === "range";
 }
 
+export const isConditionSource = (question: Parameters<typeof isAnswerable>[0]): question is AnswerableQuestion =>
+  isAnswerable(question) && question.kind !== "rank";
+
 export function operatorsFor(question: AnswerableQuestion): ConditionOperator[] {
+  if (question.kind === "rank") return [];
+  if (question.kind === "acknowledge") return ["confirmed", "answered"];
   if (question.kind === "select_multiple") return ["includes", "excludes", "answered"];
   if (isNumeric(question)) return ["is", "is_not", "gt", "gte", "lt", "lte", "answered"];
   return ["is", "is_not", "answered"];
 }
 
 export function newCondition(definition: SurveyDefinition, question: AnswerableQuestion, choice?: string): Condition {
+  if (question.kind === "acknowledge") return { question: question.name, op: "confirmed", value: "" };
   const options = choicesFor(definition, question);
   const selected = options.find((option) => option.name === choice) ?? options[0];
   const op = selected ? (question.kind === "select_multiple" ? "includes" : "is") : "answered";
@@ -52,8 +58,11 @@ function conditionRow(definition: SurveyDefinition, questions: ReadonlyMap<strin
   }
   if (node.kind !== "binary" || node.left.kind !== "ref") return null;
   const question = questions.get(node.left.name);
-  if (!question) return null;
+  if (!question || !isConditionSource(question)) return null;
   const value = literal(node.right);
+  if (question.kind === "acknowledge" && node.op === "=" && value === "OK") {
+    return { question: question.name, op: "confirmed", value: "" };
+  }
   if (node.op === "!=" && value === "") return { question: question.name, op: "answered", value: "" };
   const op = (Object.keys(comparisons) as Array<keyof typeof comparisons>).find((key) => comparisons[key] === node.op);
   if (!op || !operatorsFor(question).includes(op)) return null;
@@ -100,6 +109,7 @@ export function writeConditions(definition: SurveyDefinition, join: ConditionJoi
     const question = questions.get(row.question);
     if (!question || !operatorsFor(question).includes(row.op)) throw new ExpressionError("Choose an earlier question and a comparison for that question.");
     const ref = `\${${question.name}}`;
+    if (row.op === "confirmed") return `${ref} = 'OK'`;
     if (row.op === "answered") return `${ref} != ''`;
     if ((question.kind === "select_one" || question.kind === "select_multiple") && !choicesFor(definition, question).some((choice) => choice.name === row.value)) {
       throw new ExpressionError("Choose an answer from the question's list.");

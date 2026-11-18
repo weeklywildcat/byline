@@ -6,10 +6,10 @@ import { Input } from "@byline/newsroom-ui/ui/input";
 import { TextAreaField } from "@byline/newsroom-ui/components/form-fields";
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
-import { isNumeric, newCondition, OPERATOR_LABELS, operatorsFor, writeConditions, type Condition, type ConditionJoin } from "../../polls/engine/condition-builder";
+import { isConditionSource, isNumeric, newCondition, OPERATOR_LABELS, operatorsFor, writeConditions, type Condition, type ConditionJoin } from "../../polls/engine/condition-builder";
 import { choicesFor, describeCondition } from "../../polls/engine/logic";
 import { relevanceProblem, type LogicTarget } from "../../polls/engine/logic-map";
-import { isAnswerable, type SurveyDefinition } from "../../polls/engine/types";
+import { type SurveyDefinition } from "../../polls/engine/types";
 import { PollSelect } from "./fields";
 
 export function RuleEditor({ definition, target, seed, focusedRow, onApply, onCancel }: {
@@ -31,7 +31,7 @@ export function RuleEditor({ definition, target, seed, focusedRow, onApply, onCa
   const [join, setJoin] = useState<ConditionJoin>(builder.kind === "simple" ? builder.join : "and");
   const [editing, setEditing] = useState(Boolean(seed));
   const [problem, setProblem] = useState<string | null>(null);
-  const earlier = definition.questions.slice(0, target.start).filter(isAnswerable);
+  const earlier = definition.questions.slice(0, target.start).filter(isConditionSource);
   const reset = () => {
     setEditing(false);
     setProblem(null);
@@ -112,7 +112,7 @@ export function RuleEditor({ definition, target, seed, focusedRow, onApply, onCa
                 </div>
                 <PollSelect label="Comparison" value={row.op} options={(source ? operatorsFor(source) : [row.op]).map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
                   onChange={(value) => set({ op: value as Condition["op"], value: row.value || options[0]?.name || (source && isNumeric(source) ? "0" : "") })} />
-                {row.op === "answered" ? null : options.length ? (
+                {row.op === "answered" || row.op === "confirmed" ? null : options.length ? (
                   <PollSelect label="Answer" value={row.value} options={options.map((choice) => ({ value: choice.name, label: choice.label }))} onChange={(value) => set({ value })} />
                 ) : (
                   <Input value={row.value} inputMode={source && isNumeric(source) ? "decimal" : undefined} aria-label="Comparison value"

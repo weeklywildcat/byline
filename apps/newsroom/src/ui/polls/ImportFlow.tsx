@@ -12,6 +12,7 @@ import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { imageCardLists, respondentScreens, screenQuestions } from "../../polls/engine/presentation";
 import { isAnswerable } from "../../polls/engine/types";
 import { hasErrors } from "../../polls/engine/xlsform";
 import { useNewsroomRoutes } from "../shell/account";
@@ -44,6 +45,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
     onSuccess: (result) => { setPreview(result); setStep("Review"); }
   });
   const blocked = preview ? hasErrors(preview.issues) : true;
+  const needsImages = preview && [...imageCardLists(preview.definition).values()].some(({ choices }) => choices.some(({ image }) => !image?.mediaId));
   const finish = useMutation({
     mutationFn: async (publish: boolean) => {
       if (!preview) throw new Error("Upload a workbook first.");
@@ -122,7 +124,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
         <section className="flex flex-col gap-4">
           <div>
             <h2 className="text-base font-semibold">{preview.definition.settings.title}</h2>
-            <p className="text-sm text-muted-foreground">{preview.source.filename} · {preview.definition.questions.filter(isAnswerable).length} questions · {preview.definition.lists.length} choice lists</p>
+            <p className="text-sm text-muted-foreground">{preview.source.filename} · {respondentScreens(preview.definition).filter((screen) => screenQuestions(screen).some(isAnswerable)).length} questions · {preview.definition.lists.length} choice lists</p>
           </div>
           {errors ? (
             <Alert variant="destructive">
@@ -153,6 +155,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
       {preview && step === "Publish" ? (
         <section className="flex max-w-2xl flex-col gap-5">
           {blocked ? <InlineAlert title="This workbook has errors">Fix them in the spreadsheet and upload it again, or save it as a draft and fix it here.</InlineAlert> : null}
+          {needsImages ? <InlineAlert title="Choice images need Media files">Save as a draft, then choose the matching images in Build before publishing.</InlineAlert> : null}
           <TextField label="What changed" optional value={note} onChange={setNote} maxLength={500} placeholder="e.g. Reworded the artwork questions" hint="Kept with the version, for whoever reads the history." />
           <p className="text-sm text-muted-foreground">Publishing creates a version that can never be changed. Respondents answer the newest version; earlier responses keep the questions they saw.</p>
           {finish.isError ? <InlineAlert title="That didn't finish">{(finish.error as Error).message}</InlineAlert> : null}
@@ -160,7 +163,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
             <Button type="button" variant="outline" onClick={() => setStep("Preview")}><ArrowLeft data-icon="inline-start" />Back</Button>
             <span className="flex-1" />
             <Button type="button" variant="outline" disabled={finish.isPending} onClick={() => finish.mutate(false)}>Save as draft</Button>
-            <Button type="button" disabled={blocked || finish.isPending} onClick={() => finish.mutate(true)}>{finish.isPending ? <Spinner data-icon="inline-start" /> : null}Publish</Button>
+            <Button type="button" disabled={blocked || Boolean(needsImages) || finish.isPending} onClick={() => finish.mutate(true)}>{finish.isPending ? <Spinner data-icon="inline-start" /> : null}Publish</Button>
           </div>
         </section>
       ) : null}
