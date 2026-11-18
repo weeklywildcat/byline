@@ -224,15 +224,37 @@ by a small reader in `src/polls/engine/xlsx.ts` (no spreadsheet library, nothing
 problem with its sheet and row. Review writes every condition in words. Preview is the real respondent screen with a
 path tracker. Publishing is refused while there are errors.
 
-**Build** edits the draft without a spreadsheet: wording, hints, required, choices, scales, sections, conditions (a
-builder for common conditions, or the expression itself under *Write it*), the welcome and thank-you screens, and the
-questions to compare results by. It saves a moment after each change (*Saving… / Saved*), one save at a time, each
+Use **Build → Questions** to edit wording, hints, required answers, choices, scales, sections, conditions, the
+welcome and thank-you screens, and the questions to compare results by. Build saves a moment after each change (*Saving… / Saved*), one save at a time, each
 carrying the draft revision: a stale editor is refused (409) and offered *Load latest* or an explicit *Save mine over
 it*, never a silent merge. Questions and answers reorder by dragging their handles or from the keyboard (Space, arrows,
 Space), and *Move up* / *Move down* stay in each question's menu. Identifiers are generated (from the wording, once,
 when Build named them and nothing published or referenced uses them) and kept under *Advanced*; anything published
 keeps its identifier. On narrow screens the question editor opens in a Drawer. **Download as spreadsheet** writes the
 draft or any version in the same format, so a poll can round-trip.
+
+### Logic Map
+
+**Build → Logic** shows the same draft as **Questions**. The order connectors run from Start through each question
+to Thank you. A labeled logic connector means an earlier answer can make the destination appear through its
+existing XLSForm `relevant` expression. Display logic has no skip-to, goto or branch routing. Section cards show
+which questions they contain. A condition on a section applies to all its questions, including questions in
+nested sections.
+
+Drag from a question's answer handle to a later question or section, or select a source and choose **Add logic**
+to pick a destination by touch or keyboard. **Edit display logic** opens the selected question or section, and
+selecting a logic connector opens its rule. Choose **Apply** to update the draft through Build's autosave. The
+builder accepts a flat set of conditions joined by *When all are true* or *When any is true*. **Write it** opens the
+raw expression. Advanced expressions that the builder cannot fully represent retain their original text until you
+deliberately edit or replace them. Removing a builder connector offers **Undo**.
+
+**Test path** starts with blank answers and highlights the questions that currently apply and the conditions that
+show them. Select an applicable question to try an answer, and change an earlier answer to see subsequent questions
+and their answers disappear when they stop applying. **Why is this shown?** explains the selected question's display
+conditions. Test answers stay in the map for that session and are never saved as responses.
+
+Moving cards saves their positions to your Byline preferences for this poll. Poll order and section membership
+are edited in Questions. **Fit map** brings the map into view and **Reset layout** restores the automatic layout.
 
 **Preview** runs the real respondent screen beside a path tracker: which questions apply, which were not asked, the
 answers chosen, why each conditional question is asked, and *Start again* for the next branch.
@@ -260,14 +282,15 @@ committed files drift. **Add the example poll** installs the example by importin
 
 - `tests/polls-engine.test.ts`: expressions, branching, pruning, server validation, importer errors, results, CSV and
   the committed workbooks.
+- `tests/polls-logic-map.test.ts` covers builder round-tripping, advanced expressions, nested section gates,
+  respondent path agreement and layout at the 300-question limit.
 - `tests/polls-ux.test.ts`: pairing codes, links, periods, progress, the timeline, Compare by, secondary suppression
   and the Data handoff.
 - `tests/integration/polls.test.ts`: access, versions, the kiosk, pairing (hashed at rest, expiry, one use,
   replacement, throttling, locked start, no newsroom access), web-link windows and limits, linked polls and the
   dataset handoff, against PostgreSQL.
-- `npm run test:polls:browser --workspace @byline/newsroom` against a throwaway database
-  (`scripts/seed-polls-browser.ts`): the whole workflow in Chromium (laptop reporter, anonymous "iPad" pairing at
-  `/poll`, PIN, a response, results), Build's keyboard sorting and the narrow section drawer; then real WebKit on
-  iPad landscape and portrait (pairing from the link's fragment, locked start, touch targets under a coarse pointer,
-  keyboard answers, reduced motion) and a phone (a web link at both addresses, no sideways scrolling). WebKit needs
-  `npx playwright install webkit` once.
+- `npm run test:polls:browser --workspace @byline/newsroom` runs against the throwaway database from
+  `scripts/seed-polls-browser.ts`. Chromium covers the Poll Studio workflow, keyboard sorting and Logic Map
+  editing by pointer and keyboard. WebKit uses iPad landscape and portrait profiles for pairing, the kiosk and
+  Logic Map touch controls. A WebKit phone profile checks both web link addresses. Install WebKit once with
+  `npx playwright install webkit`.

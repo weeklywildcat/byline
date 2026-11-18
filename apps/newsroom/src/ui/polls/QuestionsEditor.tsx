@@ -18,16 +18,23 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLeg
 import { Input } from "@byline/newsroom-ui/ui/input";
 import { Separator } from "@byline/newsroom-ui/ui/separator";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ChevronDown, CircleAlert, CloudCheck, Copy, GitBranch, GripVertical, Info, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
+import type { Viewport } from "@xyflow/react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { choicesFor, describeCondition } from "../../polls/engine/logic";
 import { isAnswerable, KIND_LABELS, type Choice, type Question, type QuestionKind, type SurveyDefinition } from "../../polls/engine/types";
-import { validateDefinition } from "../../polls/engine/xlsform";
+import { readCondition } from "../../polls/engine/condition-builder";
+import { diagnoseDefinition } from "../../polls/engine/logic-map";
 import { useNewsroomRoutes } from "../shell/account";
 import { ApiError } from "../story/api";
 import { fetchSurvey, pollKeys, updateSurvey, type SurveyDetail } from "./api";
 import { PollSelect, SwitchField } from "./fields";
+import { useLogicPositions } from "./useLogicPositions";
+import { RuleEditor } from "./RuleEditor";
 import { IssueList } from "./Review";
 
 /**
@@ -40,6 +47,10 @@ import { IssueList } from "./Review";
  * (under Advanced). Anything already published keeps its identifier, so
  * results stay comparable across versions.
  */
+
+const LogicMap = dynamic(() => import("./LogicMap").then((module) => module.LogicMap), {
+  loading: () => <p role="status" className="flex items-center gap-2 py-4 text-sm text-muted-foreground"><Spinner />Loading map…</p>
+});
 
 const NEW_KINDS: QuestionKind[] = ["select_one", "select_multiple", "range", "text", "integer", "note"];
 const AUTOSAVE_MS = 1200;
@@ -82,13 +93,13 @@ function settleNames(draft: SurveyDefinition, name: string, published: ReadonlyS
     finalName = uniqueName(slug(question.label), taken);
     next = { ...next, questions: next.questions.map((entry, i) => (i === index ? { ...entry, name: finalName } : entry)) };
   }
-  if ((question.kind === "select_one" || question.kind === "select_multiple") && !draft.questions.some((entry) => entry.name !== name && "list" in entry && entry.list === question.list)) {
+  if ((question.kind === "select_one" || question.kind === "select_multiple") && !referenced(draft, name) && !draft.questions.some((entry) => entry.name !== name && "list" in entry && entry.list === question.list)) {
     const list = next.lists.find((entry) => entry.name === question.list);
     if (list) {
       const used = new Set<string>();
       const choices = list.choices.map((choice) => {
         let value = choice.name;
-        if (AUTO_CHOICE.test(choice.name) && choice.label.trim() && !/^Answer \d+$|^First answer$|^Second answer$/.test(choice.label) && !new RegExp(`'${choice.name}'`).test(JSON.stringify(next.questions.map((entry) => entry.relevant ?? "")))) {
+        if (AUTO_CHOICE.test(choice.name) && choice.label.trim() && !/^Answer \d+$|^First answer$|^Second answer$/.test(choice.label)) {
           value = uniqueName(slug(choice.label), new Set([...list.choices.map((entry) => entry.name).filter((entry) => entry !== choice.name), ...used]));
         }
         used.add(value);
@@ -98,32 +109,6 @@ function settleNames(draft: SurveyDefinition, name: string, published: ReadonlyS
     }
   }
   return { draft: next, name: finalName };
-}
-
-type Condition = { question: string; op: "is" | "is_not" | "includes" | "answered"; value: string };
-
-/** Reads a condition the builder can show; anything else stays as written (Advanced). */
-function parseConditions(source: string | undefined): { join: "and" | "or"; rows: Condition[] } | null {
-  if (!source?.trim()) return { join: "and", rows: [] };
-  const join = / or /.test(source) && !/ and /.test(source) ? "or" : "and";
-  const rows: Condition[] = [];
-  for (const part of source.split(join === "and" ? / and / : / or /)) {
-    const text = part.trim();
-    let match = /^\$\{([\w.-]+)\}\s*(=|!=)\s*'([^']*)'$/.exec(text);
-    if (match) { rows.push({ question: match[1], op: match[3] === "" ? (match[2] === "!=" ? "answered" : "is") : match[2] === "=" ? "is" : "is_not", value: match[3] }); continue; }
-    match = /^selected\(\$\{([\w.-]+)\},\s*'([^']*)'\)$/.exec(text);
-    if (match) { rows.push({ question: match[1], op: "includes", value: match[2] }); continue; }
-    return null;
-  }
-  return { join, rows };
-}
-
-function writeConditions(join: "and" | "or", rows: Condition[]): string {
-  return rows.filter((row) => row.question).map((row) => (
-    row.op === "includes" ? `selected(\${${row.question}}, '${row.value}')`
-      : row.op === "answered" ? `\${${row.question}} != ''`
-      : `\${${row.question}} ${row.op === "is" ? "=" : "!="} '${row.value}'`
-  )).join(` ${join} `);
 }
 
 type SaveState = { kind: "saved" } | { kind: "dirty" } | { kind: "saving" } | { kind: "conflict" } | { kind: "error"; message: string };
@@ -166,7 +151,9 @@ function useAutosave(id: number, initial: SurveyDefinition, initialRevision: num
     }
   }, [api, id, queries]);
 
-  const change = useCallback((next: SurveyDefinition) => {
+  const change = useCallback((update: SurveyDefinition | ((current: SurveyDefinition) => SurveyDefinition)) => {
+    const next = typeof update === "function" ? update(latest.current) : update;
+    if (next === latest.current) return;
     latest.current = next;
     setDraft(next);
     if (conflict.current) return;
@@ -225,7 +212,11 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
   const [selected, setSelected] = useState<string | null>(draft.questions[0]?.name ?? null);
   const wide = useMediaQuery("(min-width: 1024px)", true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const issues = useMemo(() => validateDefinition(draft), [draft]);
+  const logic = useSearchParams()?.get("build") === "logic";
+  const { positions, update: setPositions } = useLogicPositions(id, logic, draft);
+  const viewport = useRef<Viewport | undefined>(undefined);
+  const setViewport = useCallback((next: Viewport | undefined) => { viewport.current = next; }, []);
+  const { issues, byItem } = useMemo(() => diagnoseDefinition(draft), [draft]);
   const published = useMemo(() => new Set(data.versions.length && data.current ? data.current.definition.questions.map((question) => question.name) : []), [data.versions.length, data.current]);
   const index = draft.questions.findIndex((question) => question.name === selected);
   const question = index >= 0 ? draft.questions[index] : null;
@@ -308,11 +299,31 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
     />
   ) : null;
 
+  // Both views stay inside this editor and share its draft and revision fence.
+  const openView = (view: string, name?: string) => {
+    if (view === "logic" && !logic) {
+      setSelected(settle(selected));
+      setDrawerOpen(false);
+    } else if (name) {
+      setSelected(name);
+      setDrawerOpen(true);
+    }
+    const url = new URL(window.location.href);
+    if (view === "logic") url.searchParams.set("build", "logic");
+    else url.searchParams.delete("build");
+    if (url.href !== window.location.href) window.history.pushState(null, "", url);
+  };
   const errors = issues.filter((issue) => issue.severity === "error");
   return (
     <div className="flex flex-col gap-4" data-polls-editor="">
       <div className="sticky top-[var(--byline-header-height,0px)] z-10 -mx-4 flex flex-wrap items-center gap-2 border-b bg-background px-4 py-2 lg:-mx-6 lg:px-6">
-        <ButtonGroup>
+        <Tabs value={logic ? "logic" : "questions"} onValueChange={(view) => openView(view)}>
+          <TabsList aria-label="Build views">
+            <TabsTrigger value="questions" className="poll-logic-touch">Questions</TabsTrigger>
+            <TabsTrigger value="logic" className="poll-logic-touch">Logic</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {!logic ? <ButtonGroup>
           <Button type="button" variant="outline" onClick={() => add("select_one")}><Plus data-icon="inline-start" />Add question</Button>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="Add a different kind of question" />}><ChevronDown /></DropdownMenuTrigger>
@@ -320,7 +331,7 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
               {NEW_KINDS.map((kind) => <DropdownMenuItem key={kind} onClick={() => add(kind)}>{KIND_LABELS[kind]}</DropdownMenuItem>)}
             </DropdownMenuContent>
           </DropdownMenu>
-        </ButtonGroup>
+        </ButtonGroup> : null}
         <span className="flex-1" />
         {errors.length ? <span className="text-sm text-destructive tabular-nums">{errors.length} {errors.length === 1 ? "error" : "errors"}</span> : null}
         <SaveStatus state={state} />
@@ -344,9 +355,13 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
           <AlertAction><Button type="button" size="sm" variant="outline" onClick={() => void retry()}>Try again</Button></AlertAction>
         </Alert>
       ) : null}
-      {errors.length ? <IssueList issues={errors} max={6} /> : null}
+      {issues.length ? <IssueList issues={issues} max={6} /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
+      {logic ? (
+        <LogicMap definition={draft} issues={byItem} selectedQuestion={selected} onSelectQuestion={setSelected}
+          onEditQuestion={(name) => openView("questions", name)} onChange={change}
+          positions={positions} onPositions={setPositions} viewport={viewport.current} onViewport={setViewport} />
+      ) : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
         <div className="flex min-w-0 flex-col gap-8">
           {draft.questions.length ? (
             <SortableQuestions draft={draft} selected={wide ? selected : null} onSelect={(name) => select(name)} onMove={moveTo} onDuplicate={duplicateAt} onRemove={removeAt} />
@@ -378,7 +393,7 @@ export function BuildEditor({ id, data }: { id: number; data: SurveyDetail }) {
             </DrawerContent>
           </Drawer>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -568,7 +583,9 @@ function QuestionInspector({ draft, question, index, published, publishedNames, 
       <Separator />
       <FieldGroup>
         <SectionPicker draft={draft} question={question} onChange={onChange} />
-        <ConditionEditor draft={draft} question={question} onChange={(relevant) => onReplace({ relevant: relevant || undefined })} />
+        <RuleEditor key={question.relevant ?? ""} definition={draft} target={{
+          kind: "question", name: question.name, item: question, start: index, members: [index], builder: readCondition(draft, question.relevant)
+        }} onApply={(relevant) => onReplace({ relevant })} />
       </FieldGroup>
 
       <Separator />
@@ -672,53 +689,5 @@ function SectionPicker({ draft, question, onChange }: { draft: SurveyDefinition;
       </div>
       {group ? <Input aria-label="Section heading" value={group.label} onChange={(event) => onChange({ ...draft, groups: draft.groups.map((entry) => (entry.name === group.name ? { ...entry, label: event.target.value } : entry)) })} /> : null}
     </FormField>
-  );
-}
-
-/** When a question is asked: the builder by default, the raw expression under "Write it". */
-function ConditionEditor({ draft, question, onChange }: { draft: SurveyDefinition; question: Question; onChange: (relevant: string) => void }) {
-  const parsed = parseConditions(question.relevant);
-  const [advanced, setAdvanced] = useState(parsed === null);
-  const earlier = draft.questions.slice(0, draft.questions.findIndex((entry) => entry.name === question.name)).filter(isAnswerable);
-  const rows = parsed?.rows ?? [];
-  const join = parsed?.join ?? "and";
-  const write = (nextRows: Condition[], nextJoin = join) => onChange(writeConditions(nextJoin, nextRows));
-  return (
-    <FieldSet>
-      <div className="flex items-center justify-between">
-        <FieldLegend variant="label" className="mb-0">Show this question</FieldLegend>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setAdvanced(!advanced)}>{advanced ? "Use the builder" : "Write it"}</Button>
-      </div>
-      {advanced || parsed === null ? (
-        <TextField label="Condition" hint="An XLSForm condition. Refer to earlier questions as ${identifier}." autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="${book_report} = 'yes'" value={question.relevant ?? ""} onChange={onChange} />
-      ) : (
-        <>
-          {!rows.length ? <FieldDescription>Always shown.</FieldDescription> : null}
-          {rows.length > 1 ? (
-            <PollSelect label="How conditions combine" className="w-48" value={join} options={[{ value: "and", label: "When all are true" }, { value: "or", label: "When any is true" }]} onChange={(value) => write(rows, value === "or" ? "or" : "and")} />
-          ) : null}
-          {rows.map((row, i) => {
-            const target = earlier.find((entry) => entry.name === row.question);
-            const options = target ? choicesFor(draft, target) : [];
-            const set = (patch: Partial<Condition>) => write(rows.map((entry, j) => (j === i ? { ...entry, ...patch } : entry)));
-            return (
-              <div key={i} className="grid gap-1.5 border-l-2 pl-3">
-                <PollSelect label="Earlier question" value={row.question} options={earlier.map((entry) => ({ value: entry.name, label: entry.label.slice(0, 70) }))} onChange={(value) => set({ question: value, value: "" })} />
-                <div className="flex gap-1.5">
-                  <PollSelect label="Comparison" className="w-36 shrink-0" value={row.op} options={[{ value: "is", label: "is" }, { value: "is_not", label: "is not" }, ...(target?.kind === "select_multiple" ? [{ value: "includes", label: "includes" }] : []), { value: "answered", label: "was answered" }]} onChange={(value) => set({ op: value as Condition["op"] })} />
-                  {row.op !== "answered" ? (
-                    options.length
-                      ? <PollSelect label="Answer" value={row.value} options={options.map((choice) => ({ value: choice.name, label: choice.label }))} onChange={(value) => set({ value })} />
-                      : <Input value={row.value} onChange={(event) => set({ value: event.target.value })} aria-label="Value" />
-                  ) : null}
-                  <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label="Remove condition" onClick={() => write(rows.filter((_entry, j) => j !== i))}><X /></Button>
-                </div>
-              </div>
-            );
-          })}
-          <Button type="button" variant="outline" size="sm" className="self-start" disabled={!earlier.length} onClick={() => write([...rows, { question: earlier.at(-1)?.name ?? "", op: "is", value: "" }])}><Plus data-icon="inline-start" />Only when…</Button>
-        </>
-      )}
-    </FieldSet>
   );
 }

@@ -1,0 +1,82 @@
+/* Poll Studio only. The newsroom pipeline scopes the vendor stylesheet with the Nova kit. */
+@import "@xyflow/react/dist/style.css";
+
+.byline-poll-logic .react-flow {
+  --xy-background-pattern-dots-color-default: var(--border);
+  --xy-attribution-background-color-default: var(--background);
+  --xy-connectionline-stroke-default: var(--primary);
+  --xy-edge-stroke-default: var(--muted-foreground);
+  --xy-edge-stroke-selected-default: var(--primary);
+  --xy-handle-background-color-default: var(--primary);
+  --xy-handle-border-color-default: var(--background);
+}
+
+.byline-poll-logic .react-flow__attribution a {
+  color: var(--muted-foreground);
+}
+
+.byline-poll-logic .react-flow__node:focus-visible > div {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.byline-poll-logic .react-flow__handle {
+  width: 12px;
+  height: 12px;
+}
+.byline-poll-logic .react-flow__handle.poll-order-handle {
+  visibility: hidden;
+}
+.byline-poll-logic .react-flow__handle.poll-rule-target {
+  width: 16px;
+  height: 16px;
+  background: var(--background);
+  border: 2px solid var(--primary);
+}
+.byline-poll-logic .react-flow__handle.valid {
+  background: var(--primary);
+}
+
+.byline-poll-logic .poll-order .react-flow__edge-path {
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+.byline-poll-logic .poll-dependency .react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.byline-poll-logic .poll-dependency .react-flow__edge-textbg {
+  fill: var(--background);
+  stroke: var(--border);
+}
+.byline-poll-logic .poll-dependency .react-flow__edge-text {
+  fill: var(--foreground);
+  font: 600 12px var(--font-sans);
+}
+.byline-poll-logic .poll-dependency:focus-visible .react-flow__edge-textbg,
+.byline-poll-logic .poll-dependency.selected .react-flow__edge-textbg {
+  stroke: var(--ring);
+  stroke-width: 2;
+}
+.byline-poll-logic .poll-dependency[data-active="true"] .react-flow__edge-path {
+  stroke-width: 3.5;
+}
+.byline-poll-logic .poll-dependency[data-active="false"] .react-flow__edge-path {
+  stroke-dasharray: 5 4;
+  opacity: .3;
+}
+.byline-poll-logic .poll-dependency[data-active="false"] .react-flow__edge-text {
+  fill: var(--muted-foreground);
+}
+.byline-poll-logic .poll-dependency[data-active="false"] .react-flow__edge-textbg {
+  stroke-dasharray: 3 2;
+}
+
+@media (any-pointer: coarse) {
+  .poll-logic-touch,
+  .poll-logic-panel [data-slot="select-trigger"],
+  .poll-logic-panel [data-slot="input"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

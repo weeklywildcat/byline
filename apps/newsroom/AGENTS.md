@@ -32,7 +32,9 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
   `public/tracking.ts`. Decide access only in `src/polls/access.ts`. A kiosk holds a session-scoped credential and
   no Byline session: pairing (`claimPairing`, a single-use six-digit code stored only as an HMAC, throttled) gives an
   anonymous device that credential, and `startKiosk` ends the account's session in the same response. Never execute anything from an
-  uploaded workbook; the parser and expression engine in `src/polls/engine` are the only readers.
+  uploaded workbook; the parser and expression engine in `src/polls/engine` are the only readers. Questions and
+  Logic share the Build draft and revision fence. The Logic Map projects the existing question and section
+  `relevant` expressions. Its node positions belong in Payload Preferences.
 - **Nothing private enters a public projection.** Public snapshot/live/poll
   projections use explicit allowlists.
 - **Byline UI, Payload underneath.** Payload owns infrastructure and the
