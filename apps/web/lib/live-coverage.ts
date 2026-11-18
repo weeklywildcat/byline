@@ -48,9 +48,9 @@ export function attachLiveSource(
   };
 }
 
-export function buildArticleLiveView(post: ArchivePost) {
+export function buildArticleLiveView(post: ArchivePost): ArticleLiveView | null {
   const native = nativeStory(post.id);
-  if (native) return attachLiveSource(native.live, post.id);
+  if (native) return attachLiveSource(native.live, post.id) ?? null;
   const live = getPostLiveCoverage(post);
   return live ? createArticleLiveView(live, {
     postId: post.id, locale: publication.locale, timeZone: publication.timezone,

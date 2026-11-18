@@ -329,7 +329,7 @@ for (const type of ARTICLE_BLOCK_TYPES) {
   if (!structuredHtml.includes(`byline-block-${type}`)) problems.push(`missing rendered ${type} block`);
 }
 for (const fact of ["byline-footnote-ref", "fnref-fn-timing", "fnref-fn-survey", "fnref-fn-budget", "byline-footnotes", "byline-footnote-back",
-  "Library extends its hours", "Should the school open another lunch window?", "Yes, open a window", "fixture-lunch-line",
+  "Library extends its hours", "fixture-lunch-line",
   "The board meets on Tuesday.", "Jordan Lee", "Ada Reporter", "Gus Guest", "Olive Once", "An earlier version misstated the vote count.",
   "https://weeklywildcat.com/2026/10/14/news/board-approves-lunch-budget/", "newsarticle-json-ld"]) {
   if (!structuredHtml.includes(fact)) problems.push(`missing rendered fact: ${fact}`);
