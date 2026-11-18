@@ -71,21 +71,27 @@ with the results.
 **Web link.** Turned on, off and configured in Collect: copy, open, QR code, opening and closing times, an optional
 access code, a new link (with a warning that the old one stops working) and the number of web responses.
 
-## Pairing a device
+## Setting up a device
 
-The recommended setup. The iPad never signs in to Byline.
+`/poll` is the neutral entry point for putting a phone, tablet, Chromebook or computer into polling mode. There are
+two setup paths. Both end with the same session-scoped kiosk credential, and a polling device never keeps a Byline
+newsroom session while respondents use it.
+
+### Use a pairing code
+
+The recommended setup when the reporter has Byline open on a different device.
 
 1. On their own phone or laptop, signed in, the interviewer starts fieldwork in **Collect** (or **Polls → Start
    fieldwork**): poll, location, period, sampling method, a 4–8 digit PIN, and how long the code lasts (15 minutes
-   to 2 days, an hour by default), so an iPad can be set up ahead of time.
+   to 2 days, an hour by default).
 2. `POST /api/byline/polls/sessions/:id/pairing` returns a six-digit code (`482 913`) and its expiry. Poll Studio
-   shows where to go (`<host>/poll`), the code, a copy button, a QR code of the pairing link, and watches for the
-   iPad to arrive. The link carries the code after `#`, which a browser never sends to a server.
-3. On the iPad, `/poll` takes the code. `POST /api/byline/polls/pair` (anonymous) spends it and sets the session's
-   kiosk credential (`byline-poll-kiosk`, httpOnly, SameSite=Strict, 12 hours). Any Byline cookie on the device is
-   expired in the same response.
-4. The iPad opens `/polls/kiosk` **locked**, showing only the poll title and place. The interviewer's PIN opens the
-   controls; they lock it again before handing it over.
+   shows `<host>/poll`, the code, a copy button, and a QR code whose fragment carries the code without sending it
+   in the initial HTTP request.
+3. On the polling device, `/poll` accepts the code. `POST /api/byline/polls/pair` (anonymous) spends it and sets the
+   session's kiosk credential (`byline-poll-kiosk`, httpOnly, SameSite=Strict, 12 hours). Any Byline cookie already
+   on that browser is expired in the same response.
+4. The device opens `/polls/kiosk` **locked**. The interviewer's PIN opens the controls; they lock it again before
+   handing the device over.
 
 The code (`src/polls/pairing.ts`) follows RFC 8628's user-code advice:
 
@@ -99,13 +105,26 @@ The code (`src/polls/pairing.ts`) follows RFC 8628's user-code advice:
 - The reply says nothing about the poll, its responses or anyone's account, and a refused code says only that it
   didn't work.
 - If the session is already running on a device, preparing a code is refused unless the interviewer asks to
-  replace it (`replaceDevice`); the old device keeps working until the new one claims the code. A code made without
-  that permission is refused if a device started meanwhile.
+  replace it (`replaceDevice`); the old device keeps working until the new one claims the code.
 
-**Use this device** is still offered, as the second choice: the signed-in device itself becomes the kiosk.
-`POST /api/byline/polls/sessions/:id/kiosk` creates the credential, hashes the PIN, **ends the interviewer's Byline
-session on the server** (Payload's `logoutOperation`) and, in the same response, expires the `payload-token` cookie
-and sets the kiosk cookie. Other Byline tabs on the device are told to leave for the login screen.
+### Sign in on this device
+
+`/poll` also offers **Sign in to Byline** for an interviewer who wants to set up the device they are already holding.
+
+The link goes through Payload's normal admin login with a validated return path to:
+
+`/admin/polls?view=fieldwork&setupDevice=1`
+
+It does not make `/poll` an allowed authentication redirect and does not duplicate the login form. After sign-in,
+Poll Studio opens a focused **Set up this device** flow: choose the poll, location, period, sampling method and
+interviewer PIN, then choose **Start polling on this device**.
+
+That final action uses the same `POST /api/byline/polls/sessions/:id/kiosk` handoff as **Use this device** elsewhere in
+Poll Studio. It creates the kiosk credential, hashes the PIN, **ends the interviewer's Byline session on the server**
+with Payload's `logoutOperation`, expires the `payload-token` cookie and opens `/polls/kiosk`. Other Byline tabs on
+the device are told to leave for the login screen. The device is therefore no more privileged than one paired by code.
+
+**Use this device** remains available in ordinary Collect/fieldwork screens for the same direct handoff.
 
 ## The kiosk
 
