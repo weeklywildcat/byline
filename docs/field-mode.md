@@ -115,6 +115,44 @@ desk has):
 - The `live-updates` collection refuses any non-editor request naming another author,
   and only editors may change an update's author.
 
+## Recording
+
+Field has one recorder (`ui/field/recording.tsx`), owned by Field itself rather
+than by the Record drawer or a Story screen. Once a recording starts, the reporter
+can close the drawer (**Keep recording and close**), type notes, take photos, go
+back to the assignments or open another Story: it keeps recording. While it runs,
+every Field screen shows a bar at the top (`REC 3:12 · Story`, with **Stop**; tapping
+it reopens the recorder), the Story's Record button reads `Recording 3:12`, the tab
+title starts with `● Recording`, and the screen is kept awake. The bar also says
+when the phone has paused the microphone (a call, another app).
+
+Recordings can't be lost:
+
+- **Saved as it records.** The recorder hands over a chunk every three seconds
+  (and immediately when Field goes to the background), and each chunk is written
+  to IndexedDB with a `recording` outbox item in one transaction. At most the
+  last few seconds are ever only in memory.
+- **Recovered after a crash.** If the page is lost mid-recording (a reload, a
+  crash, the phone closing the tab), the next time Field opens it rebuilds the
+  recording from its chunks, queues it and marks it "Recovered". A Web Lock held
+  for as long as the recording runs (or, without Web Locks, a chunk in the last 30
+  seconds) keeps recovery away from a recording another tab is still making.
+- **Interruptions save.** If the phone takes the microphone for good, or the
+  recorder errors, what was recorded is queued and Field says so.
+- **Leaving asks.** Links out of Field (Back to the story, Open full story,
+  Newsroom) ask first while recording: **Stop and save**, then continue. Closing
+  the tab gets the browser's own leave prompt.
+- **Storage full.** If the phone refuses a chunk, the take is kept in memory and
+  handed over whole on Stop; the recorder says to keep Field open, and the item
+  reads "Not safely queued" until it sends.
+- **Audio leaves the phone only when the server has it**, or when the reporter
+  deletes it: Discard asks first, and a failed recording (for example, larger than
+  the upload limit) offers **Save a copy to this phone**.
+
+The chunks are joined only to upload; the stored item never holds a second copy.
+The desktop Reporting tab's recorder (`ui/reporting/Recorder.tsx`) is separate and
+uploads directly.
+
 ## Outbox
 
 Every capture goes into one IndexedDB outbox per account first
@@ -134,6 +172,10 @@ stored it as published; a Publish now that could not publish reads, for example,
 - If the browser will not store a file (quota), the item says **Not safely
   queued — keep this page open**; it is never silently dropped.
 - Sent files are removed from the device; sent items are kept a day for Recent.
+- Recordings are stored as chunks beside their item (see Recording); files the
+  reporter deletes from Recent are confirmed first.
+- If the browser's database fails for any reason (Safari can lose its connection),
+  the outbox reopens it once, then keeps the capture in memory and says so.
 
 ## Layout
 
@@ -146,6 +188,6 @@ small mobile actions.
 ## Validation
 
 ```sh
-npx vitest run tests/field-outbox.test.ts tests/live-ui.test.tsx tests/live-coverage-domain.test.ts   # in apps/newsroom
+npx vitest run tests/field-outbox.test.ts tests/field-recorder.test.tsx tests/live-ui.test.tsx tests/live-coverage-domain.test.ts   # in apps/newsroom
 npx vitest run --config vitest.integration.config.ts tests/integration/field.test.ts tests/integration/live-coverage.test.ts tests/integration/live-workflow.test.ts tests/integration/live-story-mode-migration.test.ts
 ```
