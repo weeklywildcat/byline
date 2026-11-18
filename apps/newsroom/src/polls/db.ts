@@ -1,5 +1,5 @@
 import type { PostgresAdapterArgs } from "@payloadcms/db-postgres";
-import { bigserial, index, integer, jsonb, pgTable, smallint, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { bigserial, boolean, index, integer, jsonb, pgTable, smallint, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Wildcat Polls' fieldwork and answers (docs/wildcat-polls.md#data-model).
@@ -33,11 +33,18 @@ export const pollSessions = pgTable("byline_poll_sessions", {
   kioskTicket: varchar("kiosk_ticket", { length: 36 }),
   pinFailures: smallint("pin_failures").notNull().default(0),
   pinLockedUntil: timestamp("pin_locked_until", { withTimezone: true, mode: "date" }),
+  // A pending device pairing (src/polls/pairing.ts): the code's keyed hash, never the code; the PIN the
+  // paired device will use; and whether claiming may replace a device already running this session.
+  pairingCodeHash: varchar("pairing_code_hash", { length: 64 }),
+  pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true, mode: "date" }),
+  pairingPinHash: varchar("pairing_pin_hash", { length: 200 }),
+  pairingReplaces: boolean("pairing_replaces").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow()
 }, (table) => [
   index("byline_poll_sessions_survey").on(table.surveyId, table.startedAt),
   index("byline_poll_sessions_interviewer").on(table.interviewerId, table.status),
-  uniqueIndex("byline_poll_sessions_kiosk_token").on(table.kioskTokenHash)
+  uniqueIndex("byline_poll_sessions_kiosk_token").on(table.kioskTokenHash),
+  uniqueIndex("byline_poll_sessions_pairing_code").on(table.pairingCodeHash)
 ]);
 
 /**
@@ -101,6 +108,16 @@ export const pollPublicStarts = pgTable("byline_poll_public_starts", {
   usedAt: timestamp("used_at", { withTimezone: true, mode: "date" })
 }, (table) => [index("byline_poll_public_starts_survey").on(table.surveyId, table.issuedAt)]);
 
+/**
+ * Failed pairing claims, counted per minute across the newsroom. The claiming
+ * device is anonymous, so the throttle is global and nothing identifying it
+ * (no IP address) is kept. Old windows are pruned.
+ */
+export const pollPairingLimits = pgTable("byline_poll_pairing_limits", {
+  windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).primaryKey(),
+  failures: integer("failures").notNull().default(0)
+});
+
 type SchemaHook = NonNullable<PostgresAdapterArgs["beforeSchemaInit"]>[number];
 
 export const addPollTables: SchemaHook = ({ schema }) => ({
@@ -110,6 +127,7 @@ export const addPollTables: SchemaHook = ({ schema }) => ({
     byline_poll_sessions: pollSessions,
     byline_poll_session_events: pollSessionEvents,
     byline_poll_responses: pollResponses,
-    byline_poll_public_starts: pollPublicStarts
+    byline_poll_public_starts: pollPublicStarts,
+    byline_poll_pairing_limits: pollPairingLimits
   }
 });

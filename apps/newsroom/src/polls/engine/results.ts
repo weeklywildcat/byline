@@ -63,6 +63,14 @@ function median(values: number[]): number | null {
 
 const statusOf = (answers: StoredAnswers, name: string): StoredAnswer => answers[name] ?? { status: "not_applicable" };
 
+/** The questions results can be compared by: the poll's configured breakdowns that are single-choice questions. */
+export function compareOptions(definition: SurveyDefinition): Array<{ name: string; label: string }> {
+  return definition.settings.breakdowns.flatMap((name) => {
+    const question = definition.questions.find((entry) => entry.name === name);
+    return question?.kind === "select_one" ? [{ name, label: question.label }] : [];
+  });
+}
+
 export function summarize(definition: SurveyDefinition, rows: readonly ResponseRow[], options: { minimumGroup: number; breakdowns?: readonly string[] }): SurveyResults {
   const questions: QuestionResult[] = [];
   for (const question of definition.questions) {
@@ -118,22 +126,65 @@ export function breakdown(definition: SurveyDefinition, rows: readonly ResponseR
   if (!byQuestion || byQuestion.kind !== "select_one") return null;
   const groups = choicesFor(definition, byQuestion);
   const choices = choicesFor(definition, question);
+  const answeredIn = groups.map((group) => rows.flatMap((row) => {
+    const byState = statusOf(row.answers, by);
+    if (byState.status !== "answered" || byState.value !== group.name) return [];
+    const state = statusOf(row.answers, question.name);
+    return state.status === "answered" ? [state.value] : [];
+  }));
+  const withheld = new Set(answeredIn.flatMap((answered, index) => (answered.length < minimumGroup ? [index] : [])));
+  // Secondary suppression: if exactly one group with anyone in it is withheld, the
+  // overall result minus the others would give it away, so the next smallest is withheld too.
+  const occupiedWithheld = [...withheld].filter((index) => answeredIn[index].length > 0);
+  if (occupiedWithheld.length === 1) {
+    const smallest = answeredIn.map((answered, index) => ({ index, size: answered.length })).filter((entry) => !withheld.has(entry.index) && entry.size > 0).sort((a, b) => a.size - b.size)[0];
+    if (smallest) withheld.add(smallest.index);
+  }
   return {
     by, byLabel: byQuestion.label, question: question.name, questionLabel: question.label,
     choices: choices.map(({ name, label }) => ({ name, label })),
-    groups: groups.map((group) => {
-      const inGroup = rows.filter((row) => { const state = statusOf(row.answers, by); return state.status === "answered" && state.value === group.name; });
-      const answered = inGroup.flatMap((row) => { const state = statusOf(row.answers, question.name); return state.status === "answered" ? [state.value] : []; });
+    groups: groups.map((group, index) => {
+      const answered = answeredIn[index];
       const base = answered.length;
-      const suppressed = base < minimumGroup;
+      // A withheld group carries nothing: no base, no counts, no percentages.
+      if (withheld.has(index)) return { name: group.name, label: group.label, base: 0, suppressed: true, cells: Object.fromEntries(choices.map((choice) => [choice.name, { count: 0, percent: null }])) };
       const cells: Record<string, BreakdownCell> = {};
       for (const choice of choices) {
         const count = answered.filter((value) => (Array.isArray(value) ? value.includes(choice.name) : value === choice.name)).length;
-        cells[choice.name] = suppressed ? { count: 0, percent: null } : { count, percent: pct(count, base) };
+        cells[choice.name] = { count, percent: pct(count, base) };
       }
-      return { name: group.name, label: group.label, base: suppressed ? 0 : base, suppressed, cells };
+      return { name: group.name, label: group.label, base, suppressed: false, cells };
     })
   };
+}
+
+/* ------------------------------------------------------------------ over time */
+
+export type TimelinePoint = { day: string; kiosk: number; public: number };
+
+/** Responses per day (in the newsroom's timezone), by how they were collected. Counts only. */
+export function responseTimeline(rows: readonly Pick<ResponseRow, "submittedAt" | "mode">[], timeZone: string): TimelinePoint[] {
+  const format = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+  const days = new Map<string, TimelinePoint>();
+  for (const row of rows) {
+    const day = format.format(new Date(row.submittedAt));
+    const point = days.get(day) ?? { day, kiosk: 0, public: 0 };
+    point[row.mode] += 1;
+    days.set(day, point);
+  }
+  const sorted = [...days.values()].sort((a, b) => a.day.localeCompare(b.day));
+  if (sorted.length < 2) return sorted;
+  // Fill quiet days so the line doesn't skip over them.
+  const filled: TimelinePoint[] = [];
+  const cursor = new Date(`${sorted[0].day}T12:00:00Z`);
+  const last = sorted.at(-1)!.day;
+  for (let guard = 0; guard < 400; guard++) {
+    const day = cursor.toISOString().slice(0, 10);
+    filled.push(days.get(day) ?? { day, kiosk: 0, public: 0 });
+    if (day >= last) break;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return filled;
 }
 
 /* ------------------------------------------------------------------ fieldwork */

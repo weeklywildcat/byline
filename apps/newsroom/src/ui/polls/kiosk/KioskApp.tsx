@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
 import { cn } from "@byline/newsroom-ui/lib/utils";
 import { useScreenWakeLock } from "@byline/newsroom-ui/lib/wake-lock";
-import { CloudOff, Delete, Lock, MapPin, Pause, Play, ShieldCheck, Square } from "lucide-react";
+import { Cloud, CloudOff, Delete, Lock, MapPin, Pause, Play, ShieldCheck, Square, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Answers, SurveyDefinition } from "../../../polls/engine/types";
 import { clearStoredUploads, encryptedStore, flushUploads, memoryStore, newKey, type PollUpload, type SendResult, type UploadStore } from "../outbox";
@@ -64,7 +64,7 @@ async function call<T>(api: string, path: string, body?: unknown, timeoutMs = 15
   }
 }
 
-export function KioskApp({ api, loginHref }: { api: string; loginHref: string }) {
+export function KioskApp({ api, pairHref }: { api: string; pairHref: string }) {
   const [state, setState] = useState<KioskState | null>(null);
   const [ended, setEnded] = useState<{ message: string; counts?: Counts } | null>(null);
   const [offline, setOffline] = useState(false);
@@ -90,6 +90,14 @@ export function KioskApp({ api, loginHref }: { api: string; loginHref: string })
   }, [api]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const up = () => { setOffline(false); void load(); };
+    const down = () => setOffline(true);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) setOffline(true);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
+  }, [load]);
 
   // The browser's Back button stays inside the kiosk.
   useEffect(() => {
@@ -195,7 +203,7 @@ export function KioskApp({ api, loginHref }: { api: string; loginHref: string })
 
   return (
     <AdminRoot className="byline-polls-kiosk" toaster={false}>
-      {ended ? <Ended loginHref={loginHref} message={ended.message} counts={ended.counts} />
+      {ended ? <Ended pairHref={pairHref} message={ended.message} counts={ended.counts} />
         : !state ? <Loading offline={offline} onRetry={() => void load()} />
         : state.mode === "respondent" && !handBack && (!state.ticket?.submitted || ticketFinished.current === state.ticket.id) ? (
           <SurveyRunner
@@ -209,7 +217,7 @@ export function KioskApp({ api, loginHref }: { api: string; loginHref: string })
             doneAction={<div className="pt-2"><Button type="button" variant="outline" size="lg" className="h-12 px-5 text-base" onClick={() => setHandBack("finished")}><Lock data-icon="inline-start" />Return to interviewer</Button></div>}
           />
         ) : state.mode === "interviewer" ? (
-          <InterviewerPanel state={state} pending={pending.length} durable={store?.durable ?? false} rejected={rejected} onAct={act} onEnd={end} onLock={() => void act("/lock")} />
+          <InterviewerPanel state={state} pending={pending.length} durable={store?.durable ?? false} online={!offline} rejected={rejected} onAct={act} onEnd={end} onLock={() => void act("/lock")} />
         ) : (
           <PinScreen
             state={state}
@@ -250,20 +258,21 @@ function Loading({ offline, onRetry }: { offline: boolean; onRetry: () => void }
   );
 }
 
-function Ended({ loginHref, message, counts }: { loginHref: string; message: string; counts?: Counts }) {
+function Ended({ pairHref, message, counts }: { pairHref: string; message: string; counts?: Counts }) {
   return (
     <Shell className="grid place-items-center">
       <div className="flex max-w-xl flex-col gap-4">
         <h1 className="text-3xl font-semibold tracking-tight">Session ended</h1>
         <p className="text-lg leading-relaxed">{message}</p>
         {counts ? <p className="text-muted-foreground tabular-nums">{counts.completed} completed · {counts.declined} declined · {counts.abandoned} incomplete</p> : null}
-        <div className="pt-2"><Button nativeButton={false} size="lg" className="h-12 px-5 text-base" render={<a href={loginHref} />}>Sign in to Byline</Button></div>
+        <div className="pt-2"><Button nativeButton={false} size="lg" className="h-14 px-6 text-lg" render={<a href={pairHref} />}>Pair this iPad with a new code</Button></div>
+        <p className="text-sm text-muted-foreground">Start a session in Poll Studio on your own phone or laptop to get a code.</p>
       </div>
     </Shell>
   );
 }
 
-function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onLock }: { state: KioskState; pending: number; durable: boolean; rejected: number; onAct: (path: string, body?: unknown) => Promise<void>; onEnd: () => Promise<void>; onLock: () => void }) {
+function InterviewerPanel({ state, pending, durable, online, rejected, onAct, onEnd, onLock }: { state: KioskState; pending: number; durable: boolean; online: boolean; rejected: number; onAct: (path: string, body?: unknown) => Promise<void>; onEnd: () => Promise<void>; onLock: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -287,9 +296,10 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
   const declineKey = useRef(newKey());
   const beginKey = useRef(newKey());
   const started = new Date(state.session.startedAt);
+  const healthy = online && pending === 0 && rejected === 0;
   return (
     <Shell>
-      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-3xl flex-col gap-6 py-6">
+      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-3xl flex-col gap-6 py-6" data-polls-interviewer="">
         <header className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground">Interviewer</p>
@@ -298,15 +308,35 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
               {[state.session.locationName, state.session.period || null, `since ${started.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`, `version ${state.version.number}`].filter(Boolean).join(" · ")}
             </p>
           </div>
-          <Button type="button" variant="outline" size="lg" onClick={onLock}><Lock data-icon="inline-start" />Lock</Button>
+          <Button type="button" variant="outline" size="lg" className="h-12 px-5" onClick={onLock}><Lock data-icon="inline-start" />Lock</Button>
         </header>
 
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y py-4 sm:grid-cols-4">
+        <section className="rounded-xl border bg-muted/40 px-5 py-4" aria-labelledby="sampling-rule" data-polls-sampling="">
+          <h2 id="sampling-rule" className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Users className="size-4" aria-hidden="true" />Who to approach</h2>
+          <p className="mt-1.5 text-xl leading-snug font-medium text-balance">{state.session.method || "No sampling rule was set for this session. Approach students the same way each time, and note how in the methodology."}</p>
+        </section>
+
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y py-4 sm:grid-cols-4" aria-label="This session so far">
           <Stat label="Completed" value={counts.completed} />
           <Stat label="Declined" value={counts.declined} />
           <Stat label="Incomplete" value={counts.abandoned} />
           <Stat label="Waiting to upload" value={pending} attention={pending > 0} />
         </dl>
+
+        {!online ? (
+          <Alert variant="destructive" data-polls-offline="">
+            <CloudOff />
+            <AlertTitle>No connection</AlertTitle>
+            <AlertDescription>{durable ? "You can keep polling: finished surveys are encrypted on this iPad and upload when it reconnects." : "This browser can't keep answers safely offline. Reconnect before the next survey."}</AlertDescription>
+          </Alert>
+        ) : pending > 0 ? (
+          <Alert>
+            <Cloud />
+            <AlertTitle>{pending} {pending === 1 ? "survey is" : "surveys are"} uploading</AlertTitle>
+            <AlertDescription>{durable ? "Encrypted on this iPad until Byline confirms it has them." : "Keep the iPad connected until this reaches 0."}</AlertDescription>
+          </Alert>
+        ) : null}
+        {rejected ? <p className="text-sm font-medium text-destructive" role="alert">{rejected} response{rejected === 1 ? " was" : "s were"} refused by the server and not saved.</p> : null}
 
         {paused ? (
           <Alert>
@@ -331,7 +361,7 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
             type="button"
             variant="outline"
             size="lg"
-            className="h-16 text-lg"
+            className="h-20 text-lg"
             disabled={paused || busy !== null}
             onClick={() => void run("decline", async () => { await onAct("/decline", { eventKey: declineKey.current }); declineKey.current = newKey(); }, "Decline recorded.")}
           >
@@ -343,19 +373,22 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
 
         <div className="mt-auto flex flex-col gap-4">
           <Separator />
-          <div className="flex flex-wrap gap-2">
-            {!paused ? <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void run("pause", () => onAct("/pause"))}><Pause data-icon="inline-start" />Pause</Button> : null}
-            <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setMoving(true)}><MapPin data-icon="inline-start" />Change location</Button>
-            <Button type="button" variant="outline" disabled={busy !== null} onClick={() => setEnding(true)}><Square data-icon="inline-start" />End session</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!paused ? <Button type="button" variant="outline" size="lg" className="h-11" disabled={busy !== null} onClick={() => void run("pause", () => onAct("/pause"))}><Pause data-icon="inline-start" />Pause</Button> : null}
+            <Button type="button" variant="outline" size="lg" className="h-11" disabled={busy !== null} onClick={() => setMoving(true)}><MapPin data-icon="inline-start" />Change location</Button>
+            <Button type="button" variant="outline" size="lg" className="h-11" disabled={busy !== null} onClick={() => setEnding(true)}><Square data-icon="inline-start" />End session</Button>
+            <span className="flex-1" />
+            {healthy ? (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground" data-polls-durability="">
+                {durable ? <ShieldCheck className="size-4" aria-hidden="true" /> : <Cloud className="size-4" aria-hidden="true" />}
+                {durable ? "Online · answers kept safely" : "Online only"}
+              </span>
+            ) : null}
           </div>
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
-            {durable ? <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <CloudOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
-            <span>
-              {durable ? "Answers waiting to upload are encrypted on this iPad and deleted once Byline has them." : "Online only: this browser can't store answers securely, so keep the iPad connected until “Waiting to upload” is 0."}
-              {rejected ? ` ${rejected} response${rejected === 1 ? " was" : "s were"} refused by the server and not saved.` : ""}
-              {" "}Before handing the iPad over, turn on Guided Access (Settings → Accessibility) to keep it on this page.
-            </span>
-          </p>
+          <details className="text-sm text-muted-foreground">
+            <summary className="cursor-pointer py-2 font-medium">Before you hand the iPad over</summary>
+            <p className="leading-relaxed">Lock it first. For extra safety, turn on Guided Access (Settings → Accessibility → Guided Access, then triple-click the side or home button) to keep it on this page. {durable ? "Finished surveys waiting to upload are encrypted on this iPad and deleted once Byline has them." : "This browser can't store answers securely, so keep the iPad connected until “Waiting to upload” is 0."}</p>
+          </details>
         </div>
       </div>
 
@@ -375,7 +408,7 @@ function InterviewerPanel({ state, pending, durable, rejected, onAct, onEnd, onL
           <AlertDialogHeader>
             <AlertDialogTitle>End this session?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pending ? `${pending} response${pending === 1 ? " is" : "s are"} still waiting to upload and will be lost if you end now. Connect to Wi-Fi and wait for it to reach 0.` : "This device leaves kiosk mode. You'll need to sign in to Byline to start another session."}
+              {pending ? `${pending} response${pending === 1 ? " is" : "s are"} still waiting to upload and will be lost if you end now. Connect to Wi-Fi and wait for it to reach 0.` : "This iPad leaves the poll. To poll again, pair it with a new code from Poll Studio."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -435,17 +468,17 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const title = reason === "finished" ? "Please hand the iPad back." : reason === "stopped" ? "Hand the iPad back to the interviewer." : "Interviewer PIN";
+  const title = reason === "finished" ? "Please hand the iPad back." : reason === "stopped" ? "Hand the iPad back to the interviewer." : state.survey.title;
   return (
     <Shell className="grid place-items-center">
       <div className="flex w-full max-w-sm flex-col items-center gap-6 py-8">
         <div className="flex flex-col items-center gap-2 text-center">
           <Lock className="size-5 text-muted-foreground" aria-hidden="true" />
           <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
-          <p className="text-muted-foreground">{reason === "locked" ? state.survey.title : "Interviewer: enter your PIN."}</p>
+          <p className="text-muted-foreground">{reason === "locked" ? `${[state.session.locationName, state.session.period || null].filter(Boolean).join(" · ")}. Interviewer: enter your PIN to open the controls.` : "Interviewer: enter your PIN."}</p>
           {surveyRunning ? <p className="text-sm font-medium text-destructive">Unlocking ends the current survey as incomplete. Its answers are not saved.</p> : null}
         </div>
-        <div className="flex h-6 items-center gap-3" aria-label={`${pin.length} digits entered`} role="status">
+        <div className="flex h-6 items-center gap-3" aria-label={`Interviewer PIN: ${pin.length} digits entered`} role="status">
           {Array.from({ length: Math.max(4, pin.length) }, (_, i) => <span key={i} className={cn("size-3 rounded-full border border-foreground", i < pin.length && "bg-foreground")} />)}
         </div>
         <p className="min-h-5 text-center text-sm font-medium text-destructive" role="alert">{waiting ? `Too many tries. Wait ${waiting} s.` : error}</p>
@@ -453,7 +486,7 @@ function PinScreen({ state, reason, surveyRunning, onUnlock, onCancel }: { state
           {KEYS.map((digit) => <PinKey key={digit} label={digit} onPress={() => press(digit)} disabled={checking || waiting > 0} />)}
           <PinKey label="Delete" icon={<Delete className="size-5" />} onPress={() => setPin((value) => value.slice(0, -1))} disabled={checking || !pin} />
           <PinKey label="0" onPress={() => press("0")} disabled={checking || waiting > 0} />
-          <Button type="button" className="h-16 text-base" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
+          <Button type="button" className="h-16 text-lg" disabled={pin.length < 4 || checking || waiting > 0} onClick={() => void submit()}>
             {checking ? <Spinner /> : "Unlock"}
           </Button>
         </div>

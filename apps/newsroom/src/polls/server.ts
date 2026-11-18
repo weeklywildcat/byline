@@ -8,13 +8,16 @@ import { canAdministerPolls, canInterview, canManagePolls, canRunSession, canSee
 import { POLL_LOCATIONS, POLL_SURVEYS, POLL_VERSIONS, SURVEY_STATUSES, type SurveyStatus } from "./collections";
 import { pollPublicStarts, pollResponses, pollSessionEvents, pollSessions } from "./db";
 import { normalizeDefinition } from "./definition";
-import { fieldworkRow, responsesCsv, summarize, summaryCsv, type EventCounts, type ResponseRow } from "./engine/results";
+import { aggregateHandoff, HANDOFF_FIELDS } from "./engine/handoff";
+import { compareOptions, fieldworkRow, responseTimeline, responsesCsv, summarize, summaryCsv, type EventCounts, type ResponseRow } from "./engine/results";
 import { emptyDefinition, isAnswerable, type StoredAnswers, type SurveyDefinition } from "./engine/types";
 import { definitionToSheets, hasErrors, importWorkbook, validateDefinition, type ImportIssue } from "./engine/xlsform";
 import { readWorkbook, WorkbookError, writeWorkbook } from "./engine/xlsx";
 import { hashPin, newPublicKey, normalizeAccessCode } from "./kiosk";
 import { EXAMPLE_SHEETS, EXAMPLE_WORKBOOK_FILE, SPREADSHEET_GUIDE_FILE, TEMPLATE_SHEETS, TEMPLATE_WORKBOOK_FILE } from "./workbooks/example";
 import { SPREADSHEET_GUIDE } from "./workbooks/guide";
+import { collectionPeriods } from "./periods";
+import { createDataset, createRows, deleteDataset } from "../data/server";
 
 /**
  * Poll Studio's server (docs/wildcat-polls.md). Every operation re-checks the
@@ -99,7 +102,7 @@ async function responseCounts(payload: Payload, surveyIds: number[]): Promise<Ma
   return new Map(rows.map((row) => [row.surveyId, Number(row.count)]));
 }
 
-function surveySummary(survey: SurveyDoc, ctx: ScreenContext, extra: { responses: number; versionNumber: number | null }) {
+function surveySummary(survey: SurveyDoc, ctx: ScreenContext, extra: { responses: number; versionNumber: number | null; activeSessions?: number; draftChanged?: boolean }) {
   return {
     id: survey.id,
     title: survey.title,
@@ -110,9 +113,13 @@ function surveySummary(survey: SurveyDoc, ctx: ScreenContext, extra: { responses
     updatedAt: survey.updatedAt,
     kioskEnabled: survey.kioskEnabled !== false,
     publicLink: survey.publicLink?.enabled === true,
+    activeSessions: extra.activeSessions ?? 0,
+    /** Editors only: the draft differs from the published version (or nothing is published yet). */
+    draftChanged: extra.draftChanged ?? false,
     canInterview: canInterview(ctx.user, survey) && survey.status === "open" && relationId(survey.currentVersion) !== null && survey.kioskEnabled !== false,
     canViewResults: canViewResults(ctx.user, survey),
-    canManage: canManagePolls(ctx.user)
+    canManage: canManagePolls(ctx.user),
+    canAdminister: canAdministerPolls(ctx.user)
   };
 }
 
@@ -123,7 +130,8 @@ export async function sessionSummaries(payload: Payload, where: ReturnType<typeo
   const sessions = await db.select({
     id: pollSessions.id, surveyId: pollSessions.surveyId, versionId: pollSessions.versionId, interviewerId: pollSessions.interviewerId,
     locationId: pollSessions.locationId, locationName: pollSessions.locationName, period: pollSessions.period, method: pollSessions.method,
-    status: pollSessions.status, startedAt: pollSessions.startedAt, endedAt: pollSessions.endedAt, kioskActive: sql<boolean>`${pollSessions.kioskTokenHash} is not null and ${pollSessions.kioskExpiresAt} > now()`
+    status: pollSessions.status, startedAt: pollSessions.startedAt, endedAt: pollSessions.endedAt, kioskActive: sql<boolean>`${pollSessions.kioskTokenHash} is not null and ${pollSessions.kioskExpiresAt} > now()`,
+    pairingExpiresAt: sql<Date | null>`case when ${pollSessions.pairingCodeHash} is not null and ${pollSessions.pairingExpiresAt} > now() then ${pollSessions.pairingExpiresAt} end`
   }).from(pollSessions).where(where).orderBy(desc(pollSessions.startedAt)).limit(limit);
   const counts = await eventCounts(payload, sessions.map((session) => session.id));
   const names = await userNames(payload, sessions.map((session) => session.interviewerId));
@@ -131,6 +139,8 @@ export async function sessionSummaries(payload: Payload, where: ReturnType<typeo
     ...session,
     startedAt: session.startedAt.toISOString(),
     endedAt: session.endedAt?.toISOString() ?? null,
+    // Whether a pairing code is waiting to be used (never the code itself).
+    pairingExpiresAt: session.pairingExpiresAt ? new Date(session.pairingExpiresAt).toISOString() : null,
     interviewer: names.get(String(session.interviewerId)) ?? "Someone",
     counts: counts.get(session.id) ?? { started: 0, declined: 0, completed: 0, abandoned: 0 }
   }));
@@ -157,19 +167,35 @@ export async function pollsOverview(ctx: ScreenContext) {
   const { docs } = await payload.find({ collection: POLL_SURVEYS, req: ctx.req, overrideAccess: false, depth: 0, pagination: false, sort: "-updatedAt" });
   const surveys = (docs as unknown as SurveyDoc[]).filter((survey) => canSeeSurvey(ctx.user, survey));
   const versionIds = surveys.map((survey) => Number(relationId(survey.currentVersion))).filter(Boolean);
-  const versions = versionIds.length ? (await payload.find({ collection: POLL_VERSIONS, where: { id: { in: versionIds } }, pagination: false, ...system, select: { number: true } })).docs : [];
-  const versionNumber = new Map(versions.map((version) => [version.id, (version as { number: number }).number]));
+  const manage = canManagePolls(ctx.user);
+  const versions = versionIds.length ? (await payload.find({ collection: POLL_VERSIONS, where: { id: { in: versionIds } }, pagination: false, ...system, select: manage ? { number: true, definition: true } : { number: true } })).docs as unknown as VersionDoc[] : [];
+  const versionNumber = new Map(versions.map((version) => [version.id, version.number]));
+  const versionById = new Map(versions.map((version) => [version.id, version]));
   const counts = await responseCounts(payload, surveys.filter((survey) => canViewResults(ctx.user, survey)).map((survey) => survey.id));
+  const running = await activeSessionCounts(payload, surveys.map((survey) => survey.id));
+  const draftChanged = (survey: SurveyDoc) => {
+    if (!manage) return false;
+    const current = versionById.get(Number(relationId(survey.currentVersion)));
+    return current ? !sameDefinition(draftOf(survey), current.definition) : Boolean(survey.draft);
+  };
   const mine = canManagePolls(ctx.user) ? ne(pollSessions.status, "ended") : and(ne(pollSessions.status, "ended"), eq(pollSessions.interviewerId, Number(ctx.user.id)));
   const sessions = await sessionSummaries(payload, mine, 30);
   const { docs: locations } = await payload.find({ collection: POLL_LOCATIONS, ...system, pagination: false, sort: "name" });
   return {
     me: { id: ctx.user.id, role: ctx.user.role, canManage: canManagePolls(ctx.user), canAdminister: canAdministerPolls(ctx.user) },
-    surveys: surveys.map((survey) => surveySummary(survey, ctx, { responses: counts.get(survey.id) ?? 0, versionNumber: versionNumber.get(Number(relationId(survey.currentVersion))) ?? null })),
+    surveys: surveys.map((survey) => surveySummary(survey, ctx, { responses: counts.get(survey.id) ?? 0, versionNumber: versionNumber.get(Number(relationId(survey.currentVersion))) ?? null, activeSessions: running.get(survey.id) ?? 0, draftChanged: draftChanged(survey) })),
     sessions: sessions.map((session) => ({ ...session, survey: surveys.find((survey) => survey.id === session.surveyId)?.title ?? "A poll" })),
     locations: locations.map((location) => ({ id: location.id, name: String((location as { name: string }).name), notes: String((location as { notes?: string }).notes ?? ""), active: (location as { active?: boolean }).active !== false })),
+    periods: collectionPeriods(),
     timeZone: ctx.timeZone
   };
+}
+
+async function activeSessionCounts(payload: Payload, surveyIds: number[]): Promise<Map<number, number>> {
+  if (!surveyIds.length) return new Map();
+  const db = await pollDb(payload);
+  const rows = await db.select({ surveyId: pollSessions.surveyId, count: sql<number>`count(*)::int` }).from(pollSessions).where(and(inArray(pollSessions.surveyId, surveyIds), ne(pollSessions.status, "ended"))).groupBy(pollSessions.surveyId);
+  return new Map(rows.map((row) => [row.surveyId, Number(row.count)]));
 }
 
 /* ------------------------------------------------------------------ import */
@@ -229,11 +255,17 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
   const counts = canViewResults(ctx.user, survey) ? await responseCounts(payload, [id]) : new Map<number, number>();
   const linked = await linkedRecords(ctx, survey);
   const sessions = await sessionSummaries(payload, canManagePolls(ctx.user) ? eq(pollSessions.surveyId, id) : and(eq(pollSessions.surveyId, id), eq(pollSessions.interviewerId, Number(ctx.user.id))), 100);
+  const byMode = canViewResults(ctx.user, survey) ? await responseCountsByMode(payload, id) : null;
+  const changed = Boolean(draft && current && !sameDefinition(draft, current.definition));
+  const { docs: locationDocs } = await payload.find({ collection: POLL_LOCATIONS, where: { active: { equals: true } }, ...system, pagination: false, sort: "name" });
   return {
     me: { id: ctx.user.id },
     timeZone: ctx.timeZone,
+    periods: collectionPeriods(),
+    locations: locationDocs.map((location) => ({ id: location.id, name: String((location as { name: string }).name) })),
+    responsesByMode: byMode,
     survey: {
-      ...surveySummary(survey, ctx, { responses: counts.get(id) ?? 0, versionNumber: current?.number ?? null }),
+      ...surveySummary(survey, ctx, { responses: counts.get(id) ?? 0, versionNumber: current?.number ?? null, activeSessions: sessions.filter((session) => session.status !== "ended").length, draftChanged: changed || Boolean(draft && !current) }),
       owner: names.get(String(relationId(survey.owner))) ?? "",
       methodology: survey.methodology ?? "",
       minimumGroup: survey.minimumGroup ?? 5,
@@ -250,7 +282,7 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
     },
     draft,
     draftIssues: draft ? validateDefinition(draft) : [],
-    draftChanged: Boolean(draft && current && !sameDefinition(draft, current.definition)),
+    draftChanged: changed,
     current: current ? { id: current.id, number: current.number, definition: versionDefinition(current) } : null,
     versions: versions.map((version) => ({ id: version.id, number: version.number, label: version.label ?? "", sourceFilename: version.sourceFilename ?? "", note: version.note ?? "", publishedAt: version.publishedAt, publishedBy: names.get(String(relationId(version.publishedBy))) ?? "", questionCount: version.questionCount ?? 0 })),
     sessions
@@ -261,6 +293,12 @@ export async function surveyDetail(ctx: ScreenContext, id: number) {
 export function sameDefinition(a: unknown, b: unknown): boolean {
   const canonical = (definition: unknown) => JSON.stringify(normalizeDefinition(definition), (key, value) => (key === "source" ? undefined : value));
   return canonical(a) === canonical(b);
+}
+
+async function responseCountsByMode(payload: Payload, surveyId: number): Promise<{ kiosk: number; public: number }> {
+  const db = await pollDb(payload);
+  const rows = await db.select({ mode: pollResponses.mode, count: sql<number>`count(*)::int` }).from(pollResponses).where(eq(pollResponses.surveyId, surveyId)).groupBy(pollResponses.mode);
+  return { kiosk: Number(rows.find((row) => row.mode === "kiosk")?.count ?? 0), public: Number(rows.find((row) => row.mode === "public")?.count ?? 0) };
 }
 
 async function linkedRecords(ctx: ScreenContext, survey: SurveyDoc) {
@@ -551,7 +589,10 @@ export async function endSession(payload: Payload, id: string, now: Date) {
     const [session] = await tx.select().from(pollSessions).where(eq(pollSessions.id, id)).for("update");
     if (!session) return;
     if (session.kioskTicket) await abandonTicket(tx as unknown as Drizzle, session, session.kioskTicket, now);
-    await tx.update(pollSessions).set({ status: "ended", endedAt: session.endedAt ?? now, kioskTokenHash: null, kioskExpiresAt: null, kioskPinHash: null, kioskMode: "locked", kioskTicket: null, kioskUnlockedUntil: null, updatedAt: now }).where(eq(pollSessions.id, id));
+    await tx.update(pollSessions).set({
+      status: "ended", endedAt: session.endedAt ?? now, kioskTokenHash: null, kioskExpiresAt: null, kioskPinHash: null, kioskMode: "locked", kioskTicket: null, kioskUnlockedUntil: null,
+      pairingCodeHash: null, pairingExpiresAt: null, pairingPinHash: null, pairingReplaces: false, updatedAt: now
+    }).where(eq(pollSessions.id, id));
   });
 }
 
@@ -564,7 +605,7 @@ export async function abandonTicket(db: Drizzle, session: { id: string; surveyId
 
 /* ------------------------------------------------------------------ results */
 
-export type ResultFilters = { from: string | null; to: string | null; location: string | null; session: string | null; version: number | null; mode: "kiosk" | "public" | null };
+export type ResultFilters = { from: string | null; to: string | null; location: string | null; session: string | null; version: number | null; mode: "kiosk" | "public" | null; compare: string | null };
 
 export function resultFilters(params: URLSearchParams): ResultFilters {
   const date = (value: string | null) => (value && !Number.isNaN(Date.parse(value)) ? new Date(value).toISOString() : null);
@@ -575,7 +616,8 @@ export function resultFilters(params: URLSearchParams): ResultFilters {
     location: params.get("location")?.slice(0, 120) || null,
     session: /^[0-9a-f-]{36}$/.test(params.get("session") ?? "") ? params.get("session") : null,
     version: Number.isSafeInteger(version) && version > 0 ? version : null,
-    mode: mode === "kiosk" || mode === "public" ? mode : null
+    mode: mode === "kiosk" || mode === "public" ? mode : null,
+    compare: /^[A-Za-z_][\w.-]{0,80}$/.test(params.get("compare") ?? "") ? params.get("compare") : null
   };
 }
 
@@ -609,7 +651,10 @@ export async function surveyResults(ctx: ScreenContext, id: number, params: URLS
   const definition = versionDefinition(version);
   const rows = await responsesFor(payload, id, filters);
   const minimumGroup = survey.minimumGroup ?? 5;
-  const results = summarize(definition, rows, { minimumGroup });
+  // Breakdowns only for the one "Compare by" question asked for, and only one the poll configured.
+  const comparable = compareOptions(definition);
+  const compare = comparable.find((option) => option.name === filters.compare)?.name ?? null;
+  const results = summarize(definition, rows, { minimumGroup, breakdowns: compare ? [compare] : [] });
 
   // Fieldwork: approaches and endings by session, location and collection method.
   const db = await pollDb(payload);
@@ -645,12 +690,15 @@ export async function surveyResults(ctx: ScreenContext, id: number, params: URLS
     survey: { id: survey.id, title: survey.title, methodology: survey.methodology ?? "", minimumGroup, status: survey.status, linked: await linkedRecords(ctx, survey) },
     version: { id: version.id, number: version.number },
     versions: versions.map((entry) => ({ id: entry.id, number: entry.number, publishedAt: entry.publishedAt })),
-    filters,
+    filters: { ...filters, compare },
     options: {
       locations: [...new Set([...sessions.map((session) => session.locationName)])].sort(),
       sessions: sessions.map((session) => ({ id: session.id, label: sessionLabel(session.id), startedAt: session.startedAt, endedAt: session.endedAt, method: session.method }))
     },
     modes: { kiosk: rows.filter((row) => row.mode === "kiosk").length, public: rows.filter((row) => row.mode === "public").length },
+    compare: { options: comparable, selected: compare },
+    timeline: responseTimeline(rows, ctx.timeZone),
+    canCreateDataset: canManagePolls(ctx.user),
     results,
     fieldwork: {
       total: fieldworkRow("total", "All interviewer-led sessions", total, minimumGroup),
@@ -673,4 +721,72 @@ export async function exportResponses(ctx: ScreenContext, id: number, params: UR
   if (kind === "summary") return download(summaryCsv(summarize(definition, rows, { minimumGroup: survey.minimumGroup ?? 5 })), "text/csv; charset=utf-8", `${slugify(survey.title)}-summary-${stamp}.csv`);
   ctx.req.payload.logger.info({ msg: "Poll responses exported", surveyId: id, userId: ctx.user.id, rows: rows.length });
   return download(responsesCsv(definition, rows, new Map(versions.map((entry) => [entry.id, entry.number]))), "text/csv; charset=utf-8", `${slugify(survey.title)}-responses-${stamp}.csv`);
+}
+
+/* ------------------------------------------------------------------ results → data */
+
+/**
+ * "Create dataset from results" (docs/wildcat-polls.md#results-to-byline-data):
+ * the current filtered results, as reviewed aggregates, in a new private
+ * working dataset made through Data's own server functions. No response,
+ * written answer or respondent-level value is read into it, and nothing is
+ * published: that is Data's Publish step, taken deliberately later.
+ */
+export async function createResultsDataset(ctx: ScreenContext, id: number, params: URLSearchParams) {
+  requireManager(ctx.user);
+  const view = await surveyResults(ctx, id, params);
+  const minimumGroup = view.survey.minimumGroup;
+  const handoff = aggregateHandoff(view.results, { minimumGroup, compare: view.results.breakdowns });
+  if (!handoff.rows.length) throw new APIError("There are no results to put in a dataset yet (questions answered by fewer than the smallest reported group are left out).", 409);
+  const f = view.filters;
+  const scope = [
+    f.from || f.to ? `responses ${f.from ? `from ${f.from.slice(0, 10)}` : ""}${f.to ? ` to ${f.to.slice(0, 10)}` : ""}`.trim() : null,
+    f.location ? `at ${f.location}` : null,
+    f.session ? "one session" : null,
+    f.mode ? (f.mode === "kiosk" ? "in person" : "by web link") : null,
+    f.version ? `version ${view.version.number}` : null,
+    view.compare.selected ? `compared by ${view.compare.options.find((option) => option.name === view.compare.selected)?.label ?? view.compare.selected}` : null
+  ].filter(Boolean).join(", ");
+  const description = [
+    `Aggregate results of the poll “${view.survey.title}” (${view.results.responses} responses${scope ? `; ${scope}` : ""}), made in Poll Studio on ${ctx.now.toISOString().slice(0, 10)}.`,
+    `Groups and questions with fewer than ${minimumGroup} respondents are left out. No individual or written answers.`,
+    handoff.withheld.length ? `${handoff.withheld.length} question${handoff.withheld.length === 1 ? " was" : "s were"} left out for having too few answers.` : ""
+  ].filter(Boolean).join(" ").slice(0, 2000);
+  const dataset = await createDataset(ctx, { title: `${view.survey.title} — results`.slice(0, 120), description, schema: { fields: HANDOFF_FIELDS, retiredKeys: [] } });
+  try {
+    for (let start = 0; start < handoff.rows.length; start += 1000) {
+      await createRows(ctx, Number(dataset.id), { rows: handoff.rows.slice(start, start + 1000).map((values) => ({ values })) });
+    }
+  } catch (error) {
+    await deleteDataset(ctx, Number(dataset.id)).catch(() => undefined);
+    throw error;
+  }
+  ctx.req.payload.logger.info({ msg: "Poll results copied to a dataset", surveyId: id, datasetId: dataset.id, userId: ctx.user.id, rows: handoff.rows.length });
+  return { datasetId: Number(dataset.id), rows: handoff.rows.length, withheld: handoff.withheld.length };
+}
+
+/* ------------------------------------------------------------------ linked coverage */
+
+/**
+ * The polls linked to a Story or Collection, as this account may see them:
+ * Poll Studio stays the authority, so this is a read of its links, never a
+ * copy. Response counts only for people allowed to read results.
+ */
+export async function linkedPolls(ctx: ScreenContext, params: URLSearchParams) {
+  const story = Number(params.get("story"));
+  const collection = Number(params.get("collection"));
+  const field = Number.isSafeInteger(story) && story > 0 ? "linkedStory" : Number.isSafeInteger(collection) && collection > 0 ? "linkedCollection" : null;
+  if (!field) throw new APIError("Name a story or a collection.", 400);
+  const { docs } = await ctx.req.payload.find({ collection: POLL_SURVEYS, where: { [field]: { equals: field === "linkedStory" ? story : collection } }, req: ctx.req, overrideAccess: false, depth: 0, pagination: false, sort: "-updatedAt" });
+  const surveys = (docs as unknown as SurveyDoc[]).filter((survey) => canSeeSurvey(ctx.user, survey));
+  const counts = await responseCounts(ctx.req.payload, surveys.filter((survey) => canViewResults(ctx.user, survey)).map((survey) => survey.id));
+  const running = await activeSessionCounts(ctx.req.payload, surveys.map((survey) => survey.id));
+  return {
+    polls: surveys.map((survey) => ({
+      id: survey.id, title: survey.title, status: survey.status,
+      responses: canViewResults(ctx.user, survey) ? counts.get(survey.id) ?? 0 : null,
+      activeSessions: running.get(survey.id) ?? 0,
+      publicLink: survey.publicLink?.enabled === true
+    }))
+  };
 }

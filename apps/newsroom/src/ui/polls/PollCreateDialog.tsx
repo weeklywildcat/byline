@@ -28,7 +28,7 @@ export function PollCreateDialog({ api, admin, onClose, navigate }: { api: strin
     try {
       const { id } = await postJson<{ id: number }>(api, "/byline/polls/surveys", start === "example" ? { example: true } : { title: title.trim() || "Untitled poll" });
       onClose();
-      navigate(`${admin}/polls?poll=${id}${start === "blank" ? "&tab=questions" : ""}`);
+      navigate(`${admin}/polls?poll=${id}${start === "blank" ? "&tab=build" : ""}`);
     } catch (failure) {
       setError((failure as Error).message);
     } finally {

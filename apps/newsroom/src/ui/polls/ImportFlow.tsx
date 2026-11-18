@@ -62,7 +62,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
     },
     onSuccess: async (id, publish) => {
       await queries.invalidateQueries({ queryKey: pollKeys.all });
-      go({ poll: id, tab: publish ? "overview" : "questions" });
+      go({ poll: id, tab: publish ? "overview" : "build" });
     }
   });
   const pick = (file: File | undefined) => { if (file) upload.mutate(file); };
@@ -146,7 +146,7 @@ export function ImportFlow({ pollId }: { pollId: number | null }) {
       {preview && step === "Preview" ? (
         <section className="flex flex-col gap-4">
           <PreviewPanel definition={preview.definition} />
-          <Nav back={() => setStep("Review")} next={() => setStep("Publish")} nextLabel="Continue" />
+          <Nav back={() => setStep("Review")} next={() => setStep("Publish")} nextLabel="Continue to publish" />
         </section>
       ) : null}
 

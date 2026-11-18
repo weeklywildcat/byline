@@ -7,23 +7,30 @@ import { body } from "../newsroom/http";
 import type { ScreenContext } from "../newsroom/screen-models";
 import { canInterview, canRunSession } from "./access";
 import { POLL_LOCATIONS, POLL_SURVEYS } from "./collections";
-import { pollPublicStarts, pollResponses, pollSessionEvents, pollSessions } from "./db";
+import { pollPairingLimits, pollPublicStarts, pollResponses, pollSessionEvents, pollSessions } from "./db";
 import { checkSubmission } from "./engine/logic";
 import {
   expiredKioskCookie, hashPin, hashToken, kioskCookie, kioskTokenFrom, KIOSK_LIFETIME_MS, KIOSK_UNLOCK_MS, newToken, normalizeAccessCode, outboxKey,
   PIN_ATTEMPTS, PIN_LOCK_MS, PIN_PATTERN, PIN_REVOKE_AFTER, publicStartToken, verifyPin, verifySecret
 } from "./kiosk";
+import { formatPairingCode, hashPairingCode, newPairingCode, normalizePairingCode, PAIRING_FAILURES_PER_WINDOW, PAIRING_WINDOW_MS, pairingExpiry, pairingWindow } from "./pairing";
 import { abandonTicket, endSession, eventCounts, loadSession, loadSurvey, loadVersion, pollDb, versionDefinition, type SurveyDoc } from "./server";
 
 /**
  * Fieldwork (docs/wildcat-polls.md#kiosk): handing a device to students.
  *
- * `startKiosk` is the only bridge from a signed-in account to a kiosk. It
- * issues a credential for one session and, in the same response, ends the
- * interviewer's Byline session on that device (Payload removes the session
- * server-side and the cookie is expired), so nothing on the iPad can reach the
- * newsroom any more. The kiosk endpoints accept only that credential and only
- * act on its session. Respondents can submit; only the interviewer, after a
+ * There are two bridges from a signed-in account to a kiosk, and both issue a
+ * credential for one session only:
+ *
+ * - Pairing (recommended): the interviewer prepares a short, single-use code
+ *   on their own signed-in device (`preparePairing`); the iPad types it at
+ *   `/poll` (`claimPairing`) without ever signing in, and starts locked.
+ * - Use this device: `startKiosk` turns the signed-in device itself into the
+ *   kiosk and, in the same response, ends its Byline session (Payload removes
+ *   the session server-side and the cookie is expired).
+ *
+ * Either way nothing on the iPad can reach the newsroom. The kiosk endpoints
+ * accept only that credential and only act on its session. Respondents can submit; only the interviewer, after a
  * server-checked PIN, can record a refusal, start a survey, pause, move or end.
  */
 
@@ -58,20 +65,35 @@ function respond(run: (req: PayloadRequest) => Promise<unknown>): PayloadHandler
 
 /* ------------------------------------------------------------------ handoff */
 
+/** The interviewer's PIN, chosen for one session: digits only, and not a trivial run. */
+function newPin(value: unknown): string {
+  const pin = String(value ?? "");
+  if (!PIN_PATTERN.test(pin)) throw new APIError("Choose a PIN of 4 to 8 digits.", 400);
+  if (/^(\d)\1+$/.test(pin) || "0123456789".includes(pin) || "9876543210".includes(pin)) throw new APIError("Choose a PIN that isn't a repeated or straight run of digits.", 400);
+  return pin;
+}
+
+/** A session a signed-in account may put on a device: theirs (or any, for an editor), still running, for an open poll. */
+async function sessionForDevice(ctx: ScreenContext, req: PayloadRequest, sessionId: string) {
+  const session = await loadSession(req.payload, sessionId);
+  if (!canRunSession(ctx.user, session)) throw new APIError("Only this session's interviewer can put it on a device.", 403);
+  if (session.status === "ended") throw new APIError("This session has ended. Start a new one.", 409);
+  const survey = await loadSurvey(req.payload, session.surveyId, req);
+  if (!canInterview(ctx.user, survey) || survey.status !== "open" || survey.kioskEnabled === false) throw new APIError("This poll is not open for fieldwork.", 409);
+  return session;
+}
+
+const deviceRunning = (session: Session, now: Date) => Boolean(session.kioskTokenHash && session.kioskExpiresAt && session.kioskExpiresAt > now);
+const noPairing = { pairingCodeHash: null, pairingExpiresAt: null, pairingPinHash: null, pairingReplaces: false } as const;
+
 /**
  * Signed in → kiosk. The PIN is the interviewer's, chosen now; it is never
  * their Byline password. Re-running this for a session (a reload lost the
  * cookie, or a new device) revokes the previous kiosk credential.
  */
 export async function startKiosk(ctx: ScreenContext, req: PayloadRequest, sessionId: string, input: { pin?: unknown }) {
-  const session = await loadSession(req.payload, sessionId);
-  if (!canRunSession(ctx.user, session)) throw new APIError("Only this session's interviewer can hand it to a device.", 403);
-  if (session.status === "ended") throw new APIError("This session has ended. Start a new one.", 409);
-  const survey = await loadSurvey(req.payload, session.surveyId, req);
-  if (!canInterview(ctx.user, survey) || survey.status !== "open") throw new APIError("This poll is not open for fieldwork.", 409);
-  const pin = String(input.pin ?? "");
-  if (!PIN_PATTERN.test(pin)) throw new APIError("Choose a PIN of 4 to 8 digits.", 400);
-  if (/^(\d)\1+$/.test(pin) || "0123456789".includes(pin) || "9876543210".includes(pin)) throw new APIError("Choose a PIN that isn't a repeated or straight run of digits.", 400);
+  await sessionForDevice(ctx, req, sessionId);
+  const pin = newPin(input.pin);
   const token = newToken();
   const now = new Date();
   const expires = new Date(now.getTime() + KIOSK_LIFETIME_MS);
@@ -81,7 +103,7 @@ export async function startKiosk(ctx: ScreenContext, req: PayloadRequest, sessio
     if (locked?.kioskTicket) await abandonTicket(tx as never, locked, locked.kioskTicket, now);
     await tx.update(pollSessions).set({
       kioskTokenHash: hashToken(token), kioskExpiresAt: expires, kioskPinHash: await hashPin(pin), kioskMode: "interviewer",
-      kioskUnlockedUntil: new Date(now.getTime() + KIOSK_UNLOCK_MS), kioskTicket: null, pinFailures: 0, pinLockedUntil: null, updatedAt: now
+      kioskUnlockedUntil: new Date(now.getTime() + KIOSK_UNLOCK_MS), kioskTicket: null, pinFailures: 0, pinLockedUntil: null, ...noPairing, updatedAt: now
     }).where(eq(pollSessions.id, sessionId));
   });
   // End this device's Byline session on the server, then expire its cookie.
@@ -92,14 +114,125 @@ export async function startKiosk(ctx: ScreenContext, req: PayloadRequest, sessio
   return json({ kiosk: "/polls/kiosk" }, 200, [signedOut, kioskCookie(token, expires)]);
 }
 
+/* ------------------------------------------------------------------ pairing */
+
+/**
+ * Prepares a pairing code for a session (docs/wildcat-polls.md#pairing-a-device).
+ * The interviewer chooses the PIN now; it takes effect on the device that
+ * claims the code (a replacement code for one not yet used may keep it). The
+ * interviewer also chooses how long the code lasts, up to two days. A new code replaces any earlier one for the session. When a
+ * device is already running the session, pairing another one stops it, so that
+ * has to be asked for (`replaceDevice`).
+ */
+export async function preparePairing(ctx: ScreenContext, req: PayloadRequest, sessionId: string, input: { pin?: unknown; replaceDevice?: unknown; expiresInMinutes?: unknown }) {
+  const session = await sessionForDevice(ctx, req, sessionId);
+  const now = new Date();
+  const replaces = deviceRunning(session, now);
+  if (replaces && input.replaceDevice !== true) throw new APIError("This session is already running on a device. Pairing another device stops that one.", 409, { deviceRunning: true });
+  // A fresh code for a pairing that hasn't been used yet may keep the PIN already chosen for it.
+  const keepPin = (input.pin === undefined || input.pin === "") && session.pairingPinHash;
+  const pinHash = keepPin ? session.pairingPinHash! : await hashPin(newPin(input.pin));
+  const expiresAt = pairingExpiry(now, input.expiresInMinutes);
+  const db = await pollDb(req.payload);
+  for (let attempt = 0; ; attempt++) {
+    const code = newPairingCode();
+    try {
+      await db.update(pollSessions).set({ pairingCodeHash: hashPairingCode(req.payload.secret, code), pairingExpiresAt: expiresAt, pairingPinHash: pinHash, pairingReplaces: replaces, updatedAt: now }).where(eq(pollSessions.id, session.id));
+      req.payload.logger.info({ msg: "Poll pairing code prepared", sessionId: session.id, userId: ctx.user.id, replaces });
+      return { code: formatPairingCode(code), expiresAt: expiresAt.toISOString(), replaces };
+    } catch (error) {
+      // Another live code has the same hash (vanishingly rare): draw again.
+      if (attempt >= 3 || !/unique|duplicate/i.test(String((error as Error).message))) throw error;
+    }
+  }
+}
+
+/** Withdraws a session's pairing code before anyone uses it. */
+export async function cancelPairing(ctx: ScreenContext, req: PayloadRequest, sessionId: string) {
+  const session = await loadSession(req.payload, sessionId);
+  if (!canRunSession(ctx.user, session)) throw new APIError("Only this session's interviewer can do that.", 403);
+  const db = await pollDb(req.payload);
+  await db.update(pollSessions).set({ ...noPairing, updatedAt: new Date() }).where(eq(pollSessions.id, session.id));
+  return { cancelled: true };
+}
+
+async function pairingThrottled(db: Awaited<ReturnType<typeof pollDb>>, now: Date): Promise<boolean> {
+  const [row] = await db.select({ failures: pollPairingLimits.failures }).from(pollPairingLimits).where(eq(pollPairingLimits.windowStart, pairingWindow(now))).limit(1);
+  return (row?.failures ?? 0) >= PAIRING_FAILURES_PER_WINDOW;
+}
+
+async function recordPairingFailure(db: Awaited<ReturnType<typeof pollDb>>, now: Date) {
+  await db.insert(pollPairingLimits).values({ windowStart: pairingWindow(now), failures: 1 })
+    .onConflictDoUpdate({ target: pollPairingLimits.windowStart, set: { failures: sql`${pollPairingLimits.failures} + 1` } });
+  await db.delete(pollPairingLimits).where(lt(pollPairingLimits.windowStart, new Date(now.getTime() - 24 * 60 * 60 * 1000)));
+}
+
+const PAIRING_REFUSED = "That code didn't work. Check it, or ask the interviewer for a new one.";
+
+/**
+ * `/poll`: an anonymous device types a pairing code. A good code is spent at
+ * once and the device receives the session's kiosk credential, starting
+ * locked behind the interviewer's PIN. Nothing about the poll, its responses
+ * or anyone's account is returned, and a refused code says only that it
+ * didn't work. Failed tries are throttled across the newsroom.
+ */
+export async function claimPairing(req: PayloadRequest) {
+  const input = await bodyOf<{ code?: unknown }>(req);
+  const now = new Date();
+  const db = await pollDb(req.payload);
+  if (await pairingThrottled(db, now)) {
+    const retryAfter = Math.ceil((pairingWindow(now).getTime() + PAIRING_WINDOW_MS - now.getTime()) / 1000);
+    throw new APIError("Too many wrong codes have been tried. Wait a few minutes, then enter the code again.", 429, { retryAfter });
+  }
+  const code = normalizePairingCode(input.code);
+  if (!code) {
+    await recordPairingFailure(db, now);
+    throw new APIError(PAIRING_REFUSED, 400);
+  }
+  const hash = hashPairingCode(req.payload.secret, code);
+  const token = newToken();
+  const expires = new Date(now.getTime() + KIOSK_LIFETIME_MS);
+  let outcome: "paired" | "unknown" | "refused" = "unknown";
+  let refusal = PAIRING_REFUSED;
+  let sessionId = "";
+  await db.transaction(async (tx) => {
+    const [session] = await tx.select().from(pollSessions).where(eq(pollSessions.pairingCodeHash, hash)).for("update");
+    if (!session) return;
+    // A code is spent by the first try that finds it, whatever happens next.
+    await tx.update(pollSessions).set({ ...noPairing, updatedAt: now }).where(eq(pollSessions.id, session.id));
+    if (!session.pairingExpiresAt || session.pairingExpiresAt <= now || session.status === "ended" || !session.pairingPinHash) return;
+    const survey = await loadSurvey(req.payload, session.surveyId);
+    if (survey.status !== "open" || survey.kioskEnabled === false) { outcome = "refused"; refusal = "This poll isn't open for fieldwork any more."; return; }
+    if (deviceRunning(session, now) && !session.pairingReplaces) { outcome = "refused"; refusal = "This session started on another device after the code was made. Ask the interviewer for a new code."; return; }
+    if (session.kioskTicket) await abandonTicket(tx as never, session, session.kioskTicket, now);
+    await tx.update(pollSessions).set({
+      kioskTokenHash: hashToken(token), kioskExpiresAt: expires, kioskPinHash: session.pairingPinHash, kioskMode: "locked",
+      kioskUnlockedUntil: null, kioskTicket: null, pinFailures: 0, pinLockedUntil: null, updatedAt: now
+    }).where(eq(pollSessions.id, session.id));
+    outcome = "paired";
+    sessionId = session.id;
+  });
+  if (outcome === "unknown") {
+    await recordPairingFailure(db, now);
+    throw new APIError(PAIRING_REFUSED, 400);
+  }
+  if (outcome === "refused") throw new APIError(refusal, 409);
+  // A kiosk never shares a browser with a Byline sign-in: end one if this device had it.
+  const users = req.payload.collections.users;
+  if (req.user) await logoutOperation({ collection: users, req, allSessions: false }).catch(() => undefined);
+  const signedOut = generateExpiredPayloadCookie({ collectionAuthConfig: users.config.auth, cookiePrefix: req.payload.config.cookiePrefix }) as string;
+  req.payload.logger.info({ msg: "Poll kiosk paired", sessionId });
+  return json({ kiosk: "/polls/kiosk" }, 200, [signedOut, kioskCookie(token, expires)]);
+}
+
 /* ------------------------------------------------------------------ kiosk context */
 
 async function kioskSession(req: PayloadRequest): Promise<Session> {
   const token = kioskTokenFrom(req);
-  if (!token) throw new APIError("This device isn't running a poll. Sign in to Byline to start one.", 401);
+  if (!token) throw new APIError("This device isn't running a poll. Pair it with a code from Poll Studio to start one.", 401);
   const db = await pollDb(req.payload);
   const [session] = await db.select().from(pollSessions).where(and(eq(pollSessions.kioskTokenHash, hashToken(token)), gt(pollSessions.kioskExpiresAt, new Date()))).limit(1);
-  if (!session || session.status === "ended") throw new APIError("This polling session has ended on this device. Sign in to Byline to start another.", 401);
+  if (!session || session.status === "ended") throw new APIError("This polling session has ended on this device. Pair it again with a new code to keep polling.", 401);
   return session;
 }
 
@@ -171,7 +304,7 @@ export async function kioskUnlock(req: PayloadRequest) {
     const failures = session.pinFailures + 1;
     if (failures >= PIN_REVOKE_AFTER) {
       await endSessionKiosk(req.payload, session, now);
-      throw new APIError("Too many wrong PINs: this device has been signed out of the session. The interviewer can sign in to Byline to continue.", 401);
+      throw new APIError("Too many wrong PINs: this device has been signed out of the session. The interviewer can pair it again from Poll Studio.", 401);
     }
     const lockedUntil = failures % PIN_ATTEMPTS === 0 ? new Date(now.getTime() + PIN_LOCK_MS * 2 ** (failures / PIN_ATTEMPTS - 1)) : null;
     await db.update(pollSessions).set({ pinFailures: failures, pinLockedUntil: lockedUntil, updatedAt: now }).where(eq(pollSessions.id, session.id));
@@ -396,5 +529,6 @@ export const fieldworkHandlers = {
   end: respond((req) => kioskEnd(req)),
   publicPoll: respond((req) => publicPoll(req, String(req.routeParams?.key ?? ""))),
   publicStart: respond((req) => publicStart(req, String(req.routeParams?.key ?? ""))),
-  publicSubmit: respond((req) => publicSubmit(req, String(req.routeParams?.key ?? "")))
+  publicSubmit: respond((req) => publicSubmit(req, String(req.routeParams?.key ?? ""))),
+  pair: respond((req) => claimPairing(req))
 };

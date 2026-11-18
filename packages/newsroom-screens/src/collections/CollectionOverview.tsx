@@ -159,6 +159,7 @@ export function CollectionOverview({
           <CollectionTasks detail={detail} people={people} timezone={timezone} refresh={() => actions.refresh({ tasks: true, schedule: true })} preview />
           {detail.tasks.filter((t) => t.state === "open").length > 5 ? more("tasks", "All tasks") : null}
         </section>
+        {host.linkedWork ? <div className="order-6 empty:hidden @min-[960px]/collection:order-none">{host.linkedWork(c.id)}</div> : null}
         <section className="order-7 @min-[960px]/collection:order-none" aria-labelledby="collection-public-summary">
           <h2 id="collection-public-summary" className="mb-2 text-base font-semibold">Public presentation</h2>
           <p className="text-sm text-muted-foreground">

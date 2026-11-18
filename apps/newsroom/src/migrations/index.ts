@@ -30,6 +30,7 @@ import * as migration_20261114_010953_welcome_onboarding_request from './2026111
 import * as migration_20261117_161800_donation_waitlist from './20261117_161800_donation_waitlist';
 import * as migration_20261117_182713_retire_article_polls from './20261117_182713_retire_article_polls';
 import * as migration_20261117_184452_wildcat_polls from './20261117_184452_wildcat_polls';
+import * as migration_20261118_023730_poll_device_pairing from './20261118_023730_poll_device_pairing';
 
 export const migrations = [
   {
@@ -190,6 +191,11 @@ export const migrations = [
   {
     up: migration_20261117_184452_wildcat_polls.up,
     down: migration_20261117_184452_wildcat_polls.down,
-    name: '20261117_184452_wildcat_polls'
+    name: '20261117_184452_wildcat_polls',
+  },
+  {
+    up: migration_20261118_023730_poll_device_pairing.up,
+    down: migration_20261118_023730_poll_device_pairing.down,
+    name: '20261118_023730_poll_device_pairing'
   },
 ];

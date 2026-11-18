@@ -51,6 +51,30 @@ type Draft = Record<string, string>;
 
 /** The respondent's actions: the kit's Button at its large size, made taller for a finger on an iPad. */
 const ACTION = "h-12 px-5 text-base";
+/** The kiosk's primary action is bigger still: an iPad held at arm's length. */
+const KIOSK_PRIMARY = "h-14 px-7 text-lg";
+
+/**
+ * Whether the number of questions a respondent will see is known before they
+ * start: true when nothing in the poll is conditional. With branching the
+ * total changes as they answer, so progress says "Question 4", never a total
+ * that moves.
+ */
+export function hasStableLength(definition: SurveyDefinition): boolean {
+  return !definition.questions.some((question) => question.relevant?.trim()) && !definition.groups.some((group) => group.relevant?.trim());
+}
+
+function useOnline(): boolean {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+  return online;
+}
 
 export function SurveyRunner(props: RunnerProps) {
   const { definition, mode, embedded = false } = props;
@@ -174,7 +198,10 @@ export function SurveyRunner(props: RunnerProps) {
   const optional = current && isAnswerable(current) ? !current.required : false;
   const isLast = current ? screens.indexOf(current) === screens.length - 1 : true;
 
+  const stable = useMemo(() => hasStableLength(definition), [definition]);
+  const online = useOnline();
   const progress = stage === "welcome" ? 0 : stage === "done" ? 100 : Math.round((index / Math.max(1, screens.length)) * 100);
+  const primary = mode === "kiosk" ? KIOSK_PRIMARY : ACTION;
   const gutter = "px-[max(1.25rem,var(--byline-safe-left))] sm:px-8";
   return (
     <div
@@ -185,22 +212,25 @@ export function SurveyRunner(props: RunnerProps) {
       <header className={cn("sticky top-0 z-10 bg-background", !embedded && "pt-(--byline-safe-top)")}>
         <div className={cn("mx-auto flex min-h-14 w-full max-w-5xl items-center gap-3", gutter)}>
           <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{definition.settings.title}</p>
+          {mode === "public" && !online ? <span className="shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground" role="status">Offline</span> : null}
           {stage === "questions" && current ? (
-            <p className="shrink-0 text-sm text-muted-foreground tabular-nums" aria-live="polite">
-              <span className="sr-only">Question </span>{index + 1}<span aria-hidden="true"> of </span><span className="sr-only"> of about </span>{screens.length}
+            <p className="shrink-0 text-sm text-muted-foreground tabular-nums" aria-live="polite" data-poll-progress="">
+              {stable ? `Question ${index + 1} of ${screens.length}` : `Question ${index + 1}`}
             </p>
           ) : null}
           {stage === "questions" && props.onStop ? <Button type="button" variant="ghost" onClick={props.onStop}>Stop</Button> : null}
           {props.headerAction}
         </div>
-        <div className={cn("mx-auto w-full max-w-5xl", gutter)}>
-          <Progress value={progress} aria-label="Progress through the poll" />
-        </div>
+        {stable ? (
+          <div className={cn("mx-auto w-full max-w-5xl", gutter)}>
+            <Progress value={progress} aria-label="Progress through the poll" />
+          </div>
+        ) : <div className="border-b" aria-hidden="true" />}
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col">
         {stage === "welcome" ? (
-          <Welcome definition={definition} count={screensFor(definition, {}).filter(isAnswerable).length} onBegin={begin} />
+          <Welcome definition={definition} count={stable ? screensFor(definition, {}).filter(isAnswerable).length : definition.questions.filter(isAnswerable).length} upTo={!stable} primary={primary} onBegin={begin} />
         ) : stage === "done" ? (
           <Done definition={definition} submitting={submitting} outcome={outcome} onRetry={retry} action={props.doneAction} mode={mode} />
         ) : current ? (
@@ -257,8 +287,8 @@ export function SurveyRunner(props: RunnerProps) {
             <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={back}><ArrowLeft data-icon="inline-start" />Back</Button>
             <span className="flex-1" />
             {answerable && optional ? <Button type="button" variant="ghost" size="lg" className={ACTION} onClick={() => void skip()}>Skip</Button> : null}
-            <Button type="button" size="lg" className={cn(ACTION, "min-w-32")} disabled={answerable && !hasAnswer} onClick={() => void next()}>
-              {isLast ? "Submit" : "Next"}
+            <Button type="button" size="lg" className={cn(primary, "min-w-36")} disabled={answerable && !hasAnswer} onClick={() => void next()}>
+              {isLast ? "Submit" : "Continue"}
               {isLast ? <Check data-icon="inline-end" /> : <ArrowRight data-icon="inline-end" />}
             </Button>
           </div>
@@ -270,7 +300,7 @@ export function SurveyRunner(props: RunnerProps) {
 
 /* ------------------------------------------------------------------ screens */
 
-function Welcome({ definition, count, onBegin }: { definition: SurveyDefinition; count: number; onBegin: () => void }) {
+function Welcome({ definition, count, upTo, primary, onBegin }: { definition: SurveyDefinition; count: number; upTo: boolean; primary: string; onBegin: () => void }) {
   const { settings } = definition;
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 px-[max(1.25rem,var(--byline-safe-left))] py-12 sm:px-8 animate-in fade-in duration-300 motion-reduce:animate-none">
@@ -281,10 +311,10 @@ function Welcome({ definition, count, onBegin }: { definition: SurveyDefinition;
       </div>
       <p className="text-lg leading-relaxed text-muted-foreground">
         {settings.welcome || "Taking part is voluntary and anonymous. We never ask for your name, and you can skip any question or stop at any time."}
-        {" "}About {count} {count === 1 ? "question" : "questions"}.
+        {" "}{upTo ? "Up to" : ""} {count} {count === 1 ? "question" : "questions"}.
       </p>
       <div>
-        <Button type="button" size="lg" className={cn(ACTION, "min-w-32")} onClick={onBegin}>Start<ArrowRight data-icon="inline-end" /></Button>
+        <Button type="button" size="lg" className={cn(primary, "min-w-36")} onClick={onBegin}>Start<ArrowRight data-icon="inline-end" /></Button>
       </div>
     </section>
   );
