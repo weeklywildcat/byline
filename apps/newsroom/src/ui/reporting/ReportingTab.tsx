@@ -38,6 +38,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, FileText, Image as ImageIcon, Link2, Lock, LockOpen, Mic, MoreHorizontal, PanelRight, Pencil, Plus, Radio, RefreshCw, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { LinkedPolls } from "../polls/LinkedPolls";
 import { GROUND_RULE_OPTIONS, groundRuleLabel, materialDayGroups, materialMatchesFilter, materialMatchesSearch, MATERIAL_FILTERS, sortMaterial, type MaterialFilter, type ReportingFileMaterial, type ResourceMaterial, type StoryMaterialItem } from "../../domain/reporting";
 import type { ReportingAppointment, ReportingSource } from "../../reporting/material";
 import { postJson } from "../story/api";
@@ -715,6 +716,7 @@ function PlanningContext({ context, data, capture, canCapture, refresh }: { cont
           <ul className="divide-y border-y">{data.appointments.map((appointment) => <li key={appointment.id}><AppointmentRow appointment={appointment} data={data} timeZone={data.timeZone} capture={capture} canCapture={canCapture && appointment.status !== "cancelled"} stacked onEdit={appointmentRecord(appointment.id) && writable ? (element) => appointmentDialog.openWith(appointmentRecord(appointment.id), element) : undefined} /></li>)}</ul>
         )}
       </section>
+      <LinkedPolls kind="story" id={Number(context.storyId)} />
       {workspace ? <>
         <SourceDialog key={`source-${sourceDialog.session}`} open={sourceDialog.open} source={sourceDialog.target} onClose={closeAnd(sourceDialog.close)} finalFocus={sourceDialog.finalFocus} />
         <AppointmentDialog key={`appointment-${appointmentDialog.session}`} open={appointmentDialog.open} appointment={appointmentDialog.target} onClose={closeAnd(appointmentDialog.close)} finalFocus={appointmentDialog.finalFocus} />

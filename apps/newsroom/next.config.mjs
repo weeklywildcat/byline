@@ -45,16 +45,16 @@ const nextConfig = {
     // Nothing on this host is meant for search engines.
     return [
       { source: "/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
-      {
-        // Wildcat Polls' respondent routes: never cached, never framed, never leaking a referrer.
-        source: "/polls/:path*",
+      // Wildcat Polls' respondent routes (/poll, /poll/<key>, /polls/*): never cached, never framed, never leaking a referrer.
+      ...["/poll", "/poll/:path*", "/polls/:path*"].map((source) => ({
+        source,
         headers: [
           { key: "Cache-Control", value: "private, no-store" },
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" }
         ]
-      },
+      })),
       {
         // Poll Studio shows results: a kiosk's Back button must never bring a cached copy back.
         source: "/admin/polls",

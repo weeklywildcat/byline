@@ -74,7 +74,7 @@ export function WritersPicker({ people, value, onChange, disabled, appearance = 
   </Combobox>;
 }
 
-const SITE_WALL_TIME = /^\\d{4}-\\d{2}-\\d{2}T(\\d{2}):(\\d{2})(?::\\d{2})?$/;
+const SITE_WALL_TIME = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})(?::\d{2})?$/;
 
 /** The newsroom-local HH:MM shown by a date-and-time picker. */
 export function pickerTime(value: string | null | undefined, timezone: string): string {

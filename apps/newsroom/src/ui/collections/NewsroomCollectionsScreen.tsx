@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkedPolls } from "../polls/LinkedPolls";
 import { CollectionsScreen } from "@byline/newsroom-screens/collections/CollectionsScreen";
 import { CollectionHostProvider, type CollectionHost } from "@byline/newsroom-screens/collections/collection-host";
 import type { CollectionGuard } from "@byline/newsroom-screens/collections/collection-guard";
@@ -107,7 +108,9 @@ function CollectionsBody({ fetchers, currentUserId }: { fetchers: Fetchers; curr
     openCalendar: (collectionId) => leave(`${routes.admin}/calendar?collectionId=${collectionId}`),
     media,
     activity: false,
-    createCollection: canCreate ? () => openCreate("collection") : undefined
+    createCollection: canCreate ? () => openCreate("collection") : undefined,
+    // Polls Poll Studio links to this Collection, as this account may see them (src/ui/polls/LinkedPolls.tsx).
+    linkedWork: (collectionId) => <LinkedPolls kind="collection" id={collectionId} headingClassName="mb-2 text-base font-semibold" />
   }), [workspace.api, fetchers, currentUserId, openStory, storyHref, leave, navigate, routes, media, canCreate, openCreate]);
 
   const narrow = route.collectionId !== null && composition !== "collection-workspace";

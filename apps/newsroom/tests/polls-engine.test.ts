@@ -198,8 +198,9 @@ describe("results", () => {
     const rows = [1, 2, 3, 4, 5, 6].map((id) => row(id, { grade: yes(id <= 5 ? "9" : "12"), book_report: yes(id % 2 ? "yes" : "no") }));
     const results = summarize(definition, rows, { minimumGroup: 5 });
     const byGrade = results.breakdowns.find((entry) => entry.question === "book_report")!;
-    expect(byGrade.groups.find((group) => group.name === "9")).toMatchObject({ base: 5, suppressed: false });
     expect(byGrade.groups.find((group) => group.name === "12")).toMatchObject({ base: 0, suppressed: true, cells: { yes: { percent: null } } });
+    // The only other group is withheld too: the overall result minus it would give the small group away.
+    expect(byGrade.groups.find((group) => group.name === "9")).toMatchObject({ base: 0, suppressed: true, cells: { yes: { count: 0, percent: null } } });
   });
 
   it("reports approach rates only when enough people were approached", () => {

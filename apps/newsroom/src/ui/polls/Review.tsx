@@ -101,33 +101,50 @@ function Condition({ text, prefix = "Shown when" }: { text: string; prefix?: str
 
 /**
  * The real respondent screen with a path tracker beside it: answer as a
- * student would and watch which questions apply. Nothing is saved.
+ * student would and watch which questions apply, and why. Nothing is saved.
  */
 export function PreviewPanel({ definition }: { definition: SurveyDefinition }) {
   const [run, setRun] = useState(0);
   const [progress, setProgress] = useState<{ answers: Answers; current: string | null }>({ answers: {}, current: null });
   const onProgress = useCallback((state: { answers: Answers; current: string | null }) => setProgress(state), []);
   const visible = useMemo(() => visibleQuestionNames(definition, progress.answers), [definition, progress.answers]);
+  const conditional = definition.questions.filter((question) => question.relevant);
+  const branches = conditional.filter((question) => visible.has(question.name)).length;
+  const restart = () => { setRun((n) => n + 1); setProgress({ answers: {}, current: null }); };
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]" data-polls-preview="">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]" data-polls-preview="">
       <div className="h-[min(78dvh,52rem)] min-h-[34rem] overflow-y-auto rounded-lg border">
         <SurveyRunner key={run} definition={definition} mode="preview" embedded onProgress={onProgress} onSubmit={async () => ({ status: "saved" })} />
       </div>
       <aside className="flex flex-col gap-3 lg:max-h-[min(78dvh,52rem)] lg:overflow-y-auto" aria-label="Path through the poll">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">This path</h3>
-          <Button type="button" variant="outline" size="sm" onClick={() => setRun((n) => n + 1)}><RotateCcw data-icon="inline-start" />Start again</Button>
+          <Button type="button" variant="outline" size="sm" onClick={restart}><RotateCcw data-icon="inline-start" />Start again</Button>
         </div>
-        <p className="text-xs text-muted-foreground">Answer differently to test another branch. Nothing is saved.</p>
-        <ol className="flex flex-col divide-y rounded-lg border text-sm">
+        <p className="text-xs text-muted-foreground" role="status">
+          {conditional.length
+            ? `${branches} of ${conditional.length} conditional ${conditional.length === 1 ? "question applies" : "questions apply"} so far. Start again and answer differently to test another branch. Nothing is saved.`
+            : "Every question is asked of everyone. Nothing is saved."}
+        </p>
+        <ol className="flex flex-col divide-y rounded-lg border text-sm" data-polls-path="">
           {definition.questions.map((question: Question) => {
             const shown = visible.has(question.name);
             const state = progress.answers[question.name];
-            const value = state?.status === "answered" ? labelFor(definition, question, expressionValue(state)) : state?.status === "skipped" ? "Skipped" : shown ? "" : "Not applicable";
+            const value = state?.status === "answered" ? labelFor(definition, question, expressionValue(state)) : state?.status === "skipped" ? "Skipped" : null;
+            const current = progress.current === question.name;
             return (
-              <li key={question.name} className={cn("flex flex-col gap-0.5 px-3 py-2", !shown && "text-muted-foreground/60", progress.current === question.name && "bg-muted")}>
-                <span className={cn("line-clamp-1", !shown && "line-through")}>{question.label}</span>
+              <li key={question.name} className={cn("flex flex-col gap-0.5 px-3 py-2", !shown && "text-muted-foreground/70", current && "bg-muted")} aria-current={current ? "step" : undefined} data-path-state={shown ? (value ? "answered" : "pending") : "not-applicable"}>
+                <span className="flex items-start gap-2">
+                  <span className={cn("line-clamp-2 flex-1", !shown && "line-through")}>{question.label}</span>
+                  {!shown ? <Badge variant="outline" className="shrink-0 font-normal">Not asked</Badge> : current ? <Badge variant="secondary" className="shrink-0 font-normal">Now</Badge> : null}
+                </span>
                 {value ? <span className={cn("text-xs", state?.status === "answered" ? "font-medium text-foreground" : "text-muted-foreground")}>{value}</span> : null}
+                {question.relevant ? (
+                  <span className="inline-flex items-start gap-1 text-xs text-muted-foreground">
+                    <GitBranch className="mt-px size-3 shrink-0" aria-hidden="true" />
+                    {shown ? "Asked because " : "Asked only when "}{describeCondition(definition, question.relevant)}
+                  </span>
+                ) : null}
               </li>
             );
           })}

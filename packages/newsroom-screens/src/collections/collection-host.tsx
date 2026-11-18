@@ -32,6 +32,12 @@ export type CollectionHost = {
   activity?: boolean;
   /** The host's global Create for a Collection (one flow, one dialog). */
   createCollection?: () => void;
+  /**
+   * Work the host links to this Collection from its own tools (Payload: the
+   * polls Poll Studio links here), shown on the Overview. The host decides what
+   * the account may see; the screen only places it.
+   */
+  linkedWork?: (collectionId: number) => ReactNode;
 };
 
 const CollectionHostContext = createContext<CollectionHost | null>(null);

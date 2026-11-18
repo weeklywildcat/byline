@@ -3,38 +3,44 @@
 import { AdminRoot } from "@byline/newsroom-ui/components/admin-root";
 import { InlineAlert } from "@byline/newsroom-ui/components/inline-alert";
 import { StatusBadge, type StatusTone } from "@byline/newsroom-ui/components/status-badge";
+import { Badge } from "@byline/newsroom-ui/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@byline/newsroom-ui/ui/breadcrumb";
 import { Button } from "@byline/newsroom-ui/ui/button";
-import { Card } from "@byline/newsroom-ui/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@byline/newsroom-ui/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@byline/newsroom-ui/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@byline/newsroom-ui/ui/input-group";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Skeleton } from "@byline/newsroom-ui/ui/skeleton";
 import { Spinner } from "@byline/newsroom-ui/ui/spinner";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@byline/newsroom-ui/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@byline/newsroom-ui/ui/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, FileSpreadsheet, FileText, MapPin, MoreHorizontal, Plus, Radio, Vote } from "lucide-react";
+import { ChevronRight, Copy, FileSpreadsheet, FileText, MapPin, MoreHorizontal, Plus, Radio, Search, Upload, Vote } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { EXAMPLE_WORKBOOK_FILE, SPREADSHEET_GUIDE_FILE, TEMPLATE_WORKBOOK_FILE } from "../../polls/workbooks/example";
 import { useNewsroomRoutes } from "../shell/account";
+import { useBylineCreate } from "../shell/create";
 import { useShellNavigation } from "../shell/navigation";
 import { createSurvey, fetchOverview, fileHref, formatWhen, pollKeys, STATUS_LABEL, type PollsOverview } from "./api";
 import { Fieldwork, SessionRows } from "./Fieldwork";
 import { ImportFlow } from "./ImportFlow";
 import { Locations } from "./Locations";
-import { SurveyWorkspace, type SurveyTab } from "./SurveyWorkspace";
+import { SurveyWorkspace, surveyTab, type SurveyTab } from "./SurveyWorkspace";
 
 /**
  * Poll Studio (`/admin/polls`, docs/wildcat-polls.md). The address is the
  * state, moved through the shell's navigation:
  *
- *   (none)                    every poll you can see, and sessions running now
- *   ?view=fieldwork[&poll=]   start a polling session and hand the device over
+ *   (none)                    every poll you can see, and fieldwork running now
+ *   ?view=fieldwork           choose a poll, then set up fieldwork
  *   ?view=import[&poll=]      upload → validate → review → preview → publish
  *   ?view=locations           where fieldwork happens (editors)
- *   ?poll=<id>&tab=<tab>      one poll: overview, questions, preview, results, fieldwork, settings
+ *   ?poll=<id>&tab=<tab>      one poll: overview, build, preview, collect, results, settings
+ *
+ * The older `tab=questions` and `tab=fieldwork` (and `view=fieldwork&poll=`)
+ * still open Build and Collect.
  */
-export type PollsTarget = { view?: "fieldwork" | "import" | "locations"; poll?: number; tab?: SurveyTab };
+export type PollsTarget = { view?: "fieldwork" | "import" | "locations"; poll?: number; tab?: SurveyTab; start?: boolean };
 
 export function usePollsNavigation() {
   const { admin } = useNewsroomRoutes();
@@ -44,6 +50,7 @@ export function usePollsNavigation() {
     if (target.view) search.set("view", target.view);
     if (target.poll) search.set("poll", String(target.poll));
     if (target.tab && target.tab !== "overview") search.set("tab", target.tab);
+    if (target.start) search.set("start", "1");
     const query = search.toString();
     navigate(`${admin}/polls${query ? `?${query}` : ""}`);
   }, [admin, navigate]);
@@ -53,8 +60,6 @@ const positive = (value: string | null | undefined) => {
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
-
-const TABS: readonly SurveyTab[] = ["overview", "questions", "preview", "results", "fieldwork", "settings"];
 
 export function PollStudio(_props: { api: string; admin: string }) {
   // A page restored from the back/forward cache after the account signed out (a kiosk started) must not show results.
@@ -74,11 +79,12 @@ function PollsRouter() {
   const params = useSearchParams();
   const view = params?.get("view");
   const poll = positive(params?.get("poll"));
-  const tab = TABS.find((entry) => entry === params?.get("tab")) ?? "overview";
-  if (view === "fieldwork") return <Fieldwork key={`fieldwork-${poll ?? ""}`} preselect={poll} />;
+  const start = params?.get("start") === "1";
+  if (view === "fieldwork" && poll) return <SurveyWorkspace key={`poll-${poll}`} id={poll} tab="collect" startFieldwork />;
+  if (view === "fieldwork") return <Fieldwork key="fieldwork" />;
   if (view === "import") return <ImportFlow key={`import-${poll ?? ""}`} pollId={poll} />;
   if (view === "locations") return <Locations />;
-  if (poll) return <SurveyWorkspace key={`poll-${poll}`} id={poll} tab={tab} />;
+  if (poll) return <SurveyWorkspace key={`poll-${poll}`} id={poll} tab={surveyTab(params?.get("tab"))} startFieldwork={start} />;
   return <PollsHome />;
 }
 
@@ -88,7 +94,7 @@ export function PageHeader({ title, description, actions, status, level = "page"
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className={level === "page" ? "text-2xl font-semibold tracking-tight" : "text-xl font-semibold tracking-tight"}>{title}</h1>
+          <h1 className={level === "page" ? "text-2xl font-semibold tracking-tight" : "text-xl font-semibold tracking-tight text-balance"}>{title}</h1>
           {status}
         </div>
         {description ? <div className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</div> : null}
@@ -139,34 +145,54 @@ export function TemplateItems({ api }: { api: string }) {
   );
 }
 
+type Filter = "all" | "open" | "draft" | "closed" | "archived";
+const FILTERS: Array<{ value: Filter; label: string }> = [
+  { value: "all", label: "All" }, { value: "open", label: "Open" }, { value: "draft", label: "Draft" }, { value: "closed", label: "Closed" }, { value: "archived", label: "Archived" }
+];
+
 function PollsHome() {
   const { api } = useNewsroomRoutes();
   const go = usePollsNavigation();
+  const { openCreate } = useBylineCreate();
   const queries = useQueryClient();
   const overview = useQuery({ queryKey: pollKeys.overview(), queryFn: () => fetchOverview(api) });
   const data = overview.data;
   const manage = data?.me.canManage ?? false;
-  const created = async ({ id }: { id: number }, tab: SurveyTab) => { await queries.invalidateQueries({ queryKey: pollKeys.all }); go({ poll: id, tab }); };
-  const example = useMutation({ mutationFn: () => createSurvey(api, { example: true }), onSuccess: (result) => created(result, "overview") });
-  const blank = useMutation({ mutationFn: () => createSurvey(api, { title: "Untitled poll" }), onSuccess: (result) => created(result, "questions") });
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const example = useMutation({
+    mutationFn: () => createSurvey(api, { example: true }),
+    onSuccess: async ({ id }) => { await queries.invalidateQueries({ queryKey: pollKeys.all }); go({ poll: id }); }
+  });
   const canFieldwork = data?.surveys.some((survey) => survey.canInterview) ?? false;
+  const counts = useMemo(() => {
+    const map = new Map<Filter, number>([["all", 0]]);
+    for (const survey of data?.surveys ?? []) {
+      map.set("all", (map.get("all") ?? 0) + (survey.status === "archived" ? 0 : 1));
+      map.set(survey.status as Filter, (map.get(survey.status as Filter) ?? 0) + 1);
+    }
+    return map;
+  }, [data]);
+  const shown = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return (data?.surveys ?? []).filter((survey) => (filter === "all" ? survey.status !== "archived" : survey.status === filter) && (!needle || `${survey.title} ${survey.description}`.toLowerCase().includes(needle)));
+  }, [data, filter, search]);
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-6 px-4 py-6 lg:px-6" data-polls-home="">
       <PageHeader
         title="Polls"
-        description={manage ? "Create and run student surveys, then analyze the results." : "Run fieldwork for the polls you've been given, and read the results you can see."}
+        description={manage ? "Build a poll, collect answers in person or by link, and read the results." : "Run fieldwork for the polls you've been given, and read the results you can see."}
         actions={data ? (
           <>
-            {canFieldwork ? <Button type="button" variant={manage ? "outline" : "default"} onClick={() => go({ view: "fieldwork" })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
+            {canFieldwork ? <Button type="button" variant="outline" onClick={() => go({ view: "fieldwork" })}><Radio data-icon="inline-start" />Start fieldwork</Button> : null}
             {manage ? (
               <>
-                <Button type="button" onClick={() => go({ view: "import" })}><FileSpreadsheet data-icon="inline-start" />Import spreadsheet</Button>
+                <Button type="button" variant="outline" onClick={() => go({ view: "import" })}><Upload data-icon="inline-start" />Import</Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="More poll actions" />}><MoreHorizontal /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-60">
                     <DropdownMenuGroup>
-                      <DropdownMenuItem onClick={() => blank.mutate()}><Plus />New blank poll</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => example.mutate()}><Copy />Add the example poll</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => go({ view: "locations" })}><MapPin />Polling locations</DropdownMenuItem>
                     </DropdownMenuGroup>
@@ -174,6 +200,7 @@ function PollsHome() {
                     <TemplateItems api={api} />
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Button type="button" onClick={() => openCreate("poll")}><Plus data-icon="inline-start" />New poll</Button>
               </>
             ) : null}
           </>
@@ -181,27 +208,56 @@ function PollsHome() {
       />
 
       {overview.isError ? <InlineAlert title="Polls aren't available" onAction={() => void overview.refetch()}>{(overview.error as Error).message}</InlineAlert> : null}
-      {example.isError || blank.isError ? <InlineAlert title="The poll wasn't created">{((example.error ?? blank.error) as Error).message}</InlineAlert> : null}
+      {example.isError ? <InlineAlert title="The poll wasn't created">{(example.error as Error).message}</InlineAlert> : null}
 
       {data?.sessions.length ? (
         <section className="flex flex-col gap-3" aria-labelledby="polls-running">
-          <h2 id="polls-running" className="text-sm font-semibold">Fieldwork running now</h2>
-          <SessionRows sessions={data.sessions} meId={data.me.id} manage={manage} showSurvey timeZone={data.timeZone} />
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="polls-running" className="text-sm font-semibold">Fieldwork running now</h2>
+            <span className="text-xs text-muted-foreground tabular-nums">{data.sessions.length} {data.sessions.length === 1 ? "session" : "sessions"}</span>
+          </div>
+          <SessionRows sessions={data.sessions} meId={data.me.id} manage={manage} showSurvey timeZone={data.timeZone} onOpenSurvey={(id) => go({ poll: id, tab: "collect" })} />
         </section>
       ) : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="polls-list">
         <h2 id="polls-list" className="sr-only">Polls</h2>
-        {!data ? <ListSkeleton /> : data.surveys.length ? <SurveyTable data={data} onOpen={(id) => go({ poll: id })} /> : (
+        {data?.surveys.length ? (
+          <div className="flex flex-wrap items-center gap-2" role="search">
+            <InputGroup className="w-full sm:w-72">
+              <InputGroupAddon><Search /></InputGroupAddon>
+              <InputGroupInput type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search polls" aria-label="Search polls" />
+            </InputGroup>
+            <ToggleGroup variant="outline" size="sm" aria-label="Show polls" className="max-w-full overflow-x-auto" value={[filter]} onValueChange={(next: unknown[]) => { if (typeof next[0] === "string") setFilter(next[0] as Filter); }}>
+              {FILTERS.map((entry) => (
+                <ToggleGroupItem key={entry.value} value={entry.value} className="gap-1.5">
+                  {entry.label}
+                  {counts.get(entry.value) ? <span className="text-muted-foreground tabular-nums">{counts.get(entry.value)}</span> : null}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+        ) : null}
+        {!data ? <ListSkeleton /> : data.surveys.length ? (
+          shown.length ? <PollRows data={data} surveys={shown} onOpen={(id) => go({ poll: id })} /> : (
+            <Empty className="border border-dashed">
+              <EmptyHeader>
+                <EmptyTitle>No polls match</EmptyTitle>
+                <EmptyDescription>{search ? "Try another search, or look under All." : "Nothing here yet."}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent><Button type="button" variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Show all polls</Button></EmptyContent>
+            </Empty>
+          )
+        ) : (
           <Empty className="border border-dashed">
             <EmptyHeader>
               <EmptyMedia variant="icon"><Vote /></EmptyMedia>
               <EmptyTitle>{manage ? "No polls yet" : "No polls for you yet"}</EmptyTitle>
-              <EmptyDescription>{manage ? "Import a workbook, or start from the example poll." : "When an editor gives you fieldwork or results for a poll, it appears here."}</EmptyDescription>
+              <EmptyDescription>{manage ? "Build one here, import a spreadsheet, or start from the example." : "When an editor gives you fieldwork or results for a poll, it appears here."}</EmptyDescription>
             </EmptyHeader>
             {manage ? (
               <EmptyContent className="flex-row flex-wrap justify-center">
-                <Button type="button" onClick={() => go({ view: "import" })}>Import spreadsheet</Button>
+                <Button type="button" onClick={() => openCreate("poll")}><Plus data-icon="inline-start" />New poll</Button>
                 <Button type="button" variant="outline" disabled={example.isPending} onClick={() => example.mutate()}>{example.isPending ? <Spinner data-icon="inline-start" /> : null}Add the example poll</Button>
               </EmptyContent>
             ) : null}
@@ -212,46 +268,38 @@ function PollsHome() {
   );
 }
 
-/** A row that opens on click anywhere; its title button is the keyboard and screen-reader target. */
-function openable(onOpen: () => void) {
-  return {
-    className: "cursor-pointer",
-    onClick: (event: { target: EventTarget }) => {
-      if ((event.target as HTMLElement).closest("a,button")) return;
-      onOpen();
-    }
-  };
-}
+const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
 
-function SurveyTable({ data, onOpen }: { data: PollsOverview; onOpen: (id: number) => void }) {
+/** Each poll as an item: what it is, where it stands, and what's happening with it. */
+function PollRows({ data, surveys, onOpen }: { data: PollsOverview; surveys: PollsOverview["surveys"]; onOpen: (id: number) => void }) {
   return (
-    <Card className="gap-0 py-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[46%]">Poll</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden text-right sm:table-cell">Version</TableHead>
-            <TableHead className="text-right">Responses</TableHead>
-            <TableHead className="hidden text-right md:table-cell">Updated</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.surveys.map((survey) => (
-            <TableRow key={survey.id} {...openable(() => onOpen(survey.id))} data-polls-row={survey.id}>
-              <TableCell className="max-w-0 whitespace-normal">
-                <Button type="button" variant="ghost" size="sm" className="h-auto min-h-0 justify-start rounded-none p-0 text-left font-medium whitespace-normal hover:bg-transparent hover:underline any-pointer-coarse:min-h-0" onClick={() => onOpen(survey.id)}>{survey.title}</Button>
-                {survey.description ? <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{survey.description}</p> : null}
-              </TableCell>
-              <TableCell><PollStatus status={survey.status} /></TableCell>
-              <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">{survey.versionNumber ? `v${survey.versionNumber}` : "—"}</TableCell>
-              <TableCell className="text-right tabular-nums">{survey.canViewResults ? survey.responses.toLocaleString("en-US") : "—"}</TableCell>
-              <TableCell className="hidden text-right text-muted-foreground tabular-nums md:table-cell">{formatWhen(survey.updatedAt, data.timeZone)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+    <ItemGroup className="gap-0 rounded-lg border" data-polls-list="">
+      {surveys.map((survey, index) => (
+        <Item
+          key={survey.id}
+          className={index ? "rounded-none border-t-border text-left" : "rounded-none text-left"}
+          render={<button type="button" onClick={() => onOpen(survey.id)} data-polls-row={survey.id} />}
+        >
+          <ItemContent className="min-w-0">
+            <ItemTitle className="flex-wrap">
+              <span>{survey.title}</span>
+              <PollStatus status={survey.status} />
+              {survey.draftChanged && survey.versionNumber ? <Badge variant="outline" className="font-normal">Unpublished changes</Badge> : null}
+            </ItemTitle>
+            <ItemDescription className="tabular-nums">
+              {[
+                survey.versionNumber ? `Version ${survey.versionNumber}` : "Not published",
+                survey.canViewResults ? plural(survey.responses, "response") : null,
+                survey.activeSessions ? `${plural(survey.activeSessions, "session")} running` : null,
+                survey.publicLink ? "Web link on" : null,
+                `Updated ${formatWhen(survey.updatedAt, data.timeZone)}`
+              ].filter(Boolean).join(" · ")}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions><ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" /></ItemActions>
+        </Item>
+      ))}
+    </ItemGroup>
   );
 }
 

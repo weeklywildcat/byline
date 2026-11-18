@@ -230,16 +230,130 @@ describe("the kiosk", () => {
   });
 });
 
+describe("device pairing", () => {
+  const claim = (code: unknown) => call("post", "/byline/polls/pair", null, { data: { code } });
+  const tokenFrom = (cookies: string[]) => cookies.map((cookie) => new RegExp(`^${KIOSK_COOKIE}=([^;]+)`).exec(cookie)?.[1]).find(Boolean) ?? "";
+  const newSession = async (who = "interviewer") => (await call("post", "/byline/polls/sessions", who, { data: { surveyId: ids.survey, locationId: ids.cafeteria, period: "Lunch B", method: "Every fifth student" } })).body.id as string;
+  const prepare = (session: string, data: Record<string, unknown> = { pin: "4826" }, who = "interviewer") => call("post", "/byline/polls/sessions/:session/pairing", who, { params: { session }, data });
+
+  it("gives the interviewer a six-digit code that is kept only as a keyed hash", async () => {
+    const session = await newSession();
+    expect((await prepare(session, { pin: "4826" }, "stranger")).status).toBe(403);
+    expect((await prepare(session, { pin: "1234" })).status).toBe(400);
+    const prepared = await prepare(session, { pin: "4826", expiresInMinutes: 120 });
+    expect(prepared.status).toBe(200);
+    expect(prepared.body.code).toMatch(/^\d{3} \d{3}$/);
+    expect(Date.parse(prepared.body.expiresAt) - Date.now()).toBeGreaterThan(119 * 60_000);
+    const { rows } = await db().execute(sql`select pairing_code_hash, pairing_pin_hash, pairing_expires_at from byline_poll_sessions where id = ${session}`);
+    const digits = prepared.body.code.replace(" ", "");
+    expect(rows[0].pairing_code_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(rows[0])).not.toContain(digits);
+    expect(String(rows[0].pairing_pin_hash)).toMatch(/^scrypt\$/);
+    // At most two days, however long was asked for.
+    const long = await prepare(session, { pin: "4826", expiresInMinutes: 60 * 24 * 10 });
+    expect(Date.parse(long.body.expiresAt) - Date.now()).toBeLessThanOrEqual(2 * 24 * 60 * 60_000 + 5_000);
+    await call("post", "/byline/polls/sessions/:session/end", "interviewer", { params: { session } });
+  });
+
+  it("pairs an anonymous device once, locked, with nothing about the newsroom in the reply", async () => {
+    const session = await newSession();
+    const { code } = (await prepare(session)).body;
+    const paired = await claim(code);
+    expect(paired.status).toBe(200);
+    expect(paired.body).toEqual({ kiosk: "/polls/kiosk" });
+    const cookies = paired.headers.getSetCookie();
+    expect(cookies.some((cookie) => cookie.startsWith(`${KIOSK_COOKIE}=`) && /HttpOnly/.test(cookie) && /SameSite=Strict/.test(cookie))).toBe(true);
+    // The device never held a Byline session; any it had is expired.
+    expect(cookies.some((cookie) => /^payload-token=;/.test(cookie))).toBe(true);
+    const token = tokenFrom(cookies);
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const state = await kiosk("get", "/byline/polls/kiosk", token);
+    expect(state.body).toMatchObject({ mode: "locked", session: { id: session, method: "Every fifth student" } });
+    // Interviewer controls need the PIN chosen with the code.
+    expect((await kiosk("post", "/byline/polls/kiosk/decline", token, { eventKey: key("pd1") })).status).toBe(423);
+    expect((await kiosk("post", "/byline/polls/kiosk/unlock", token, { pin: "4826" })).body.mode).toBe("interviewer");
+    // The code is spent: it is not a credential any more.
+    expect((await claim(code)).status).toBe(400);
+    const { rows } = await db().execute(sql`select pairing_code_hash from byline_poll_sessions where id = ${session}`);
+    expect(rows[0].pairing_code_hash).toBeNull();
+    // The paired device still reaches nothing in the newsroom.
+    for (const [method, path, params] of [["get", "/byline/polls", {}], ["get", "/byline/polls/surveys/:id/results", { id: ids.survey }], ["get", "/byline/polls/surveys/:id/export/responses", { id: ids.survey }], ["post", "/byline/polls/sessions/:session/pairing", { session }]] as const) {
+      expect((await call(method, path, null, { kiosk: token, params })).status, path).toBe(401);
+    }
+    await kiosk("post", "/byline/polls/kiosk/end", token);
+  });
+
+  it("refuses malformed, unknown, expired and replaced codes alike", async () => {
+    for (const bad of ["", "12345", "abcdef", 123456, null]) expect((await claim(bad)).status).toBe(400);
+    const session = await newSession();
+    const first = (await prepare(session)).body.code;
+    const second = (await prepare(session, {})).body.code; // keeps the pending PIN
+    if (first !== second) expect((await claim(first)).status).toBe(400);
+    await db().execute(sql`update byline_poll_sessions set pairing_expires_at = now() - interval '1 second' where id = ${session}`);
+    const expired = await claim(second);
+    expect(expired.status).toBe(400);
+    expect(expired.body.message).toBe("That code didn't work. Check it, or ask the interviewer for a new one.");
+    const fresh = (await prepare(session, { pin: "2580" })).body.code;
+    await call("post", "/byline/polls/sessions/:session/end", "interviewer", { params: { session } });
+    expect((await claim(fresh)).status).toBe(400);
+    await db().execute(sql`delete from byline_poll_pairing_limits`);
+  });
+
+  it("replaces a running device only when the interviewer says so", async () => {
+    const { token: running, sessionId } = await startKioskFor("interviewer", ids.survey);
+    const refused = await prepare(sessionId);
+    expect(refused.status).toBe(409);
+    expect(refused.body.data.deviceRunning).toBe(true);
+    const replacing = await prepare(sessionId, { pin: "4826", replaceDevice: true });
+    expect(replacing.body.replaces).toBe(true);
+    // Until the new device claims the code, the old one keeps working.
+    expect((await kiosk("get", "/byline/polls/kiosk", running)).status).toBe(200);
+    const paired = await claim(replacing.body.code);
+    expect(paired.status).toBe(200);
+    expect((await kiosk("get", "/byline/polls/kiosk", running)).status).toBe(401);
+    await kiosk("post", "/byline/polls/kiosk/end", tokenFrom(paired.headers.getSetCookie()));
+  });
+
+  it("throttles failed claims across the newsroom, without recording who tried", async () => {
+    const session = await newSession();
+    const { code } = (await prepare(session)).body;
+    for (let i = 0; i < 20; i++) await claim(String(100000 + i));
+    const { rows } = await db().execute(sql`select * from byline_poll_pairing_limits`);
+    expect(Object.keys(rows[0]).sort()).toEqual(["failures", "window_start"]);
+    const throttled = await claim(code);
+    expect(throttled.status).toBe(429);
+    expect(throttled.body.data.retryAfter).toBeGreaterThan(0);
+    await db().execute(sql`delete from byline_poll_pairing_limits`);
+    // The code survived the throttle and still works once.
+    expect((await claim(code)).status).toBe(200);
+    await call("post", "/byline/polls/sessions/:session/end", "interviewer", { params: { session } });
+  });
+
+  it("keeps the signed-in “Use this device” path", async () => {
+    const { token } = await startKioskFor("interviewer", ids.survey);
+    expect((await kiosk("get", "/byline/polls/kiosk", token)).body.mode).toBe("interviewer");
+    await kiosk("post", "/byline/polls/kiosk/end", token);
+  });
+});
+
 describe("results", () => {
   it("counts the response with each question's own base and exports safe CSV", async () => {
-    const results = (await call("get", "/byline/polls/surveys/:id/results", "analyst", { params: { id: ids.survey } })).body;
+    const plain = (await call("get", "/byline/polls/surveys/:id/results", "analyst", { params: { id: ids.survey } })).body;
+    expect(plain.results.breakdowns).toEqual([]);
+    expect(plain.compare.options.map((option: { name: string }) => option.name)).toContain("grade");
+    expect(plain.timeline).toEqual([expect.objectContaining({ kiosk: 1, public: 0 })]);
+    expect(plain.canCreateDataset).toBe(false);
+    const results = (await call("get", "/byline/polls/surveys/:id/results", "analyst", { params: { id: ids.survey }, query: { compare: "grade" } })).body;
+    expect(results.compare.selected).toBe("grade");
     expect(results.results.responses).toBe(1);
     const gender = results.results.questions.find((question: { name: string }) => question.name === "gender");
     expect(gender.base).toMatchObject({ answered: 0, unanswered: 1, notApplicable: 0 });
     const purpose = results.results.questions.find((question: { name: string }) => question.name === "ai_purpose");
     expect(purpose.base.answered).toBe(1);
     expect(results.fieldwork.total).toMatchObject({ declined: 1, completed: 1, abandoned: 1, reliable: false, declineRate: null });
-    // One grade group of one student is withheld.
+    // Comparing by something the poll didn't configure gives nothing.
+    expect((await call("get", "/byline/polls/surveys/:id/results", "analyst", { params: { id: ids.survey }, query: { compare: "anything_else" } })).body.results.breakdowns).toEqual([]);
+    // One grade group of one student is withheld, and the chart data carries no numbers for it.
     expect(results.results.breakdowns[0].groups.find((group: { name: string }) => group.name === "10")).toMatchObject({ suppressed: true, base: 0 });
     const csv = await call("get", "/byline/polls/surveys/:id/export/responses", "analyst", { params: { id: ids.survey } });
     expect(csv.headers.get("content-type")).toMatch(/text\/csv/);
@@ -280,6 +394,62 @@ describe("public links", () => {
     expect((await submit(key("p2"))).status).toBe(409);
     const { rows } = await db().execute(sql`select mode, session_id from byline_poll_responses where submission_id in (${key("p0")}, ${key("p1")})`);
     expect(rows).toEqual([{ mode: "public", session_id: null }]);
+  });
+
+  it("keeps to the link's window and hourly limit", async () => {
+    const detail = (await call("get", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey } })).body;
+    const linkKey = detail.survey.publicLinkSettings.key;
+    const later = new Date(Date.now() + 86_400_000).toISOString();
+    const earlier = new Date(Date.now() - 60_000).toISOString();
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { publicLink: { opensAt: later, accessCode: "" } } });
+    expect((await call("get", "/byline/polls/public/:key", null, { params: { key: linkKey } })).status).toBe(404);
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { publicLink: { opensAt: null, closesAt: earlier } } });
+    expect((await call("get", "/byline/polls/public/:key", null, { params: { key: linkKey } })).status).toBe(410);
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { publicLink: { closesAt: null, hourlyLimit: 10 } } });
+    const opened = await call("get", "/byline/polls/public/:key", null, { params: { key: linkKey } });
+    expect(opened.body.needsCode).toBe(false);
+    // Nothing about the newsroom or other respondents is in the public poll.
+    expect(Object.keys(opened.body).sort()).toEqual(["closesAt", "definition", "needsCode", "title"]);
+    await db().execute(sql`insert into byline_poll_public_starts (token_hash, survey_id, version_id, issued_at) select md5(random()::text) || md5(random()::text), ${ids.survey}, ${ids.version}, now() from generate_series(1, 10)`);
+    expect((await call("post", "/byline/polls/public/:key/start", null, { params: { key: linkKey }, data: {} })).status).toBe(429);
+    await db().execute(sql`delete from byline_poll_public_starts where used_at is null`);
+    // A new link retires the old one.
+    const renewed = await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { publicLink: { regenerateKey: true, hourlyLimit: 300 } } });
+    expect(renewed.body.survey.publicLinkSettings.key).not.toBe(linkKey);
+    expect((await call("get", "/byline/polls/public/:key", null, { params: { key: linkKey } })).status).toBe(404);
+  });
+});
+
+describe("results elsewhere", () => {
+  it("shows a poll on its linked Collection only to people who can see the poll", async () => {
+    const collection = await payload.create({ collection: "collections", data: { name: "AI at school", type: "ongoing" } as never, overrideAccess: true });
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { linkedCollection: collection.id } });
+    const forEditor = await call("get", "/byline/polls/linked", "editor", { query: { collection: String(collection.id) } });
+    expect(forEditor.body.polls).toEqual([expect.objectContaining({ id: ids.survey, status: "open", responses: expect.any(Number) })]);
+    // An interviewer sees it, but no response count; a stranger sees nothing.
+    expect((await call("get", "/byline/polls/linked", "interviewer", { query: { collection: String(collection.id) } })).body.polls).toEqual([expect.objectContaining({ id: ids.survey, responses: null })]);
+    expect((await call("get", "/byline/polls/linked", "stranger", { query: { collection: String(collection.id) } })).body.polls).toEqual([]);
+    expect((await call("get", "/byline/polls/linked", null, { query: { collection: String(collection.id) } })).status).toBe(401);
+  });
+
+  it("copies reviewed aggregates, never responses or written answers, into a private dataset", async () => {
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { minimumGroup: 3 } });
+    expect((await call("post", "/byline/polls/surveys/:id/dataset", "analyst", { params: { id: ids.survey } })).status).toBe(403);
+    const made = await call("post", "/byline/polls/surveys/:id/dataset", "editor", { params: { id: ids.survey }, query: { mode: "kiosk" } });
+    // Two kiosk responses are fewer than three: nothing to hand over.
+    expect(made.status).toBe(409);
+    const all = await call("post", "/byline/polls/surveys/:id/dataset", "editor", { params: { id: ids.survey } });
+    expect(all.status).toBe(200);
+    expect(all.body.rows).toBeGreaterThan(0);
+    const dataset = await payload.findByID({ collection: "data-datasets", id: all.body.datasetId, overrideAccess: true, depth: 0 }) as unknown as { release?: unknown; description: string };
+    expect(dataset.release ?? null).toBeNull();
+    expect(dataset.description).toContain("No individual or written answers");
+    const records = await payload.find({ collection: "data-records", where: { dataset: { equals: all.body.datasetId } }, overrideAccess: true, pagination: false, depth: 0 });
+    const text = JSON.stringify(records.docs.map((doc) => (doc as { values: unknown }).values));
+    expect(text).not.toContain("=cmd");
+    expect(text).not.toContain("anything_else");
+    expect(text).toContain("\"question_key\":\"grade\"");
+    await call("patch", "/byline/polls/surveys/:id", "editor", { params: { id: ids.survey }, data: { minimumGroup: 5, linkedCollection: null } });
   });
 });
 

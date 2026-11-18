@@ -2,7 +2,7 @@
 
 import type { ImportIssue } from "../../polls/engine/xlsform";
 import type { SurveyDefinition } from "../../polls/engine/types";
-import type { pollsOverview, surveyDetail, surveyResults } from "../../polls/server";
+import type { linkedPolls, pollsOverview, surveyDetail, surveyResults } from "../../polls/server";
 import { ApiError, getJson, patchJson, postJson } from "../story/api";
 
 /**
@@ -12,6 +12,7 @@ import { ApiError, getJson, patchJson, postJson } from "../story/api";
 export type PollsOverview = Awaited<ReturnType<typeof pollsOverview>>;
 export type SurveyDetail = Awaited<ReturnType<typeof surveyDetail>>;
 export type SurveyResultsView = Awaited<ReturnType<typeof surveyResults>>;
+export type LinkedPolls = Awaited<ReturnType<typeof linkedPolls>>;
 export type ImportPreview = { definition: SurveyDefinition; issues: ImportIssue[]; source: { filename: string; sha256: string; bytes: number } };
 
 export const pollKeys = {
@@ -19,7 +20,8 @@ export const pollKeys = {
   overview: () => [...pollKeys.all, "overview"] as const,
   survey: (id: number) => [...pollKeys.all, "survey", id] as const,
   results: (id: number, filters: string) => [...pollKeys.all, "results", id, filters] as const,
-  people: () => [...pollKeys.all, "people"] as const
+  people: () => [...pollKeys.all, "people"] as const,
+  linked: (kind: "story" | "collection", id: number) => [...pollKeys.all, "linked", kind, id] as const
 };
 
 export const fetchOverview = (api: string) => getJson<PollsOverview>(api, "/byline/polls");
@@ -35,6 +37,12 @@ export const saveLocation = (api: string, id: number | null, body: { name?: stri
 export const createSession = (api: string, body: { surveyId: number; locationId?: number | null; locationName?: string; period?: string; method?: string }) => postJson<{ id: string }>(api, "/byline/polls/sessions", body);
 export const endSession = (api: string, id: string) => postJson<{ ended: true }>(api, `/byline/polls/sessions/${id}/end`, {});
 export const startKiosk = (api: string, id: string, pin: string) => postJson<{ kiosk: string }>(api, `/byline/polls/sessions/${id}/kiosk`, { pin });
+export type PairingCode = { code: string; expiresAt: string; replaces: boolean };
+/** A single-use six-digit code for a device to type at /poll, lasting up to two days. `pin` may be left out to keep the PIN of a code still pending. */
+export const preparePairing = (api: string, id: string, body: { pin?: string; replaceDevice?: boolean; expiresInMinutes?: number }) => postJson<PairingCode>(api, `/byline/polls/sessions/${id}/pairing`, body);
+export const cancelPairing = (api: string, id: string) => postJson<{ cancelled: true }>(api, `/byline/polls/sessions/${id}/pairing/cancel`, {});
+export const createResultsDataset = (api: string, id: number, filters: string) => postJson<{ datasetId: number; rows: number; withheld: number }>(api, `/byline/polls/surveys/${id}/dataset${filters ? `?${filters}` : ""}`, {});
+export const fetchLinkedPolls = (api: string, kind: "story" | "collection", id: number) => getJson<LinkedPolls>(api, `/byline/polls/linked?${kind}=${id}`);
 
 /** Uploads a workbook for validation. Nothing is saved. */
 export async function uploadWorkbook(api: string, file: File): Promise<ImportPreview> {

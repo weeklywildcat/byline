@@ -1,5 +1,6 @@
 import config from "@payload-config";
 import { getPayload } from "payload";
+import { PAIR_PATH } from "../../../../polls/links";
 import { KioskApp } from "../../../../ui/polls/kiosk/KioskApp";
 
 /**
@@ -11,6 +12,5 @@ export const metadata = { title: "Wildcat Polls" };
 
 export default async function KioskPage() {
   const payload = await getPayload({ config });
-  const { routes, admin } = payload.config;
-  return <KioskApp api={routes.api} loginHref={`${routes.admin}${admin.routes.login}?redirect=${encodeURIComponent(`${routes.admin}/polls?view=fieldwork`)}`} />;
+  return <KioskApp api={payload.config.routes.api} pairHref={PAIR_PATH} />;
 }
