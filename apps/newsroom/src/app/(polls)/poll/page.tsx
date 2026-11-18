@@ -1,6 +1,7 @@
 import config from "@payload-config";
 import { getPayload } from "payload";
 import { PairingApp } from "../../../ui/polls/kiosk/PairingApp";
+import { deviceSetupSignInPath } from "../../../polls/links";
 
 /**
  * `/poll`: the neutral setup entry for a polling device.
@@ -16,7 +17,5 @@ export const metadata = { title: "Wildcat Polls" };
 export default async function PairPage() {
   const payload = await getPayload({ config });
   const { routes, admin } = payload.config;
-  const returnTo = `${routes.admin}/polls?view=fieldwork&setupDevice=1`;
-  const signInHref = `${routes.admin}${admin.routes.login}?${new URLSearchParams({ redirect: returnTo })}`;
-  return <PairingApp api={routes.api} signInHref={signInHref} />;
+  return <PairingApp api={routes.api} signInHref={deviceSetupSignInPath(routes.admin, admin.routes.login)} />;
 }
