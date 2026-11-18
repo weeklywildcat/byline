@@ -270,7 +270,7 @@ describe("projects and the public snapshot", () => {
     expect(published.body.publication).toBe("published");
     expect(await readCurrentRevision(payload)).toBeGreaterThan(before);
     const snap = await snapshot();
-    expect(snap.schemaVersion).toBe(3);
+    expect(snap.schemaVersion).toBe(4);
     const current = (await detail()).release;
     expect(snap.data.projects).toHaveLength(1);
     expect(snap.data.projects[0]).toMatchObject({ slug: "main-street-sidewalk", href: "/data/main-street-sidewalk/", presentation: { kind: "custom", key: "fixture-sidewalk-project" }, source: "City engineering department." });

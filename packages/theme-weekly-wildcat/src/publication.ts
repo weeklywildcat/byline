@@ -11,7 +11,7 @@ import type { BylinePublicationConfig } from "@byline/core";
  * configuration; it is never an editorial field.
  */
 export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   revision: 0,
   identity: {
     name: "Weekly Wildcat",
@@ -89,5 +89,7 @@ export const WEEKLY_WILDCAT_PUBLICATION: BylinePublicationConfig = {
     defaultTitle: "Weekly Wildcat",
     defaultDescription: "Student journalism from the Weekly Wildcat newsroom in Ninety Six, South Carolina.",
     organizationType: "NewsMediaOrganization"
-  }
+  },
+  // Measurement is a newsroom decision (Site → Analytics); nothing is installed until one is published.
+  analytics: null
 };

@@ -230,7 +230,7 @@ describe("a project that published Stories depend on", () => {
     await payload.update({ collection: "data-projects", id: ids.changed, draft: false, data: { _status: "draft" } as never, overrideAccess: true });
     await expect(snapshot()).rejects.toThrow(/Data Project|cannot be projected/);
     await payload.update({ collection: "data-projects", id: ids.changed, draft: false, data: { _status: "published" } as never, overrideAccess: true });
-    await expect(snapshot()).resolves.toMatchObject({ schemaVersion: 3 });
+    await expect(snapshot()).resolves.toMatchObject({ schemaVersion: 4 });
   });
 
   it("can be unpublished and deleted once no published Story shows it, and draft Stories do not count", async () => {

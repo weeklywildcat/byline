@@ -5,10 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@byline/newsroom-ui/ui
 import { useSearchParams } from "next/navigation";
 import { useNewsroomRoutes } from "../shell/account";
 import { useShellNavigation } from "../shell/navigation";
+import { AnalyticsSettings } from "./AnalyticsSettings";
 import { PublicationSettingsPanel } from "./PublicationSettings";
 import { SiteRecords } from "./SiteRecords";
 
-const tabs = ["Publication", "Pages", "Sections", "Topics", "Redirects"] as const;
+const tabs = ["Publication", "Analytics", "Pages", "Sections", "Topics", "Redirects"] as const;
 export function SiteWorkspace() {
   const { admin } = useNewsroomRoutes();
   const params = useSearchParams();
@@ -20,6 +21,7 @@ export function SiteWorkspace() {
       <Tabs value={tab} onValueChange={(value) => runGuarded(() => window.history.pushState(null, "", `${admin}/site?tab=${value}`))}>
         <TabsList className="h-auto max-w-full flex-wrap justify-start">{tabs.map((label) => <TabsTrigger key={label} value={label.toLowerCase()}>{label}</TabsTrigger>)}</TabsList>
         <TabsContent value="publication" className="pt-3"><PublicationSettingsPanel /></TabsContent>
+        <TabsContent value="analytics" className="pt-3"><AnalyticsSettings /></TabsContent>
         {(["pages", "sections", "topics", "redirects"] as const).map((group) => <TabsContent key={group} value={group} className="pt-3"><SiteRecords group={group} /></TabsContent>)}
       </Tabs>
     </main>

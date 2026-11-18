@@ -12,7 +12,11 @@ export const FORBIDDEN_SNAPSHOT_KEYS = new Set([
   "brief", "resources", "createdBy", "uploadedBy", "linkedPerson", "accounts", "googleSubject", "discordUserId",
   "sessions", "hash", "salt", "resetPasswordToken", "publicationAssets", "sourceHash", "failureMessage", "legacySource",
   "plan", "workflow", "deadline", "editor", "members", "lead", "interviews", "tasks", "phone",
-  "folder", "previewSrc", "sourceNotes", "storagePath", "originalUrl", "previewUrl", "lexical", "blockType", "blockName", "root", "editorialNotes", "assignedEditor", "appointments", "sources", "storyPlan", "voterKey", "buildToken", "accountPreferences"
+  "folder", "previewSrc", "sourceNotes", "storagePath", "originalUrl", "previewUrl", "lexical", "blockType", "blockName", "root", "editorialNotes", "assignedEditor", "appointments", "sources", "storyPlan", "voterKey", "buildToken", "accountPreferences",
+  // The private Google Analytics connection (docs/google-analytics.md): only `publication.analytics`' Measurement ID and tag behavior are public.
+  "encryptedRefreshToken", "refreshToken", "accessToken", "grantedScopes", "googleAccountEmail", "accountResource", "accountDisplayName",
+  "propertyResource", "propertyDisplayName", "propertyTimeZone", "propertyId", "streamResource", "streamDisplayName", "streamDefaultUri",
+  "trackingMode", "connectedBy", "connectedAt", "lastVerifiedAt", "lastSuccessfulRequestAt", "lastErrorCode"
 ]);
 
 const FORBIDDEN_TEXT = ["/api/media/file/", "/api/byline/", "/admin/collections/", "/preview/story"];
@@ -37,10 +41,14 @@ export function assertPublicSafe(snapshot: unknown, json: string, env: Record<st
   if (token && token.length >= 16) needles.push(token);
   const deployHook = env.BYLINE_DEPLOY_HOOK_URL?.trim();
   if (deployHook) needles.push(deployHook);
+  // Integration secrets: the encryption key and the Google OAuth client secret never belong in a snapshot.
+  const integration = [env.BYLINE_INTEGRATIONS_SECRET?.trim(), env.BYLINE_GOOGLE_CLIENT_SECRET?.trim()].filter((value): value is string => Boolean(value && value.length >= 16));
+  needles.push(...integration);
   for (const needle of needles) {
     if (!needle || !json.includes(needle)) continue;
     if (needle === token) fail("the build credential");
     if (needle === deployHook) fail("the deploy-hook credential");
+    if (integration.includes(needle)) fail("an integration secret");
     fail(`a private reference (${needle.startsWith("/") && needle.length > 30 ? "a newsroom storage path" : needle})`);
   }
 }

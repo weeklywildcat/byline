@@ -36,6 +36,8 @@
     "seed:people:browser": "node --import tsx scripts/seed-people-browser.ts",
     "test:people:browser": "playwright test --config playwright.people.config.ts",
     "seed:polls:browser": "node --import tsx scripts/seed-polls-browser.ts",
+    "seed:analytics:browser": "node --import tsx scripts/seed-analytics-browser.ts",
+    "test:analytics:browser": "playwright test --config playwright.analytics.config.ts",
     "test:polls:browser": "playwright test --config playwright.polls.config.ts",
     "publication:deploy:now": "payload run scripts/publication-snapshot.ts deploy"
   },

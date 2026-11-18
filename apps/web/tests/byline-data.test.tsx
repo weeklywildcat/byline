@@ -33,7 +33,7 @@ describe("Snapshot v3", () => {
   it("accepts v3 with Data and reads v2 as having none", () => {
     expect(validatePublicBuildSnapshot(snapshot(3, section), { dataPresentation: presentation }).data.projects).toHaveLength(3);
     expect(validatePublicBuildSnapshot(snapshot(2)).data).toEqual({ projects: [], releases: [] });
-    expect(() => validatePublicBuildSnapshot({ ...snapshot(3, section), schemaVersion: 4 })).toThrow(/unsupported schemaVersion/);
+    expect(() => validatePublicBuildSnapshot({ ...snapshot(3, section), schemaVersion: 5 })).toThrow(/unsupported schemaVersion/);
   });
 
   it("fails closed on an unknown presentation, a missing release, a private field and a duplicate route", () => {
@@ -59,8 +59,10 @@ describe("Snapshot v3", () => {
         : new Response(bytes);
     }) as typeof globalThis.fetch;
     const acquired = await acquirePayloadSnapshot({ baseUrl: "https://newsroom.example/api/byline/build", token: "t".repeat(40), fetch });
-    expect(acquired.snapshot.schemaVersion).toBe(3);
-    expect(seen).toEqual(["2,3", "2,3"]);
+    // A v3 artifact is accepted and read as the current (v4) contract: it simply measures nothing.
+    expect(acquired.snapshot.schemaVersion).toBe(4);
+    expect(acquired.snapshot.publication.analytics).toBeNull();
+    expect(seen).toEqual(["2,3,4", "2,3,4"]);
   });
 });
 

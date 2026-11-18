@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, HeartPulse, House, Images, KanbanSquare, Layers, MessageSquareText, Newspaper, Send, Sheet, Users, Vote, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChartColumn, FileText, HeartPulse, House, Images, KanbanSquare, Layers, MessageSquareText, Newspaper, Send, Sheet, Users, Vote, type LucideIcon } from "lucide-react";
 import type { ShellUser } from "./NavUser";
 
 export type ShellNavLink = { key: string; label: string; path: string; href: string; exact?: boolean; group?: "publish" };
@@ -28,5 +28,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   feedback: MessageSquareText,
   "front-page": Newspaper,
   distribution: Send,
-  "content-health": HeartPulse
+  "content-health": HeartPulse,
+  analytics: ChartColumn
 };

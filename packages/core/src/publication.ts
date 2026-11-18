@@ -1,4 +1,29 @@
-export const BYLINE_PUBLICATION_SCHEMA_VERSION = 1 as const;
+/**
+ * Version 2 adds `analytics` (the public Google tag's non-secret behavior). Version 1
+ * documents (older snapshots, `BYLINE_PUBLICATION_JSON`) still normalize, as `analytics: null`.
+ */
+export const BYLINE_PUBLICATION_SCHEMA_VERSION = 2 as const;
+export const BYLINE_PUBLICATION_SCHEMA_VERSION_V1 = 1 as const;
+
+/** How Byline-managed measurement treats the reader: an external tag owner decides, or Byline always collects, or asks first. */
+export const ANALYTICS_CONSENT_MODES = ["external", "always", "ask"] as const;
+export type BylineAnalyticsConsentMode = (typeof ANALYTICS_CONSENT_MODES)[number];
+
+/**
+ * The only Analytics facts that are public: which Google tag to load and how.
+ * Never a property or account ID, a credential, the connected Google identity,
+ * granted scopes, an error or a timestamp (those stay in the private
+ * integration and never enter a snapshot).
+ */
+export type BylinePublicationAnalytics = {
+  provider: "google";
+  measurementId: string;
+  installTag: boolean;
+  consentMode: BylineAnalyticsConsentMode;
+};
+
+/** A GA4 web stream's Measurement ID. */
+export const GOOGLE_MEASUREMENT_ID = /^G-[A-Z0-9]{4,20}$/;
 
 export type BylinePublicationAsset = {
   url: string;
@@ -69,7 +94,31 @@ export type BylinePublicationConfig = {
     defaultDescription: string;
     organizationType: "Organization" | "NewsMediaOrganization";
   };
+  /** Public measurement, or `null` when Byline publishes none (tracking is absent or owned elsewhere). */
+  analytics: BylinePublicationAnalytics | null;
 };
+
+/** The publication contract as snapshots v2 and v3 carried it: no `analytics`. */
+export type BylinePublicationConfigV1 = Omit<BylinePublicationConfig, "schemaVersion" | "analytics"> & {
+  schemaVersion: typeof BYLINE_PUBLICATION_SCHEMA_VERSION_V1;
+};
+
+/**
+ * Normalizes public Analytics. Anything that cannot load a real tag is `null`:
+ * `installTag: false` means an outside owner measures the site, so Byline
+ * publishes nothing, not even the Measurement ID.
+ */
+export function normalizePublicationAnalytics(value: unknown): BylinePublicationAnalytics | null {
+  const candidate = record(value);
+  if (candidate.provider !== "google" || typeof candidate.measurementId !== "string" || !GOOGLE_MEASUREMENT_ID.test(candidate.measurementId) || candidate.installTag !== true) return null;
+  const consentMode = candidate.consentMode === "always" || candidate.consentMode === "ask" ? candidate.consentMode : "ask";
+  return { provider: "google", measurementId: candidate.measurementId, installTag: true, consentMode };
+}
+
+/** Upgrades a version 1 publication to the current contract. It simply measures nothing. */
+export function upgradePublicationConfigV1(config: BylinePublicationConfigV1): BylinePublicationConfig {
+  return { ...config, schemaVersion: BYLINE_PUBLICATION_SCHEMA_VERSION, analytics: null };
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -134,7 +183,7 @@ function asset(value: unknown, fallback: BylinePublicationAsset): BylinePublicat
 
 export function normalizePublicationConfig(value: unknown, fallback: BylinePublicationConfig): BylinePublicationConfig {
   const candidate = record(value);
-  if (candidate.schemaVersion !== BYLINE_PUBLICATION_SCHEMA_VERSION) return fallback;
+  if (candidate.schemaVersion !== BYLINE_PUBLICATION_SCHEMA_VERSION && candidate.schemaVersion !== BYLINE_PUBLICATION_SCHEMA_VERSION_V1) return fallback;
 
   const identity = record(candidate.identity);
   const location = record(candidate.location);
@@ -239,7 +288,8 @@ export function normalizePublicationConfig(value: unknown, fallback: BylinePubli
       defaultTitle: text(seo.defaultTitle, fallback.seo.defaultTitle),
       defaultDescription: text(seo.defaultDescription, fallback.seo.defaultDescription),
       organizationType: seo.organizationType === "NewsMediaOrganization" ? "NewsMediaOrganization" : "Organization"
-    }
+    },
+    analytics: candidate.schemaVersion === BYLINE_PUBLICATION_SCHEMA_VERSION ? normalizePublicationAnalytics(candidate.analytics) : null
   };
 }
 

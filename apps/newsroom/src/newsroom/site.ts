@@ -1,7 +1,7 @@
 import { APIError, commitTransaction, initTransaction, killTransaction, type Field } from "payload";
 import { atLeast } from "../access/user";
 import { isSlug, slugify } from "../domain/slug";
-import { PUBLICATION_GLOBAL, Publication } from "../globals/Publication";
+import { ANALYTICS_GROUP, PUBLICATION_GLOBAL, Publication } from "../globals/Publication";
 import { lockPublicPaths, readPublicPaths } from "../public/url-changes";
 import type { ScreenContext } from "./screen-models";
 
@@ -32,7 +32,8 @@ function describe(fields: Field[]): SettingField[] {
   });
 }
 
-const fields = describe(Publication.fields);
+// Analytics is configured in Site → Analytics (its own endpoints), never as a raw field here.
+const fields = describe(Publication.fields).filter((field) => field.name !== ANALYTICS_GROUP);
 function clean(fields: SettingField[], data: unknown): Record<string, unknown> {
   if (!data || typeof data !== "object" || Array.isArray(data)) return {};
   const row = data as Record<string, unknown>;

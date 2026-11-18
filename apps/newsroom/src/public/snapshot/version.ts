@@ -4,7 +4,8 @@ export { PUBLIC_SNAPSHOT_SCHEMA_VERSION };
 /** Projection semantics, independent of the schema, content revision and Media recipe. */
 // 3: adds the optional `frontPage` placements (docs/front-page.md).
 // 4: Snapshot v3 with Byline Data (published Data Projects and their release descriptors).
-export const PUBLIC_SNAPSHOT_PRODUCER_VERSION = 4;
+// 5: Snapshot v4: `publication.analytics` (public Google tag behavior, docs/google-analytics.md).
+export const PUBLIC_SNAPSHOT_PRODUCER_VERSION = 5;
 
 /** The immutable artifact's name: content-addressed by the exact stored bytes. */
 export function snapshotFilename(revision: number, sha256: string): string {

@@ -23,6 +23,7 @@ import { useLeaveGuard } from "../shell/navigation";
 import { setStoryCrumb } from "../shell/story-crumb";
 import { useSettleAutosave, useStoryField } from "./form";
 import { HistoryTab } from "./HistoryTab";
+import { PerformanceView } from "./PerformanceView";
 import { PlanWorkspace } from "./PlanWorkspace";
 import { StoryNotes } from "./StoryNotes";
 import { FocusedHeader, StoryHeader } from "./StoryHeader";
@@ -89,7 +90,13 @@ export const StoryScreen: CollapsibleFieldClientComponent = ({ field, parentPath
   const quoteInserter = useRef<QuoteInserter | null>(null);
   const [location, setLocation] = useState<StoryLocation>(() => parseStoryLocation(typeof window === "undefined" ? "" : window.location.search));
 
-  // The address is the place: Back/Forward move between workspaces and focused views.
+  // The address is the place. A client-side navigation into a Story (a link from Analytics, Home or search) mounts this
+  // screen before the browser's address has moved, so read it again once it has: `?view=performance` must open Performance.
+  useEffect(() => {
+    const current = parseStoryLocation(window.location.search);
+    setLocation((previous) => (JSON.stringify(previous) === JSON.stringify(current) ? previous : current));
+  }, []);
+  // Back/Forward move between workspaces and focused views.
   useEffect(() => {
     const onPop = () => setLocation(parseStoryLocation(window.location.search));
     window.addEventListener("popstate", onPop);
@@ -191,8 +198,11 @@ function StoryFrame({ context, location, go, storyId, children }: { context: Sto
   const workspaceData = useOptionalWorkspace();
   const headline = useStoryField<string>("headline");
   const fallback = useDefaultWorkspace(storyId);
-  const workspace: StoryWorkspace = location.workspace ?? fallback.workspace;
   const mode = location.mode;
+  // A focused view's way back is the workspace the reader came from, not merely the Story's default.
+  const cameFrom = useRef<StoryWorkspace | null>(null);
+  const workspace: StoryWorkspace = location.workspace ?? (mode ? cameFrom.current : null) ?? fallback.workspace;
+  if (!mode) cameFrom.current = workspace;
   const [referenceOpen, setReferenceOpen] = useState(false);
   const referenceTrigger = useRef<HTMLButtonElement | null>(null);
 
@@ -222,7 +232,7 @@ function StoryFrame({ context, location, go, storyId, children }: { context: Sto
 
   // The app header's breadcrumb: Stories › this Story's headline, and a focused view's name after it.
   const crumbTitle = headline.value ?? "";
-  const crumbMode = mode ? { review: "Review", history: "History", transcript: "Transcript" }[mode] : null;
+  const crumbMode = mode ? { review: "Review", history: "History", performance: "Performance", transcript: "Transcript" }[mode] : null;
   useEffect(() => {
     setStoryCrumb({ id: storyId, title: crumbTitle, mode: crumbMode, openStory: crumbMode ? () => go({ workspace }) : null });
   }, [storyId, crumbTitle, crumbMode, go, workspace]);
@@ -326,6 +336,12 @@ function StoryFrame({ context, location, go, storyId, children }: { context: Sto
               <ActivitySection />
             </div>
           </WorkspaceGate>
+        </div>
+      ) : null}
+      {mode === "performance" ? (
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 md:px-8" data-story-mode="performance">
+          <FocusedHeader title="Performance" backLabel={`Back to ${WORKSPACE_LABELS[workspace]}`} storyTitle={headline.value ?? ""} onBack={backToWorkspace} />
+          <PerformanceView storyId={storyId} />
         </div>
       ) : null}
       {mode === "review" ? (

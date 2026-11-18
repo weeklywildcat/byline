@@ -2,13 +2,13 @@ import { FIXED_PUBLIC_CONTENT_ROUTES, isCodeOwnedPublicPath } from "./routing";
 import { isCanonicalRedirectPath } from "./redirect-path";
 import { z } from "zod";
 import { mediaCredit, mediaKindOf, safeWebUrl, validateArticleBody, type ArticleBody, type PublicEventReference } from "@byline/article-body";
-import { youTubeEmbedUrl, type BylinePublicationConfig, type PrimaryVideo } from "@byline/core";
+import { youTubeEmbedUrl, type BylinePublicationConfigV1, type PrimaryVideo } from "@byline/core";
 import { largestNaturalImage, publicationManifestBlobs, validatePublicationMediaManifest, type PublicationMediaManifest } from "./publication-media";
 import { stableSerialize } from "./digests";
 import { publicStoryPath } from "./publication-dates";
 import { escapeHtml, type PublicStory, type PublicTerm } from "./story";
 
-/** Snapshot v2's wire version. The current producer writes v3 (`public-snapshot-v3.ts`); builds still accept v2. */
+/** Snapshot v2's wire version. The current producer writes v4 (`public-snapshot-v4.ts`); builds still accept v2. */
 export const PUBLIC_SNAPSHOT_V2_SCHEMA_VERSION = 2 as const;
 
 const text = z.string();
@@ -121,7 +121,7 @@ export type PublicMediaSnapshot = z.infer<typeof media>;
 export type PublicCorrectionSnapshot = z.infer<typeof datasets.shape.corrections>[number];
 export type PublicCollectionSnapshot = z.infer<typeof collection>;
 export type PublicBuildSnapshotV2 = Omit<z.infer<typeof publicBuildSnapshotV2Schema>, "publication" | "datasets"> & {
-  publication: BylinePublicationConfig;
+  publication: BylinePublicationConfigV1;
   datasets: Omit<z.infer<typeof datasets>, "stories"> & { stories: PublicStorySnapshot[] };
 };
 
@@ -132,7 +132,7 @@ const same = (left: unknown, right: unknown) => stableSerialize(left) === stable
 
 export type SnapshotRegistryOptions = { interactive?: (key: string) => boolean; tracker?: (key: string) => boolean };
 
-/** Snapshot v2 and v3 share these sections; v3 only adds `data`. */
+/** Snapshots v2, v3 and v4 share these sections. `publication` is the version 1 contract; v4 extends it with `analytics`. */
 export const snapshotSchemaParts = { publication, datasets, frontPage, instant, count } as const;
 
 /**
@@ -166,7 +166,12 @@ export function validatePublicBuildSnapshotV2(input: unknown, options: SnapshotR
  * relationships, bodies, Media, Front Page). `beforeRedirects` lets a newer
  * version claim its own routes before redirect targets are checked.
  */
-export function validateSnapshotFacts(snapshot: Omit<PublicBuildSnapshotV2, "schemaVersion">, options: SnapshotRegistryOptions = {}, hooks: { beforeRedirects?: (claim: (path: string) => void, stories: ReadonlySet<number>) => void; dataProjects?: ReadonlySet<number> } = {}): void {
+/** What every version's publication must offer the shared invariants. */
+export type SnapshotFactsInput = Omit<PublicBuildSnapshotV2, "schemaVersion" | "publication"> & {
+  publication: Pick<BylinePublicationConfigV1, "revision" | "locale" | "timezone" | "urls">;
+};
+
+export function validateSnapshotFacts(snapshot: SnapshotFactsInput, options: SnapshotRegistryOptions = {}, hooks: { beforeRedirects?: (claim: (path: string) => void, stories: ReadonlySet<number>) => void; dataProjects?: ReadonlySet<number> } = {}): void {
   const { publication, datasets: data } = snapshot;
   requireFact(publication.revision === snapshot.revision, "publication revision differs");
   try {

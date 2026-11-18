@@ -55,8 +55,9 @@ export function assertBylineProtocolCompatibility(value: unknown): BylineProtoco
   if (manifest.protocolVersion !== BYLINE_PROTOCOL_VERSION) {
     mismatches.push(`protocol ${manifest.protocolVersion} (frontend supports ${BYLINE_PROTOCOL_VERSION})`);
   }
-  if (manifest.publicationSchemaVersion !== 1) {
-    mismatches.push(`publication schema ${manifest.publicationSchemaVersion} (frontend supports 1)`);
+  // Version 2 adds `analytics`; a version 1 export is still a compatible publication.
+  if (manifest.publicationSchemaVersion !== 1 && manifest.publicationSchemaVersion !== 2) {
+    mismatches.push(`publication schema ${manifest.publicationSchemaVersion} (frontend supports 1 and 2)`);
   }
   if (manifest.designSchemaVersion !== BYLINE_DESIGN_SCHEMA_VERSION) {
     mismatches.push(

@@ -1,6 +1,6 @@
 # The Story screen
 
-A Story has two workspaces, **Plan** and **Write**, as tabs under the Story header. Plan is where a story is prepared, reported and coordinated; Write is the article. They are places to work, not lifecycle stages: moving between them never submits, publishes or changes the Story's stage. Review, History and a Transcript are focused views with a way back, never tabs.
+A Story has two workspaces, **Plan** and **Write**, as tabs under the Story header. Plan is where a story is prepared, reported and coordinated; Write is the article. They are places to work, not lifecycle stages: moving between them never submits, publishes or changes the Story's stage. Review, History, Performance and a Transcript are focused views with a way back, never tabs.
 
 Code: `apps/newsroom/src/ui/story/` (`StoryScreen`, `StoryHeader`, `PlanWorkspace`, `WriteTab`, `story-view.ts`), `apps/newsroom/src/ui/reporting/` (the Reporting notebook, `ReportingReference`) and `packages/newsroom-screens/src/story-context/` (`StoryPlan`, `StoryContext`).
 
@@ -68,9 +68,10 @@ When the Story container is at least 1180px wide, **Story context** sits beside 
 | --- | --- | --- |
 | Review | the header's Review action or status link, a notification | Back to story (a decision also returns) |
 | History | overflow menu → View history | Back to Plan / Back to Write |
+| Performance | overflow menu → Performance (`?view=performance`) | Back to the workspace you came from |
 | Transcript | Plan's Reporting, Reporting reference | Back to Plan |
 
-History holds versions and restore, the Front Page, Distribution and corrections, the Story's notes and its full activity. The article stays mounted underneath all of them.
+Performance is a published Story's audience from Google Analytics ([docs/google-analytics.md](google-analytics.md)): readers right now, views and readers over time, how readers found it, referrers, devices and, when Byline measures reading progress, how far they read. Whoever can open the Story can see it; the publication-wide Analytics desk is separate (editors). An unpublished Story says Performance starts after it is published. History holds versions and restore, the Front Page, Distribution and corrections, the Story's notes and its full activity. The article stays mounted underneath all of them.
 
 ## Story details
 

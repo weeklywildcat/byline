@@ -6,10 +6,12 @@ const baseURL = "http://127.0.0.1:" + port;
 
 // Story-embed specs need the offline-snapshot fixture build (`npm run build:data-embed-fixture`), not the browser fixture.
 const dataEmbedBuild = process.env.BYLINE_BROWSER_FIXTURE === "data-embed";
+// Google Analytics specs need the fixture built with Byline-managed measurement (`npm run build:analytics-fixture`).
+const analyticsBuild = process.env.BYLINE_BROWSER_FIXTURE === "analytics";
 
 export default defineConfig({
   testDir: path.resolve(__dirname, "tests/browser"),
-  ...(dataEmbedBuild ? { testMatch: /data-embeds\.spec\.ts$/ } : { testIgnore: /data-embeds\.spec\.ts$/ }),
+  ...(dataEmbedBuild ? { testMatch: /data-embeds\.spec\.ts$/ } : analyticsBuild ? { testMatch: /analytics\.spec\.ts$/ } : { testIgnore: [/data-embeds\.spec\.ts$/, /analytics\.spec\.ts$/] }),
   timeout: 45_000,
   expect: { timeout: 10_000 },
   forbidOnly: Boolean(process.env.CI),

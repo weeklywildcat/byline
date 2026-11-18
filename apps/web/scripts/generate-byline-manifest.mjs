@@ -29,7 +29,7 @@ if (snapshotBacked && process.env.BYLINE_PUBLICATION_REVISION !== undefined && p
 const manifest = {
   protocolVersion: 1,
   frontendVersion: String(packageJson.version || "0.0.0"),
-  publicationSchemaVersion: 1,
+  publicationSchemaVersion: builtPublication?.schemaVersion === 1 ? 1 : 2,
   generatedAt: new Date().toISOString(),
   contentSource,
   publicationRevision: positiveInteger(process.env.BYLINE_PUBLICATION_REVISION ?? builtPublication.revision),

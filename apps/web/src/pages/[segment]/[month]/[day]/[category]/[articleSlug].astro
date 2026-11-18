@@ -87,7 +87,7 @@ const slots = {
   newsletter: React.createElement("div", { id: "article-newsletter-island-slot" })
 };
 ---
-<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo={chrome === "standard"} hideMastheadDate chrome={chrome} chromeLogo={getStoryLogoAlign(presentation)} masthead={masthead}>
+<BaseLayout metadata={metadata} themeColor="#fbfaf7" stickyLogo={chrome === "standard"} hideMastheadDate chrome={chrome} chromeLogo={getStoryLogoAlign(presentation)} masthead={masthead} analyticsContent={story && section ? { type: "story", id: story.id, group: section.slug } : null}>
   <script id="newsarticle-json-ld" type="application/ld+json" set:html={serializeJsonLd(story ? nativeArticleJsonLd(story, !visualStory) : getArticleJsonLd(post!, { articleBody: !visualStory }))}></script>
   <script id="article-breadcrumb-json-ld" type="application/ld+json" set:html={serializeJsonLd(getBreadcrumbSchema([
     { name: "Home", path: "/" },

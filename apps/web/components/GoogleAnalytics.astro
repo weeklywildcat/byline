@@ -1,0 +1,17 @@
+---
+import { getPublicationConfig } from "@/lib/publication";
+import { analyticsRuntimeConfig, type AnalyticsContent } from "@/lib/analytics";
+
+interface Props {
+  /** The Story this page is, when it is one. Non-Story pages carry none. */
+  content?: AnalyticsContent | null;
+}
+const { content = null } = Astro.props;
+const config = analyticsRuntimeConfig(getPublicationConfig(), content);
+---
+{/* Injects nothing at all unless Byline owns the tag: an existing Google tag or tag manager never doubles. */}
+{config && <script type="application/json" id="byline-analytics-config" set:html={JSON.stringify(config).replace(/</g, "\\u003c")}></script>}
+{config && <script>
+  import { startAnalytics } from "@/lib/analytics-client";
+  startAnalytics();
+</script>}

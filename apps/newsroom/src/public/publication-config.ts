@@ -13,6 +13,11 @@ const asset = (value: unknown) => {
   return { url: String(item.url ?? ""), alt: typeof item.alt === "string" ? item.alt : "", width: dimension(item.width), height: dimension(item.height) };
 };
 
+/** The Global's analytics group as the public contract: only a Byline-installed tag has any public form. */
+function publishedAnalytics(group: Row) {
+  return { provider: "google", measurementId: group.measurementId, installTag: group.installTag === true, consentMode: group.consentMode };
+}
+
 /**
  * The published Publication Global as `BylinePublicationConfig`, through the
  * shared normalizer (so anything unexpected falls back field by field to the
@@ -24,7 +29,7 @@ export function publicationConfigFromGlobal(row: Row | null | undefined, revisio
   const published = row && row._status === "published" ? row : null;
   const candidate = published
     ? {
-        schemaVersion: 1,
+        schemaVersion: 2,
         revision,
         identity: record(published.identity),
         location: record(published.location),
@@ -50,7 +55,8 @@ export function publicationConfigFromGlobal(row: Row | null | undefined, revisio
         social: list(published.social).map((item) => ({ service: item.service, label: item.label, url: item.url })),
         features: Object.fromEntries(FEATURE_SWITCHES.map((name) => [name, record(published.features)[name] === true])),
         licensing: record(published.licensing),
-        seo: record(published.seo)
+        seo: record(published.seo),
+        analytics: publishedAnalytics(record(published.analytics))
       }
     : { ...WEEKLY_WILDCAT_PUBLICATION, revision };
   const config = normalizePublicationConfig(candidate, { ...WEEKLY_WILDCAT_PUBLICATION, revision });

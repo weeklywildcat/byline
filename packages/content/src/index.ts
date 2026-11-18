@@ -150,3 +150,4 @@ export * from "./versions";
 export * from "./story";
 export * from "./public-snapshot-v2";
 export * from "./public-snapshot-v3";
+export * from "./public-snapshot-v4";

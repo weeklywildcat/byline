@@ -28,17 +28,27 @@ export async function verifyExportBoundary(root) {
   }
 
   const manifest = JSON.parse(await readFile(path.join(root, "_byline", "manifest.json"), "utf8"));
-  if (manifest.protocolVersion !== 1 || manifest.publicationSchemaVersion !== 1) {
+  if (manifest.protocolVersion !== 1 || (manifest.publicationSchemaVersion !== 1 && manifest.publicationSchemaVersion !== 2)) {
     throw new Error("Static export manifest uses unsupported Byline compatibility versions.");
   }
 
   const publication = JSON.parse(await readFile(path.join(root, "_byline", "publication.json"), "utf8"));
   const allowedPublicationKeys = [
     "schemaVersion", "revision", "identity", "location", "locale", "timezone", "urls", "branding",
-    "appearance", "sections", "navigation", "social", "features", "licensing", "seo"
+    "appearance", "sections", "navigation", "social", "features", "licensing", "seo", "analytics"
   ];
   for (const key of Object.keys(publication)) {
     if (!allowedPublicationKeys.includes(key)) throw new Error(`Public export contains unexpected publication field ${key}.`);
+  }
+
+  // The only measurement facts that may be public: a Byline-installed Google tag's ID and behavior (docs/google-analytics.md).
+  const analytics = publication.analytics ?? null;
+  if (analytics !== null) {
+    const keys = Object.keys(analytics).sort().join(",");
+    if (keys !== "consentMode,installTag,measurementId,provider" || analytics.provider !== "google" || analytics.installTag !== true ||
+        !/^G-[A-Z0-9]{4,20}$/.test(analytics.measurementId) || !["always", "ask"].includes(analytics.consentMode)) {
+      throw new Error("Public export carries unexpected analytics configuration.");
+    }
   }
 
   assertNoSecretKeys(publication);
