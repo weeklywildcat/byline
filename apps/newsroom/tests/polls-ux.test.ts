@@ -5,7 +5,7 @@ import { compareOptions, responseTimeline, summarize, type ResponseRow } from ".
 import type { SurveyDefinition } from "../src/polls/engine/types";
 import { importWorkbook } from "../src/polls/engine/xlsform";
 import { readWorkbook } from "../src/polls/engine/xlsx";
-import { legacyPublicPollPath, pairingPath, publicPollPath, PUBLIC_POLL_KEY } from "../src/polls/links";
+import { deviceSetupPath, deviceSetupSignInPath, legacyPublicPollPath, pairingPath, publicPollPath, PUBLIC_POLL_KEY } from "../src/polls/links";
 import {
   formatPairingCode, hashPairingCode, newPairingCode, normalizePairingCode, PAIRING_DEFAULT_MS, PAIRING_FAILURES_PER_WINDOW, PAIRING_MAX_MS, PAIRING_MIN_MS,
   PAIRING_WINDOW_MS, pairingExpiry, pairingWindow
@@ -78,6 +78,12 @@ describe("respondent links", () => {
 
   it("put a pairing code in the fragment, which never reaches the server", () => {
     expect(pairingPath("048 213")).toBe("/poll#048213");
+  });
+
+  it("keeps signed-in device setup inside the admin login flow", () => {
+    expect(deviceSetupPath("/admin")).toBe("/admin/polls?view=fieldwork&setupDevice=1");
+    const href = deviceSetupSignInPath("/admin", "/login");
+    expect(href).toBe("/admin/login?redirect=%2Fadmin%2Fpolls%3Fview%3Dfieldwork%26setupDevice%3D1");
   });
 
   it("serve both public addresses from the same app", () => {
