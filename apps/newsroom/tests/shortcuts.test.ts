@@ -9,7 +9,7 @@ describe("keyboard navigation", () => {
     const staff = goShortcuts("staff").map((item) => item.label);
     expect(staff).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "Data", "Polls"]);
     const editor = goShortcuts("editor");
-    expect(editor.map((item) => item.label)).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "Data", "Polls", "People", "Front Page", "Distribution", "Content Health", "Analytics"]);
+    expect(editor.map((item) => item.label)).toEqual(["Home", "Stories", "Calendar", "Media", "Collections", "Data", "Polls", "Front Page", "Distribution", "Content Health", "Analytics"]);
     expect(new Set(editor.map((item) => item.key)).size).toBe(editor.length);
     // Every destination in the navigation has a letter, so a new one cannot be left without.
     expect(NAVIGATION.filter((item) => !GO_KEYS[item.key]).map((item) => item.key)).toEqual([]);
