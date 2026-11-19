@@ -38,12 +38,12 @@ type Plan = { returning: number[]; carry: number[]; titles: Record<string, strin
 
 const day = (value: string) => formatWallTime(value, { withTime: false }) || value;
 
-export function RolloverScreen() {
+export function RolloverScreen({ embedded = false }: { embedded?: boolean }) {
   const { api } = useNewsroomRoutes();
   const years = useYears(api);
   return (
     <AdminRoot toaster={false} className="byline-rollover">
-      <main className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6" data-byline-rollover-screen="">
+      <main className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-rollover-screen="">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">New school year</h1>
           <p className="max-w-prose text-sm text-muted-foreground">Decide who returns and which responsibilities carry over. Nothing changes until the last step, and last year’s people, assignments and reviews are kept as history.</p>
@@ -350,7 +350,7 @@ function RoutingCheck({ preview, pending, admin }: { preview: RolloverPreview | 
         {preview.routing.map((issue) => (
           <Item key={`${issue.workflowId}-${issue.step}-${issue.message}`} variant="outline" size="sm" className="border-destructive/50">
             <ItemContent><ItemTitle>{issue.workflow}: {issue.step}</ItemTitle><ItemDescription>{issue.message}</ItemDescription></ItemContent>
-            {issue.fix.kind === "role" ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/people?view=roles&role=${issue.fix.roleId}`} />}>Fix roles</Button></ItemActions> : null}
+            {issue.fix.kind === "role" ? <ItemActions><Button type="button" size="sm" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/site?tab=people&view=roles&role=${issue.fix.roleId}`} />}>Fix roles</Button></ItemActions> : null}
           </Item>
         ))}
       </ItemGroup>
