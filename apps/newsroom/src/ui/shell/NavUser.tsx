@@ -51,6 +51,7 @@ function Identity({ user, compact = false }: { user: ShellUser; compact?: boolea
  */
 export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = false }: { user: ShellUser; systemHref: string | null; logoutUrl: string; loginHref: string; compact?: boolean }) {
   const account = useNewsroomAccount();
+  const canManagePeople = account?.role === "editor" || account?.role === "administrator";
   const { admin } = useNewsroomRoutes();
   const { isMobile, state } = useSidebar();
   const { signingOut, signOut } = useSignOut(logoutUrl, loginHref);
@@ -78,11 +79,11 @@ export function NavUser({ user, systemHref, logoutUrl, loginHref, compact = fals
             <DropdownMenuItem onClick={openHelp}><Keyboard aria-hidden="true" />Keyboard shortcuts<DropdownMenuShortcut>?</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem onClick={replayWelcome}><Compass aria-hidden="true" />Take the Byline tour</DropdownMenuItem>
             <DropdownMenuSeparator />
-            {systemHref ? (
+            {canManagePeople ? (
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem render={<ShellLink href={`${admin}/site`} />}>Site</DropdownMenuItem>
-                  <DropdownMenuItem render={<ShellLink href={systemHref} />}><Wrench aria-hidden="true" />System administration</DropdownMenuItem>
+                  {systemHref ? <DropdownMenuItem render={<ShellLink href={systemHref} />}><Wrench aria-hidden="true" />System administration</DropdownMenuItem> : null}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
               </>
