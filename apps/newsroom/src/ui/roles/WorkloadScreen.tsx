@@ -65,9 +65,10 @@ export function WorkloadScreen({ embedded = false }: { embedded?: boolean }) {
   const all = workload.data?.rows ?? [];
   const rows = all.filter((row) => row.name.toLowerCase().includes(filter.trim().toLowerCase()));
 
+  const Container = embedded ? "section" : "main";
   return (
     <AdminRoot toaster={false} className="byline-workload">
-      <main className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-workload-screen="">
+      <Container className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-workload-screen="">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Workload</h1>
           <p className="max-w-prose text-sm text-muted-foreground">What’s on each person’s plate right now, to help when you assign work. These are counts, not measures of anyone’s performance, and they never stop an assignment.</p>
@@ -138,7 +139,7 @@ export function WorkloadScreen({ embedded = false }: { embedded?: boolean }) {
             </div>
           </>
         ) : null}
-      </main>
+      </Container>
     </AdminRoot>
   );
 }
