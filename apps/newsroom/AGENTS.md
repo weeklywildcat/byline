@@ -2,6 +2,8 @@
 
 The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public site is a separate Astro export built from a snapshot. See [architecture](../../docs/architecture.md).
 
+Byline is being generalized; see the [plan](../../docs/generalization-plan.md). Two parts bind here already: the schema is the same for every installation (a feature switch or a site never adds or removes a collection, table, or migration), and the newsroom server will read a site only through its plain-data `config` entry.
+
 ## Rules
 
 - **Byline owns the experience; Payload supplies infrastructure.** Use Payload's

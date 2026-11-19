@@ -4,6 +4,8 @@ These instructions apply to work under `packages/story-presentations/`. This pac
 
 This directory is the developer escape hatch for the occasional Weekly Wildcat story that needs a bespoke presentation. By default the Byline newsroom remains the source of truth for the journalism and the repository controls only presentation. The one deliberate exception is a **flagship visual story** (below), whose narrative lives here.
 
+Byline is being generalized; see the [plan](../../docs/generalization-plan.md). Production presentations will move from this package to a site package (slice 1d). Until that lands, keep adding them here as this guide describes. A key or name that has shipped is permanent: retire an entry, do not delete or rename it.
+
 ## When a writer asks for an immersive story
 
 A request may be as informal as:

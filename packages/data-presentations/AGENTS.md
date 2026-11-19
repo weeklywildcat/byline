@@ -3,6 +3,8 @@
 These instructions apply to `packages/data-presentations/`. Read
 [Byline Data](../../docs/byline-data.md) first.
 
+Byline is being generalized; see the [plan](../../docs/generalization-plan.md). Production presentations will move from this package to a site package (slice 1d). Until that lands, keep adding them here as this guide describes. A key or name that has shipped is permanent: retire an entry, do not delete or rename it.
+
 This package is shared by the public site (Astro/Vite) and the newsroom
 preview (Next.js). Never import Payload, Next, Astro, `import.meta.glob`,
 `?inline` CSS or any other bundler-specific syntax here. A presentation's
