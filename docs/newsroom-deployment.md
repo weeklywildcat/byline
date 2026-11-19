@@ -1,37 +1,57 @@
 # Payload newsroom deployment
 
-The newsroom uses PostgreSQL, persistent media and publication volumes, and
-the repository's `apps/newsroom/Dockerfile`.
+The newsroom uses PostgreSQL, persistent media and publication volumes, and a prebuilt production image published by GitHub Actions.
 
 ## Staff entrance
 
-Weekly Wildcat staff use `https://byline.weeklywildcat.com/`. Route that
-hostname to the newsroom web service and set
-`BYLINE_NEWSROOM_URL=https://byline.weeklywildcat.com` in its environment.
-The root redirects to `/admin`, where Payload sends signed-out staff to the
-Byline login and signed-in staff to Byline Home. If Google sign-in is enabled,
-register the HTTPS origin and its `/api/byline/auth/google/callback` URL with
-the Google OAuth client.
+Weekly Wildcat staff use `https://byline.weeklywildcat.com/`. Route that hostname to the newsroom web service and set `BYLINE_NEWSROOM_URL=https://byline.weeklywildcat.com` in its environment. The root redirects to `/admin`, where Payload sends signed-out staff to the Byline login and signed-in staff to Byline Home.
 
-Verify the root redirects to the newsroom login and staff can reach Byline Home.
+If Google sign-in is enabled, register the HTTPS origin and its `/api/byline/auth/google/callback` URL with the Google OAuth client.
 
-## Build context
+Verify the root redirects to the newsroom login and staff can reach Byline Home after every production change.
 
-Build from the repository root so npm workspaces are available:
+## Immutable production image
 
-```sh
-docker build -f apps/newsroom/Dockerfile -t byline-newsroom:local .
+Every successful push to `main` builds the production newsroom once in GitHub Actions and publishes the resulting image to GitHub Container Registry:
+
+```text
+ghcr.io/weeklywildcat/byline-newsroom:<full-git-sha>
+ghcr.io/weeklywildcat/byline-newsroom:main
 ```
 
-The Dockerfile copies the root lockfile and every workspace `package.json`
-before source code, then runs `npm ci`. Docker therefore reuses the dependency
-layer when only application source changes. A package manifest or lockfile change
-correctly invalidates that layer. The npm download cache is also mounted with
-BuildKit so dependency-changing builds can reuse downloaded packages.
+Deployments always pull the full commit SHA. The `main` tag is only a convenient pointer for humans.
 
-The repository `.dockerignore` excludes Git metadata, local dependencies,
-compiled output, environment files and local newsroom media from the build
-context.
+The image is built from `apps/newsroom/Dockerfile`. It installs the monorepo dependencies, compiles the Next/Payload production server against CI's throwaway PostgreSQL service, and stores the finished build in:
+
+```text
+/app/apps/newsroom/.byline-prebuilt-next
+```
+
+`BYLINE_NEXT_DIST_DIR=.byline-prebuilt-next` makes the web process serve that build. The directory intentionally does not live under `.next`, because existing production installations may still mount the old persistent `.next` release volume. That legacy volume can remain mounted during migration without hiding the build baked into the image.
+
+The build database URL and Payload secret used by CI are synthetic build-time values and are passed through BuildKit secret mounts, not Docker build arguments. Production database credentials and production secrets are not baked into the image or recorded in image metadata.
+
+The image carries `org.opencontainers.image.revision=<full-git-sha>`. Both CI and the production deploy script verify the revision and the Next `BUILD_ID` before using the image.
+
+### Building the image locally
+
+A production image build needs a reachable PostgreSQL database because Payload participates in the Next build. With the development PostgreSQL service running on port 54329:
+
+```sh
+export BYLINE_IMAGE_BUILD_DATABASE_URL=postgres://byline:byline@127.0.0.1:54329/byline_newsroom
+export BYLINE_IMAGE_BUILD_PAYLOAD_SECRET=local-image-build-secret-0123456789abcdef
+
+docker build --network host \
+  -f apps/newsroom/Dockerfile \
+  --secret id=byline_build_database_url,env=BYLINE_IMAGE_BUILD_DATABASE_URL \
+  --secret id=byline_build_payload_secret,env=BYLINE_IMAGE_BUILD_PAYLOAD_SECRET \
+  --build-arg BYLINE_BUILD_SHA=local \
+  -t byline-newsroom:local .
+
+unset BYLINE_IMAGE_BUILD_DATABASE_URL BYLINE_IMAGE_BUILD_PAYLOAD_SECRET
+```
+
+This is for local verification only. Normal production deploys pull the image produced by CI and do not build on the production host.
 
 ## Production process model
 
@@ -41,46 +61,54 @@ Use the same image for:
 - media jobs;
 - publication snapshot jobs;
 - scheduled publishing jobs;
-- maintenance jobs;
-- one-shot migrations; and
-- the one-shot Next production build.
+- maintenance jobs; and
+- one-shot migrations.
 
-The web process and the build process share the same persistent `.next`
-volume, but never mutate the same build tree. Production builds write to
-`.next/releases/<release>`; `.next/active-release` names the build a newly
-started web process should serve. The already-running process keeps serving its
-previously resolved release while the next one compiles. The web and media
-worker must also share the private Media and prepared publication-media volumes.
+The web and media worker must share the private Media and prepared publication-media volumes.
 
-The `publication-worker` also owns public-site deploy-hook delivery. Set
-`BYLINE_DEPLOY_HOOK_URL` to the provider's private production deploy-hook URL
-(for Weekly Wildcat, the Cloudflare Workers Builds hook). A successful current
-snapshot queues a coalescing `deploy-public-site` job; transient HTTP/network
-failures retry in the publication queue. The URL must be HTTPS and must not be
-committed to the repository.
+The `publication-worker` also owns public-site deploy-hook delivery. Set `BYLINE_DEPLOY_HOOK_URL` to the provider's private production deploy-hook URL. A successful current snapshot queues the coalescing public-site deployment job; transient HTTP/network failures retry in the publication queue. The URL must be HTTPS and must not be committed to the repository.
 
-On startup the publication worker reconciles the current snapshot and deployment
-handoff. If the current snapshot artifact is missing it requeues snapshot
-preparation. If the exact current snapshot has no pending or successfully
-triggered deploy job, it requeues deployment. This makes worker restarts repair
-a crash between snapshot promotion and provider delivery without creating a new
-Cloudflare build when that snapshot was already accepted.
+On startup the publication worker reconciles the current snapshot and deployment handoff. If the current snapshot artifact is missing it requeues snapshot preparation. If the exact current snapshot has no pending or successfully triggered deploy job, it requeues deployment.
 
-For an event-night recovery, inspect status and, only when the current snapshot
-is ready, trigger the same validated deploy hook directly:
+For an event-night recovery, inspect status and, only when the current snapshot is ready, trigger the same validated deploy hook directly:
 
 ```sh
 npm run publication:snapshot:status --workspace @byline/newsroom
 npm run publication:deploy:now --workspace @byline/newsroom
 ```
 
-`publication:deploy:now` never prints the hook URL. It refuses to deploy if the
-current revision lacks a verified snapshot artifact, and it uses the same
-revision/digest checks and request headers as the queued deploy task.
+`publication:deploy:now` never prints the hook URL. It refuses to deploy if the current revision lacks a verified snapshot artifact.
+
+## One-time production registry setup
+
+The production host must be able to pull `ghcr.io/weeklywildcat/byline-newsroom`.
+
+The simplest setup for this public repository is to make the container package public after GitHub creates it for the first time. If the package remains private, authenticate Docker on the production host with a GitHub credential that has permission to read packages:
+
+```sh
+docker login ghcr.io
+```
+
+Do not put a registry token in the repository or in the Compose file.
+
+The existing production Compose project may continue to reference:
+
+```text
+byline-newsroom:local
+```
+
+The deploy script pulls the immutable SHA image, verifies it, then retags it to that stable local name before Compose recreates services. This keeps existing service definitions, environment configuration, volumes, commands and worker wiring intact.
+
+Override the defaults only when necessary:
+
+```sh
+BYLINE_NEWSROOM_IMAGE_REPOSITORY=ghcr.io/weeklywildcat/byline-newsroom
+BYLINE_NEWSROOM_LOCAL_IMAGE=byline-newsroom:local
+```
 
 ## Updating production
 
-The canonical production update command is:
+The canonical production update command remains:
 
 ```sh
 npm run deploy:newsroom
@@ -88,89 +116,69 @@ npm run deploy:newsroom
 
 Run it from a clean `main` checkout on the production host. The command:
 
-1. verifies that the checkout is on `main` with no local changes;
-2. fast-forwards to `origin/main`, then restarts itself from the updated
-   checkout;
-3. validates that the production Compose project contains every required
-   newsroom service;
-4. builds the shared `byline-newsroom` image once through the `newsroom`
-   service instead of asking Compose to export the same image for every service;
-5. builds a versioned Next release while the currently running newsroom stays
-   online, seeding Next's persistent Turbopack compiler cache from the previous
-   release;
-6. runs committed Payload migrations only after the application build has
-   succeeded;
-7. atomically activates the verified release; and
-8. recreates the web process and workers from the newly built shared image,
-   retaining the previous release as the immediate rollback target.
+1. verifies the checkout is clean and on `main`;
+2. fast-forwards to `origin/main` and restarts itself from the updated commit;
+3. validates the required production Compose services;
+4. pulls `ghcr.io/weeklywildcat/byline-newsroom:<full-git-sha>`;
+5. verifies the image's OCI revision label and baked Next `BUILD_ID`;
+6. retags the verified image to the stable local image name used by Compose;
+7. starts a one-shot `newsroom` container to prove the production Compose wiring can still see the baked build;
+8. runs committed Payload migrations while the old newsroom continues serving;
+9. recreates the web process and workers;
+10. performs an HTTP health check against `/admin`; and
+11. verifies the publication worker still has a configured public deploy hook and can report snapshot status.
 
-By default the script expects the production Compose project one directory above
-the repository checkout. For example, a checkout at `/opt/byline/src` uses the
-Compose project at `/opt/byline`. Other layouts can set:
+The production host does **not** run `npm ci`, `docker build`, or `next build` during a normal deployment.
+
+By default the script expects the production Compose project one directory above the repository checkout. For example, a checkout at `/opt/byline/src` uses the Compose project at `/opt/byline`. Other layouts can set:
 
 ```sh
 BYLINE_DEPLOY_ROOT=/path/to/compose-project npm run deploy:newsroom
 ```
 
-A failed image build, Next build, or migration never changes the active release
-and does not stop the currently running newsroom. The cutover happens only after
-the new build and migrations succeed. If the final Compose recreation fails,
-the script restores the previous release pointer and previous newsroom image tag
-before attempting to bring the services back.
+### Failure and rollback behavior
+
+The current newsroom is left running while the new image is pulled, checked and migrated.
+
+- A pull or image-verification failure changes nothing.
+- A Compose-compatibility failure restores the previous stable image tag before exiting.
+- A migration failure restores the previous stable image tag; the current containers remain online.
+- A service recreation or health-check failure restores the previous image tag and recreates the newsroom services from it.
+
+The first deployment using this model can still roll back to the previous host-built image. The legacy `.next/active-release` pointer is not changed by the new deploy, so an old image restored during rollback continues to find the old release exactly as before.
 
 ### Manual / recovery procedure
 
-If the wrapper cannot be used, run the equivalent steps manually from the
-production Compose project:
+Prefer the wrapper because it includes the revision, compatibility, rollback and health checks. If manual recovery is required:
 
 ```sh
 cd /path/to/byline/repository
 git pull --ff-only origin main
+sha="$(git rev-parse HEAD)"
+remote="ghcr.io/weeklywildcat/byline-newsroom:$sha"
 
-release="$(git -C /path/to/byline/repository rev-parse --short=12 HEAD)-$(date +%s)"
+docker pull "$remote"
+docker image inspect "$remote"
+docker tag "$remote" byline-newsroom:local
 
 cd /path/to/compose-project
-docker compose build newsroom
-docker compose run --rm --no-deps newsroom-build \
-  node scripts/newsroom-release.mjs build "$release"
 docker compose run --rm migrate
-previous="$(docker compose run --rm --no-deps newsroom-build \
-  node scripts/newsroom-release.mjs current | tail -n 1)"
-docker compose run --rm --no-deps newsroom-build \
-  node scripts/newsroom-release.mjs activate "$release"
 docker compose up -d --no-deps --force-recreate \
   newsroom \
   media-worker \
   publication-worker \
   scheduled-worker \
   maintenance-worker
-docker compose run --rm --no-deps newsroom-build \
-  node scripts/newsroom-release.mjs prune "$previous"
 ```
 
-Build only `newsroom` because all of these services use the same
-`byline-newsroom:local` image. Running a bare `docker compose build` can make
-BuildKit export and unpack that same image separately for each service, which
-adds substantial deployment time and disk I/O without producing distinct
-artifacts.
+Before a manual cutover, keep the previous local image ID so it can be retagged if recovery is needed.
 
-`newsroom-build` uses the shared `.next` volume only as a release store.
-Each deploy gets its own directory, so the active web process never observes a
-partially replaced build. The build helper also carries the previous release's
-`cache/` directory forward, which lets Next 16's
-`turbopackFileSystemCacheForBuild` reuse production compiler work. Passing
-`--no-deps` to this one-shot build avoids starting the migration dependency a
-second time.
+## Legacy host-built releases
 
-Production must keep `BYLINE_DB_PUSH=0` and run committed Payload migrations.
-Do not expose PostgreSQL publicly. The newsroom may be published through a
-reverse proxy or Cloudflare Tunnel while its host port remains bound to
-loopback.
+Older Byline deployments compiled versioned builds into a shared `.next` volume using `newsroom-build` and `scripts/newsroom-release.mjs`.
 
-On a normal source-only update, the `npm ci` Docker layer should report
-`CACHED`. A package manifest or lockfile change correctly invalidates that
-layer.
+Those components can remain in the production Compose project during the transition. Normal deploys no longer require the `newsroom-build` service and no longer read or mutate the persistent `.next` release store because the image explicitly sets `BYLINE_NEXT_DIST_DIR=.byline-prebuilt-next`.
 
-This Dockerfile intentionally prepares the monorepo runtime rather than baking
-the Next build into the image: the newsroom build needs the deployment
-environment, while image construction should not require production secrets.
+Once the prebuilt-image deployment has been proven in production and the rollback window has passed, the unused `newsroom-build` service and persistent `.next` release volume may be removed from the host configuration separately. Keeping that cleanup out of this migration makes the first cutover reversible.
+
+Production must keep `BYLINE_DB_PUSH=0` and run committed Payload migrations. Do not expose PostgreSQL publicly. The newsroom may be published through a reverse proxy or Cloudflare Tunnel while its host port remains bound to loopback.
