@@ -21,7 +21,7 @@ import { EXAMPLE_WORKBOOK_FILE, SPREADSHEET_GUIDE_FILE, TEMPLATE_WORKBOOK_FILE }
 import { useNewsroomRoutes } from "../shell/account";
 import { useBylineCreate } from "../shell/create";
 import { useShellNavigation } from "../shell/navigation";
-import { createSurvey, fetchOverview, fileHref, formatWhen, pollKeys, STATUS_LABEL, type PollsOverview } from "./api";
+import { createSurvey, fetchOverview, fileHref, formatWhen, pollKeys, saveFile, STATUS_LABEL, type PollsOverview } from "./api";
 import { Fieldwork, SessionRows } from "./Fieldwork";
 import { ImportFlow } from "./ImportFlow";
 import { Locations } from "./Locations";
@@ -139,9 +139,9 @@ export function TemplateItems({ api }: { api: string }) {
   return (
     <DropdownMenuGroup>
       <DropdownMenuLabel>Spreadsheet format</DropdownMenuLabel>
-      <DropdownMenuItem render={<a href={fileHref(api, TEMPLATE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Blank template (.xlsx)</DropdownMenuItem>
-      <DropdownMenuItem render={<a href={fileHref(api, EXAMPLE_WORKBOOK_FILE)} download />}><FileSpreadsheet />Example workbook (.xlsx)</DropdownMenuItem>
-      <DropdownMenuItem render={<a href={fileHref(api, SPREADSHEET_GUIDE_FILE)} download />}><FileText />Format guide (.md)</DropdownMenuItem>
+      <DropdownMenuItem onClick={saveFile(fileHref(api, TEMPLATE_WORKBOOK_FILE), TEMPLATE_WORKBOOK_FILE)}><FileSpreadsheet />Blank template (.xlsx)</DropdownMenuItem>
+      <DropdownMenuItem onClick={saveFile(fileHref(api, EXAMPLE_WORKBOOK_FILE), EXAMPLE_WORKBOOK_FILE)}><FileSpreadsheet />Example workbook (.xlsx)</DropdownMenuItem>
+      <DropdownMenuItem onClick={saveFile(fileHref(api, SPREADSHEET_GUIDE_FILE), SPREADSHEET_GUIDE_FILE)}><FileText />Format guide (.md)</DropdownMenuItem>
     </DropdownMenuGroup>
   );
 }

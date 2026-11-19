@@ -3,6 +3,7 @@
 import type { ImportIssue } from "../../polls/engine/xlsform";
 import type { SurveyDefinition } from "../../polls/engine/types";
 import type { linkedPolls, pollsOverview, surveyDetail, surveyResults } from "../../polls/server";
+import { toast } from "sonner";
 import { ApiError, getJson, patchJson, postJson } from "../story/api";
 
 /**
@@ -56,6 +57,35 @@ export async function uploadWorkbook(api: string, file: File): Promise<ImportPre
 
 export const fileHref = (api: string, file: string) => `${api}/byline/polls/files/${file}`;
 export const workbookHref = (api: string, id: number, versionId?: number) => `${api}/byline/polls/surveys/${id}/workbook${versionId ? `?version=${versionId}` : ""}`;
+/**
+ * Saves one of the newsroom's files. A plain `<a download>` is fetched by Safari's
+ * download manager, which sends neither an `Origin` nor a `Sec-Fetch-Site` header, so
+ * Payload's CSRF check drops the session cookie and the file comes back as a 401 JSON
+ * body. Fetching it here, like every other call, sends the cookie, and the saved
+ * file is the response itself.
+ */
+export async function downloadFile(href: string, fallbackName: string) {
+  const response = await fetch(href, { credentials: "include" });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(body.message ?? "Byline couldn't download that file.", response.status, body.data ?? {});
+  }
+  const named = /filename="?([^";]+)"?/i.exec(response.headers.get("Content-Disposition") ?? "")?.[1];
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = named || fallbackName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** A menu item or button's click handler that saves `href`, and says so if it can't. */
+export const saveFile = (href: string, fallbackName: string) => () => {
+  downloadFile(href, fallbackName).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Byline couldn't download that file."));
+};
+
 export const exportHref = (api: string, id: number, kind: "responses" | "summary", filters: string) => `${api}/byline/polls/surveys/${id}/export/${kind}${filters ? `?${filters}` : ""}`;
 
 export const STATUS_LABEL: Record<string, string> = { draft: "Draft", open: "Open", closed: "Closed", archived: "Archived" };
