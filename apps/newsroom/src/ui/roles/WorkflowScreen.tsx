@@ -385,10 +385,10 @@ function Preview({ api, workflow, steps, overview, dirty }: { api: string; workf
 function fixLink(step: PreviewStep, admin: string, story: RoutingPreview["story"]): { href: string; label: string } | null {
   if (!step.fix) return null;
   switch (step.fix.kind) {
-    case "role": return { href: `${admin}/people?view=roles&role=${step.fix.roleId}`, label: "Fix roles" };
+    case "role": return { href: `${admin}/site?tab=people&view=roles&role=${step.fix.roleId}`, label: "Fix roles" };
     case "workflow": return null;
     case "story-editor": return { href: `${admin}/collections/stories/${story.id}`, label: "Open the story to assign an editor" };
-    case "school-year": return { href: `${admin}/people?view=rollover`, label: "Start a school year" };
+    case "school-year": return { href: `${admin}/site?tab=people&view=rollover`, label: "Start a school year" };
   }
 }
 
