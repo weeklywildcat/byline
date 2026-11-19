@@ -58,7 +58,7 @@ const range = (level: LoadLevel) => {
   return next ? `${LOAD_THRESHOLDS[level]}–${LOAD_THRESHOLDS[next] - 1}` : `${LOAD_THRESHOLDS[level]}+`;
 };
 
-export function WorkloadScreen() {
+export function WorkloadScreen({ embedded = false }: { embedded?: boolean }) {
   const { api } = useNewsroomRoutes();
   const workload = useWorkload(api);
   const [filter, setFilter] = useState("");
@@ -67,7 +67,7 @@ export function WorkloadScreen() {
 
   return (
     <AdminRoot toaster={false} className="byline-workload">
-      <main className="mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6" data-byline-workload-screen="">
+      <main className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-workload-screen="">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Workload</h1>
           <p className="max-w-prose text-sm text-muted-foreground">What’s on each person’s plate right now, to help when you assign work. These are counts, not measures of anyone’s performance, and they never stop an assignment.</p>
