@@ -1,3 +1,4 @@
+import { GOOGLE_MEASUREMENT_ID } from "@byline/core";
 import { WEEKLY_WILDCAT_PUBLICATION as DEFAULTS } from "@byline/theme-weekly-wildcat/publication";
 import type { Field, GlobalConfig } from "payload";
 import { administratorsOnly, atLeast, newsroomUser } from "../access/user";
@@ -53,6 +54,14 @@ function asset(name: string, label: string, value: { url: string; alt: string; w
   };
 }
 
+/**
+ * Public measurement (docs/google-analytics.md): only what the public site needs to load Google's tag.
+ * Written by the Analytics endpoints (Site → Analytics) and published with the Publication, never edited as
+ * a raw field and never carrying a property, account, credential or Google identity (those are private, in
+ * `analytics-integration`). `installTag: false` publishes no measurement at all.
+ */
+export const ANALYTICS_GROUP = "analytics";
+
 export const FEATURE_SWITCHES = ["sports", "events", "newsletter", "discord"] as const;
 
 export const Publication: GlobalConfig = {
@@ -62,7 +71,15 @@ export const Publication: GlobalConfig = {
   access: { read: administratorsOnly, readVersions: administratorsOnly, update: administratorsOnly },
   versions: { max: 50, drafts: { autosave: false, validate: true } },
   hooks: {
+    // Public analytics change only through the Analytics endpoints: an ordinary publish (even of an older draft)
+    // keeps whatever measurement is already published, so a stale draft can never re-enable or alter the tag.
     beforeChange: [async ({ data, req }) => {
+      if (data._status === "published" && req.context?.bylineAnalyticsPublish !== true) {
+        const current = (await req.payload.db.findGlobal({ slug: PUBLICATION_GLOBAL, req })) as Record<string, unknown> | null;
+        data[ANALYTICS_GROUP] = current && current._status === "published" ? current[ANALYTICS_GROUP] ?? { installTag: false, measurementId: "", consentMode: "ask" } : { installTag: false, measurementId: "", consentMode: "ask" };
+      }
+      return data;
+    }, async ({ data, req }) => {
       if (data._status === "published" && typeof data.timezone === "string") {
         await lockPublicPaths(req);
         if (publicationConfigFromGlobal(await readPublishedPublication(req.payload, req), 0).timezone === data.timezone) return data;
@@ -214,6 +231,17 @@ export const Publication: GlobalConfig = {
         text("defaultTitle", DEFAULTS.seo.defaultTitle, 120),
         { name: "defaultDescription", type: "textarea", required: true, defaultValue: DEFAULTS.seo.defaultDescription, maxLength: 320 },
         { name: "organizationType", type: "select", required: true, defaultValue: DEFAULTS.seo.organizationType, options: [{ value: "NewsMediaOrganization", label: "News media organization" }, { value: "Organization", label: "Organization" }] }
+      ]
+    },
+    {
+      name: ANALYTICS_GROUP,
+      type: "group",
+      // Never a raw field: Site → Analytics writes it through the Analytics endpoints.
+      admin: { hidden: true },
+      fields: [
+        { name: "installTag", type: "checkbox", defaultValue: false },
+        { name: "measurementId", type: "text", maxLength: 24, validate: (value: unknown) => (value === undefined || value === null || value === "" || GOOGLE_MEASUREMENT_ID.test(String(value)) ? true : "Use a Google Measurement ID such as G-ABC123XYZ.") },
+        { name: "consentMode", type: "select", defaultValue: "ask", options: [{ value: "ask", label: "Ask readers first" }, { value: "always", label: "Always collect" }] }
       ]
     }
   ]

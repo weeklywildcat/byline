@@ -21,7 +21,7 @@ import { PlanningProperties } from "@byline/newsroom-screens/workspace/DetailsSe
 import { useOptionalWorkspace } from "@byline/newsroom-screens/workspace/StoryWorkspace";
 import { useDocumentInfo, useForm, useFormBackgroundProcessing, useFormModified, useFormProcessing } from "@payloadcms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronLeft, Ellipsis, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
+import { ArrowRight, ChartColumn, Check, ChevronLeft, Ellipsis, History, List, SlidersHorizontal, Smartphone } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { editorialReadiness } from "../../domain/story-readiness";
@@ -77,8 +77,8 @@ export function peopleLine(names: string[]): string {
 
 export type HeaderProps = {
   context: StoryScreenContext;
-  /** Opens a focused view: Review (the submitted version and its pipeline) or History. */
-  onOpen: (view: "review" | "history") => void;
+  /** Opens a focused view: Review (the submitted version and its pipeline), History or Performance (the Story's audience). */
+  onOpen: (view: "review" | "history" | "performance") => void;
 };
 
 type Transition = "accept-pitch" | "start-drafting" | "put-on-hold" | "drop" | "resume";
@@ -375,6 +375,7 @@ export function StoryHeader({ context, onOpen }: HeaderProps) {
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={() => setDetailsOpen(true)}><SlidersHorizontal aria-hidden="true" />Story details{publicationProblems && canEditPublication ? <Badge variant="destructive" className="ml-auto">{publicationProblems}</Badge> : null}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onOpen("history")}><History aria-hidden="true" />View history</DropdownMenuItem>
+                {id != null ? <DropdownMenuItem onClick={() => onOpen("performance")}><ChartColumn aria-hidden="true" />Performance</DropdownMenuItem> : null}
                 {liveCoverage && id != null ? <DropdownMenuItem render={<ShellLink href={liveCoverage.fieldHref} />}><Smartphone aria-hidden="true" />Open in Field Mode</DropdownMenuItem> : null}
               </DropdownMenuGroup>
               {sidelineActions.length ? <>

@@ -3,6 +3,8 @@ import { getNavigation, getPublicationConfig } from "@/lib/publication";
 import { BEHIND_THE_SCENES } from "@/lib/behind-the-scenes";
 
 const publication = getPublicationConfig();
+// A reader can change their analytics choice only where Byline asks for it.
+const privacyControl = publication.analytics?.installTag === true && publication.analytics.consentMode === "ask";
 const footerLinks = getNavigation("footer");
 if (!footerLinks.some((link) => link.url === BEHIND_THE_SCENES.path)) {
   footerLinks.push({ label: BEHIND_THE_SCENES.name, url: BEHIND_THE_SCENES.path, locations: ["footer"], group: "About" });
@@ -34,6 +36,7 @@ export function SiteFooter() {
             <p>{publication.identity.tagline}</p>
             <address>{publication.location.address}</address>
             <a href={publication.urls.contact}>Contact</a>
+            {privacyControl ? <button type="button" className="footer-privacy-settings" data-analytics-privacy>Privacy settings</button> : null}
           </div>
         </div>
 

@@ -1,9 +1,11 @@
 # Payload public build snapshots
 
-Payload projects its published records into the native **Public Snapshot v3**
+Payload projects its published records into the native **Public Snapshot v4**
 contract in `@byline/content`: Snapshot v2's content plus Byline Data's
-published projects and release descriptors ([Byline Data](byline-data.md#snapshot-v3)).
-Builds still read v2. The artifact is the complete content input for
+published projects and release descriptors ([Byline Data](byline-data.md#snapshot-v3)),
+and, from v4, `publication.analytics`, the public Google tag's Measurement ID and behavior
+([Google Analytics](google-analytics.md#public-contract)). Builds still read v2 and v3 and
+upgrade them with `analytics: null` (`validatePublicBuildSnapshot`). The artifact is the complete content input for
 the static Astro build. The renderer gets canonical public Stories, including
 their semantic bodies, and renders them with the same article presentation
 builder and components as Live Preview.
@@ -75,8 +77,8 @@ revision fence distinguishes such races from invalid public records.
 ## Immutable artifact
 
 ```text
-<BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v3/
-  snapshot-v3-r<R>-<sha256>.json
+<BYLINE_PUBLICATION_MEDIA_DIR>/snapshots/v4/
+  snapshot-v4-r<R>-<sha256>.json
 ```
 
 Data Releases use the same immutable artifact store
@@ -143,7 +145,7 @@ them under `out/_byline/media`.
 ## Native datasets
 
 The envelope contains `schemaVersion`, `revision`, `generatedAt`,
-`publication`, `datasets`, `counts`, optional `frontPage` and (v3) `data`. The JSON Schema documents the wire
+`publication`, `datasets`, `counts`, optional `frontPage` and (v3+) `data`. The JSON Schema for the current wire format is `schemas/public-build-snapshot-v4.schema.json`. The JSON Schema documents the wire
 format and `validatePublicBuildSnapshotV2` checks its runtime invariants. In v3 a Story body's
 `dataProject` block must name a project in the same snapshot's `data` section
 ([Story embeds](byline-data.md#story-embeds)); `collectPublicSnapshot` collects

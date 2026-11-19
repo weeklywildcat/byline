@@ -30,10 +30,10 @@ describe("Byline protocol compatibility", () => {
       assertBylineProtocolCompatibility({
         ...compatibleManifest,
         protocolVersion: 2,
-        publicationSchemaVersion: 2,
+        publicationSchemaVersion: 3,
         designSchemaVersion: 3,
         themeApiVersion: 4
       })
-    ).toThrow(/protocol 2.*publication schema 2.*design schema 3.*theme API 4/i);
+    ).toThrow(/protocol 2.*publication schema 3.*design schema 3.*theme API 4/i);
   });
 });

@@ -20,7 +20,8 @@ export const GO_KEYS: Readonly<Record<string, string>> = {
   people: "p",
   "front-page": "f",
   distribution: "d",
-  "content-health": "t"
+  "content-health": "t",
+  analytics: "n"
 };
 
 export type GoShortcut = { key: string; label: string; path: string };

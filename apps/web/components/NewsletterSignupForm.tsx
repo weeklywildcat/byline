@@ -34,7 +34,22 @@ export function NewsletterSignupForm({
     script.src = kitScriptSrc;
     embedRef.current.append(script);
 
+    // Kit renders its own success message after a real signup. Only that counts as a sign-up: opening or
+    // submitting the form unsuccessfully never does. Reported once per page.
+    const host = embedRef.current;
+    let reported = false;
+    const watch = new MutationObserver(() => {
+      const success = host.querySelector(".formkit-alert-success");
+      if (!reported && success && success.textContent?.trim()) {
+        reported = true;
+        window.dispatchEvent(new CustomEvent("byline:signup", { detail: { method: "newsletter" } }));
+        watch.disconnect();
+      }
+    });
+    watch.observe(host, { childList: true, subtree: true, characterData: true });
+
     return () => {
+      watch.disconnect();
       script.remove();
     };
   }, [usesLegacyKitForm]);

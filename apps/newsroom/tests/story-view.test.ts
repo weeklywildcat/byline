@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultWorkspace, hasArticleText, parseStoryLocation, storyLocationSearch } from "../src/ui/story/story-view";
+import { defaultWorkspace, hasArticleText, parseStoryLocation, STORY_WORKSPACES, storyLocationSearch } from "../src/ui/story/story-view";
 import { normalizeWorkspaceMemory, REMEMBERED_STORIES, rememberedWorkspace, rememberWorkspace } from "../src/ui/story/story-workspace-memory-model";
 
 const paragraph = (text: string) => ({ type: "paragraph", children: text ? [{ type: "text", text }] : [] });
@@ -11,6 +11,11 @@ describe("Story addresses (docs/story-screen.md)", () => {
     expect(parseStoryLocation("?view=write")).toMatchObject({ workspace: "write", mode: null });
     expect(parseStoryLocation("?view=review")).toMatchObject({ workspace: null, mode: "review" });
     expect(parseStoryLocation("?view=history")).toMatchObject({ workspace: null, mode: "history" });
+    // Performance is a focused view like Review and History, never a third workspace.
+    expect(parseStoryLocation("?view=performance")).toMatchObject({ workspace: null, mode: "performance" });
+    expect(STORY_WORKSPACES).toEqual(["plan", "write"]);
+    expect(storyLocationSearch("?view=write&foo=1", { mode: "performance" })).toBe("?foo=1&view=performance");
+    expect(storyLocationSearch("?view=performance", { workspace: "write" })).toBe("?view=write");
     // No workspace named: the Story's default decides (never the lifecycle).
     expect(parseStoryLocation("")).toMatchObject({ workspace: null, mode: null, section: null });
   });
@@ -50,7 +55,7 @@ describe("Story addresses (docs/story-screen.md)", () => {
     // A section, a capture or an appointment only belong to Plan.
     expect(storyLocationSearch("", { workspace: "write", section: "reporting", capture: "note", appointment: "a" })).toBe("?view=write");
     // Round trip.
-    for (const search of ["?view=plan", "?view=write", "?view=review", "?view=history", "?transcript=3", "?view=plan&section=todo"]) {
+    for (const search of ["?view=plan", "?view=write", "?view=review", "?view=history", "?view=performance", "?transcript=3", "?view=plan&section=todo"]) {
       expect(storyLocationSearch("", parseStoryLocation(search))).toBe(search);
     }
   });

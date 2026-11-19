@@ -74,6 +74,7 @@ export interface Config {
     'content-health': ContentHealth;
     'video-facts': VideoFact;
     notifications: Notification;
+    'donation-waitlist': DonationWaitlist;
     people: Person;
     media: Media;
     sections: Section;
@@ -136,6 +137,7 @@ export interface Config {
     'content-health': ContentHealthSelect<false> | ContentHealthSelect<true>;
     'video-facts': VideoFactsSelect<false> | VideoFactsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
+    'donation-waitlist': DonationWaitlistSelect<false> | DonationWaitlistSelect<true>;
     people: PeopleSelect<false> | PeopleSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     sections: SectionsSelect<false> | SectionsSelect<true>;
@@ -186,11 +188,13 @@ export interface Config {
   globals: {
     publication: Publication;
     'distribution-settings': DistributionSetting;
+    'analytics-integration': AnalyticsIntegration;
     'payload-jobs-stats': PayloadJobsStat;
   };
   globalsSelect: {
     publication: PublicationSelect<false> | PublicationSelect<true>;
     'distribution-settings': DistributionSettingsSelect<false> | DistributionSettingsSelect<true>;
+    'analytics-integration': AnalyticsIntegrationSelect<false> | AnalyticsIntegrationSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
   locale: null;
@@ -803,6 +807,18 @@ export interface Notification {
   inbox?: boolean | null;
   readAt?: string | null;
   emailState?: ('none' | 'pending' | 'sent' | 'failed' | 'skipped') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * People who asked to be notified when Weekly Wildcat donations open.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "donation-waitlist".
+ */
+export interface DonationWaitlist {
+  id: number;
+  email: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -2169,6 +2185,15 @@ export interface NotificationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "donation-waitlist_select".
+ */
+export interface DonationWaitlistSelect<T extends boolean = true> {
+  email?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "people_select".
  */
 export interface PeopleSelect<T extends boolean = true> {
@@ -3164,6 +3189,11 @@ export interface Publication {
     defaultDescription: string;
     organizationType: 'NewsMediaOrganization' | 'Organization';
   };
+  analytics?: {
+    installTag?: boolean | null;
+    measurementId?: string | null;
+    consentMode?: ('ask' | 'always') | null;
+  };
   _status?: ('draft' | 'published') | null;
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -3204,6 +3234,52 @@ export interface DistributionSetting {
         id?: string | null;
       }[]
     | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-integration".
+ */
+export interface AnalyticsIntegration {
+  id: number;
+  status: 'disconnected' | 'pending-selection' | 'connected' | 'needs-reconnect';
+  googleAccountEmail?: string | null;
+  googleSubject?: string | null;
+  accountResource?: string | null;
+  accountDisplayName?: string | null;
+  propertyResource?: string | null;
+  propertyDisplayName?: string | null;
+  propertyTimeZone?: string | null;
+  streamResource?: string | null;
+  streamDisplayName?: string | null;
+  streamDefaultUri?: string | null;
+  measurementId?: string | null;
+  trackingMode: 'external' | 'byline';
+  consentMode: 'external' | 'always' | 'ask';
+  encryptedRefreshToken?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  grantedScopes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  connectedAt?: string | null;
+  connectedBy?: (number | null) | User;
+  lastVerifiedAt?: string | null;
+  lastSuccessfulRequestAt?: string | null;
+  lastErrorCode?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -3356,6 +3432,13 @@ export interface PublicationSelect<T extends boolean = true> {
         defaultDescription?: T;
         organizationType?: T;
       };
+  analytics?:
+    | T
+    | {
+        installTag?: T;
+        measurementId?: T;
+        consentMode?: T;
+      };
   _status?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3386,6 +3469,36 @@ export interface DistributionSettingsSelect<T extends boolean = true> {
         sections?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-integration_select".
+ */
+export interface AnalyticsIntegrationSelect<T extends boolean = true> {
+  status?: T;
+  googleAccountEmail?: T;
+  googleSubject?: T;
+  accountResource?: T;
+  accountDisplayName?: T;
+  propertyResource?: T;
+  propertyDisplayName?: T;
+  propertyTimeZone?: T;
+  streamResource?: T;
+  streamDisplayName?: T;
+  streamDefaultUri?: T;
+  measurementId?: T;
+  trackingMode?: T;
+  consentMode?: T;
+  encryptedRefreshToken?: T;
+  grantedScopes?: T;
+  connectedAt?: T;
+  connectedBy?: T;
+  lastVerifiedAt?: T;
+  lastSuccessfulRequestAt?: T;
+  lastErrorCode?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

@@ -19,7 +19,7 @@ async function loadFixturePublication() {
   if (process.env.BYLINE_PUBLICATION_JSON) return JSON.parse(process.env.BYLINE_PUBLICATION_JSON);
   const file = process.env.BYLINE_PUBLICATION_FILE || "tests/fixtures/weekly-wildcat-publication.json";
   const value = JSON.parse(await readFile(path.resolve(projectRoot, file), "utf8"));
-  if (value?.schemaVersion !== 1) throw new Error("Unsupported fixture publication schema version.");
+  if (value?.schemaVersion !== 1 && value?.schemaVersion !== 2) throw new Error("Unsupported fixture publication schema version.");
   return value;
 }
 

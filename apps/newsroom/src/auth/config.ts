@@ -3,27 +3,35 @@ export const GOOGLE_CALLBACK = `${GOOGLE_START}/callback`;
 export const GOOGLE_BUTTON = `${GOOGLE_START}/button`;
 export const GOOGLE_CREDENTIAL = `${GOOGLE_BUTTON}/credential`;
 
-export function googleConfig(apiPath: string, env = process.env) {
+type Env = Record<string, string | undefined>;
+
+/** The newsroom's Google OAuth client, shared by sign-in and the Analytics connection. */
+export function googleOAuthCredentials(env: Env = process.env) {
   const clientId = env.BYLINE_GOOGLE_CLIENT_ID?.trim();
   const clientSecret = env.BYLINE_GOOGLE_CLIENT_SECRET?.trim();
-  const hostedDomain = env.BYLINE_GOOGLE_HOSTED_DOMAIN?.trim().toLowerCase();
-  if (!clientId?.endsWith(".apps.googleusercontent.com") || !clientSecret ||
-      !hostedDomain || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(hostedDomain)) return null;
+  return clientId?.endsWith(".apps.googleusercontent.com") && clientSecret ? { clientId, clientSecret } : null;
+}
 
+/** `BYLINE_NEWSROOM_URL` as an origin, only when it is https (or loopback http outside production). */
+export function validatedNewsroomOrigin(env: Env = process.env): URL | null {
   try {
     const origin = new URL(env.BYLINE_NEWSROOM_URL ?? "");
     const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
     if (origin.protocol !== "https:" &&
         !(origin.protocol === "http:" && loopback && env.NODE_ENV !== "production")) return null;
     if (origin.pathname !== "/" || origin.search || origin.hash || origin.username || origin.password) return null;
-    return {
-      clientId, clientSecret, hostedDomain,
-      secure: origin.protocol === "https:",
-      callback: new URL(apiPath + GOOGLE_CALLBACK, origin).href,
-    };
+    return origin;
   } catch {
     return null;
   }
+}
+
+export function googleConfig(apiPath: string, env: Env = process.env) {
+  const credentials = googleOAuthCredentials(env);
+  const hostedDomain = env.BYLINE_GOOGLE_HOSTED_DOMAIN?.trim().toLowerCase();
+  const origin = validatedNewsroomOrigin(env);
+  if (!credentials || !hostedDomain || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(hostedDomain) || !origin) return null;
+  return { ...credentials, hostedDomain, secure: origin.protocol === "https:", callback: new URL(apiPath + GOOGLE_CALLBACK, origin).href };
 }
 
 /** Accept only paths inside the newsroom; never redirect through a supplied origin. */

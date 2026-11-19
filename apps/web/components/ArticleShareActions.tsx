@@ -43,9 +43,12 @@ export function ArticleShareActions({ title, url }: ArticleShareActionsProps) {
   async function handleShare() {
     if (navigator.share) {
       await navigator.share({ title, url });
+      // Measured only once the share really went through (the reader can cancel the sheet).
+      window.dispatchEvent(new CustomEvent("byline:share", { detail: { method: "native" } }));
       return;
     }
 
+    window.dispatchEvent(new CustomEvent("byline:share", { detail: { method: "email" } }));
     window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`;
   }
 
@@ -53,6 +56,7 @@ export function ArticleShareActions({ title, url }: ArticleShareActionsProps) {
     try {
       await copyText(url);
       setCopyStatus("copied");
+      window.dispatchEvent(new CustomEvent("byline:share", { detail: { method: "copy_link" } }));
     } catch {
       setCopyStatus("failed");
     }

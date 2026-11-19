@@ -243,6 +243,16 @@ The private Byline newsroom uses Payload, Next.js, and PostgreSQL. The public si
   Stories embed from being unpublished or deleted (`data/usage.ts`); and keep
   the Data section collected before Story bodies are normalized in
   `collectPublicSnapshot`.
+- **Google Analytics** ([docs/google-analytics.md](../../docs/google-analytics.md)) is a
+  separate, read-only OAuth grant (never newsroom sign-in, never `analytics.edit`, no hosted-domain
+  rule), bound to the starting administrator. Credentials live only in the private
+  `analytics-integration` Global as an AES-256-GCM envelope under `BYLINE_INTEGRATIONS_SECRET`
+  (never `PAYLOAD_SECRET`); read and write it only through `analytics/connection.ts` after a
+  role check. Only `publication.analytics` (Measurement ID, `installTag`, consent mode) is public,
+  and only through `publishAnalyticsChoice`, never a raw Publication field. The browser never calls
+  Google or names a report: add reports to `analytics/reports.ts` and spell Google names only in
+  `analytics/model.ts`. Map Google rows to Stories only with `content-map.ts` (one row, one record).
+  Keep the Story endpoint on the Story's own visibility; the desk is editors+.
 - `src/payload-types.ts` is this app's internal type file. It must never become
   the public site's content contract.
 

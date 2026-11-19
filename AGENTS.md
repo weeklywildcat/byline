@@ -15,13 +15,14 @@ Read the nearest scoped guide before editing. Find the owning layer and its exis
 ## Architecture rules
 
 - Payload owns editorial content, access, drafts, jobs, and publishing. Keep planning state on the unversioned story plan. Project public content through explicit allowlists.
-- Astro consumes a local, validated Snapshot v3 (v2 is still read) and produces `apps/web/out/`. Keep static output and the compatibility guard in `apps/web/next.config.ts`. Rendering makes no newsroom requests. No SSR, public authentication, or public database.
+- Astro consumes a local, validated Snapshot v4 (v2 and v3 are still read) and produces `apps/web/out/`. Keep static output and the compatibility guard in `apps/web/next.config.ts`. Rendering makes no newsroom requests. No SSR, public authentication, or public database.
 - Keep credentials, private newsroom facts, and media originals out of public snapshots and artifacts.
 - Keep one shared article renderer and one presentation resolver. Standard, Feature, Immersive and Split are the built-in openings, and Site navigation (Standard or Minimal) is chosen separately by the layout before it renders ([docs/story-openings.md](docs/story-openings.md)); bespoke layouts and repository interactives live in the presentation package.
 - Keep the homepage layout in code. Front Page placements choose stories for existing slots; they do not change the design.
 - Apple platforms ([docs/apple-platforms.md](docs/apple-platforms.md)): use the `--byline-safe-*` variables for anything touching a screen edge, `touch-hit` for small raw controls, and `any-pointer: coarse` (never `pointer: coarse`) for touch sizing. Never sniff the user agent. Context menus mount for every input; only hover previews are hover-gated. Do not move the 768px or 1200px navigation breakpoints.
 - Sports records are an archive. Keep historical routes and redirects; do not add live game, team, or roster management.
 - Wildcat Polls ([docs/wildcat-polls.md](docs/wildcat-polls.md)) is a private survey app inside the newsroom. Respondents' answers stay in its dedicated PostgreSQL tables and never enter a snapshot, public change tracking or a site build. Article polls are retired; the public static site does not collect votes.
+- Google Analytics ([docs/google-analytics.md](docs/google-analytics.md)): GA is the data source; Byline owns setup, Story joins and the optional public tag. Credentials are private and encrypted; the only public fact is `publication.analytics` in Snapshot v4. External tracking injects nothing; Ask mode sends nothing before consent.
 - Byline Data: datasets are working data; only an editor's Publish makes an immutable, content-addressed release, and public pages render releases materialized before Astro runs. Private fields never enter a release. Newsroom users never enter code; presentations are repository code that declares what it reads. A Story embeds a published Project by ID (the `dataProject` block) and never copies its data.
 
 ## Development

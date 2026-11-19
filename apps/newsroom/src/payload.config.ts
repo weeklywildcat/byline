@@ -19,6 +19,8 @@ import sharp from "sharp";
 import { WEB_APP_ICON_BASE, WEB_APP_MANIFEST_PATH } from "./newsroom/web-app-manifest";
 import { atLeast, newsroomUser } from "./access/user";
 import { googleEndpoints } from "./auth/google-endpoints";
+import { AnalyticsIntegration } from "./globals/AnalyticsIntegration";
+import { analyticsEndpoints } from "./analytics/endpoints";
 import { Media, MEDIA_UPLOAD_MAX_BYTES } from "./collections/Media";
 import { REPORTING_LIMITS } from "./domain/reporting";
 import { mediaFolders } from "./collections/MediaFolders";
@@ -151,7 +153,7 @@ export default buildConfig({
     : {}),
   collections: collections.map((collection) => withImportIdGuard(withPublicTracking(collection))),
   // The publication's public configuration (administrators; drafts stage changes, only the published Global is public).
-  globals: [Publication, DistributionSettings],
+  globals: [Publication, DistributionSettings, AnalyticsIntegration],
   // Camera originals are larger than Payload's 20 MB multipart default, and interview recordings larger still.
   // The multipart limit is the larger of the two; Media refuses anything over its own limit (collections/Media.ts).
   upload: { limits: { fileSize: Math.max(MEDIA_UPLOAD_MAX_BYTES, REPORTING_LIMITS.fileBytes) } },
@@ -168,7 +170,7 @@ export default buildConfig({
   }),
   graphQL: { disable: true },
   // The newsroom screens' API (/api/byline/...); every handler re-checks the account.
-  endpoints: [...donationWaitlistEndpoints, ...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...pollEndpoints, ...googleEndpoints],
+  endpoints: [...donationWaitlistEndpoints, ...newsroomEndpoints, ...reportingEndpoints, ...fieldEndpoints, ...frontPageEndpoints, ...distributionEndpoints, ...dataEndpoints, ...pollEndpoints, ...googleEndpoints, ...analyticsEndpoints],
   admin: {
     user: Users.slug,
     // Payload's default asks gravatar.com for every signed-in staff member's picture, which sends a hash of their
@@ -233,6 +235,8 @@ export default buildConfig({
         field: { Component: "/components/BylineField#BylineField", path: "/field", exact: true, meta: { title: "Field" } },
         // Front Page Desk: editorial priority over the code-owned homepage (editors).
         frontPage: { Component: "/components/BylineFrontPage#BylineFrontPage", path: "/front-page", exact: true, meta: { title: "Front Page" } },
+        // Analytics: publication-wide audience reporting for editors (Google Analytics, docs/google-analytics.md).
+        analytics: { Component: "/components/BylineAnalytics#BylineAnalytics", path: "/analytics", exact: true, meta: { title: "Analytics" } },
         distribution: { Component: "/components/BylineDistribution#BylineDistribution", path: "/distribution", exact: true, meta: { title: "Distribution" } },
         // Administrators only: the entry to Payload's raw collection screens.
         system: { Component: "/components/SystemAdministration#SystemAdministration", path: "/system", meta: { title: "System administration" } }

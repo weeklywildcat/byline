@@ -5,10 +5,11 @@
  * under the Story header. They are places to work, never lifecycle stages:
  * moving between them changes nothing about the Story.
  *
- * Review, History and a Transcript are focused views reached deliberately
- * (the header's Review action or status, the overflow menu, a transcript in
- * Plan's Reporting), each with a way back to the workspace. They are never
- * tabs.
+ * Review, History, Performance and a Transcript are focused views reached
+ * deliberately (the header's Review action or status, the overflow menu, a
+ * transcript in Plan's Reporting), each with a way back to the workspace.
+ * They are never tabs. Performance is a published Story's audience
+ * (docs/google-analytics.md); Plan and Write stay the only workspaces.
  *
  * The address carries all of it, so a link, Back/Forward and a reload land
  * in the same place:
@@ -17,7 +18,7 @@
  * | --- | --- |
  * | `?view=plan` / `?view=write` | that workspace |
  * | `?view=plan&section=reporting` | Plan, at a section |
- * | `?view=review` / `?view=history` | the focused view |
+ * | `?view=review` / `?view=history` / `?view=performance` | the focused view |
  * | `?transcript=<id>` | the transcript, focused, over Plan |
  * | (none) | the default workspace for this Story (`defaultWorkspace`) |
  *
@@ -32,7 +33,7 @@ export const STORY_WORKSPACES = ["plan", "write"] as const;
 export type StoryWorkspace = (typeof STORY_WORKSPACES)[number];
 
 /** A focused view over the workspaces. `null` is the workspace itself. */
-export const STORY_MODES = ["review", "history", "transcript"] as const;
+export const STORY_MODES = ["review", "history", "performance", "transcript"] as const;
 export type StoryMode = (typeof STORY_MODES)[number];
 
 /** Plan's sections, in reading order: what the jump links and old links can name. */
@@ -67,7 +68,7 @@ export function parseStoryLocation(search: string): StoryLocation {
   const transcript = Number.isSafeInteger(transcriptId) && transcriptId > 0 ? transcriptId : null;
   let section = pick(PLAN_SECTIONS, params.get("section"));
   let workspace = pick(STORY_WORKSPACES, view);
-  let mode: StoryMode | null = view === "review" || view === "history" ? view : null;
+  let mode: StoryMode | null = view === "review" || view === "history" || view === "performance" ? view : null;
 
   if (!workspace && !mode) {
     // Reporting is Plan's Reporting section now; every way that used to open it still does.
@@ -93,7 +94,7 @@ export function parseStoryLocation(search: string): StoryLocation {
 export function storyLocationSearch(search: string, next: StoryPlace): string {
   const params = new URLSearchParams(search);
   for (const key of ["tab", "view", "section", "capture", "transcript", "appointment"]) params.delete(key);
-  if (next.mode === "review" || next.mode === "history") params.set("view", next.mode);
+  if (next.mode === "review" || next.mode === "history" || next.mode === "performance") params.set("view", next.mode);
   else if (next.mode === "transcript" && next.transcript) params.set("transcript", String(next.transcript));
   else if (next.workspace) params.set("view", next.workspace);
   const plan = !next.mode && next.workspace === "plan";

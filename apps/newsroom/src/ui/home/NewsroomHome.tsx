@@ -6,6 +6,7 @@ import { useConfig, usePreferences } from "@payloadcms/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useNewsroomAccount } from "../shell/account";
+import { AudienceNow } from "./AudienceNow";
 import { createBylineRequest } from "./payload-fetchers";
 import { useBylineCreate } from "../shell/create";
 import { useBylineSearch } from "../shell/search";
@@ -41,5 +42,5 @@ export function NewsroomHome({ currentUserId }: { currentUserId: number | null }
   const { openCreate } = useBylineCreate();
   const { setStoryOpener } = useBylineSearch();
   const shell = useMemo<HomeShell>(() => ({ queryClient, openCreate, setStoryOpener, preloadStory }), [queryClient, openCreate, setStoryOpener, preloadStory]);
-  return <HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} preferences={preferences} actionUrls={{ planning: `${admin}/stories`, calendar: `${admin}/calendar`, contentHealth: editor ? `${admin}/content-health` : undefined, workspace: workspaceUrl }} />;
+  return <>{editor ? <AudienceNow /> : null}<HomeApp fetchers={fetchers} currentUserId={currentUserId} shell={shell} preferences={preferences} actionUrls={{ planning: `${admin}/stories`, calendar: `${admin}/calendar`, contentHealth: editor ? `${admin}/content-health` : undefined, workspace: workspaceUrl }} /></>;
 }

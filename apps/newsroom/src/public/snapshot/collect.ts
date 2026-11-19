@@ -1,7 +1,7 @@
 import { isBlockingIssue, type MediaId } from "@byline/article-body";
 import {
   FIXED_PUBLIC_CONTENT_ROUTES, collapseRedirects, PUBLIC_SNAPSHOT_SCHEMA_VERSION, publicSnapshotContributor, publicStoryPath, snapshotStoryReference,
-  snapshotEventReference, validatePublicBuildSnapshotV3, type PublicBuildSnapshotV3, type PublicStorySnapshot
+  snapshotEventReference, validatePublicBuildSnapshotV4, type PublicBuildSnapshotV4, type PublicStorySnapshot
 } from "@byline/content";
 import { collectDataSection } from "../../data/snapshot";
 import { dataPresentationDescriptor } from "../../data/registry";
@@ -22,7 +22,7 @@ import { hasLiveCoverage } from "../../domain/live-coverage";
 import { collectLiveCoverage, liveUpdatePeople, readLivePlans, readLiveUpdates, type LiveBylinePerson } from "./live";
 import { activePlacements } from "../../front-page/server";
 
-type Datasets = PublicBuildSnapshotV3["datasets"];
+type Datasets = PublicBuildSnapshotV4["datasets"];
 type StoryFacts = Omit<PublicStorySnapshot, "body">;
 const ids = (value: unknown) => [...new Set(relationIds(value).map(Number))];
 const term = (row: Datasets["sections"][number], prefix: string): PublicTerm => ({ key: `${prefix}-${row.id}`, name: row.name, href: row.href });
@@ -81,7 +81,7 @@ function contentLosingIssues(issues: NormalizeIssue[]): string[] {
   });
 }
 
-export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV3> {
+export async function collectPublicSnapshot(payload: Payload, options: { revision: number; now?: () => Date; asOf?: Date; afterRead?: () => Promise<void> }): Promise<PublicBuildSnapshotV4> {
   const { revision } = options;
   const now = options.now?.() ?? new Date();
   const [publicationRow, sectionRows, topicRows, storyRows, pages, events, redirectRows] = await Promise.all([
@@ -193,7 +193,7 @@ export async function collectPublicSnapshot(payload: Payload, options: { revisio
     counts: Object.fromEntries(Object.entries(datasets).map(([key, rows]) => [key, rows.length])),
     ...(active && Object.keys(placements).length ? { frontPage: { placements, activatedAt: active.activatedAt } } : {}), data };
   try {
-    return validatePublicBuildSnapshotV3(snapshot, { interactive, tracker, dataPresentation: dataPresentationDescriptor });
+    return validatePublicBuildSnapshotV4(snapshot, { interactive, tracker, dataPresentation: dataPresentationDescriptor });
   } catch (error) {
     throw new PublicSnapshotError("invalid-projection", (error as Error).message);
   }

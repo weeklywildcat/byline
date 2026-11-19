@@ -78,7 +78,8 @@ export const NAVIGATION: readonly NavItem[] = [
   // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
   { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
   { key: "distribution", label: "Distribution", path: "/distribution", minimumRole: "editor", exact: true, group: "publish" },
-  { key: "content-health", label: "Content Health", path: "/content-health", minimumRole: "editor", exact: true, group: "publish" }
+  { key: "content-health", label: "Content Health", path: "/content-health", minimumRole: "editor", exact: true, group: "publish" },
+  { key: "analytics", label: "Analytics", path: "/analytics", minimumRole: "editor", exact: true, group: "publish" }
 ];
 
 export function navigationFor(role: Role): NavItem[] {
