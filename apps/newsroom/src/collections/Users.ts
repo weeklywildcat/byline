@@ -2,6 +2,9 @@ import { lockAccountChanges, requireOtherAdministrator } from "../newsroom/accou
 import { APIError, type CollectionConfig, type PayloadRequest, type Where } from "payload";
 import { administratorsOnly, administratorsOnlyField, atLeast, newsroomUser, relationId, requestUser, sameId } from "../access/user";
 import { ROLE_OPTIONS } from "../domain/vocabulary";
+import { passwordResetEmail, PASSWORD_RESET_EXPIRATION_MS } from "../domain/account-email";
+import { emailBrand, emailDateline } from "../newsroom/email-brand";
+import { formatAdminURL } from "payload/shared";
 
 const selfOrAdministrator = ({ req, id }: { req: PayloadRequest; id?: number | string }) => {
   const user = requestUser(req);
@@ -21,7 +24,21 @@ export const Users: CollectionConfig = {
     tokenExpiration: 60 * 60 * 10,
     maxLoginAttempts: 5,
     lockTime: 15 * 60 * 1000,
-    cookies: { sameSite: "Lax", secure: process.env.NODE_ENV === "production" }
+    cookies: { sameSite: "Lax", secure: process.env.NODE_ENV === "production" },
+    // "Forgot password?" sends the Byline reset email. The link is built from the
+    // configured server URL only, never the request's Host header.
+    forgotPassword: {
+      expiration: PASSWORD_RESET_EXPIRATION_MS,
+      generateEmailSubject: () => passwordResetEmail({ resetUrl: "", email: "" }).subject,
+      generateEmailHTML: async (args) => {
+        const { req, token, user } = args ?? {};
+        if (!req || !token) return "";
+        const { config } = req.payload;
+        const resetUrl = formatAdminURL({ adminRoute: config.routes.admin, path: `${config.admin.routes.reset}/${token}`, serverURL: config.serverURL });
+        const account = (user ?? {}) as { email?: string | null; name?: string | null };
+        return passwordResetEmail({ resetUrl, email: account.email ?? "", name: account.name, brand: await emailBrand(req.payload, req), dateline: emailDateline() }).html;
+      }
+    }
   },
   admin: {
     useAsTitle: "name",

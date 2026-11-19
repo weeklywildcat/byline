@@ -75,27 +75,55 @@ describe("notification text", () => {
 });
 
 describe("notification email", () => {
+  const brand = { name: "Weekly Wildcat", homeUrl: "https://newsroom.example.test/admin", logo: { light: "https://newsroom.example.test/email/wordmark.png", dark: "https://newsroom.example.test/email/wordmark-dark.png", width: 240, height: 28 }, siteUrl: "https://weeklywildcat.example.test", organization: "Ninety Six High School", fontUrl: "https://newsroom.example.test/fonts/mona-sans-latin.woff2" };
+
   it("carries a link and escapes everything it was given", () => {
     const message = notificationEmail({ kind: "highPriorityTasks", actor: "<b>Eve</b>", story: "Budget", detail: "A & B" }, "https://newsroom.example.test/admin/collections/stories/4?x=1&y=2");
     expect(message.subject).toBe("<b>Eve</b> gave you a high-priority task: A & B");
-    expect(message.text).toContain("Open in Byline: https://newsroom.example.test/admin/collections/stories/4?x=1&y=2");
+    expect(message.text).toContain("Open the task: https://newsroom.example.test/admin/collections/stories/4?x=1&y=2");
     expect(message.html).toContain("&lt;b&gt;Eve&lt;/b&gt;");
     expect(message.html).toContain("A &amp; B");
     expect(message.html).toContain('href="https://newsroom.example.test/admin/collections/stories/4?x=1&amp;y=2"');
     expect(message.html).toContain('role="presentation"');
-    expect(message.html).toContain("background:#6f1d35");
-    expect(message.html).toContain(">BYLINE<");
-    expect(message.html).toContain("Open in Byline&nbsp;→");
     expect(message.html).not.toContain("<b>Eve");
   });
 
-  it("lists digest items in both fallbacks and the styled card", () => {
-    const message = notificationEmail({ kind: "dueDigest", actor: null, story: null, detail: null, items: [{ type: "task", title: "Overdue call", storyId: 3, when: "overdue" }, { type: "deadline", title: "Budget vote", storyId: 4, when: "today" }] }, "https://x.test/admin");
-    expect(message.text).toContain("- Task: Overdue call (overdue)");
-    expect(message.text).toContain("- Story deadline: Budget vote (today)");
-    expect(message.html).toContain("Overdue call");
-    expect(message.html).toContain("Task · overdue");
+  it("uses the publication's masthead, says what to do next and why it was sent", () => {
+    const message = notificationEmail({ kind: "readyForReview", actor: "Ada", story: "Budget vote delayed", detail: "copy" }, "https://newsroom.example.test/admin/collections/stories/4", { brand, settingsHref: "https://newsroom.example.test/admin?notifications=settings", dateline: "Thursday, November 19" });
+    expect(message.html).toContain('src="https://newsroom.example.test/email/wordmark.png"');
+    expect(message.html).toContain('alt="Weekly Wildcat"');
+    expect(message.html).toContain('src: url("https://newsroom.example.test/fonts/mona-sans-latin.woff2")');
+    expect(message.html).toContain("font-family:'Mona Sans',sans-serif;");
+    expect(message.html).toContain("Thursday, November 19");
+    expect(message.html).toContain("Review the story&nbsp;&rarr;");
+    expect(message.html).toContain("approve it or send it back");
+    expect(message.html).toContain("Ninety Six High School");
+    expect(message.html).not.toMatch(/Arial|Helvetica|Georgia|Times|[^-]serif[;"]/);
+    expect(message.text).not.toContain("Story: Budget vote delayed");
+    expect(message.text).toContain("“Reviews” emails are on");
+    expect(message.text).toContain("Change what you get: https://newsroom.example.test/admin?notifications=settings");
+  });
+
+  it("falls back to the name in type without a logo address", () => {
+    const message = notificationEmail({ kind: "transcriptReady", actor: null, story: null, detail: "Interview 1" }, "https://x.test/admin");
+    expect(message.html).not.toContain("<img");
+    expect(message.html).toContain(">Weekly Wildcat</span>");
+    expect(message.html).toContain("Read the transcript");
+  });
+
+  it("splits the digest into overdue and today, each linked to its story", () => {
+    const message = notificationEmail(
+      { kind: "dueDigest", actor: null, story: null, detail: null, items: [{ type: "task", title: "Overdue call", storyId: 3, when: "overdue" }, { type: "deadline", title: "Budget vote", storyId: 4, when: "today" }, { type: "appointment", title: "Coach interview", storyId: null, when: "today" }] },
+      "https://x.test/admin",
+      { storyHref: (id) => `https://x.test/admin/collections/stories/${id}` }
+    );
+    expect(message.subject).toBe("3 items are due today or overdue");
+    expect(message.text).toContain("OVERDUE (1)\n- Overdue call — Task · Overdue\n  https://x.test/admin/collections/stories/3");
+    expect(message.text).toContain("DUE TODAY (2)");
+    expect(message.text).toContain("- Coach interview — Appointment · Due today");
+    expect(message.html).toContain('href="https://x.test/admin/collections/stories/4"');
     expect(message.html).toContain("Morning briefing");
+    expect(message.html).toContain("1 overdue, 2 due today.");
   });
 
   it("styles a one-off reminder without pretending it is the morning digest", () => {
@@ -106,7 +134,30 @@ describe("notification email", () => {
     expect(message.subject).toBe("“Interview” starts in 1 hour");
     expect(message.html).toContain(">Reminder<");
     expect(message.html).not.toContain("Morning briefing");
-    expect(message.text).toContain("Open in Byline:");
+    expect(message.text).toContain("Story: Budget");
+    expect(message.text).toContain("See the details: https://x.test/admin/collections/stories/4");
+  });
+
+  it("marks failures as needing attention", () => {
+    const message = notificationEmail({ kind: "frontPageFailures", actor: null, story: null, detail: "Story 9 is unpublished" }, "https://x.test/admin/front-page");
+    expect(message.html).toContain("&#9679;&nbsp;Attention needed");
+    expect(message.text).not.toContain("Problem:");
+    expect(message.text).toContain("Open Front Page: https://x.test/admin/front-page");
+  });
+
+  it("adds the story when the headline names only the work", () => {
+    const message = notificationEmail({ kind: "dueDigest", actor: null, story: "Budget vote delayed", detail: "Call the clerk", reminder: { type: "deadline", target: "task", when: "tomorrow" } }, "https://x.test/admin");
+    expect(message.subject).toBe("“Call the clerk” is due tomorrow");
+    expect(message.text).toContain("Story: Budget vote delayed");
+    expect(message.html).toContain(">Deadline<");
+  });
+
+  it("has copy for every kind", () => {
+    for (const kind of NOTIFICATION_KINDS) {
+      const message = notificationEmail({ kind, actor: "Ada", story: "Budget", detail: "x", items: [] }, "https://x.test/admin");
+      expect(message.html).toContain("&rarr;");
+      expect(message.text).toContain("https://x.test/admin");
+    }
   });
 });
 
