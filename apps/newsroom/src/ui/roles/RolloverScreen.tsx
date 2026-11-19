@@ -41,9 +41,10 @@ const day = (value: string) => formatWallTime(value, { withTime: false }) || val
 export function RolloverScreen({ embedded = false }: { embedded?: boolean }) {
   const { api } = useNewsroomRoutes();
   const years = useYears(api);
+  const Container = embedded ? "section" : "main";
   return (
     <AdminRoot toaster={false} className="byline-rollover">
-      <main className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-rollover-screen="">
+      <Container className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-rollover-screen="">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">New school year</h1>
           <p className="max-w-prose text-sm text-muted-foreground">Decide who returns and which responsibilities carry over. Nothing changes until the last step, and last year’s people, assignments and reviews are kept as history.</p>
@@ -54,7 +55,7 @@ export function RolloverScreen({ embedded = false }: { embedded?: boolean }) {
         {years.data ? (years.data.planned
           ? <Rollover key={years.data.planned.id} api={api} overview={years.data} />
           : <PlanYear api={api} overview={years.data} />) : null}
-      </main>
+      </Container>
     </AdminRoot>
   );
 }
