@@ -59,7 +59,7 @@ export const DATA_PATH = "/data";
  * Stories, Calendar, Media, Collections (reporting projects; public coverage
  * is only an optional presentation of a Collection, never a destination),
  * Data (datasets newsroom staff keep, and the reader-facing projects built on them),
- * Polls (Wildcat Polls), then the editor tools (People, Feedback…), each as its screen is ported
+ * Polls (Wildcat Polls), then the editor publishing desks, each as its screen is ported
  * (docs/newsroom-os.md). There is no generic Planning
  * destination: WordPress's Planning page was an umbrella over these screens,
  * and here each is first-class. Visibility is a convenience; every
@@ -74,7 +74,6 @@ export const NAVIGATION: readonly NavItem[] = [
   { key: "data", label: "Data", path: DATA_PATH, minimumRole: "staff", exact: true },
   // Staff see the polls granted to them (fieldwork, results); editors manage every poll. The server decides per poll.
   { key: "polls", label: "Polls", path: POLLS_PATH, minimumRole: "staff", exact: true },
-  { key: "people", label: "People", path: "/people", minimumRole: "editor", exact: true },
   // Publish: global desks that coordinate many Stories. Ordinary Story-level work stays on the Story.
   { key: "front-page", label: "Front Page", path: "/front-page", minimumRole: "editor", exact: true, group: "publish" },
   { key: "distribution", label: "Distribution", path: "/distribution", minimumRole: "editor", exact: true, group: "publish" },
@@ -113,8 +112,8 @@ export function primaryLocationFor(pathname: string, adminRoute: string): Primar
   if (storyIdFromPath(pathname, adminRoute) !== null) {
     return { key: "stories", parent: { label: "Stories", path: STORIES_PATH } };
   }
-  if (path === REVIEW_WORKFLOWS_PATH) return { key: null, parent: { label: "People", path: "/people" } };
-  if (destination || path === "/profile" || path === "/site" || path === SYSTEM_ADMINISTRATION_PATH) {
+  if (path === REVIEW_WORKFLOWS_PATH) return { key: null, parent: { label: "People", path: "/site?tab=people" } };
+  if (destination || path === "/profile" || path === "/site" || path === "/people" || path === SYSTEM_ADMINISTRATION_PATH) {
     return { key: null, parent: HOME_PARENT };
   }
   return null;
@@ -127,8 +126,6 @@ export function primaryLocationFor(pathname: string, adminRoute: string): Primar
 export function activeNavKey(items: readonly Pick<NavItem, "key" | "path" | "exact">[], pathname: string, adminRoute: string): string | null {
   if (storyIdFromPath(pathname, adminRoute) !== null && items.some((item) => item.key === "stories")) return "stories";
   const path = stripAdmin(pathname, adminRoute);
-  // Review workflows are part of the team's operations, beside People and Roles.
-  if (path === REVIEW_WORKFLOWS_PATH && items.some((item) => item.key === "people")) return "people";
   const match = items
     .filter((item) => (item.path === "" || item.exact ? path === item.path : path === item.path || path.startsWith(`${item.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0];
@@ -220,7 +217,8 @@ export function locationFor(pathname: string, adminRoute: string): Crumb[] {
   if (nav) return [{ label: nav.label }];
   if (/^\/collections\/stories\/[^/]+$/.test(path) && !path.endsWith("/create")) return [{ label: "Stories", path: STORIES_PATH }, { label: "Story" }];
   if (path === "/site") return [{ label: "Site" }];
-  if (path === REVIEW_WORKFLOWS_PATH) return [{ label: "People", path: "/people" }, { label: "Review workflows" }];
+  if (path === "/people") return [{ label: "Site", path: "/site" }, { label: "People" }];
+  if (path === REVIEW_WORKFLOWS_PATH) return [{ label: "Site", path: "/site" }, { label: "People", path: "/site?tab=people" }, { label: "Review workflows" }];
   if (path === "/content-health") return [{ label: "Content Health" }];
   if (/^\/collections\/pages\/\d+$/.test(path)) return [{ label: "Site", path: "/site?tab=pages" }, { label: "Page" }];
   if (path === SYSTEM_ADMINISTRATION_PATH) return [{ label: "System administration" }];

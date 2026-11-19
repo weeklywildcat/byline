@@ -42,7 +42,7 @@ const SCOPE_HELP = {
 } as const;
 const SCOPE_CHOICES: ReadonlyArray<ChoiceCard<RoleRow["scopeKind"]>> = (["none", "section", "media"] as const).map((kind) => ({ value: kind, title: SCOPE_LABELS[kind], description: SCOPE_HELP[kind] }));
 
-export function RolesScreen() {
+export function RolesScreen({ embedded = false }: { embedded?: boolean }) {
   const { api, admin } = useNewsroomRoutes();
   const params = useSearchParams();
   const overview = useRoles(api);
@@ -60,16 +60,17 @@ export function RolesScreen() {
   const archivedCount = data?.roles.filter((role) => role.archived).length ?? 0;
   const unstaffed = data?.year ? roles.filter((role) => !role.archived && !role.members.length).length : 0;
 
+  const Container = embedded ? "section" : "main";
   return (
     <AdminRoot toaster={false} className="byline-roles">
-      <main className="mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6" data-byline-roles-screen="">
+      <Container className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-roles-screen="">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
             <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
             <p className="max-w-prose text-sm text-muted-foreground">Newsroom roles decide who reviews which stories. They don’t give anyone access to anything; that stays with each account’s security role.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/people?view=rollover`} />}><CalendarPlus data-icon="inline-start" aria-hidden="true" />New school year</Button>
+            <Button type="button" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/site?tab=people&view=rollover`} />}><CalendarPlus data-icon="inline-start" aria-hidden="true" />New school year</Button>
             <Button type="button" onClick={() => setCreating(true)} disabled={!data}><Plus data-icon="inline-start" aria-hidden="true" />New role</Button>
           </div>
         </header>
@@ -81,7 +82,7 @@ export function RolesScreen() {
             <CircleAlert aria-hidden="true" />
             <AlertTitle>No school year is active</AlertTitle>
             <AlertDescription>Roles can be set up, but nobody can be added to one until a school year is active, and reviews can’t be routed.</AlertDescription>
-            <AlertAction><Button type="button" size="xs" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/people?view=rollover`} />}>Start a year</Button></AlertAction>
+            <AlertAction><Button type="button" size="xs" variant="outline" nativeButton={false} role="link" render={<ShellLink href={`${admin}/site?tab=people&view=rollover`} />}>Start a year</Button></AlertAction>
           </Alert>
         ) : null}
 
@@ -120,7 +121,7 @@ export function RolesScreen() {
             ))}
           </ItemGroup>
         ) : null}
-      </main>
+      </Container>
 
       {data ? <RoleSheet key={open?.id ?? "none"} api={api} overview={data} role={open} onClose={() => setOpenId(null)} /> : null}
       <NewRoleDialog api={api} open={creating} onOpenChange={setCreating} onCreated={(id) => setOpenId(id)} />

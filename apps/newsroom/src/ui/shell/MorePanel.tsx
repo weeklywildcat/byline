@@ -1,14 +1,12 @@
 "use client";
 
-import { storiesHref } from "@byline/newsroom-screens/planning/planning-api";
-import { builtInStoryView } from "@byline/newsroom-screens/planning/story-views";
 import { Button } from "@byline/newsroom-ui/ui/button";
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@byline/newsroom-ui/ui/item";
 import { Kbd } from "@byline/newsroom-ui/ui/kbd";
 import { Separator } from "@byline/newsroom-ui/ui/separator";
-import { BookmarkCheck, ChevronRight, Compass, Keyboard, LogOut, NotebookPen, Settings, UserRound, Wrench, type LucideIcon } from "lucide-react";
+import { ChevronRight, Compass, Keyboard, LogOut, NotebookPen, Settings, UserRound, Wrench, type LucideIcon } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { canAdministerSystem, navigationFor, STORIES_PATH, SYSTEM_ADMINISTRATION_PATH, type NavItem } from "../../domain/navigation";
+import { canAdministerSystem, navigationFor, SYSTEM_ADMINISTRATION_PATH, type NavItem } from "../../domain/navigation";
 import type { MoreAccount } from "./MoreNavigation";
 import { NAV_ICONS } from "./nav-items";
 import { opensElsewhere, ShellLink, useShellNavigation } from "./navigation";
@@ -42,8 +40,6 @@ export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, after
   const { replayWelcome } = useOnboarding();
   const { signOut, signingOut } = useSignOut(logoutUrl, loginHref);
   const items = navigationFor(role);
-  const team = items.find((item) => item.key === "people");
-  const review = builtInStoryView("review");
   const publishing = items.filter((item) => item.group === "publish");
   const canAdminister = canAdministerSystem(role);
   function follow(event: MouseEvent<HTMLAnchorElement>, href: string) {
@@ -59,16 +55,10 @@ export function MorePanel({ admin, role, hasProfile, loginHref, logoutUrl, after
         <MoreLink href={`${admin}/field`} label="Field Mode" icon={NotebookPen} follow={follow} />
         {items.filter((item) => item.key === "media" || item.key === "collections" || item.key === "data" || item.key === "polls").map(link)}
       </MoreGroup>
-      {team && (
-        <MoreGroup title="Team">
-          {link(team)}
-          {review && <MoreLink href={storiesHref(`${admin}${STORIES_PATH}`, review.filters)} label={review.label} icon={BookmarkCheck} follow={follow} />}
-        </MoreGroup>
-      )}
       {publishing.length > 0 && (
         <MoreGroup title="Publishing">
           {publishing.map(link)}
-          {canAdminister && <MoreLink href={`${admin}/site`} label="Site" icon={Settings} follow={follow} />}
+          <MoreLink href={`${admin}/site`} label="Site" icon={Settings} follow={follow} />
         </MoreGroup>
       )}
       <MoreGroup title="Account and tools">

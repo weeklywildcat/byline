@@ -9,10 +9,10 @@ import { ShellLink } from "../shell/navigation";
 export type TeamView = "people" | "roles" | "workflows" | "workload";
 
 const LINKS: Array<{ view: TeamView; label: string; path: string }> = [
-  { view: "people", label: "People", path: "/people" },
-  { view: "roles", label: "Roles", path: "/people?view=roles" },
+  { view: "people", label: "People", path: "/site?tab=people" },
+  { view: "roles", label: "Roles", path: "/site?tab=people&view=roles" },
   { view: "workflows", label: "Review workflows", path: REVIEW_WORKFLOWS_PATH },
-  { view: "workload", label: "Workload", path: "/people?view=workload" }
+  { view: "workload", label: "Workload", path: "/site?tab=people&view=workload" }
 ];
 
 /** The team's operational screens. Links, not tabs: each is its own place with its own URL. */
