@@ -111,6 +111,15 @@ describe("Byline shell composition", () => {
     }
   });
 
+  it("does not repeat built-in Stories shortcuts under Saved views in the global sidebar", () => {
+    const sidebar = src("ui/shell/DefaultSidebar.tsx");
+    expect(sidebar).not.toContain("Saved views");
+    expect(sidebar).not.toContain("SIDEBAR_STORY_VIEWS");
+    expect(sidebar).not.toContain("SavedViews");
+    // Stories' contextual pane still supplies its actual views and saved-view controls.
+    expect(src("ui/shell/StoriesWorkspaceSidebar.tsx")).toContain("StoriesNavigator");
+  });
+
   it("keeps every collapsed control named: tooltips on destinations, Create and the account", () => {
     expect(src("ui/shell/DefaultSidebar.tsx")).toContain("tooltip={item.label}");
     expect(src("ui/shell/DefaultSidebar.tsx")).toContain("aria-current={active ? \"page\" : undefined}");
