@@ -56,20 +56,21 @@ const previewStyle = themeTokensToCssVariables(
 ) as CSSProperties;
 
 /** Global sidebar throughout. Person selection and list state live in the URL. */
-export function NewsroomPeopleScreen({ self = false }: { self?: boolean }) {
+export function NewsroomPeopleScreen({ self = false, embedded = false }: { self?: boolean; embedded?: boolean }) {
+  const Container = embedded ? "section" : "main";
   return (
     <AdminRoot toaster={false} className="byline-people">
-      <main
-        className="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"
+      <Container
+        className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-5 px-4 py-6 lg:px-6"}
         data-byline-people-screen=""
       >
-        <PeopleBody self={self} />
-      </main>
+        <PeopleBody self={self} embedded={embedded} />
+      </Container>
     </AdminRoot>
   );
 }
 
-function PeopleBody({ self }: { self: boolean }) {
+function PeopleBody({ self, embedded }: { self: boolean; embedded: boolean }) {
   const routes = useNewsroomRoutes();
   const params = useSearchParams();
   const query = peopleQuery(new URLSearchParams(params?.toString()));
@@ -140,11 +141,12 @@ function PeopleBody({ self }: { self: boolean }) {
   });
   const href = (id: number | null, nextQuery = query) => {
     const search = new URLSearchParams();
+    if (embedded) search.set("tab", "people");
     if (nextQuery.view !== "active") search.set("view", nextQuery.view);
     if (nextQuery.search) search.set("search", nextQuery.search);
     if (nextQuery.page > 1) search.set("page", String(nextQuery.page));
     if (id) search.set("person", String(id));
-    return `${routes.admin}/people${search.size ? `?${search}` : ""}`;
+    return `${routes.admin}/${embedded ? "site" : "people"}${search.size ? `?${search}` : ""}`;
   };
   const open = (id: number | null) =>
     guard(() =>
