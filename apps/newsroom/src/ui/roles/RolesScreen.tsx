@@ -60,9 +60,10 @@ export function RolesScreen({ embedded = false }: { embedded?: boolean }) {
   const archivedCount = data?.roles.filter((role) => role.archived).length ?? 0;
   const unstaffed = data?.year ? roles.filter((role) => !role.archived && !role.members.length).length : 0;
 
+  const Container = embedded ? "section" : "main";
   return (
     <AdminRoot toaster={false} className="byline-roles">
-      <main className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-roles-screen="">
+      <Container className={embedded ? "flex w-full min-w-0 flex-col gap-5" : "mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-5 px-4 py-6 lg:px-6"} data-byline-roles-screen="">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
             <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
@@ -120,7 +121,7 @@ export function RolesScreen({ embedded = false }: { embedded?: boolean }) {
             ))}
           </ItemGroup>
         ) : null}
-      </main>
+      </Container>
 
       {data ? <RoleSheet key={open?.id ?? "none"} api={api} overview={data} role={open} onClose={() => setOpenId(null)} /> : null}
       <NewRoleDialog api={api} open={creating} onOpenChange={setCreating} onCreated={(id) => setOpenId(id)} />
