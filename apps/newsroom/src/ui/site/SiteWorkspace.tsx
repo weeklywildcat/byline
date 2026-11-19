@@ -25,7 +25,7 @@ export function SiteWorkspace({ canAdministerSite }: { canAdministerSite: boolea
   const peopleView = params?.get("view");
   const { runGuarded } = useShellNavigation();
   return <AdminRoot toaster={false}>
-    <main className="mx-auto grid w-full max-w-5xl min-w-0 gap-4 px-4 py-6 md:px-8">
+    <main className={`mx-auto grid w-full min-w-0 gap-4 px-4 py-6 md:px-8 ${tab === "people" ? "max-w-[1240px]" : "max-w-5xl"}`}>
       <h1 className="text-2xl font-semibold">Site</h1>
       <Tabs value={tab} onValueChange={(value) => runGuarded(() => window.history.pushState(null, "", `${admin}/site?tab=${value}`))}>
         <TabsList className="h-auto max-w-full flex-wrap justify-start">{tabs.map((label) => <TabsTrigger key={label} value={label.toLowerCase()}>{label}</TabsTrigger>)}</TabsList>
