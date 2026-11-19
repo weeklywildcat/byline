@@ -47,6 +47,12 @@ jobs:
   newsroom:
     name: Newsroom (Payload + PostgreSQL)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: newsroom-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     services:
       postgres:
         image: postgres:17-alpine
@@ -74,21 +80,11 @@ jobs:
       - name: Validate production newsroom Dockerfile
         run: docker build --check -f apps/newsroom/Dockerfile .
 
-      - name: Build production newsroom image
-        run: docker build -f apps/newsroom/Dockerfile -t byline-newsroom:ci .
-
       - name: Install workspace dependencies
         run: npm ci
 
       - name: Typecheck and unit-test the newsroom
         run: npm run typecheck:newsroom && npm run test:newsroom
-
-      - name: Build the production newsroom bundle
-        env:
-          DATABASE_URL: postgres://byline:byline@localhost:5432/postgres
-          PAYLOAD_SECRET: ci-production-build-secret-0123456789abcdef
-          BYLINE_DB_PUSH: "0"
-        run: npm run build --workspace @byline/newsroom
 
       - name: Access-control and storage integration tests against PostgreSQL
         env:
@@ -103,6 +99,39 @@ jobs:
           PGPASSWORD=byline psql -h localhost -U byline -d postgres -c "CREATE DATABASE byline_newsroom_migrations"
           npm run migrate:check --workspace @byline/newsroom
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-flags: --allow-insecure-entitlement network.host
+
+      - name: Build the deployable newsroom image
+        env:
+          BYLINE_IMAGE_BUILD_DATABASE_URL: postgres://byline:byline@127.0.0.1:5432/postgres
+          BYLINE_IMAGE_BUILD_PAYLOAD_SECRET: ci-image-build-secret-0123456789abcdef
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/newsroom/Dockerfile
+          load: true
+          network: host
+          allow: network.host
+          tags: byline-newsroom:ci
+          build-args: |
+            BYLINE_BUILD_SHA=${{ github.sha }}
+          secret-envs: |
+            byline_build_database_url=BYLINE_IMAGE_BUILD_DATABASE_URL
+            byline_build_payload_secret=BYLINE_IMAGE_BUILD_PAYLOAD_SECRET
+          cache-from: type=gha,scope=newsroom-production-image
+          cache-to: type=gha,mode=max,scope=newsroom-production-image
+
+      - name: Verify the deployable image
+        run: |
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' byline-newsroom:ci)" = "$GITHUB_SHA"
+          docker run --rm --entrypoint sh byline-newsroom:ci -lc '
+            test "$BYLINE_NEXT_DIST_DIR" = ".byline-prebuilt-next"
+            test -s /app/apps/newsroom/.byline-prebuilt-next/BUILD_ID
+          '
+
       - name: Install Chromium for Payload snapshot parity
         run: npx playwright install --with-deps chromium
 
@@ -114,6 +143,24 @@ jobs:
           BYLINE_MEDIA_LOCAL_DIR: ${{ runner.temp }}/parity-originals
           BYLINE_PUBLICATION_MEDIA_DIR: ${{ runner.temp }}/parity-publication
         run: npm run payload --workspace @byline/newsroom -- run scripts/payload-snapshot-parity.ts "${{ runner.temp }}/parity"
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish immutable newsroom image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ghcr.io/weeklywildcat/byline-newsroom
+        run: |
+          docker tag byline-newsroom:ci "$IMAGE:$GITHUB_SHA"
+          docker tag byline-newsroom:ci "$IMAGE:main"
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:main"
 
   validate:
     name: Shared contracts and public site
