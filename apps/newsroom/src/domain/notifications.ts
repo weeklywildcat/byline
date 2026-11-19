@@ -10,6 +10,8 @@
  * leaves a stale title behind and nothing private is copied into the message.
  */
 
+import { DEFAULT_EMAIL_BRAND, renderEmail, type EmailBrand, type EmailDetail } from "./email-layout";
+
 export const NOTIFICATION_KINDS = [
   "storyAssignments", "readyForReview", "storyReturned", "mediaAssignments", "highPriorityTasks", "appointments", "publishingFailures", "dueDigest",
   "transcriptReady", "distributionAssignments", "distributionApproval", "distributionFailures", "frontPageFailures",
@@ -147,80 +149,103 @@ export const DIGEST_LIMIT = 25;
 const TYPE_LABEL: Record<DigestItem["type"], string> = { task: "Task", production: "Media", appointment: "Appointment", deadline: "Story deadline" };
 export const digestLine = (item: DigestItem) => `${TYPE_LABEL[item.type]}: ${item.title} (${item.when})`;
 
-const EMAIL_KICKERS: Partial<Record<NotificationKind, string>> = {
-  storyAssignments: "Assignment",
-  readyForReview: "Editorial review",
-  storyReturned: "Editorial review",
-  mediaAssignments: "Assignment",
-  highPriorityTasks: "Priority work",
-  appointments: "Schedule",
-  publishingFailures: "Attention needed",
-  transcriptReady: "Reporting",
-  distributionAssignments: "Distribution",
-  distributionApproval: "Distribution",
-  distributionFailures: "Attention needed",
-  frontPageFailures: "Attention needed",
-  reviewComplete: "Editorial review",
-  reviewRouting: "Attention needed"
+type EmailCopy = { kicker: string; lead: string; action: string; alert?: boolean };
+
+/** What each notification means for the person and the one thing to do next. */
+function emailCopy(facts: NotificationFacts): EmailCopy {
+  if (facts.reminder?.type === "appointment") return { kicker: "Reminder", lead: `It starts ${facts.reminder.when}. The time, place and who you're meeting are on the story.`, action: "See the details" };
+  if (facts.reminder?.type === "deadline") return { kicker: "Deadline", lead: `It's due ${facts.reminder.when}. If it won't be ready, tell your editor now rather than at the deadline.`, action: facts.reminder.target === "story" ? "Open the story" : "Open the assignment" };
+  switch (facts.kind) {
+    case "storyAssignments":
+      return facts.detail === "editor"
+        ? { kicker: "Assignment", lead: "You're the story's editor now. Check the plan, the deadline and who's on it.", action: "Open the story" }
+        : { kicker: "Assignment", lead: "You're on the byline. The plan, deadline and your part of the work are on the story.", action: "Open the story" };
+    case "readyForReview":
+      return { kicker: "Ready for review", lead: "It's waiting on you. Read it through, then approve it or send it back with notes.", action: "Review the story" };
+    case "storyReturned":
+      return { kicker: "Changes requested", lead: "Your editor sent it back. Their notes are on the story; make the changes and send it in again.", action: "See what to change" };
+    case "mediaAssignments":
+      return { kicker: "Assignment", lead: "The brief, the deadline and where the work goes are on the story.", action: "Open the assignment" };
+    case "highPriorityTasks":
+      return { kicker: "Priority work", lead: "It's marked high priority, so it should come before your other work.", action: "Open the task" };
+    case "appointments":
+      return { kicker: "Schedule", lead: "The time, place and who you're meeting are on the story. Add it to your calendar.", action: "See the details" };
+    case "publishingFailures":
+      return { kicker: "Attention needed", lead: "The public site didn't update. Byline shows what failed and lets you try again.", action: "See what failed", alert: true };
+    case "transcriptReady":
+      return { kicker: "Reporting", lead: "Read it through, check names and spellings against your notes, and pull your quotes.", action: "Read the transcript" };
+    case "distributionAssignments":
+      return { kicker: "Distribution", lead: "You own it now: write the posts, pick the timing and send it for approval.", action: "Open distribution" };
+    case "distributionApproval":
+      return { kicker: "Approval needed", lead: "Check the copy and the timing, then approve it or send it back.", action: "Review the draft" };
+    case "distributionFailures":
+      return { kicker: "Attention needed", lead: "It didn't go out. Byline shows the error and lets you try again.", action: "See what went wrong", alert: true };
+    case "frontPageFailures":
+      return { kicker: "Attention needed", lead: "The homepage is still showing the previous lineup. Check the scheduled change and publish it again.", action: "Open Front Page", alert: true };
+    case "reviewComplete":
+      return { kicker: "Review complete", lead: "It passed review. Check the final version before it's published.", action: "Open the story" };
+    case "reviewRouting":
+      return { kicker: "Attention needed", lead: "No reviewer could be found, so the story is waiting. Assign a reviewer or check the review workflow.", action: "Open the story", alert: true };
+    case "dueDigest":
+      return { kicker: "Morning briefing", lead: "Here's what's due today and anything that's slipped. Overdue work comes first.", action: "Open Byline" };
+  }
+}
+
+/** The facts worth a second look, without repeating the headline word for word. */
+function emailDetails(facts: NotificationFacts): EmailDetail[] {
+  const details: EmailDetail[] = [];
+  if (facts.story) details.push({ label: "Story", value: facts.story });
+  const detailLabel: Partial<Record<NotificationKind, string>> = {
+    mediaAssignments: "Assignment", highPriorityTasks: "Task", appointments: "Appointment", transcriptReady: "Recording",
+    readyForReview: "Stage", distributionAssignments: "Channel", distributionApproval: "Channel", distributionFailures: "Channel",
+    publishingFailures: "What failed", frontPageFailures: "Problem", reviewRouting: "Problem"
+  };
+  const label = facts.reminder?.type === "deadline" ? (facts.reminder.target === "story" ? null : "Assignment") : detailLabel[facts.kind];
+  if (label && facts.detail) details.push({ label, value: facts.detail });
+  if (facts.reminder) details.push({ label: facts.reminder.type === "appointment" ? "Starts" : "Due", value: facts.reminder.when.replace(/^./, (letter) => letter.toUpperCase()) });
+  const actorLabel: Partial<Record<NotificationKind, string>> = {
+    storyAssignments: "Assigned by", storyReturned: "Editor", mediaAssignments: "Assigned by", highPriorityTasks: "Assigned by",
+    appointments: "Assigned by", distributionAssignments: "Assigned by", distributionApproval: "Asked by"
+  };
+  if (facts.actor && !facts.reminder && actorLabel[facts.kind]) details.push({ label: actorLabel[facts.kind]!, value: facts.actor });
+  return details;
+}
+
+export type NotificationEmailOptions = {
+  brand?: EmailBrand;
+  /** A story's address in the newsroom, for digest items. */
+  storyHref?: (storyId: number) => string;
+  /** Where a person changes what they receive. */
+  settingsHref?: string | null;
+  /** The send date, already formatted for the masthead. */
+  dateline?: string | null;
 };
 
-/** Plain text and deliberately conservative, table-based HTML for broad email-client support. */
-export function notificationEmail(facts: NotificationFacts, link: string): { subject: string; text: string; html: string } {
+/** Subject, plain text and HTML for one notification, in the shared Byline email layout. */
+export function notificationEmail(facts: NotificationFacts, link: string, options: NotificationEmailOptions = {}): { subject: string; text: string; html: string } {
   const subject = describeNotification(facts);
-  const lines = facts.kind === "dueDigest" && !facts.reminder ? (facts.items ?? []).map(digestLine) : [];
-  const kicker = facts.reminder ? "Reminder" : facts.kind === "dueDigest" ? "Morning briefing" : (EMAIL_KICKERS[facts.kind] ?? "Newsroom update");
-  const text = [subject, ...(lines.length ? ["", ...lines.map((line) => `- ${line}`)] : []), "", `Open in Byline: ${link}`, "", "Change what you receive in Byline → Notifications → Settings."].join("\n");
-  const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const itemRows = lines.length
-    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 0;border-collapse:collapse;">${(facts.items ?? []).map((item) => `<tr><td style="padding:12px 0;border-top:1px solid #e8e3df;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;"><div style="font-size:15px;line-height:1.35;font-weight:650;color:#171717;">${escape(item.title)}</div><div style="margin-top:3px;font-size:12px;line-height:1.4;color:#6b6662;">${escape(TYPE_LABEL[item.type])} · ${escape(item.when)}</div></td></tr>`).join("")}</table>`
-    : "";
-  const safeLink = escape(link);
-  const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>${escape(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f1ef;color:#171717;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escape(subject)}</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f4f1ef;border-collapse:collapse;">
-    <tr>
-      <td align="center" style="padding:28px 14px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border:1px solid #e1dbd7;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden;">
-          <tr>
-            <td style="background:#6f1d35;padding:20px 28px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
-                <tr>
-                  <td style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:17px;line-height:1;font-weight:800;letter-spacing:.12em;color:#ffffff;">BYLINE</td>
-                  <td align="right" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.2;font-weight:700;letter-spacing:.08em;color:#ead9df;">THE WEEKLY WILDCAT</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:30px 28px 28px;">
-              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.3;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6f1d35;">${escape(kicker)}</div>
-              <h1 style="margin:9px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:27px;line-height:1.18;font-weight:600;color:#171717;">${escape(subject)}</h1>
-              ${itemRows}
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 0;border-collapse:separate;">
-                <tr>
-                  <td style="background:#171717;border-radius:7px;">
-                    <a href="${safeLink}" style="display:inline-block;padding:12px 17px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">Open in Byline&nbsp;→</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:26px 0 0;padding-top:18px;border-top:1px solid #e8e3df;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:12px;line-height:1.5;color:#77716d;">Change what you receive in Byline → Notifications → Settings.</p>
-            </td>
-          </tr>
-        </table>
-        <p style="margin:14px 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.5;color:#8a8581;">Sent by Byline for The Weekly Wildcat newsroom.</p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const copy = emailCopy(facts);
+  const digest = facts.kind === "dueDigest" && !facts.reminder;
+  const items = digest ? (facts.items ?? []) : [];
+  const toItem = (item: DigestItem) => ({ title: item.title, meta: `${TYPE_LABEL[item.type]} · ${item.when === "overdue" ? "Overdue" : "Due today"}`, href: item.storyId !== null && options.storyHref ? options.storyHref(item.storyId) : null });
+  const overdue = items.filter((item) => item.when === "overdue");
+  const today = items.filter((item) => item.when !== "overdue");
+  const label = NOTIFICATION_LABELS[facts.kind].label;
+  const { html, text } = renderEmail({
+    brand: options.brand ?? DEFAULT_EMAIL_BRAND,
+    dateline: options.dateline,
+    preheader: digest ? (overdue.length ? `${overdue.length} overdue, ${today.length} due today.` : copy.lead) : copy.lead,
+    kicker: copy.kicker,
+    tone: copy.alert ? "alert" : "default",
+    title: subject,
+    lead: copy.lead,
+    // A fact the headline already states is not repeated underneath it.
+    details: digest ? [] : emailDetails(facts).filter((detail) => !subject.toLowerCase().includes(detail.value.toLowerCase())),
+    sections: digest ? [{ heading: "Overdue", tone: "alert", items: overdue.map(toItem) }, { heading: "Due today", items: today.map(toItem) }] : [],
+    action: { label: copy.action, href: link },
+    reason: `You're getting this because “${label}” emails are on for your Byline account.`,
+    manage: options.settingsHref ? { label: "Change what you get", href: options.settingsHref } : null
+  });
   return { subject, text, html };
 }
 

@@ -5,6 +5,7 @@ import {
 import type { Payload, PayloadRequest, TaskConfig, Where } from "payload";
 import { relationId, relationIds, requestUser, type NewsroomUser } from "../access/user";
 import { addDays, localDay, localToInstant, newsroomTimeZone } from "../domain/dates";
+import { emailBrand, emailDateline, newsroomOrigin } from "./email-brand";
 import type { ScreenContext } from "./screen-models";
 
 /**
@@ -162,7 +163,13 @@ const factsFor = (row: Row, headlines: Map<string, string | null>, names: Map<st
   reminder: reminderFacts(row.data)
 });
 
-const origin = () => (process.env.BYLINE_NEWSROOM_URL ?? "").replace(/\/+$/, "");
+/** Where a notification without a story lands: the screen that can fix it. */
+const LANDING: Partial<Record<NotificationKind, string>> = {
+  frontPageFailures: "/front-page",
+  distributionAssignments: "/distribution",
+  distributionApproval: "/distribution",
+  distributionFailures: "/distribution"
+};
 
 /**
  * Sends one notification's email and records the outcome. Without a transport
@@ -182,10 +189,17 @@ export async function deliverNotification(payload: Payload, id: Id, options: { c
     return "skipped";
   }
   const storyId = relationId(row.story);
-  const { headlines, names } = await nameMaps(payload, [row]);
-  const admin = payload.config.routes.admin;
-  const link = `${origin()}${admin}${storyId !== null ? `/collections/stories/${storyId}${notificationTab(row.data)}` : ""}`;
-  const message = notificationEmail(factsFor(row, headlines, names), link);
+  const [{ headlines, names }, brand] = await Promise.all([nameMaps(payload, [row]), emailBrand(payload, options.req)]);
+  const admin = `${newsroomOrigin()}${payload.config.routes.admin}`;
+  const kind = row.kind as NotificationKind;
+  const link = `${admin}${storyId !== null ? `/collections/stories/${storyId}${notificationTab(row.data)}` : (LANDING[kind] ?? "")}`;
+  const message = notificationEmail(factsFor(row, headlines, names), link, {
+    brand,
+    dateline: emailDateline(row.createdAt ? new Date(row.createdAt) : new Date()),
+    storyHref: (id) => `${admin}/collections/stories/${id}`,
+    // Opens the bell's settings (`NotificationsBell`), where email choices live.
+    settingsHref: `${admin}?notifications=settings`
+  });
   await payload.sendEmail({ to: user.email, subject: message.subject, text: message.text, html: message.html });
   await setState("sent");
   return "sent";

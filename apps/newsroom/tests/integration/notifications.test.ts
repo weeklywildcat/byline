@@ -242,8 +242,9 @@ describe("email", () => {
       expect(message.to).toBe("notify-alice@example.test");
       expect(message.subject).toContain("Fact-check the tally");
       expect(message.text).toContain(`https://newsroom.example.test/admin/collections/stories/${story.budget}`);
-      expect(message.html).toContain(">BYLINE<");
-      expect(message.html).toContain("Open in Byline&nbsp;→");
+      expect(message.html).toContain('src="https://newsroom.example.test/email/wordmark.png"');
+      expect(message.html).toContain("Open the task&nbsp;&rarr;");
+      expect(message.text).toContain("Change what you get: https://newsroom.example.test/admin?notifications=settings");
       expect((await received("alice"))[0].emailState).toBe("sent");
       // Delivering again is a no-op.
       expect(await deliverNotification(payload, row.id)).toBe("skipped");
@@ -251,6 +252,22 @@ describe("email", () => {
     } finally {
       send.mockRestore();
       vi.unstubAllEnvs();
+    }
+  });
+
+  it("sends Byline's password reset email from Forgot password", async () => {
+    const send = vi.spyOn(payload.email, "sendEmail").mockResolvedValue(undefined as never);
+    try {
+      await payload.forgotPassword({ collection: "users", data: { email: "notify-alice@example.test" } });
+      expect(send).toHaveBeenCalledTimes(1);
+      const message = send.mock.calls[0][0] as { to: string; subject: string; html: string };
+      expect(message.to).toBe("notify-alice@example.test");
+      expect(message.subject).toBe("Reset your Byline password");
+      expect(message.html).toMatch(/href="[^"]*\/admin\/reset\/[0-9a-f]+"/);
+      expect(message.html).toContain("Choose a new password&nbsp;&rarr;");
+      expect(message.html).toContain("expires in 1 hour");
+    } finally {
+      send.mockRestore();
     }
   });
 

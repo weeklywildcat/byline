@@ -59,6 +59,17 @@ export function NotificationsBell() {
     };
   }, [accountId, load]);
 
+  // Emails link to `?notifications=settings`: open the settings once, then drop the parameter.
+  useEffect(() => {
+    if (accountId === null) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("notifications") !== "settings") return;
+    url.searchParams.delete("notifications");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    setSettings(true);
+    setOpen(true);
+  }, [accountId]);
+
   useEffect(() => {
     if (!settings || loadedPreferences.current) return;
     loadedPreferences.current = true;
