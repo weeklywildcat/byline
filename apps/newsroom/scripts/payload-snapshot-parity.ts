@@ -27,6 +27,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ARTICLE_BLOCK_TYPES, type ArticleBody, type ArticleBodyNode } from "@byline/article-body";
+import { PUBLIC_SNAPSHOT_SCHEMA_VERSION } from "@byline/content";
 import { chromium } from "@playwright/test";
 import { FIXTURE_ARTICLE_BODY } from "@byline/article-body/fixtures";
 import { sql } from "@payloadcms/db-postgres";
@@ -336,7 +337,7 @@ for (const fact of ["byline-footnote-ref", "fnref-fn-timing", "fnref-fn-survey",
 }
 if (!/<img[^>]+src[Ss]et="[^"]*\/_byline\/media\/images\/[^"]*\d+w,/.test(structuredHtml)) problems.push("missing prepared responsive image candidates");
 const torture = snapshot.datasets.stories.find((entry: { id: number }) => entry.id === ids.structured);
-if (snapshot.schemaVersion !== 3 || torture?.body?.format !== "byline-v1") problems.push("accepted snapshot lacks the native structured Story");
+if (snapshot.schemaVersion !== PUBLIC_SNAPSHOT_SCHEMA_VERSION || torture?.body?.format !== "byline-v1") problems.push("accepted snapshot lacks the native structured Story");
 // Byline Data: the project's page renders its published release, and exactly that release is public.
 const dataRoute = "data/sidewalk-tracker/index.html";
 const dataHtml = filesA.includes(dataRoute) ? readFileSync(path.join(a.out, dataRoute), "utf8") : "";
